@@ -15,7 +15,6 @@ pub trait Component: 'static + Send + Sync {
         Version::parse("1.0.0").unwrap()
     }
 
-    // Default migration implementation
     fn migrate(from_version: Version, data: &[u8]) -> Result<Self, MigrationError>
     where
         Self: Sized + serde::de::DeserializeOwned;

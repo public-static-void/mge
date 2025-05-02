@@ -1,8 +1,6 @@
-pub mod macros;
-
 mod components;
 mod error;
-mod registry;
+pub(crate) mod registry;
 
 pub use components::{Health, Position};
 pub use error::{MigrationError, RegistryError};

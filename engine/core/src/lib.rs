@@ -1,6 +1,5 @@
 pub mod ecs;
-pub mod lua;
-pub mod plugins;
+pub mod modes;
 
 #[cfg(test)]
 mod tests {

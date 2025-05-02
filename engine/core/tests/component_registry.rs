@@ -1,5 +1,6 @@
 use engine_core::ecs::Component;
 use engine_core::ecs::{ComponentRegistry, Health, Position};
+use semver::Version;
 
 #[test]
 fn test_component_registration() {
@@ -95,4 +96,18 @@ fn test_version_migration() {
     // Test invalid version
     let result = Position::migrate(Version::parse("3.0.0").unwrap(), &data);
     assert!(matches!(result, Err(MigrationError::UnsupportedVersion(_))));
+}
+
+#[test]
+fn test_macro_generated_migration() {
+    #[derive(serde::Serialize)]
+    struct LegacyPosition {
+        x: f32,
+        y: f32,
+    }
+
+    let data = bson::to_vec(&LegacyPosition { x: 5.0, y: 3.0 }).unwrap();
+    let pos = Position::migrate(Version::parse("1.0.0").unwrap(), &data).unwrap();
+    assert_eq!(pos.x, 5.0);
+    assert_eq!(pos.y, 3.0);
 }
