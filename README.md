@@ -55,3 +55,21 @@ docs/            # Project-wide docs and blueprints
 
 - [`engine/core`](engine/core): ECS core, registry, migration, and schema logic.
 - [`engine_macros`](engine_macros): Procedural macros for ergonomic component definition.
+
+---
+
+## Continuous Integration & Releases
+
+- **CI**: All pull requests and pushes to main run automated checks (formatting, linting, tests) via GitHub Actions.
+
+- **Release**: Merges to main automatically trigger a semantic-release pipeline:
+
+  - Versioning and changelog are managed by semantic-release.
+
+  - Rust crate version is updated using `@timada/semantic-release-cargo`.
+
+  - Releases are published to GitHub Releases
+
+## Branch Protection:
+
+The main branch is protected: all PRs require passing status checks before merging.
