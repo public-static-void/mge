@@ -1,3 +1,7 @@
+//! Core engine library for the Modular Game Engine.
+//!
+//! Exposes ECS and mode management modules.
+
 pub mod ecs;
 pub mod modes;
 

@@ -1,6 +1,7 @@
 use semver::Version;
 use thiserror::Error;
 
+/// Errors that can occur during component registry operations.
 #[derive(Debug, Error)]
 pub enum RegistryError {
     #[error("Component not registered")]
@@ -11,6 +12,7 @@ pub enum RegistryError {
     SerializationError(#[from] serde_json::Error),
 }
 
+/// Errors that can occur during component migration.
 #[derive(Debug, Error)]
 pub enum MigrationError {
     #[error("Unsupported version: {0}")]

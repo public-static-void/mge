@@ -152,30 +152,16 @@ pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
         }
     });
 
-    // Schemars (optional)
-    let schemars_impl = if has_schema {
-        quote! {
-            impl schemars::JsonSchema for #name {
-                fn schema_name() -> String {
-                    stringify!(#name).to_string()
-                }
-                fn json_schema(generator: &mut schemars::r#gen::SchemaGenerator) -> schemars::schema::Schema {
-                    let mut schema = generator.subschema_for::<Self>();
-                    if let schemars::schema::Schema::Object(obj) = &mut schema {
-                        obj.metadata().title = Some(stringify!(#name).to_string());
-                        obj.metadata().description = Some(format!("Component {}", stringify!(#name)));
-                    }
-                    schema
-                }
-            }
-        }
+    let field_count = field_idents.len();
+
+    let derive_jsonschema = if has_schema {
+        quote! { #[derive(schemars::JsonSchema)] }
     } else {
         quote! {}
     };
 
-    let field_count = field_idents.len();
-
     let expanded = quote! {
+        #derive_jsonschema
         #input
 
         impl crate::ecs::Component for #name {
@@ -190,7 +176,7 @@ pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
                 Self: Sized + serde::de::DeserializeOwned,
             {
                 #migration_impl
-                bson::from_slice(data).map_err(Into::into)
+                Err(crate::ecs::error::MigrationError::UnsupportedVersion(from_version))
             }
         }
 
@@ -256,7 +242,6 @@ pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
             }
         }
 
-        #schemars_impl
     };
 
     TokenStream::from(expanded)

@@ -1,3 +1,7 @@
+//! ECS component definitions.
+//!
+//! This module re-exports all built-in components.
+
 mod health;
 mod position;
 

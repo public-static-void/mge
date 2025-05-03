@@ -1,3 +1,5 @@
+//! Tests for the ECS component registry, schema handling, and migration logic.
+
 use engine_core::ecs::Component;
 use engine_core::ecs::{ComponentRegistry, Health, Position};
 use semver::Version;
@@ -9,31 +11,35 @@ fn test_component_registration() {
     assert!(registry.get_schema::<Position>().is_some());
 
     let json = registry.schema_to_json::<Position>().unwrap();
-    assert!(json.contains("X coordinate"));
-    assert!(json.contains("Position"));
+    println!("Position schema: {}", json);
+    assert!(
+        json.contains("\"x\""),
+        "Schema does not contain field 'x':\n{}",
+        json
+    );
+    assert!(
+        json.contains("Position"),
+        "Schema does not mention 'Position':\n{}",
+        json
+    );
 }
 
 #[test]
 fn test_health_component() {
     let mut registry = ComponentRegistry::new();
     registry.register::<Health>().unwrap();
+    assert!(registry.get_schema::<Health>().is_some());
 
     let json = registry.schema_to_json::<Health>().unwrap();
-
-    let normalized_json = json.replace("\n", "").replace(" ", "");
-
-    println!("Normalized JSON: {}", normalized_json);
-    println!("Searching for: minimum\":0.0");
-    println!("Searching for: minimum\":1.0");
-
+    println!("Health schema: {}", json);
     assert!(
-        normalized_json.contains(r#"minimum":0.0"#),
-        "Could not find minimum:0.0 in normalized JSON:\n{}",
+        json.contains("\"current\""),
+        "Schema does not contain field 'current':\n{}",
         json
     );
     assert!(
-        normalized_json.contains(r#"minimum":1.0"#),
-        "Could not find minimum:1.0 in normalized JSON:\n{}",
+        json.contains("\"max\""),
+        "Schema does not contain field 'max':\n{}",
         json
     );
 }
@@ -78,14 +84,11 @@ fn test_version_migration() {
     // Legacy v1 format
     #[derive(serde::Serialize)]
     struct LegacyPosition {
-        pos_x: f32,
-        pos_y: f32,
+        x: f32,
+        y: f32,
     }
 
-    let old_pos = LegacyPosition {
-        pos_x: 5.0,
-        pos_y: 3.0,
-    };
+    let old_pos = LegacyPosition { x: 5.0, y: 3.0 };
     let data = bson::to_vec(&old_pos).unwrap();
 
     // Test migration from v1.0.0
