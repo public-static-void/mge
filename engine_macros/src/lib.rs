@@ -86,7 +86,7 @@ pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
 
     // Migration implementation
     let migration_impl = if let Some((from, convert)) = &migration {
-        let legacy_type = Ident::new(&convert, proc_macro2::Span::call_site());
+        let legacy_type = Ident::new(convert, proc_macro2::Span::call_site());
         let field_mappings = fields.iter().map(|f| {
             let ident = f.ident.as_ref().unwrap();
             quote! { #ident: legacy.#ident }

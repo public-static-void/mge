@@ -1,4 +1,3 @@
-use super::ecs::registry::ComponentRegistry;
 use std::any::TypeId;
 use std::collections::{HashMap, HashSet};
 
@@ -32,17 +31,15 @@ pub trait ModeTransitionHook: Send + Sync {
 /// Manages the current game mode and mode-specific component activation.
 pub struct ModeManager {
     current_mode: GameMode,
-    component_registry: ComponentRegistry,
     mode_component_map: HashMap<GameMode, HashSet<TypeId>>,
     transition_hooks: Vec<Box<dyn ModeTransitionHook>>,
 }
 
 impl ModeManager {
     /// Creates a new mode manager with the given initial mode and component registry.
-    pub fn new(initial_mode: GameMode, component_registry: ComponentRegistry) -> Self {
+    pub fn new(initial_mode: GameMode) -> Self {
         Self {
             current_mode: initial_mode,
-            component_registry,
             mode_component_map: HashMap::new(),
             transition_hooks: Vec::new(),
         }
@@ -56,7 +53,7 @@ impl ModeManager {
         for mode in modes {
             self.mode_component_map
                 .entry(mode)
-                .or_insert_with(HashSet::new)
+                .or_default()
                 .insert(type_id);
         }
     }
@@ -85,7 +82,7 @@ impl ModeManager {
     pub fn is_component_active<T: 'static>(&self) -> bool {
         self.mode_component_map
             .get(&self.current_mode)
-            .map_or(false, |components| components.contains(&TypeId::of::<T>()))
+            .is_some_and(|components| components.contains(&TypeId::of::<T>()))
     }
 
     /// Returns the TypeIds of all active components in the current mode.
