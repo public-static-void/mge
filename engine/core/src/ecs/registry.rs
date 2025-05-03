@@ -26,6 +26,12 @@ pub trait Component: 'static + Send + Sync {
         Self: Sized + serde::de::DeserializeOwned;
 }
 
+impl Default for ComponentRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ComponentRegistry {
     /// Create a new, empty registry.
     pub fn new() -> Self {
@@ -68,13 +74,13 @@ impl ComponentRegistry {
     }
 
     /// Migrate component data from a previous version.
-    pub fn migrate_component<T: Component>(
+    pub fn migrate_component<T>(
         &self,
         data: &[u8],
         from_version: Version,
     ) -> Result<T, MigrationError>
     where
-        T: serde::de::DeserializeOwned,
+        T: Component + serde::de::DeserializeOwned,
     {
         if from_version >= T::version() {
             return bson::from_slice(data).map_err(Into::into);
