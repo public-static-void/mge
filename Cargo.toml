@@ -1,0 +1,3 @@
+[workspace]
+members = ["engine/core", "engine_macros"]
+resolver = "3"
