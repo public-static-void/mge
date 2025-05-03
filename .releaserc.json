@@ -4,12 +4,6 @@
     "@semantic-release/commit-analyzer",
     "@semantic-release/release-notes-generator",
     "@semantic-release/github",
-    [
-      "@semantic-release/exec",
-      {
-        "prepareCmd": "npx semantic-release-cargo prepare",
-        "publishCmd": "npx semantic-release-cargo publish"
-      }
-    ]
+    "@timada/semantic-release-cargo"
   ]
 }
