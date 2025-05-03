@@ -160,7 +160,12 @@ dependencies = [
  "bson",
  "proc-macro2",
  "quote",
+ "schemars",
+ "semver",
+ "serde",
+ "serde_json",
  "syn",
+ "uuid",
 ]
 
 [[package]]

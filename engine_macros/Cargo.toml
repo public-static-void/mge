@@ -11,3 +11,11 @@ syn = { version = "2.0", features = ["full", "extra-traits"] }
 quote = "1.0"
 proc-macro2 = "1.0"
 bson = "2.4"
+
+[dev-dependencies]
+serde = { version = "1.0", features = ["derive"] }
+schemars = "0.8"
+semver = "1.0"
+bson = "2.14"
+serde_json = "1.0"
+uuid = "1.16"
