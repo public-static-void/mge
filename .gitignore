@@ -6,3 +6,4 @@
 /scripts/**/*.pyc
 /scripts/**/__pycache__
 /engine/target
+/node_modules
