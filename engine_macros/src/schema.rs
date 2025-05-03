@@ -1,0 +1,26 @@
+use proc_macro2::TokenStream;
+use quote::quote;
+
+pub(crate) fn generate_schema_impl(name: &syn::Ident, has_schema: bool) -> TokenStream {
+    if has_schema {
+        quote! {
+            fn generate_schema() -> Option<schemars::schema::RootSchema> {
+                Some(schemars::schema_for!(#name))
+            }
+        }
+    } else {
+        quote! {
+            fn generate_schema() -> Option<schemars::schema::RootSchema> {
+                None
+            }
+        }
+    }
+}
+
+pub(crate) fn derive_jsonschema(has_schema: bool) -> TokenStream {
+    if has_schema {
+        quote! { #[derive(schemars::JsonSchema)] }
+    } else {
+        quote! {}
+    }
+}
