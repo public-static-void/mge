@@ -4,6 +4,12 @@
     "@semantic-release/commit-analyzer",
     "@semantic-release/release-notes-generator",
     "@semantic-release/github",
-    "@semantic-release-cargo/semantic-release-cargo"
+    [
+      "@semantic-release/exec",
+      {
+        "prepareCmd": "npx semantic-release-cargo prepare",
+        "publishCmd": "npx semantic-release-cargo publish"
+      }
+    ]
   ]
 }
