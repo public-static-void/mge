@@ -76,7 +76,6 @@ cargo test -p engine_core
 ```
 
 **For users/modders:**
-Direct execution of Lua scripts (outside of tests) is planned for a future CLI tool or in-game scripting console.
 
 **Adding new Lua-exposed ECS features:**
 
@@ -89,6 +88,27 @@ Direct execution of Lua scripts (outside of tests) is planned for a future CLI t
 > The Lua scripting bridge is fully generic and mode-aware. Any registered ECS component can be set or queried from Lua using `set_component` and `get_component`, but only if it is valid for the current mode. No Rust-side scripting boilerplate is required for new components.
 
 See [`engine/core/src/scripting/mod.rs`](engine/core/src/scripting/mod.rs) for details and documentation.
+
+---
+
+## CLI: Running Lua Scripts
+
+You can run ECS-enabled Lua scripts directly from the command line using the `mge-cli` tool:
+
+```
+cargo run --bin mge-cli -- engine/scripts/lua/demo.lua
+```
+
+This executes your Lua script with full access to the ECS scripting API (`spawn_entity`, `set_component`, `get_component`, `set_mode`, etc.), including mode enforcement.
+Any errors or output from the script will be shown in your terminal.
+
+**Example output:**
+
+```
+From file: pos.x=1.1 pos.y=2.2
+```
+
+See the [Scripting (Lua)](#scripting-lua) section above for available functions and usage patterns.
 
 ---
 
