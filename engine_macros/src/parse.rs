@@ -1,4 +1,5 @@
-// engine_macros/src/parse.rs
+//! Parsing logic codegen for the #[component] macro.
+//! Parses the component attributes for versioned ECS components.
 
 use syn::parse::Parser;
 use syn::punctuated::Punctuated;

@@ -1,3 +1,6 @@
+//! Schema logic codegen for the #[component] macro.
+//! Generates schema stubs or implementations for versioned ECS components.
+
 use proc_macro2::TokenStream;
 use quote::quote;
 

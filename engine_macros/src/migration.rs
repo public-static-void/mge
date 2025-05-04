@@ -1,3 +1,6 @@
+//! Migration logic codegen for the #[component] macro.
+//! Generates migration stubs or implementations for versioned ECS components.
+
 use proc_macro2::Ident;
 use quote::quote;
 use syn::Fields;
