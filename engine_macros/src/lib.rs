@@ -11,7 +11,8 @@
 //!
 //! ## Usage
 //!
-//! ```
+//! ```ignore
+//! // This example assumes you are inside the main game engine crate with ECS and modes modules defined.
 //! use engine_macros::component;
 //!
 //! #[component(modes(Single, Multi), version = "1.2.3", schema)]
