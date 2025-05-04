@@ -12,6 +12,7 @@ MGE provides:
 - A Rust-based core engine with a macro-driven ECS framework.
 - Hot-reloadable plugin support and cross-language scripting (Lua, Python, WASM).
 - Out-of-the-box Lua scripting bridge for entity/component manipulation and rapid prototyping.
+- **Runtime mode switching and mode-specific component enforcement** in both Rust and Lua scripting.
 - Mode-specific logic and data (e.g., Colony, Roguelike).
 - Schema-driven, versioned component management.
 - An architecture designed for tooling, modding, and rapid iteration.
@@ -41,6 +42,8 @@ MGE supports Lua scripting for rapid prototyping, modding, and gameplay logic.
 
 - Scripts can spawn entities, set/get components (e.g., Position, Health), and interact with the ECS.
 - Lua scripts are loaded from `engine/scripts/lua/` and can be tested and run as part of the engine.
+- You can switch game modes at runtime and only access components valid for the current mode.
+- Attempting to set or get a component not available in the current mode will result in an error.
 
 **Example Lua script (`engine/scripts/lua/demo.lua`):**
 
@@ -49,6 +52,20 @@ local id = spawn_entity()
 set_component(id, "Position", { x = 1.1, y = 2.2 })
 local pos = get_component(id, "Position")
 print("Entity " .. id .. " position: x=" .. pos.x .. " y=" .. pos.y)
+```
+
+**Example Lua script (mode switching and enforcement):**
+
+```
+set_mode("colony")
+local id = spawn_entity()
+set_component(id, "Health", { current = 10, max = 20 }) -- OK in colony mode
+set_mode("roguelike")
+-- This will error: Health is not available in roguelike mode
+local ok, err = pcall(function()
+set_component(id, "Health", { current = 5, max = 10 })
+end)
+assert(ok == false)
 ```
 
 **For engine developers:**
@@ -69,7 +86,7 @@ Direct execution of Lua scripts (outside of tests) is planned for a future CLI t
 - Add Lua and Rust tests as needed.
 
 > **Note**:
-> The Lua scripting bridge is now fully generic. Any registered ECS component can be set or queried from Lua using set_component and get_component. No Rust-side scripting boilerplate is required for new components.
+> The Lua scripting bridge is fully generic and mode-aware. Any registered ECS component can be set or queried from Lua using `set_component` and `get_component`, but only if it is valid for the current mode. No Rust-side scripting boilerplate is required for new components.
 
 See [`engine/core/src/scripting/mod.rs`](engine/core/src/scripting/mod.rs) for details and documentation.
 
@@ -81,6 +98,7 @@ See [`engine/core/src/scripting/mod.rs`](engine/core/src/scripting/mod.rs) for d
 
    - See [`engine/core`](engine/core) and [`engine_macros`](engine_macros).
    - Define components with `#[component(...)]` and auto-generate schemas.
+   - Try switching modes at runtime and see how component access is enforced.
 
 2. **Run tests:**
 

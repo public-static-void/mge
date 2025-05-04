@@ -1,6 +1,15 @@
 use engine_core::scripting::{ScriptEngine, World};
+use mlua::Lua;
 use std::cell::RefCell;
 use std::rc::Rc;
+
+fn setup_engine_with_modes(_lua: &mlua::Lua) -> ScriptEngine {
+    let engine = ScriptEngine::new();
+    let world = Rc::new(RefCell::new(World::new()));
+    // Optionally: register components or set up modes here if needed
+    engine.register_world(world).unwrap();
+    engine
+}
 
 #[test]
 fn lua_can_spawn_and_move_entity() {
@@ -105,4 +114,22 @@ fn lua_can_set_and_get_arbitrary_component() {
     let health = world_ref.get_component(entity_id, "Health").unwrap();
     assert!((health["current"].as_f64().unwrap() - 7.5).abs() < 1e-5);
     assert!((health["max"].as_f64().unwrap() - 10.0).abs() < 1e-5);
+}
+
+#[test]
+fn test_lua_component_access_mode_enforcement() {
+    let lua = Lua::new();
+    let engine = setup_engine_with_modes(&lua);
+
+    // Lua script: in "colony" mode, try to set colony and roguelike components
+    let script = r#"
+        set_mode("colony")
+        local id = spawn_entity()
+        assert(set_component(id, "Colony::Happiness", { base_value = 0.7 }) == true)
+        local ok, err = pcall(function()
+            set_component(id, "Roguelike::Inventory", { slots = 4, weight = 1.5 })
+        end)
+        assert(ok == false)
+    "#;
+    assert!(engine.run_script(script).is_ok());
 }

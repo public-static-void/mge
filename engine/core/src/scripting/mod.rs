@@ -63,8 +63,10 @@ impl ScriptEngine {
             move |lua, (entity, name, table): (u32, String, Table)| {
                 let mut world = world_set.borrow_mut();
                 let json_value: JsonValue = Self::lua_table_to_json(lua, &table)?;
-                world.set_component(entity, &name, json_value);
-                Ok(())
+                match world.set_component(entity, &name, json_value) {
+                    Ok(_) => Ok(true),
+                    Err(e) => Err(mlua::Error::external(e)),
+                }
             },
         )?;
         globals.set("set_component", set_component)?;
@@ -84,6 +86,15 @@ impl ScriptEngine {
                 })?;
         globals.set("get_component", get_component)?;
 
+        // set_mode(mode: String)
+        let world_set_mode = world.clone();
+        let set_mode = self.lua.create_function_mut(move |_, mode: String| {
+            let mut world = world_set_mode.borrow_mut();
+            world.current_mode = mode;
+            Ok(())
+        })?;
+        globals.set("set_mode", set_mode)?;
+
         Ok(())
     }
 }
@@ -98,6 +109,7 @@ pub struct World {
     pub entities: Vec<u32>,
     pub components: HashMap<String, HashMap<u32, JsonValue>>,
     next_id: u32,
+    current_mode: String,
 }
 
 impl World {
@@ -106,6 +118,7 @@ impl World {
             entities: Vec::new(),
             components: HashMap::new(),
             next_id: 1,
+            current_mode: "colony".to_string(),
         }
     }
 
@@ -116,12 +129,36 @@ impl World {
         id
     }
 
+    pub fn is_component_allowed_in_mode(component: &str, mode: &str) -> bool {
+        match (component, mode) {
+            ("Colony::Happiness", "colony") => true,
+            ("Roguelike::Inventory", "roguelike") => true,
+            ("Position", "colony") => true,
+            ("Position", "roguelike") => true,
+            ("Health", "colony") => true,
+            // Add more as needed
+            _ => false,
+        }
+    }
+
     // Generic set_component
-    pub fn set_component(&mut self, entity: u32, name: &str, value: JsonValue) {
+    pub fn set_component(
+        &mut self,
+        entity: u32,
+        name: &str,
+        value: JsonValue,
+    ) -> Result<(), String> {
+        if !Self::is_component_allowed_in_mode(name, &self.current_mode) {
+            return Err(format!(
+                "Component {} not allowed in mode {}",
+                name, self.current_mode
+            ));
+        }
         self.components
             .entry(name.to_string())
             .or_default()
             .insert(entity, value);
+        Ok(())
     }
 
     // Generic get_component
