@@ -1,3 +1,18 @@
+//! # Lua Scripting Bridge
+//!
+//! ## Exposed Functions
+//! - `spawn_entity()` -> entity id
+//! - `set_position(entity, x, y)`
+//! - `get_position(entity)` -> {x, y} or nil
+//! - `set_health(entity, current, max)`
+//! - `get_health(entity)` -> {current, max} or nil
+//!
+//! ## Adding More Components
+//! 1. Extend `World` with your component storage.
+//! 2. Add set/get methods.
+//! 3. Register new Lua functions in `register_world`.
+//! 4. Add Lua and Rust tests.
+
 use mlua::{Lua, Result, Value};
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -53,7 +68,39 @@ impl ScriptEngine {
         })?;
         globals.set("get_position", get_position)?;
 
+        // Set health
+        let world_set_health = world.clone();
+        let set_health =
+            self.lua
+                .create_function_mut(move |_, (entity, current, max): (u32, f32, f32)| {
+                    let mut world = world_set_health.borrow_mut();
+                    world.set_health(entity, Health { current, max });
+                    Ok(())
+                })?;
+        globals.set("set_health", set_health)?;
+
+        // Get health
+        let world_get_health = world.clone();
+        let get_health = self.lua.create_function_mut(move |lua, entity: u32| {
+            let world = world_get_health.borrow();
+            if let Some(health) = world.get_health(entity) {
+                let tbl = lua.create_table()?;
+                tbl.set("current", health.current)?;
+                tbl.set("max", health.max)?;
+                Ok(Value::Table(tbl))
+            } else {
+                Ok(Value::Nil)
+            }
+        })?;
+        globals.set("get_health", get_health)?;
+
         Ok(())
+    }
+}
+
+impl Default for ScriptEngine {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -63,9 +110,16 @@ pub struct Position {
     pub y: f32,
 }
 
+#[derive(Clone, Debug)]
+pub struct Health {
+    pub current: f32,
+    pub max: f32,
+}
+
 pub struct World {
     pub entities: Vec<u32>,
     pub positions: HashMap<u32, Position>,
+    pub healths: HashMap<u32, Health>,
     next_id: u32,
 }
 
@@ -74,6 +128,7 @@ impl World {
         World {
             entities: Vec::new(),
             positions: HashMap::new(),
+            healths: HashMap::new(),
             next_id: 1,
         }
     }
@@ -91,5 +146,19 @@ impl World {
 
     pub fn get_position(&self, entity: u32) -> Option<&Position> {
         self.positions.get(&entity)
+    }
+
+    pub fn set_health(&mut self, entity: u32, health: Health) {
+        self.healths.insert(entity, health);
+    }
+
+    pub fn get_health(&self, entity: u32) -> Option<&Health> {
+        self.healths.get(&entity)
+    }
+}
+
+impl Default for World {
+    fn default() -> Self {
+        Self::new()
     }
 }
