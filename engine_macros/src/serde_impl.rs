@@ -1,3 +1,6 @@
+//! Serde logic codegen for the #[component] macro.
+//! Generates (de-)serialization stubs or implementations for versioned ECS components.
+
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{Fields, Ident};

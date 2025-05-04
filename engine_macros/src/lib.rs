@@ -1,3 +1,30 @@
+//! # engine_macros
+//!
+//! Procedural macros for the Modular Game Engine project.
+//!
+//! This crate provides the `#[component]` attribute macro, which generates boilerplate
+//! for ECS (Entity-Component-System) components, including:
+//! - Versioning and migration support
+//! - Mode restrictions
+//! - Serde (de)serialization
+//! - JSON schema generation (optional)
+//!
+//! ## Usage
+//!
+//! ```ignore
+//! // This example assumes you are inside the main game engine crate with ECS and modes modules defined.
+//! use engine_macros::component;
+//!
+//! #[component(modes(Single, Multi), version = "1.2.3", schema)]
+//! #[derive(Debug, PartialEq)]
+//! struct Position {
+//!     x: f32,
+//!     y: f32,
+//! }
+//! ```
+//!
+//! See the main project README for more context.
+
 use proc_macro::TokenStream;
 use quote::quote;
 mod migration;
@@ -5,6 +32,19 @@ mod parse;
 mod schema;
 mod serde_impl;
 
+/// Attribute macro for ECS components.
+///
+/// Generates trait implementations and boilerplate for versioning, migration,
+/// mode restriction, serialization, and schema support.
+///
+/// # Arguments
+///
+/// - `modes(...)`: List of supported game modes.
+/// - `version = "...""`: Semver version string.
+/// - `schema`: Enable JSON schema generation.
+/// - `migration(from = "...", convert = "...")`: Migration from legacy struct.
+///
+/// See crate-level docs for usage.
 #[proc_macro_attribute]
 pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
     // Parse attributes and struct
