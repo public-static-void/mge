@@ -46,8 +46,8 @@ MGE supports Lua scripting for rapid prototyping, modding, and gameplay logic.
 
 ```
 local id = spawn_entity()
-set_position(id, 1.1, 2.2)
-local pos = get_position(id)
+set_component(id, "Position", { x = 1.1, y = 2.2 })
+local pos = get_component(id, "Position")
 print("Entity " .. id .. " position: x=" .. pos.x .. " y=" .. pos.y)
 ```
 
@@ -63,10 +63,13 @@ Direct execution of Lua scripts (outside of tests) is planned for a future CLI t
 
 **Adding new Lua-exposed ECS features:**
 
-1. Extend the `World` struct with your component.
-2. Add set/get methods.
-3. Register new Lua functions in the scripting bridge.
-4. Add Lua and Rust tests.
+- Just define a new Rust component and register it with the ECS.
+- No manual scripting bridge changes are needed.
+- All components are accessible from Lua via `set_component(entity, "ComponentName", { ... })` and `get_component(entity, "ComponentName")`.
+- Add Lua and Rust tests as needed.
+
+> **Note**:
+> The Lua scripting bridge is now fully generic. Any registered ECS component can be set or queried from Lua using set_component and get_component. No Rust-side scripting boilerplate is required for new components.
 
 See [`engine/core/src/scripting/mod.rs`](engine/core/src/scripting/mod.rs) for details and documentation.
 
