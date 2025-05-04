@@ -11,8 +11,8 @@ fn main() {
     // Example Lua script: spawn and move an entity
     let script = r#"
         local id = spawn_entity()
-        set_position(id, 10.0, 20.0)
-        local pos = get_position(id)
+        set_component(id, "Position", { x = 10.0, y = 20.0 })
+        local pos = get_component(id, "Position")
         print("Entity " .. id .. " position: x=" .. pos.x .. " y=" .. pos.y)
     "#;
 
