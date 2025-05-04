@@ -4,6 +4,7 @@
 
 pub mod ecs;
 pub mod modes;
+pub mod scripting;
 
 #[cfg(test)]
 mod tests {
