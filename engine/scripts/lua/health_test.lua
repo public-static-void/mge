@@ -1,6 +1,6 @@
 local id = spawn_entity()
-set_health(id, 7.0, 10.0)
-local health = get_health(id)
+set_component(id, "Health", { current = 7.0, max = 10.0 })
+local health = get_component(id, "Health")
 print("health.current=" .. tostring(health.current) .. " health.max=" .. tostring(health.max))
 assert(math.abs(health.current - 7.0) < 1e-5)
 assert(math.abs(health.max - 10.0) < 1e-5)

@@ -60,6 +60,10 @@ impl ComponentRegistry {
         self.components.get(&TypeId::of::<T>())
     }
 
+    pub fn get_schema_by_name(&self, name: &str) -> Option<&ComponentSchema> {
+        self.components.values().find(|schema| schema.name == name)
+    }
+
     /// Get the JSON schema for a component as a pretty-printed string.
     pub fn schema_to_json<T: Component>(&self) -> Result<String, RegistryError> {
         let schema = self

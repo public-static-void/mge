@@ -13,7 +13,9 @@
 //! 3. Register new Lua functions in `register_world`.
 //! 4. Add Lua and Rust tests.
 
-use mlua::{Lua, Result, Value};
+use mlua::LuaSerdeExt;
+use mlua::{Lua, Result as LuaResult, Table, Value as LuaValue};
+use serde_json::Value as JsonValue;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -27,8 +29,21 @@ impl ScriptEngine {
         ScriptEngine { lua: Lua::new() }
     }
 
-    pub fn run_script(&self, code: &str) -> Result<()> {
+    pub fn run_script(&self, code: &str) -> LuaResult<()> {
         self.lua.load(code).exec()
+    }
+
+    fn lua_table_to_json(lua: &Lua, table: &Table) -> LuaResult<JsonValue> {
+        lua.from_value(LuaValue::Table(table.clone()))
+    }
+
+    fn json_to_lua_table<'lua>(lua: &'lua Lua, value: &JsonValue) -> LuaResult<Table<'lua>> {
+        let lua_value = lua.to_value(value)?;
+        if let LuaValue::Table(tbl) = lua_value {
+            Ok(tbl)
+        } else {
+            lua.create_table()
+        }
     }
 
     pub fn register_world(&self, world: Rc<RefCell<World>>) -> mlua::Result<()> {
@@ -42,57 +57,32 @@ impl ScriptEngine {
         })?;
         globals.set("spawn_entity", spawn)?;
 
-        // Set position
+        // set_component(entity, name, table)
         let world_set = world.clone();
-        let set_position =
-            self.lua
-                .create_function_mut(move |_, (entity, x, y): (u32, f32, f32)| {
-                    let mut world = world_set.borrow_mut();
-                    world.set_position(entity, Position { x, y });
-                    Ok(())
-                })?;
-        globals.set("set_position", set_position)?;
+        let set_component = self.lua.create_function_mut(
+            move |lua, (entity, name, table): (u32, String, Table)| {
+                let mut world = world_set.borrow_mut();
+                let json_value: JsonValue = Self::lua_table_to_json(lua, &table)?;
+                world.set_component(entity, &name, json_value);
+                Ok(())
+            },
+        )?;
+        globals.set("set_component", set_component)?;
 
-        // Get position
+        // get_component(entity, name)
         let world_get = world.clone();
-        let get_position = self.lua.create_function_mut(move |lua, entity: u32| {
-            let world = world_get.borrow();
-            if let Some(pos) = world.get_position(entity) {
-                let tbl = lua.create_table()?;
-                tbl.set("x", pos.x)?;
-                tbl.set("y", pos.y)?;
-                Ok(Value::Table(tbl))
-            } else {
-                Ok(Value::Nil)
-            }
-        })?;
-        globals.set("get_position", get_position)?;
-
-        // Set health
-        let world_set_health = world.clone();
-        let set_health =
+        let get_component =
             self.lua
-                .create_function_mut(move |_, (entity, current, max): (u32, f32, f32)| {
-                    let mut world = world_set_health.borrow_mut();
-                    world.set_health(entity, Health { current, max });
-                    Ok(())
+                .create_function_mut(move |lua, (entity, name): (u32, String)| {
+                    let world = world_get.borrow();
+                    if let Some(val) = world.get_component(entity, &name) {
+                        let tbl = Self::json_to_lua_table(lua, val)?;
+                        Ok(LuaValue::Table(tbl))
+                    } else {
+                        Ok(LuaValue::Nil)
+                    }
                 })?;
-        globals.set("set_health", set_health)?;
-
-        // Get health
-        let world_get_health = world.clone();
-        let get_health = self.lua.create_function_mut(move |lua, entity: u32| {
-            let world = world_get_health.borrow();
-            if let Some(health) = world.get_health(entity) {
-                let tbl = lua.create_table()?;
-                tbl.set("current", health.current)?;
-                tbl.set("max", health.max)?;
-                Ok(Value::Table(tbl))
-            } else {
-                Ok(Value::Nil)
-            }
-        })?;
-        globals.set("get_health", get_health)?;
+        globals.set("get_component", get_component)?;
 
         Ok(())
     }
@@ -104,22 +94,9 @@ impl Default for ScriptEngine {
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct Position {
-    pub x: f32,
-    pub y: f32,
-}
-
-#[derive(Clone, Debug)]
-pub struct Health {
-    pub current: f32,
-    pub max: f32,
-}
-
 pub struct World {
     pub entities: Vec<u32>,
-    pub positions: HashMap<u32, Position>,
-    pub healths: HashMap<u32, Health>,
+    pub components: HashMap<String, HashMap<u32, JsonValue>>,
     next_id: u32,
 }
 
@@ -127,8 +104,7 @@ impl World {
     pub fn new() -> Self {
         World {
             entities: Vec::new(),
-            positions: HashMap::new(),
-            healths: HashMap::new(),
+            components: HashMap::new(),
             next_id: 1,
         }
     }
@@ -140,20 +116,17 @@ impl World {
         id
     }
 
-    pub fn set_position(&mut self, entity: u32, pos: Position) {
-        self.positions.insert(entity, pos);
+    // Generic set_component
+    pub fn set_component(&mut self, entity: u32, name: &str, value: JsonValue) {
+        self.components
+            .entry(name.to_string())
+            .or_default()
+            .insert(entity, value);
     }
 
-    pub fn get_position(&self, entity: u32) -> Option<&Position> {
-        self.positions.get(&entity)
-    }
-
-    pub fn set_health(&mut self, entity: u32, health: Health) {
-        self.healths.insert(entity, health);
-    }
-
-    pub fn get_health(&self, entity: u32) -> Option<&Health> {
-        self.healths.get(&entity)
+    // Generic get_component
+    pub fn get_component(&self, entity: u32, name: &str) -> Option<&JsonValue> {
+        self.components.get(name)?.get(&entity)
     }
 }
 
