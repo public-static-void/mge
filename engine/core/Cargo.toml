@@ -18,3 +18,7 @@ engine_macros = { path = "../../engine_macros" }
 [dev-dependencies]
 rstest = "0.18"
 mockall = "0.12"
+
+[[bin]]
+name = "mge-cli"
+path = "src/bin/mge_cli.rs"
