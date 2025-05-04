@@ -11,6 +11,7 @@ MGE provides:
 
 - A Rust-based core engine with a macro-driven ECS framework.
 - Hot-reloadable plugin support and cross-language scripting (Lua, Python, WASM).
+- Out-of-the-box Lua scripting bridge for entity/component manipulation and rapid prototyping.
 - Mode-specific logic and data (e.g., Colony, Roguelike).
 - Schema-driven, versioned component management.
 - An architecture designed for tooling, modding, and rapid iteration.
@@ -26,11 +27,48 @@ engine/
   core/          # ECS core, registry, schema, migration (Rust)
   docs/          # Engine-specific documentation and specs
   assets/        # Game assets and data
-  scripts/       # Build or tooling scripts
+  scripts/       # Scripts for gameplay, modding, and tests
   tools/         # Engine tools and utilities
 engine_macros/   # Procedural macros for component ergonomics
 docs/            # Project-wide docs and blueprints
 ```
+
+---
+
+## Scripting (Lua)
+
+MGE supports Lua scripting for rapid prototyping, modding, and gameplay logic.
+
+- Scripts can spawn entities, set/get components (e.g., Position, Health), and interact with the ECS.
+- Lua scripts are loaded from `engine/scripts/lua/` and can be tested and run as part of the engine.
+
+**Example Lua script (`engine/scripts/lua/demo.lua`):**
+
+```
+local id = spawn_entity()
+set_position(id, 1.1, 2.2)
+local pos = get_position(id)
+print("Entity " .. id .. " position: x=" .. pos.x .. " y=" .. pos.y)
+```
+
+**For engine developers:**
+Lua scripts are run as part of the Rust integration tests to ensure scripting API stability and correctness:
+
+```
+cargo test -p engine_core
+```
+
+**For users/modders:**
+Direct execution of Lua scripts (outside of tests) is planned for a future CLI tool or in-game scripting console.
+
+**Adding new Lua-exposed ECS features:**
+
+1. Extend the `World` struct with your component.
+2. Add set/get methods.
+3. Register new Lua functions in the scripting bridge.
+4. Add Lua and Rust tests.
+
+See [`engine/core/src/scripting/mod.rs`](engine/core/src/scripting/mod.rs) for details and documentation.
 
 ---
 
