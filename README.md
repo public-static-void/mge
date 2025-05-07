@@ -23,7 +23,7 @@ For the full architecture and design blueprint, see [`docs/idea.md`](docs/idea.m
 
 ## Repository Structure
 
-```
+```text
 engine/
   core/          # ECS core, registry, schema, migration (Rust)
   docs/          # Engine-specific documentation and specs
@@ -41,37 +41,66 @@ docs/            # Project-wide docs and blueprints
 MGE supports Lua scripting for rapid prototyping, modding, and gameplay logic.
 
 - Scripts can spawn entities, set/get components (e.g., Position, Health), and interact with the ECS.
+- **Game systems like movement, health, and turns are also scriptable.**
 - Lua scripts are loaded from `engine/scripts/lua/` and can be tested and run as part of the engine.
 - You can switch game modes at runtime and only access components valid for the current mode.
 - Attempting to set or get a component not available in the current mode will result in an error.
 
-**Example Lua script (`engine/scripts/lua/demo.lua`):**
+**Available Lua functions:**
 
-```
+| Function             | Description                           |
+| -------------------- | ------------------------------------- |
+| `spawn_entity()`     | Spawn a new entity, returns entity id |
+| `set_component()`    | Set a component on an entity          |
+| `get_component()`    | Get a component from an entity        |
+| `set_mode()`         | Switch game mode                      |
+| `move_all(dx, dy)`   | Move all entities with Position       |
+| `damage_all(amount)` | Damage all entities with Health       |
+| `tick()`             | Advance the game by one turn          |
+| `get_turn()`         | Get the current turn number           |
+| `print_positions()`  | Print all entity positions            |
+| `print_healths()`    | Print all entity healths              |
+
+**Example Lua script (turn system):**
+
+```lua
 local id = spawn_entity()
-set_component(id, "Position", { x = 1.1, y = 2.2 })
-local pos = get_component(id, "Position")
-print("Entity " .. id .. " position: x=" .. pos.x .. " y=" .. pos.y)
+set_component(id, "Position", { x = 0.0, y = 0.0 })
+set_component(id, "Health", { current = 10.0, max = 10.0 })
+
+print_positions()
+print_healths()
+print("Turn: " .. get_turn())
+
+tick()
+print_positions()
+print_healths()
+print("Turn: " .. get_turn())
 ```
 
-**Example Lua script (mode switching and enforcement):**
+**Example output:**
 
+```text
+Entity 1: Object {"x": Number(0), "y": Number(0)}
+Entity 1: Object {"max": Number(10), "current": Number(10)}
+Turn: 0
+Entity 1: Object {"x": Number(1.0), "y": Number(0.0)}
+Entity 1: Object {"max": Number(10), "current": Number(9.0)}
+Turn: 1
 ```
-set_mode("colony")
-local id = spawn_entity()
-set_component(id, "Health", { current = 10, max = 20 }) -- OK in colony mode
-set_mode("roguelike")
--- This will error: Health is not available in roguelike mode
-local ok, err = pcall(function()
-set_component(id, "Health", { current = 5, max = 10 })
-end)
-assert(ok == false)
+
+To try out the new systems, run one of the Lua demo scripts:
+
+```bash
+cargo run --bin mge-cli -- engine/scripts/lua/turn_demo.lua
 ```
+
+See the [Scripting (Lua)](#scripting-lua) section above for available functions and usage patterns.
 
 **For engine developers:**
 Lua scripts are run as part of the Rust integration tests to ensure scripting API stability and correctness:
 
-```
+```bash
 cargo test -p engine_core
 ```
 
@@ -95,7 +124,7 @@ See [`engine/core/src/scripting/mod.rs`](engine/core/src/scripting/mod.rs) for d
 
 You can run ECS-enabled Lua scripts directly from the command line using the `mge-cli` tool:
 
-```
+```bash
 cargo run --bin mge-cli -- engine/scripts/lua/demo.lua
 ```
 
@@ -104,7 +133,7 @@ Any errors or output from the script will be shown in your terminal.
 
 **Example output:**
 
-```
+```text
 From file: pos.x=1.1 pos.y=2.2
 ```
 
@@ -122,9 +151,9 @@ See the [Scripting (Lua)](#scripting-lua) section above for available functions 
 
 2. **Run tests:**
 
-   ```sh
-   cargo test
-   ```
+```bash
+cargo test
+```
 
 3. **Read [`docs/idea.md`](docs/idea.md) for the full blueprint.**
 
