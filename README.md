@@ -41,27 +41,64 @@ docs/            # Project-wide docs and blueprints
 MGE supports Lua scripting for rapid prototyping, modding, and gameplay logic.
 
 - Scripts can spawn entities, set/get components (e.g., Position, Health), and interact with the ECS.
-- **Game systems like movement, health, and turns are also scriptable.**
+- **Game systems like movement, health, turns, death, and decay are scriptable.**
 - Lua scripts are loaded from `engine/scripts/lua/` and can be tested and run as part of the engine.
 - You can switch game modes at runtime and only access components valid for the current mode.
 - Attempting to set or get a component not available in the current mode will result in an error.
 
 **Available Lua functions:**
 
-| Function             | Description                           |
-| -------------------- | ------------------------------------- |
-| `spawn_entity()`     | Spawn a new entity, returns entity id |
-| `set_component()`    | Set a component on an entity          |
-| `get_component()`    | Get a component from an entity        |
-| `set_mode()`         | Switch game mode                      |
-| `move_all(dx, dy)`   | Move all entities with Position       |
-| `damage_all(amount)` | Damage all entities with Health       |
-| `tick()`             | Advance the game by one turn          |
-| `get_turn()`         | Get the current turn number           |
-| `print_positions()`  | Print all entity positions            |
-| `print_healths()`    | Print all entity healths              |
+| Function             | Description                                      |
+| -------------------- | ------------------------------------------------ |
+| `spawn_entity()`     | Spawn a new entity, returns entity id            |
+| `set_component()`    | Set a component on an entity                     |
+| `get_component()`    | Get a component from an entity                   |
+| `set_mode()`         | Switch game mode                                 |
+| `move_all(dx, dy)`   | Move all entities with Position                  |
+| `damage_all(amount)` | Damage all entities with Health                  |
+| `tick()`             | Advance the game by one turn                     |
+| `get_turn()`         | Get the current turn number                      |
+| `print_positions()`  | Print all entity positions                       |
+| `print_healths()`    | Print all entity healths                         |
+| `process_deaths()`   | Convert dead entities to corpses and start decay |
+| `process_decay()`    | Decrement decay, remove entities when done       |
+| `remove_entity(id)`  | Remove an entity and all its components          |
 
-**Example Lua script (turn system):**
+---
+
+### Entity Death, Corpses, and Decay
+
+MGE supports a robust entity lifecycle:
+
+- When an entity’s `Health.current` drops to zero or below, you can call `process_deaths()` to convert it into a **corpse** (`Corpse` component) and give it a **decay timer** (`Decay` component).
+- Each time you call `process_decay()`, the decay timer for all corpses is decremented. When it reaches zero, the entity is removed from the world.
+- You can also remove entities directly with `remove_entity(id)`.
+
+**Example Lua script:**
+
+```lua
+local id = spawn_entity()
+set_component(id, "Health", { current = 2, max = 10 })
+set_component(id, "Position", { x = 0, y = 0 })
+
+-- Simulate death by setting health to zero
+set_component(id, "Health", { current = 0, max = 10 })
+
+process_deaths()
+print("Corpse:", get_component(id, "Corpse"))
+print("Decay:", get_component(id, "Decay"))
+
+for i = 1, 5 do
+    process_decay()
+    print("Decay after tick " .. i .. ":", get_component(id, "Decay"))
+end
+
+-- After enough calls, get_component(id, "Corpse") and get_component(id, "Decay") will return nil
+```
+
+---
+
+### Example: Turn System Script
 
 ```lua
 local id = spawn_entity()
@@ -89,55 +126,30 @@ Entity 1: Object {"max": Number(10), "current": Number(9.0)}
 Turn: 1
 ```
 
-To try out the new systems, run one of the Lua demo scripts:
+---
+
+## CLI: Running Lua Scripts
+
+You can run any ECS-enabled Lua script using:
+
+```bash
+cargo run --bin mge-cli -- engine/scripts/lua/<script_name>.lua
+```
+
+For example, to run the turn demo:
 
 ```bash
 cargo run --bin mge-cli -- engine/scripts/lua/turn_demo.lua
 ```
 
-See the [Scripting (Lua)](#scripting-lua) section above for available functions and usage patterns.
-
-**For engine developers:**
-Lua scripts are run as part of the Rust integration tests to ensure scripting API stability and correctness:
+Or to test death/removal and decay:
 
 ```bash
-cargo test -p engine_core
+cargo run --bin mge-cli -- engine/scripts/lua/death_removal_demo.lua
 ```
 
-**For users/modders:**
-
-**Adding new Lua-exposed ECS features:**
-
-- Just define a new Rust component and register it with the ECS.
-- No manual scripting bridge changes are needed.
-- All components are accessible from Lua via `set_component(entity, "ComponentName", { ... })` and `get_component(entity, "ComponentName")`.
-- Add Lua and Rust tests as needed.
-
-> **Note**:
-> The Lua scripting bridge is fully generic and mode-aware. Any registered ECS component can be set or queried from Lua using `set_component` and `get_component`, but only if it is valid for the current mode. No Rust-side scripting boilerplate is required for new components.
-
-See [`engine/core/src/scripting/mod.rs`](engine/core/src/scripting/mod.rs) for details and documentation.
-
----
-
-## CLI: Running Lua Scripts
-
-You can run ECS-enabled Lua scripts directly from the command line using the `mge-cli` tool:
-
-```bash
-cargo run --bin mge-cli -- engine/scripts/lua/demo.lua
-```
-
-This executes your Lua script with full access to the ECS scripting API (`spawn_entity`, `set_component`, `get_component`, `set_mode`, etc.), including mode enforcement.
+This executes your Lua script with full access to the ECS scripting API, including mode enforcement.
 Any errors or output from the script will be shown in your terminal.
-
-**Example output:**
-
-```text
-From file: pos.x=1.1 pos.y=2.2
-```
-
-See the [Scripting (Lua)](#scripting-lua) section above for available functions and usage patterns.
 
 ---
 
@@ -169,15 +181,11 @@ cargo test
 ## Continuous Integration & Releases
 
 - **CI**: All pull requests and pushes to main run automated checks (formatting, linting, tests) via GitHub Actions.
-
 - **Release**: Merges to main automatically trigger a semantic-release pipeline:
+- Versioning and changelog are managed by semantic-release.
+- Rust crate version is updated using `@timada/semantic-release-cargo`.
+- Releases are published to GitHub Releases
 
-  - Versioning and changelog are managed by semantic-release.
-
-  - Rust crate version is updated using `@timada/semantic-release-cargo`.
-
-  - Releases are published to GitHub Releases
-
-## Branch Protection:
+## Branch Protection
 
 The main branch is protected: all PRs require passing status checks before merging.
