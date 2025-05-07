@@ -132,6 +132,23 @@ impl ScriptEngine {
         })?;
         globals.set("print_healths", print_healths)?;
 
+        // tick()
+        let world_tick = world.clone();
+        let tick = self.lua.create_function_mut(move |_, ()| {
+            let mut world = world_tick.borrow_mut();
+            world.tick();
+            Ok(())
+        })?;
+        globals.set("tick", tick)?;
+
+        // get_turn()
+        let world_get_turn = world.clone();
+        let get_turn = self.lua.create_function_mut(move |_, ()| {
+            let world = world_get_turn.borrow();
+            Ok(world.turn)
+        })?;
+        globals.set("get_turn", get_turn)?;
+
         Ok(())
     }
 }
@@ -147,6 +164,7 @@ pub struct World {
     pub components: HashMap<String, HashMap<u32, JsonValue>>,
     next_id: u32,
     current_mode: String,
+    pub turn: u32,
 }
 
 impl World {
@@ -156,6 +174,7 @@ impl World {
             components: HashMap::new(),
             next_id: 1,
             current_mode: "colony".to_string(),
+            turn: 0,
         }
     }
 
@@ -255,6 +274,13 @@ impl World {
         } else {
             println!("No Health components found.");
         }
+    }
+
+    pub fn tick(&mut self) {
+        // Example: move all entities by (1, 0) and damage all by 1
+        self.move_all(1.0, 0.0);
+        self.damage_all(1.0);
+        self.turn += 1;
     }
 }
 

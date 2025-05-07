@@ -47,7 +47,10 @@ fn lua_can_run_script_from_file() {
     let world = Rc::new(RefCell::new(World::new()));
     engine.register_world(world.clone()).unwrap();
 
-    let script_path = format!("{}/../scripts/lua/demo.lua", env!("CARGO_MANIFEST_DIR"));
+    let script_path = format!(
+        "{}/../scripts/lua/position_demo.lua",
+        env!("CARGO_MANIFEST_DIR")
+    );
     let script = std::fs::read_to_string(script_path).unwrap();
     engine.run_script(&script).unwrap();
 

@@ -4,7 +4,7 @@ use std::process::Command;
 #[test]
 fn test_lua_cli_runs_script_successfully() {
     let script_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../engine/scripts/lua/demo.lua")
+        .join("../../engine/scripts/lua/position_demo.lua")
         .canonicalize()
         .expect("Failed to canonicalize script path");
 
