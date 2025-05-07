@@ -149,6 +149,33 @@ impl ScriptEngine {
         })?;
         globals.set("get_turn", get_turn)?;
 
+        // process_deaths()
+        let world_deaths = world.clone();
+        let process_deaths = self.lua.create_function_mut(move |_, ()| {
+            let mut world = world_deaths.borrow_mut();
+            world.process_deaths();
+            Ok(())
+        })?;
+        globals.set("process_deaths", process_deaths)?;
+
+        // process_decay()
+        let world_decay = world.clone();
+        let process_decay = self.lua.create_function_mut(move |_, ()| {
+            let mut world = world_decay.borrow_mut();
+            world.process_decay();
+            Ok(())
+        })?;
+        globals.set("process_decay", process_decay)?;
+
+        // remove_entity(id)
+        let world_remove = world.clone();
+        let remove_entity = self.lua.create_function_mut(move |_, entity_id: u32| {
+            let mut world = world_remove.borrow_mut();
+            world.remove_entity(entity_id);
+            Ok(())
+        })?;
+        globals.set("remove_entity", remove_entity)?;
+
         Ok(())
     }
 }
@@ -192,6 +219,11 @@ impl World {
             ("Position", "colony") => true,
             ("Position", "roguelike") => true,
             ("Health", "colony") => true,
+            ("Health", "roguelike") => true,
+            ("Corpse", "colony") => true,
+            ("Corpse", "roguelike") => true,
+            ("Decay", "colony") => true,
+            ("Decay", "roguelike") => true,
             // Add more as needed
             _ => false,
         }
@@ -280,7 +312,72 @@ impl World {
         // Example: move all entities by (1, 0) and damage all by 1
         self.move_all(1.0, 0.0);
         self.damage_all(1.0);
+        self.process_deaths();
+        self.process_decay();
         self.turn += 1;
+    }
+
+    pub fn process_deaths(&mut self) {
+        let mut to_remove = Vec::new();
+
+        if let Some(healths) = self.components.get_mut("Health") {
+            for (&entity, value) in healths.iter() {
+                if let Some(obj) = value.as_object() {
+                    if let Some(current) = obj.get("current") {
+                        if current.as_f64().unwrap_or(1.0) <= 0.0 {
+                            to_remove.push(entity);
+                        }
+                    }
+                }
+            }
+        }
+
+        for entity in to_remove {
+            // Remove Health component
+            if let Some(healths) = self.components.get_mut("Health") {
+                healths.remove(&entity);
+            }
+
+            // Add Corpse component
+            self.set_component(entity, "Corpse", serde_json::json!({}))
+                .ok();
+
+            // Add Decay component with default time_remaining (e.g., 5 ticks)
+            self.set_component(entity, "Decay", serde_json::json!({ "time_remaining": 5 }))
+                .ok();
+        }
+    }
+
+    pub fn process_decay(&mut self) {
+        let mut to_remove_entities = Vec::new();
+
+        if let Some(decays) = self.components.get_mut("Decay") {
+            for (&entity, value) in decays.iter_mut() {
+                if let Some(obj) = value.as_object_mut() {
+                    if let Some(time_remaining) = obj.get_mut("time_remaining") {
+                        if let Some(t) = time_remaining.as_u64() {
+                            if t <= 1 {
+                                to_remove_entities.push(entity);
+                            } else {
+                                *time_remaining = serde_json::json!(t - 1);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        for entity in to_remove_entities {
+            self.remove_entity(entity);
+        }
+    }
+
+    pub fn remove_entity(&mut self, entity: u32) {
+        // Remove all components associated with the entity
+        for comps in self.components.values_mut() {
+            comps.remove(&entity);
+        }
+        // Optionally remove from entity list if you maintain one
     }
 }
 
