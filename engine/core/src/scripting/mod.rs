@@ -95,6 +95,60 @@ impl ScriptEngine {
         })?;
         globals.set("set_mode", set_mode)?;
 
+        // move_all(dx, dy)
+        let world_move = world.clone();
+        let move_all = self
+            .lua
+            .create_function_mut(move |_, (dx, dy): (f32, f32)| {
+                let mut world = world_move.borrow_mut();
+                world.move_all(dx, dy);
+                Ok(())
+            })?;
+        globals.set("move_all", move_all)?;
+
+        let world_print = world.clone();
+        let print_positions = self.lua.create_function_mut(move |_, ()| {
+            let world = world_print.borrow();
+            world.print_positions();
+            Ok(())
+        })?;
+        globals.set("print_positions", print_positions)?;
+
+        // damage_all(amount)
+        let world_damage = world.clone();
+        let damage_all = self.lua.create_function_mut(move |_, amount: f32| {
+            let mut world = world_damage.borrow_mut();
+            world.damage_all(amount);
+            Ok(())
+        })?;
+        globals.set("damage_all", damage_all)?;
+
+        // print_healths()
+        let world_print_health = world.clone();
+        let print_healths = self.lua.create_function_mut(move |_, ()| {
+            let world = world_print_health.borrow();
+            world.print_healths();
+            Ok(())
+        })?;
+        globals.set("print_healths", print_healths)?;
+
+        // tick()
+        let world_tick = world.clone();
+        let tick = self.lua.create_function_mut(move |_, ()| {
+            let mut world = world_tick.borrow_mut();
+            world.tick();
+            Ok(())
+        })?;
+        globals.set("tick", tick)?;
+
+        // get_turn()
+        let world_get_turn = world.clone();
+        let get_turn = self.lua.create_function_mut(move |_, ()| {
+            let world = world_get_turn.borrow();
+            Ok(world.turn)
+        })?;
+        globals.set("get_turn", get_turn)?;
+
         Ok(())
     }
 }
@@ -110,6 +164,7 @@ pub struct World {
     pub components: HashMap<String, HashMap<u32, JsonValue>>,
     next_id: u32,
     current_mode: String,
+    pub turn: u32,
 }
 
 impl World {
@@ -119,6 +174,7 @@ impl World {
             components: HashMap::new(),
             next_id: 1,
             current_mode: "colony".to_string(),
+            turn: 0,
         }
     }
 
@@ -164,6 +220,67 @@ impl World {
     // Generic get_component
     pub fn get_component(&self, entity: u32, name: &str) -> Option<&JsonValue> {
         self.components.get(name)?.get(&entity)
+    }
+
+    pub fn move_all(&mut self, dx: f32, dy: f32) {
+        if let Some(positions) = self.components.get_mut("Position") {
+            for (_entity, value) in positions.iter_mut() {
+                if let Some(obj) = value.as_object_mut() {
+                    if let Some(x) = obj.get_mut("x") {
+                        if let Some(x_val) = x.as_f64() {
+                            *x = serde_json::json!(x_val + dx as f64);
+                        }
+                    }
+                    if let Some(y) = obj.get_mut("y") {
+                        if let Some(y_val) = y.as_f64() {
+                            *y = serde_json::json!(y_val + dy as f64);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn print_positions(&self) {
+        if let Some(positions) = self.components.get("Position") {
+            for (entity, value) in positions {
+                println!("Entity {}: {:?}", entity, value);
+            }
+        } else {
+            println!("No Position components found.");
+        }
+    }
+
+    pub fn damage_all(&mut self, amount: f32) {
+        if let Some(healths) = self.components.get_mut("Health") {
+            for (_entity, value) in healths.iter_mut() {
+                if let Some(obj) = value.as_object_mut() {
+                    if let Some(current) = obj.get_mut("current") {
+                        if let Some(cur_val) = current.as_f64() {
+                            let new_val = (cur_val - amount as f64).max(0.0);
+                            *current = serde_json::json!(new_val);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn print_healths(&self) {
+        if let Some(healths) = self.components.get("Health") {
+            for (entity, value) in healths {
+                println!("Entity {}: {:?}", entity, value);
+            }
+        } else {
+            println!("No Health components found.");
+        }
+    }
+
+    pub fn tick(&mut self) {
+        // Example: move all entities by (1, 0) and damage all by 1
+        self.move_all(1.0, 0.0);
+        self.damage_all(1.0);
+        self.turn += 1;
     }
 }
 
