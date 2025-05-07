@@ -114,6 +114,24 @@ impl ScriptEngine {
         })?;
         globals.set("print_positions", print_positions)?;
 
+        // damage_all(amount)
+        let world_damage = world.clone();
+        let damage_all = self.lua.create_function_mut(move |_, amount: f32| {
+            let mut world = world_damage.borrow_mut();
+            world.damage_all(amount);
+            Ok(())
+        })?;
+        globals.set("damage_all", damage_all)?;
+
+        // print_healths()
+        let world_print_health = world.clone();
+        let print_healths = self.lua.create_function_mut(move |_, ()| {
+            let world = world_print_health.borrow();
+            world.print_healths();
+            Ok(())
+        })?;
+        globals.set("print_healths", print_healths)?;
+
         Ok(())
     }
 }
@@ -211,6 +229,31 @@ impl World {
             }
         } else {
             println!("No Position components found.");
+        }
+    }
+
+    pub fn damage_all(&mut self, amount: f32) {
+        if let Some(healths) = self.components.get_mut("Health") {
+            for (_entity, value) in healths.iter_mut() {
+                if let Some(obj) = value.as_object_mut() {
+                    if let Some(current) = obj.get_mut("current") {
+                        if let Some(cur_val) = current.as_f64() {
+                            let new_val = (cur_val - amount as f64).max(0.0);
+                            *current = serde_json::json!(new_val);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn print_healths(&self) {
+        if let Some(healths) = self.components.get("Health") {
+            for (entity, value) in healths {
+                println!("Entity {}: {:?}", entity, value);
+            }
+        } else {
+            println!("No Health components found.");
         }
     }
 }

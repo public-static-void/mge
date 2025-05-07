@@ -1,0 +1,5 @@
+local id = spawn_entity()
+set_component(id, "Health", { current = 10.0, max = 10.0 })
+print_healths()
+damage_all(3.0)
+print_healths()
