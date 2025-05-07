@@ -95,6 +95,25 @@ impl ScriptEngine {
         })?;
         globals.set("set_mode", set_mode)?;
 
+        // move_all(dx, dy)
+        let world_move = world.clone();
+        let move_all = self
+            .lua
+            .create_function_mut(move |_, (dx, dy): (f32, f32)| {
+                let mut world = world_move.borrow_mut();
+                world.move_all(dx, dy);
+                Ok(())
+            })?;
+        globals.set("move_all", move_all)?;
+
+        let world_print = world.clone();
+        let print_positions = self.lua.create_function_mut(move |_, ()| {
+            let world = world_print.borrow();
+            world.print_positions();
+            Ok(())
+        })?;
+        globals.set("print_positions", print_positions)?;
+
         Ok(())
     }
 }
@@ -164,6 +183,35 @@ impl World {
     // Generic get_component
     pub fn get_component(&self, entity: u32, name: &str) -> Option<&JsonValue> {
         self.components.get(name)?.get(&entity)
+    }
+
+    pub fn move_all(&mut self, dx: f32, dy: f32) {
+        if let Some(positions) = self.components.get_mut("Position") {
+            for (_entity, value) in positions.iter_mut() {
+                if let Some(obj) = value.as_object_mut() {
+                    if let Some(x) = obj.get_mut("x") {
+                        if let Some(x_val) = x.as_f64() {
+                            *x = serde_json::json!(x_val + dx as f64);
+                        }
+                    }
+                    if let Some(y) = obj.get_mut("y") {
+                        if let Some(y_val) = y.as_f64() {
+                            *y = serde_json::json!(y_val + dy as f64);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn print_positions(&self) {
+        if let Some(positions) = self.components.get("Position") {
+            for (entity, value) in positions {
+                println!("Entity {}: {:?}", entity, value);
+            }
+        } else {
+            println!("No Position components found.");
+        }
     }
 }
 

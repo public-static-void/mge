@@ -9,6 +9,7 @@ pub mod scripting;
 pub use ecs::components::{ColonyHappiness, Health, Position, RoguelikeInventory};
 pub use ecs::{EcsWorld, Error};
 pub use modes::GameMode as Mode;
+pub use scripting::World;
 
 #[cfg(test)]
 mod tests {
