@@ -13,20 +13,32 @@
 //! 3. Register new Lua functions in `register_world`.
 //! 4. Add Lua and Rust tests.
 
+pub mod input;
+
+use self::input::{InputProvider, StdinInput};
 use mlua::LuaSerdeExt;
 use mlua::{Lua, Result as LuaResult, Table, Value as LuaValue};
 use serde_json::Value as JsonValue;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 pub struct ScriptEngine {
     lua: Lua,
+    input_provider: Arc<Mutex<Box<dyn InputProvider + Send + Sync>>>,
 }
 
 impl ScriptEngine {
     pub fn new() -> Self {
-        ScriptEngine { lua: Lua::new() }
+        Self::new_with_input(Box::new(StdinInput))
+    }
+
+    pub fn new_with_input(input_provider: Box<dyn InputProvider + Send + Sync>) -> Self {
+        Self {
+            lua: Lua::new(),
+            input_provider: Arc::new(Mutex::new(input_provider)),
+        }
     }
 
     pub fn run_script(&self, code: &str) -> LuaResult<()> {
@@ -46,7 +58,7 @@ impl ScriptEngine {
         }
     }
 
-    pub fn register_world(&self, world: Rc<RefCell<World>>) -> mlua::Result<()> {
+    pub fn register_world(&mut self, world: Rc<RefCell<World>>) -> mlua::Result<()> {
         let globals = self.lua.globals();
 
         // Spawn entity
@@ -219,6 +231,15 @@ impl ScriptEngine {
                 Ok(world.count_entities_with_type(&type_str))
             })?;
         globals.set("count_entities_with_type", count_entities_with_type)?;
+
+        let input_provider = Arc::clone(&self.input_provider);
+        let get_user_input = self.lua.create_function(move |_, prompt: String| {
+            let mut provider = input_provider
+                .lock()
+                .map_err(|_| mlua::Error::external("Input provider lock poisoned"))?;
+            provider.read_line(&prompt).map_err(mlua::Error::external)
+        })?;
+        globals.set("get_user_input", get_user_input)?;
 
         Ok(())
     }

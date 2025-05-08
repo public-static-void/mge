@@ -1,11 +1,34 @@
+use engine_core::scripting::input::InputProvider;
 use engine_core::scripting::{ScriptEngine, World};
 use mlua::Lua;
 use serde_json::json;
 use std::cell::RefCell;
+use std::collections::VecDeque;
 use std::rc::Rc;
+use std::sync::Mutex;
+
+pub struct MockInput {
+    inputs: Mutex<VecDeque<String>>,
+}
+
+impl MockInput {
+    pub fn new(inputs: Vec<String>) -> Self {
+        Self {
+            inputs: Mutex::new(inputs.into()),
+        }
+    }
+}
+
+impl InputProvider for MockInput {
+    fn read_line(&mut self, _prompt: &str) -> Result<String, std::io::Error> {
+        self.inputs.lock().unwrap().pop_front().ok_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::UnexpectedEof, "No more mock inputs")
+        })
+    }
+}
 
 fn setup_engine_with_modes(_lua: &mlua::Lua) -> ScriptEngine {
-    let engine = ScriptEngine::new();
+    let mut engine = ScriptEngine::new();
     let world = Rc::new(RefCell::new(World::new()));
     // Optionally: register components or set up modes here if needed
     engine.register_world(world).unwrap();
@@ -14,7 +37,7 @@ fn setup_engine_with_modes(_lua: &mlua::Lua) -> ScriptEngine {
 
 #[test]
 fn lua_can_spawn_and_move_entity() {
-    let engine = ScriptEngine::new();
+    let mut engine = ScriptEngine::new();
     let world = Rc::new(RefCell::new(World::new()));
     engine.register_world(world.clone()).unwrap();
 
@@ -44,7 +67,7 @@ fn lua_can_spawn_and_move_entity() {
 
 #[test]
 fn lua_can_run_script_from_file() {
-    let engine = ScriptEngine::new();
+    let mut engine = ScriptEngine::new();
     let world = Rc::new(RefCell::new(World::new()));
     engine.register_world(world.clone()).unwrap();
 
@@ -64,7 +87,7 @@ fn lua_can_run_script_from_file() {
 
 #[test]
 fn lua_can_set_and_get_health() {
-    let engine = ScriptEngine::new();
+    let mut engine = ScriptEngine::new();
     let world = Rc::new(RefCell::new(World::new()));
     engine.register_world(world.clone()).unwrap();
 
@@ -88,7 +111,7 @@ fn lua_can_set_and_get_arbitrary_component() {
     use std::cell::RefCell;
     use std::rc::Rc;
 
-    let engine = ScriptEngine::new();
+    let mut engine = ScriptEngine::new();
     let world = Rc::new(RefCell::new(World::new()));
     engine.register_world(world.clone()).unwrap();
 
@@ -228,7 +251,7 @@ fn test_count_entities_with_type() {
 #[test]
 fn test_lua_damage_and_count_entities() {
     let world = Rc::new(RefCell::new(World::new()));
-    let engine = ScriptEngine::new();
+    let mut engine = ScriptEngine::new();
     engine.register_world(world.clone()).unwrap();
 
     let script = r#"
@@ -249,5 +272,22 @@ fn test_lua_damage_and_count_entities() {
 
         assert(count_entities_with_type("enemy") == 2)
     "#;
+    assert!(engine.run_script(script).is_ok());
+}
+
+#[test]
+fn test_lua_get_user_input_with_mock() {
+    let inputs = vec!["hello".to_string()];
+    let mock_input = Box::new(MockInput::new(inputs));
+
+    let world = Rc::new(RefCell::new(World::new()));
+    let mut engine = ScriptEngine::new_with_input(mock_input);
+    engine.register_world(world.clone()).unwrap();
+
+    let script = r#"
+        local input = get_user_input("Prompt: ")
+        assert(input == "hello")
+    "#;
+
     assert!(engine.run_script(script).is_ok());
 }

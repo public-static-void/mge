@@ -46,7 +46,9 @@ MGE supports Lua scripting for rapid prototyping, modding, and gameplay logic.
 - You can switch game modes at runtime and only access components valid for the current mode.
 - Attempting to set or get a component not available in the current mode will result in an error.
 
-**Available Lua functions:**
+---
+
+### Lua Scripting API
 
 | Function             | Description                                      |
 | -------------------- | ------------------------------------------------ |
@@ -63,6 +65,64 @@ MGE supports Lua scripting for rapid prototyping, modding, and gameplay logic.
 | `process_deaths()`   | Convert dead entities to corpses and start decay |
 | `process_decay()`    | Decrement decay, remove entities when done       |
 | `remove_entity(id)`  | Remove an entity and all its components          |
+| `get_user_input()`   | Prompt the user for input and return a string    |
+
+---
+
+### Interactive User Input & Roguelike Demo
+
+#### Interactive Input Support
+
+MGE supports **interactive user input** in Lua scripts via a dependency-injected input provider:
+
+- **`get_user_input(prompt)`**: Prompts the player and returns their input as a string.
+- This enables fully interactive CLI games and demos, including turn-based gameplay and user-driven choices.
+- The input system is testable and supports dependency injection for automated testing.
+
+#### Example: Interactive Roguelike Demo
+
+A full-featured, interactive roguelike demo is included at
+`engine/scripts/lua/roguelike_mvp.lua`.
+
+**Controls:**
+
+- `w/a/s/d`: Move the player
+- `e`: Attack an adjacent enemy
+- `q`: Quit the game
+
+**How to run:**
+
+```bash
+cargo run --bin mge-cli -- engine/scripts/lua/roguelike_mvp.lua
+```
+
+**Gameplay:**
+
+- Each turn, the player is prompted for an action.
+- Enemies move and attack after the player.
+- The game ends if the player dies or all enemies are defeated.
+
+**Sample Lua snippet:**
+
+```lua
+while true do
+    local cmd = get_user_input("Your move (w/a/s/d, e=attack, q=quit): ")
+    if directions[cmd] then
+        move_entity(player, directions[cmd][1], directions[cmd][2])
+    elseif cmd == "e" then
+        -- attack logic
+    elseif cmd == "q" then
+        print("Quitting game. Goodbye!")
+        break
+    else
+        print("Unknown command.")
+    end
+end
+```
+
+#### Automated Testing of Input
+
+- The input system can be mocked for automated tests, ensuring scripts using `get_user_input` can be tested without manual intervention.
 
 ---
 
@@ -146,6 +206,12 @@ Or to test death/removal and decay:
 
 ```bash
 cargo run --bin mge-cli -- engine/scripts/lua/death_removal_demo.lua
+```
+
+Or to play the interactive roguelike demo:
+
+```bash
+cargo run --bin mge-cli -- engine/scripts/lua/roguelike_mvp.lua
 ```
 
 This executes your Lua script with full access to the ECS scripting API, including mode enforcement.

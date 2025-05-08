@@ -32,7 +32,7 @@ fn test_tick_advances_turn_and_runs_systems() {
 
 #[test]
 fn test_lua_tick() {
-    let engine = ScriptEngine::new();
+    let mut engine = ScriptEngine::new();
     let world = Rc::new(RefCell::new(World::new()));
     engine.register_world(world.clone()).unwrap();
 

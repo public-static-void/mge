@@ -4,7 +4,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 fn main() {
-    let engine = ScriptEngine::new();
+    let mut engine = ScriptEngine::new();
     let world = Rc::new(RefCell::new(World::new()));
     engine.register_world(world.clone()).unwrap();
 
