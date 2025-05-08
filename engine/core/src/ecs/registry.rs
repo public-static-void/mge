@@ -1,5 +1,5 @@
-use super::{ComponentSchema, RegistryError};
-use crate::ecs::error::MigrationError;
+use crate::ecs::error::{MigrationError, RegistryError};
+use crate::ecs::schema::ComponentSchema;
 pub use semver::Version;
 use serde_json;
 use std::any::TypeId;
@@ -8,6 +8,7 @@ use std::collections::HashMap;
 /// Registry for component schemas and metadata.
 pub struct ComponentRegistry {
     components: HashMap<TypeId, ComponentSchema>,
+    external_components: HashMap<String, ComponentSchema>,
 }
 
 /// Trait for ECS components supporting schema, versioning, and migration.
@@ -37,6 +38,7 @@ impl ComponentRegistry {
     pub fn new() -> Self {
         Self {
             components: HashMap::new(),
+            external_components: HashMap::new(),
         }
     }
 
@@ -49,7 +51,8 @@ impl ComponentRegistry {
             type_id,
             ComponentSchema {
                 name: std::any::type_name::<T>().to_string(),
-                schema,
+                schema: schema.expect("schema must be present"),
+                modes: vec![],
             },
         );
         Ok(())
@@ -61,7 +64,10 @@ impl ComponentRegistry {
     }
 
     pub fn get_schema_by_name(&self, name: &str) -> Option<&ComponentSchema> {
-        self.components.values().find(|schema| schema.name == name)
+        self.components
+            .values()
+            .find(|schema| schema.name == name)
+            .or_else(|| self.external_components.get(name))
     }
 
     /// Get the JSON schema for a component as a pretty-printed string.
@@ -70,11 +76,7 @@ impl ComponentRegistry {
             .get_schema::<T>()
             .ok_or(RegistryError::UnregisteredComponent)?;
 
-        schema
-            .schema
-            .as_ref()
-            .ok_or(RegistryError::InvalidSchema)
-            .and_then(|s| serde_json::to_string_pretty(s).map_err(Into::into))
+        serde_json::to_string_pretty(&schema.schema).map_err(Into::into)
     }
 
     /// Migrate component data from a previous version.
@@ -91,5 +93,9 @@ impl ComponentRegistry {
         }
 
         T::migrate(from_version, data)
+    }
+
+    pub fn register_external_schema(&mut self, schema: ComponentSchema) {
+        self.external_components.insert(schema.name.clone(), schema);
     }
 }
