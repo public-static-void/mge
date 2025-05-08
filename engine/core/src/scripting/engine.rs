@@ -1,6 +1,6 @@
+use super::helpers::{json_to_lua_table, lua_table_to_json};
 use super::input::{InputProvider, StdinInput};
 use super::world::World;
-use mlua::LuaSerdeExt;
 use mlua::{Lua, Result as LuaResult, Table, Value as LuaValue};
 use serde_json::Value as JsonValue;
 use std::cell::RefCell;
@@ -28,19 +28,6 @@ impl ScriptEngine {
         self.lua.load(code).exec()
     }
 
-    fn lua_table_to_json(lua: &Lua, table: &Table) -> LuaResult<JsonValue> {
-        lua.from_value(LuaValue::Table(table.clone()))
-    }
-
-    fn json_to_lua_table<'lua>(lua: &'lua Lua, value: &JsonValue) -> LuaResult<Table<'lua>> {
-        let lua_value = lua.to_value(value)?;
-        if let LuaValue::Table(tbl) = lua_value {
-            Ok(tbl)
-        } else {
-            lua.create_table()
-        }
-    }
-
     pub fn register_world(&mut self, world: Rc<RefCell<World>>) -> mlua::Result<()> {
         let globals = self.lua.globals();
 
@@ -57,7 +44,7 @@ impl ScriptEngine {
         let set_component = self.lua.create_function_mut(
             move |lua, (entity, name, table): (u32, String, Table)| {
                 let mut world = world_set.borrow_mut();
-                let json_value: JsonValue = Self::lua_table_to_json(lua, &table)?;
+                let json_value: JsonValue = lua_table_to_json(lua, &table)?;
                 match world.set_component(entity, &name, json_value) {
                     Ok(_) => Ok(true),
                     Err(e) => Err(mlua::Error::external(e)),
@@ -73,7 +60,7 @@ impl ScriptEngine {
                 .create_function_mut(move |lua, (entity, name): (u32, String)| {
                     let world = world_get.borrow();
                     if let Some(val) = world.get_component(entity, &name) {
-                        let tbl = Self::json_to_lua_table(lua, val)?;
+                        let tbl = json_to_lua_table(lua, val)?;
                         Ok(LuaValue::Table(tbl))
                     } else {
                         Ok(LuaValue::Nil)
