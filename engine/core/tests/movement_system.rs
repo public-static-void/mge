@@ -32,7 +32,7 @@ fn test_move_all_moves_positions() {
 
 #[test]
 fn test_lua_move_all() {
-    let engine = ScriptEngine::new();
+    let mut engine = ScriptEngine::new();
     let world = Rc::new(RefCell::new(World::new()));
     engine.register_world(world.clone()).unwrap();
 
