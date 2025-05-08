@@ -20,7 +20,7 @@ fn main() {
 
     // --- ECS + Lua context ---
     let world = Rc::new(RefCell::new(World::new()));
-    let engine = ScriptEngine::new();
+    let mut engine = ScriptEngine::new();
     engine
         .register_world(world.clone())
         .expect("Failed to register ECS API");
