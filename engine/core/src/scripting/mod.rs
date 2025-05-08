@@ -176,6 +176,50 @@ impl ScriptEngine {
         })?;
         globals.set("remove_entity", remove_entity)?;
 
+        let world_get_entities = world.clone();
+        let get_entities_with_component =
+            self.lua.create_function_mut(move |_, name: String| {
+                let world = world_get_entities.borrow();
+                let ids = world.get_entities_with_component(&name);
+                Ok(ids)
+            })?;
+        globals.set("get_entities_with_component", get_entities_with_component)?;
+
+        let world_move_entity = world.clone();
+        let move_entity =
+            self.lua
+                .create_function_mut(move |_, (entity, dx, dy): (u32, f32, f32)| {
+                    let mut world = world_move_entity.borrow_mut();
+                    world.move_entity(entity, dx, dy);
+                    Ok(())
+                })?;
+        globals.set("move_entity", move_entity)?;
+
+        let world_is_alive = world.clone();
+        let is_entity_alive = self.lua.create_function_mut(move |_, entity: u32| {
+            let world = world_is_alive.borrow();
+            Ok(world.is_entity_alive(entity))
+        })?;
+        globals.set("is_entity_alive", is_entity_alive)?;
+
+        let world_damage_entity = world.clone();
+        let damage_entity =
+            self.lua
+                .create_function_mut(move |_, (entity, amount): (u32, f32)| {
+                    let mut world = world_damage_entity.borrow_mut();
+                    world.damage_entity(entity, amount);
+                    Ok(())
+                })?;
+        globals.set("damage_entity", damage_entity)?;
+
+        let world_count_type = world.clone();
+        let count_entities_with_type =
+            self.lua.create_function_mut(move |_, type_str: String| {
+                let world = world_count_type.borrow();
+                Ok(world.count_entities_with_type(&type_str))
+            })?;
+        globals.set("count_entities_with_type", count_entities_with_type)?;
+
         Ok(())
     }
 }
@@ -224,6 +268,7 @@ impl World {
             ("Corpse", "roguelike") => true,
             ("Decay", "colony") => true,
             ("Decay", "roguelike") => true,
+            ("Type", _) => true,
             // Add more as needed
             _ => false,
         }
@@ -378,6 +423,71 @@ impl World {
             comps.remove(&entity);
         }
         // Optionally remove from entity list if you maintain one
+    }
+
+    pub fn get_entities_with_component(&self, name: &str) -> Vec<u32> {
+        self.components
+            .get(name)
+            .map(|map| map.keys().cloned().collect())
+            .unwrap_or_default()
+    }
+
+    pub fn move_entity(&mut self, entity: u32, dx: f32, dy: f32) {
+        if let Some(positions) = self.components.get_mut("Position") {
+            if let Some(value) = positions.get_mut(&entity) {
+                if let Some(obj) = value.as_object_mut() {
+                    if let Some(x) = obj.get_mut("x") {
+                        if let Some(x_val) = x.as_f64() {
+                            *x = serde_json::json!(x_val + dx as f64);
+                        }
+                    }
+                    if let Some(y) = obj.get_mut("y") {
+                        if let Some(y_val) = y.as_f64() {
+                            *y = serde_json::json!(y_val + dy as f64);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn is_entity_alive(&self, entity: u32) -> bool {
+        if let Some(health) = self.get_component(entity, "Health") {
+            health
+                .get("current")
+                .and_then(|v| v.as_f64())
+                .unwrap_or(0.0)
+                > 0.0
+        } else {
+            false
+        }
+    }
+
+    pub fn damage_entity(&mut self, entity: u32, amount: f32) {
+        if let Some(healths) = self.components.get_mut("Health") {
+            if let Some(value) = healths.get_mut(&entity) {
+                if let Some(obj) = value.as_object_mut() {
+                    if let Some(current) = obj.get_mut("current") {
+                        if let Some(cur_val) = current.as_f64() {
+                            *current = serde_json::json!((cur_val - amount as f64).max(0.0));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn count_entities_with_type(&self, type_str: &str) -> usize {
+        self.get_entities_with_component("Type")
+            .into_iter()
+            .filter(|&id| {
+                self.get_component(id, "Type")
+                    .and_then(|v| v.get("kind"))
+                    .and_then(|k| k.as_str())
+                    .map(|k| k == type_str)
+                    .unwrap_or(false)
+            })
+            .count()
     }
 }
 
