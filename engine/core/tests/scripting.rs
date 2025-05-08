@@ -1,5 +1,6 @@
 use engine_core::scripting::{ScriptEngine, World};
 use mlua::Lua;
+use serde_json::json;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -133,6 +134,120 @@ fn test_lua_component_access_mode_enforcement() {
             set_component(id, "Roguelike::Inventory", { slots = 4, weight = 1.5 })
         end)
         assert(ok == false)
+    "#;
+    assert!(engine.run_script(script).is_ok());
+}
+
+#[test]
+fn test_get_entities_with_component() {
+    let mut world = World::new();
+    let id1 = world.spawn();
+    let id2 = world.spawn();
+    world
+        .set_component(id1, "Type", json!({ "kind": "player" }))
+        .unwrap();
+    world
+        .set_component(id2, "Type", json!({ "kind": "enemy" }))
+        .unwrap();
+
+    let ids = world.get_entities_with_component("Type");
+    assert!(ids.contains(&id1));
+    assert!(ids.contains(&id2));
+}
+
+#[test]
+fn test_move_entity() {
+    let mut world = World::new();
+    let id = world.spawn();
+    world
+        .set_component(id, "Position", json!({ "x": 0.0, "y": 0.0 }))
+        .unwrap();
+    world.move_entity(id, 1.0, 2.0);
+    let pos = world.get_component(id, "Position").unwrap();
+    assert_eq!(pos["x"], 1.0);
+    assert_eq!(pos["y"], 2.0);
+}
+
+#[test]
+fn test_is_entity_alive() {
+    let mut world = World::new();
+    let id = world.spawn();
+    world
+        .set_component(id, "Health", json!({ "current": 5.0, "max": 5.0 }))
+        .unwrap();
+    assert!(world.is_entity_alive(id));
+    world
+        .set_component(id, "Health", json!({ "current": 0.0, "max": 5.0 }))
+        .unwrap();
+    assert!(!world.is_entity_alive(id));
+}
+
+#[test]
+fn test_damage_entity() {
+    let mut world = World::new();
+    let id = world.spawn();
+    world
+        .set_component(id, "Health", json!({ "current": 10.0, "max": 10.0 }))
+        .unwrap();
+
+    world.damage_entity(id, 3.0);
+    let health = world.get_component(id, "Health").unwrap();
+    assert_eq!(health["current"], 7.0);
+
+    // Should not go below zero
+    world.damage_entity(id, 10.0);
+    let health = world.get_component(id, "Health").unwrap();
+    assert_eq!(health["current"], 0.0);
+}
+
+#[test]
+fn test_count_entities_with_type() {
+    let mut world = World::new();
+    let player = world.spawn();
+    let enemy1 = world.spawn();
+    let enemy2 = world.spawn();
+
+    world
+        .set_component(player, "Type", json!({ "kind": "player" }))
+        .unwrap();
+    world
+        .set_component(enemy1, "Type", json!({ "kind": "enemy" }))
+        .unwrap();
+    world
+        .set_component(enemy2, "Type", json!({ "kind": "enemy" }))
+        .unwrap();
+
+    assert_eq!(world.count_entities_with_type("player"), 1);
+    assert_eq!(world.count_entities_with_type("enemy"), 2);
+
+    // Remove one enemy and test again
+    world.remove_entity(enemy1);
+    assert_eq!(world.count_entities_with_type("enemy"), 1);
+}
+
+#[test]
+fn test_lua_damage_and_count_entities() {
+    let world = Rc::new(RefCell::new(World::new()));
+    let engine = ScriptEngine::new();
+    engine.register_world(world.clone()).unwrap();
+
+    let script = r#"
+        local p = spawn_entity()
+        set_component(p, "Type", { kind = "player" })
+        set_component(p, "Health", { current = 10, max = 10 })
+
+        local e1 = spawn_entity()
+        set_component(e1, "Type", { kind = "enemy" })
+        set_component(e1, "Health", { current = 5, max = 5 })
+
+        local e2 = spawn_entity()
+        set_component(e2, "Type", { kind = "enemy" })
+        set_component(e2, "Health", { current = 5, max = 5 })
+
+        damage_entity(e1, 2)
+        assert(get_component(e1, "Health").current == 3)
+
+        assert(count_entities_with_type("enemy") == 2)
     "#;
     assert!(engine.run_script(script).is_ok());
 }
