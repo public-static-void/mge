@@ -1,0 +1,10 @@
+{
+  "title": "Health",
+  "type": "object",
+  "properties": {
+    "current": { "type": "number", "minimum": 0, "maximum": 100 },
+    "max": { "type": "number", "minimum": 1, "maximum": 100 }
+  },
+  "required": ["current", "max"],
+  "modes": ["colony", "roguelike"]
+}
