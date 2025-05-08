@@ -114,3 +114,25 @@ fn test_macro_generated_migration() {
     assert_eq!(pos.x, 5.0);
     assert_eq!(pos.y, 3.0);
 }
+
+#[test]
+fn test_external_schema_loading() {
+    use engine_core::ecs::registry::ComponentRegistry;
+    use engine_core::ecs::schema::load_schemas_from_dir;
+
+    let schema_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap() + "/../assets/schemas";
+    let schemas = load_schemas_from_dir(&schema_dir).expect("Failed to load schemas");
+    assert!(
+        schemas.contains_key("Health"),
+        "Health schema should be loaded"
+    );
+
+    let mut registry = ComponentRegistry::default();
+
+    for (_name, schema) in schemas {
+        registry.register_external_schema(schema);
+    }
+
+    // Now you can check that the registry has the schema
+    assert!(registry.get_schema_by_name("Health").is_some());
+}
