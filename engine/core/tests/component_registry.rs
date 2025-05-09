@@ -136,3 +136,55 @@ fn test_external_schema_loading() {
     // Now you can check that the registry has the schema
     assert!(registry.get_schema_by_name("Health").is_some());
 }
+
+#[test]
+fn test_schema_driven_mode_enforcement() {
+    use engine_core::ecs::registry::ComponentRegistry;
+    use engine_core::ecs::schema::load_schemas_from_dir;
+    use engine_core::scripting::world::World;
+    use serde_json::json;
+    use std::sync::Arc;
+
+    // Load external schemas (assume at least health.json and roguelike_inventory.json exist)
+    let schema_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap() + "/../assets/schemas";
+    let schemas = load_schemas_from_dir(&schema_dir).expect("Failed to load schemas");
+    let mut registry = ComponentRegistry::new();
+    for (_name, schema) in schemas {
+        registry.register_external_schema(schema);
+    }
+    let registry = Arc::new(registry);
+
+    let mut world = World::new(registry.clone());
+
+    // Set mode to "colony" and try to add "Health" (should succeed)
+    world.current_mode = "colony".to_string();
+    let entity = world.spawn();
+    assert!(
+        world
+            .set_component(entity, "Health", json!({"current": 10, "max": 10}))
+            .is_ok()
+    );
+
+    // Try to add "Roguelike::Inventory" in "colony" mode (should fail)
+    let result = world.set_component(
+        entity,
+        "Roguelike::Inventory",
+        json!({"slots": [], "weight": 0.0}),
+    );
+    assert!(
+        result.is_err(),
+        "Component should not be allowed in this mode"
+    );
+
+    // Switch to "roguelike" mode and try again (should succeed)
+    world.current_mode = "roguelike".to_string();
+    assert!(
+        world
+            .set_component(
+                entity,
+                "Roguelike::Inventory",
+                json!({"slots": [], "weight": 0.0})
+            )
+            .is_ok()
+    );
+}

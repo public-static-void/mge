@@ -1,9 +1,12 @@
+use engine_core::ecs::registry::ComponentRegistry;
 use engine_core::scripting::World;
 use serde_json::json;
+use std::sync::Arc;
 
 #[test]
 fn test_death_replaces_health_with_corpse_and_decay() {
-    let mut world = World::new();
+    let registry = Arc::new(ComponentRegistry::new());
+    let mut world = World::new(registry.clone());
 
     let id = world.spawn();
     world
@@ -29,7 +32,8 @@ fn test_death_replaces_health_with_corpse_and_decay() {
 
 #[test]
 fn test_decay_removes_entity_after_time() {
-    let mut world = World::new();
+    let registry = Arc::new(ComponentRegistry::new());
+    let mut world = World::new(registry.clone());
 
     let id = world.spawn();
     world.set_component(id, "Corpse", json!({})).unwrap();

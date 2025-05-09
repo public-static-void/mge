@@ -1,10 +1,13 @@
+use engine_core::ecs::registry::ComponentRegistry;
 use engine_core::scripting::{ScriptEngine, World};
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::sync::Arc;
 
 #[test]
 fn test_tick_advances_turn_and_runs_systems() {
-    let mut world = World::new();
+    let registry = Arc::new(ComponentRegistry::new());
+    let mut world = World::new(registry.clone());
 
     let id = world.spawn();
     world
@@ -33,7 +36,8 @@ fn test_tick_advances_turn_and_runs_systems() {
 #[test]
 fn test_lua_tick() {
     let mut engine = ScriptEngine::new();
-    let world = Rc::new(RefCell::new(World::new()));
+    let registry = Arc::new(ComponentRegistry::new());
+    let world = Rc::new(RefCell::new(World::new(registry.clone())));
     engine.register_world(world.clone()).unwrap();
 
     let script = r#"
