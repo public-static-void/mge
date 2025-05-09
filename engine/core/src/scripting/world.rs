@@ -1,5 +1,7 @@
+use crate::ecs::registry::ComponentRegistry;
 use serde_json::Value as JsonValue;
 use std::collections::HashMap;
+use std::sync::Arc;
 
 pub struct World {
     pub entities: Vec<u32>,
@@ -7,16 +9,18 @@ pub struct World {
     next_id: u32,
     pub current_mode: String,
     pub turn: u32,
+    pub registry: Arc<ComponentRegistry>,
 }
 
 impl World {
-    pub fn new() -> Self {
+    pub fn new(registry: Arc<ComponentRegistry>) -> Self {
         World {
             entities: Vec::new(),
             components: HashMap::new(),
             next_id: 1,
             current_mode: "colony".to_string(),
             turn: 0,
+            registry,
         }
     }
 
@@ -264,6 +268,6 @@ impl World {
 
 impl Default for World {
     fn default() -> Self {
-        Self::new()
+        panic!("World::default() is not supported. Use World::new(registry) instead.");
     }
 }

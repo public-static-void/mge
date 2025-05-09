@@ -1,11 +1,13 @@
-mod scripting;
-use scripting::{ScriptEngine, World};
+use engine_core::ecs::registry::ComponentRegistry;
+use engine_core::scripting::{ScriptEngine, World};
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::sync::Arc;
 
 fn main() {
     let mut engine = ScriptEngine::new();
-    let world = Rc::new(RefCell::new(World::new()));
+    let registry = Arc::new(ComponentRegistry::new());
+    let world = Rc::new(RefCell::new(World::new(registry.clone())));
     engine.register_world(world.clone()).unwrap();
 
     // Example Lua script: spawn and move an entity

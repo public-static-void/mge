@@ -1,8 +1,10 @@
+use engine_core::ecs::registry::ComponentRegistry;
 use engine_core::scripting::{ScriptEngine, World};
 use std::cell::RefCell;
 use std::env;
 use std::fs;
 use std::rc::Rc;
+use std::sync::Arc;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -19,7 +21,8 @@ fn main() {
     });
 
     // --- ECS + Lua context ---
-    let world = Rc::new(RefCell::new(World::new()));
+    let registry = Arc::new(ComponentRegistry::new());
+    let world = Rc::new(RefCell::new(World::new(registry.clone())));
     let mut engine = ScriptEngine::new();
     engine
         .register_world(world.clone())
