@@ -1,11 +1,14 @@
 // engine/core/tests/type_component.rs
 
+use engine_core::ecs::registry::ComponentRegistry;
 use engine_core::scripting::World;
 use serde_json::json;
+use std::sync::Arc;
 
 #[test]
 fn test_set_and_get_type_component() {
-    let mut world = World::new();
+    let registry = Arc::new(ComponentRegistry::new());
+    let mut world = World::new(registry.clone());
     let id = world.spawn();
     let type_value = json!({ "kind": "player" });
     world.set_component(id, "Type", type_value.clone()).unwrap();

@@ -1,3 +1,4 @@
+use engine_core::ecs::registry::ComponentRegistry;
 use engine_core::scripting::input::InputProvider;
 use engine_core::scripting::{ScriptEngine, World};
 use mlua::Lua;
@@ -5,6 +6,7 @@ use serde_json::json;
 use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::rc::Rc;
+use std::sync::Arc;
 use std::sync::Mutex;
 
 pub struct MockInput {
@@ -29,7 +31,8 @@ impl InputProvider for MockInput {
 
 fn setup_engine_with_modes(_lua: &mlua::Lua) -> ScriptEngine {
     let mut engine = ScriptEngine::new();
-    let world = Rc::new(RefCell::new(World::new()));
+    let registry = Arc::new(ComponentRegistry::new());
+    let world = Rc::new(RefCell::new(World::new(registry.clone())));
     // Optionally: register components or set up modes here if needed
     engine.register_world(world).unwrap();
     engine
@@ -38,7 +41,8 @@ fn setup_engine_with_modes(_lua: &mlua::Lua) -> ScriptEngine {
 #[test]
 fn lua_can_spawn_and_move_entity() {
     let mut engine = ScriptEngine::new();
-    let world = Rc::new(RefCell::new(World::new()));
+    let registry = Arc::new(ComponentRegistry::new());
+    let world = Rc::new(RefCell::new(World::new(registry.clone())));
     engine.register_world(world.clone()).unwrap();
 
     let script = r#"
@@ -68,7 +72,8 @@ fn lua_can_spawn_and_move_entity() {
 #[test]
 fn lua_can_run_script_from_file() {
     let mut engine = ScriptEngine::new();
-    let world = Rc::new(RefCell::new(World::new()));
+    let registry = Arc::new(ComponentRegistry::new());
+    let world = Rc::new(RefCell::new(World::new(registry.clone())));
     engine.register_world(world.clone()).unwrap();
 
     let script_path = format!(
@@ -88,7 +93,8 @@ fn lua_can_run_script_from_file() {
 #[test]
 fn lua_can_set_and_get_health() {
     let mut engine = ScriptEngine::new();
-    let world = Rc::new(RefCell::new(World::new()));
+    let registry = Arc::new(ComponentRegistry::new());
+    let world = Rc::new(RefCell::new(World::new(registry.clone())));
     engine.register_world(world.clone()).unwrap();
 
     let script_path = format!(
@@ -112,7 +118,8 @@ fn lua_can_set_and_get_arbitrary_component() {
     use std::rc::Rc;
 
     let mut engine = ScriptEngine::new();
-    let world = Rc::new(RefCell::new(World::new()));
+    let registry = Arc::new(ComponentRegistry::new());
+    let world = Rc::new(RefCell::new(World::new(registry.clone())));
     engine.register_world(world.clone()).unwrap();
 
     let script = r#"
@@ -163,7 +170,8 @@ fn test_lua_component_access_mode_enforcement() {
 
 #[test]
 fn test_get_entities_with_component() {
-    let mut world = World::new();
+    let registry = Arc::new(ComponentRegistry::new());
+    let mut world = World::new(registry.clone());
     let id1 = world.spawn();
     let id2 = world.spawn();
     world
@@ -180,7 +188,8 @@ fn test_get_entities_with_component() {
 
 #[test]
 fn test_move_entity() {
-    let mut world = World::new();
+    let registry = Arc::new(ComponentRegistry::new());
+    let mut world = World::new(registry.clone());
     let id = world.spawn();
     world
         .set_component(id, "Position", json!({ "x": 0.0, "y": 0.0 }))
@@ -193,7 +202,8 @@ fn test_move_entity() {
 
 #[test]
 fn test_is_entity_alive() {
-    let mut world = World::new();
+    let registry = Arc::new(ComponentRegistry::new());
+    let mut world = World::new(registry.clone());
     let id = world.spawn();
     world
         .set_component(id, "Health", json!({ "current": 5.0, "max": 5.0 }))
@@ -207,7 +217,8 @@ fn test_is_entity_alive() {
 
 #[test]
 fn test_damage_entity() {
-    let mut world = World::new();
+    let registry = Arc::new(ComponentRegistry::new());
+    let mut world = World::new(registry.clone());
     let id = world.spawn();
     world
         .set_component(id, "Health", json!({ "current": 10.0, "max": 10.0 }))
@@ -225,7 +236,8 @@ fn test_damage_entity() {
 
 #[test]
 fn test_count_entities_with_type() {
-    let mut world = World::new();
+    let registry = Arc::new(ComponentRegistry::new());
+    let mut world = World::new(registry.clone());
     let player = world.spawn();
     let enemy1 = world.spawn();
     let enemy2 = world.spawn();
@@ -250,7 +262,8 @@ fn test_count_entities_with_type() {
 
 #[test]
 fn test_lua_damage_and_count_entities() {
-    let world = Rc::new(RefCell::new(World::new()));
+    let registry = Arc::new(ComponentRegistry::new());
+    let world = Rc::new(RefCell::new(World::new(registry.clone())));
     let mut engine = ScriptEngine::new();
     engine.register_world(world.clone()).unwrap();
 
@@ -280,7 +293,8 @@ fn test_lua_get_user_input_with_mock() {
     let inputs = vec!["hello".to_string()];
     let mock_input = Box::new(MockInput::new(inputs));
 
-    let world = Rc::new(RefCell::new(World::new()));
+    let registry = Arc::new(ComponentRegistry::new());
+    let world = Rc::new(RefCell::new(World::new(registry.clone())));
     let mut engine = ScriptEngine::new_with_input(mock_input);
     engine.register_world(world.clone()).unwrap();
 

@@ -1,10 +1,13 @@
+use engine_core::ecs::registry::ComponentRegistry;
 use engine_core::scripting::{ScriptEngine, World};
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::sync::Arc;
 
 #[test]
 fn test_move_all_moves_positions() {
-    let mut world = World::new();
+    let registry = Arc::new(ComponentRegistry::new());
+    let mut world = World::new(registry.clone());
 
     let id1 = world.spawn();
     let id2 = world.spawn();
@@ -33,7 +36,9 @@ fn test_move_all_moves_positions() {
 #[test]
 fn test_lua_move_all() {
     let mut engine = ScriptEngine::new();
-    let world = Rc::new(RefCell::new(World::new()));
+
+    let registry = Arc::new(ComponentRegistry::new());
+    let world = Rc::new(RefCell::new(World::new(registry.clone())));
     engine.register_world(world.clone()).unwrap();
 
     let script = r#"
