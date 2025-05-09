@@ -87,4 +87,4 @@ The demo script (`engine/scripts/lua/roguelike_mvp.lua`) showcases MGE’s scrip
 
 - [docs/idea.md](docs/idea.md): Architecture/design
 - [docs/examples.md](docs/examples.md): Usage examples
-- [docs/lua.md](docs/lua.md): Lua API reference
+- [docs/lua_api.md](docs/lua_api.md): Lua API reference

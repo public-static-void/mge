@@ -115,4 +115,4 @@ cargo run --bin mge-cli -- engine/scripts/lua/death_removal_demo.lua
 - See [docs/idea.md](idea.md) for the full architecture and design blueprint.
 - Lua scripts are located in `engine/scripts/lua/`.
 - Component schemas are in `engine/assets/schemas/`.
-- [docs/lua.md](docs/lua.md): Lua API reference
+- [docs/lua_api.md](lua_api.md): Lua API reference
