@@ -8,58 +8,49 @@ MGE is a modular, cross-language game engine blueprint and reference implementat
 - Hot-reloadable plugins & cross-language scripting (Lua, Python, WASM)
 - Schema-driven, versioned, and mode-restricted components
 - Runtime mode switching with enforcement in both Rust and scripting
-- Rapid prototyping via Lua scripting bridge
+- Lua scripting bridge for rapid prototyping
 - Extensible architecture for tooling and modding
 
-See [`docs/idea.md`](docs/idea.md) for the full architecture.
+See [docs/idea.md](docs/idea.md) for a deeper dive.
 
 ---
 
-## Repository Structure
+## Quickstart
 
-```text
-engine/
-  core/        # ECS core, registry, schema, migration (Rust)
-  assets/      # Game assets and data
-  scripts/     # Scripts for gameplay, modding, and tests
-  tools/       # Engine tools and utilities
-engine_macros/ # Procedural macros for component ergonomics
-docs/          # Project-wide docs and blueprints
-```
-
----
-
-## Getting Started
-
-1. **Create a World:**
-
-```rust
-let registry = Arc::new(ComponentRegistry::new());
-let mut world = World::new(registry.clone());
-```
-
-The registry contains all component schemas (macro-defined and external JSON/YAML).
-New schemas can be registered at runtime for dynamic/extensible components.
-
-2. **Run tests:**
+**Try the interactive roguelike demo:**
 
 ```bash
-cargo test
+cargo run --bin mge-cli -- engine/scripts/lua/roguelike_mvp.lua
 ```
 
-3. **See [`docs/idea.md`](docs/idea.md) and [`docs/examples.md`](docs/examples.md) for more.**
+**Controls:**
+`w/a/s/d` = move, `e` = attack, `q` = quit
+
+The demo script (`engine/scripts/lua/roguelike_mvp.lua`) showcases MGE’s scripting, ECS, and runtime mode enforcement.
 
 ---
 
-## Schema-Driven Mode Enforcement
+## Usage
 
-- Component schemas (Rust or external JSON/YAML) specify which game modes they support.
-- The registry loads all schemas at startup.
-- When setting or getting a component, the engine checks the current mode against the schema.
-- Errors are raised if a component is not allowed in the current mode.
-- Add new components at runtime by dropping schema files in `engine/assets/schemas/`.
+- **Run any Lua script:**
 
-**Example schema:**
+  ```bash
+  cargo run --bin mge-cli -- engine/scripts/lua/<script_name>.lua
+  ```
+
+- **Create a World in Rust:**
+
+  ```rust
+  let registry = Arc::new(ComponentRegistry::new());
+  let mut world = World::new(registry.clone());
+  ```
+
+- **Add schemas:**
+  Place JSON schemas in `engine/assets/schemas/` (see example below).
+
+---
+
+## Schema Example
 
 ```json
 {
@@ -74,8 +65,6 @@ cargo test
 }
 ```
 
-> **Note:** All new code and tests should use `World::new(registry)` and pass an `Arc<ComponentRegistry>`.
-
 ---
 
 ## Lua Scripting
@@ -83,14 +72,19 @@ cargo test
 - Spawn entities, set/get components, and interact with the ECS from Lua.
 - Game systems like movement, health, turns, death, and decay are scriptable.
 - Switch game modes at runtime; only access components valid for the current mode.
-- See [`docs/examples.md`](docs/examples.md) for full Lua scripts and demos.
+- See [docs/examples.md](docs/examples.md) for more.
 
 ---
 
-## CLI Usage
+## Limitations & Roadmap
 
-Run any ECS-enabled Lua script with:
+- Rust components are not auto-registered; external schemas are loaded only in tests by default.
+- Planned: runtime registration and schema loading, easier API for adding components/schemas.
 
-```bash
-cargo run --bin mge-cli -- engine/scripts/lua/<script_name>.lua
-```
+---
+
+## Resources
+
+- [docs/idea.md](docs/idea.md): Architecture/design
+- [docs/examples.md](docs/examples.md): Usage examples
+- [docs/lua.md](docs/lua.md): Lua API reference
