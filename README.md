@@ -1,23 +1,17 @@
 # Modular Game Engine (MGE)
 
-MGE is a modular, cross-language game engine blueprint and reference implementation.
-It is designed for simulation, games, and rapid prototyping with robust ECS, plugin, and scripting support.
+MGE is a modular, cross-language game engine blueprint and reference implementation for simulation, games, and rapid prototyping.
 
----
+## Features
 
-## Project Overview
+- Macro-driven ECS in Rust
+- Hot-reloadable plugins & cross-language scripting (Lua, Python, WASM)
+- Schema-driven, versioned, and mode-restricted components
+- Runtime mode switching with enforcement in both Rust and scripting
+- Rapid prototyping via Lua scripting bridge
+- Extensible architecture for tooling and modding
 
-MGE provides:
-
-- A Rust-based core engine with a macro-driven ECS framework.
-- Hot-reloadable plugin support and cross-language scripting (Lua, Python, WASM).
-- Out-of-the-box Lua scripting bridge for entity/component manipulation and rapid prototyping.
-- **Runtime mode switching and mode-specific component enforcement** in both Rust and Lua scripting.
-- Mode-specific logic and data (e.g., Colony, Roguelike).
-- Schema-driven, versioned component management.
-- An architecture designed for tooling, modding, and rapid iteration.
-
-For the full architecture and design blueprint, see [`docs/idea.md`](docs/idea.md).
+See [`docs/idea.md`](docs/idea.md) for the full architecture.
 
 ---
 
@@ -25,207 +19,27 @@ For the full architecture and design blueprint, see [`docs/idea.md`](docs/idea.m
 
 ```text
 engine/
-  core/          # ECS core, registry, schema, migration (Rust)
-  docs/          # Engine-specific documentation and specs
-  assets/        # Game assets and data
-  scripts/       # Scripts for gameplay, modding, and tests
-  tools/         # Engine tools and utilities
-engine_macros/   # Procedural macros for component ergonomics
-docs/            # Project-wide docs and blueprints
+  core/        # ECS core, registry, schema, migration (Rust)
+  assets/      # Game assets and data
+  scripts/     # Scripts for gameplay, modding, and tests
+  tools/       # Engine tools and utilities
+engine_macros/ # Procedural macros for component ergonomics
+docs/          # Project-wide docs and blueprints
 ```
-
----
-
-## Scripting (Lua)
-
-MGE supports Lua scripting for rapid prototyping, modding, and gameplay logic.
-
-- Scripts can spawn entities, set/get components (e.g., Position, Health), and interact with the ECS.
-- **Game systems like movement, health, turns, death, and decay are scriptable.**
-- Lua scripts are loaded from `engine/scripts/lua/` and can be tested and run as part of the engine.
-- You can switch game modes at runtime and only access components valid for the current mode.
-- Attempting to set or get a component not available in the current mode will result in an error.
-
----
-
-### Lua Scripting API
-
-| Function             | Description                                      |
-| -------------------- | ------------------------------------------------ |
-| `spawn_entity()`     | Spawn a new entity, returns entity id            |
-| `set_component()`    | Set a component on an entity                     |
-| `get_component()`    | Get a component from an entity                   |
-| `set_mode()`         | Switch game mode                                 |
-| `move_all(dx, dy)`   | Move all entities with Position                  |
-| `damage_all(amount)` | Damage all entities with Health                  |
-| `tick()`             | Advance the game by one turn                     |
-| `get_turn()`         | Get the current turn number                      |
-| `print_positions()`  | Print all entity positions                       |
-| `print_healths()`    | Print all entity healths                         |
-| `process_deaths()`   | Convert dead entities to corpses and start decay |
-| `process_decay()`    | Decrement decay, remove entities when done       |
-| `remove_entity(id)`  | Remove an entity and all its components          |
-| `get_user_input()`   | Prompt the user for input and return a string    |
-
----
-
-### Interactive User Input & Roguelike Demo
-
-#### Interactive Input Support
-
-MGE supports **interactive user input** in Lua scripts via a dependency-injected input provider:
-
-- **`get_user_input(prompt)`**: Prompts the player and returns their input as a string.
-- This enables fully interactive CLI games and demos, including turn-based gameplay and user-driven choices.
-- The input system is testable and supports dependency injection for automated testing.
-
-#### Example: Interactive Roguelike Demo
-
-A full-featured, interactive roguelike demo is included at
-`engine/scripts/lua/roguelike_mvp.lua`.
-
-**Controls:**
-
-- `w/a/s/d`: Move the player
-- `e`: Attack an adjacent enemy
-- `q`: Quit the game
-
-**How to run:**
-
-```bash
-cargo run --bin mge-cli -- engine/scripts/lua/roguelike_mvp.lua
-```
-
-**Gameplay:**
-
-- Each turn, the player is prompted for an action.
-- Enemies move and attack after the player.
-- The game ends if the player dies or all enemies are defeated.
-
-**Sample Lua snippet:**
-
-```lua
-while true do
-    local cmd = get_user_input("Your move (w/a/s/d, e=attack, q=quit): ")
-    if directions[cmd] then
-        move_entity(player, directions[cmd][1], directions[cmd][2])
-    elseif cmd == "e" then
-        -- attack logic
-    elseif cmd == "q" then
-        print("Quitting game. Goodbye!")
-        break
-    else
-        print("Unknown command.")
-    end
-end
-```
-
-#### Automated Testing of Input
-
-- The input system can be mocked for automated tests, ensuring scripts using `get_user_input` can be tested without manual intervention.
-
----
-
-### Entity Death, Corpses, and Decay
-
-MGE supports a robust entity lifecycle:
-
-- When an entity’s `Health.current` drops to zero or below, you can call `process_deaths()` to convert it into a **corpse** (`Corpse` component) and give it a **decay timer** (`Decay` component).
-- Each time you call `process_decay()`, the decay timer for all corpses is decremented. When it reaches zero, the entity is removed from the world.
-- You can also remove entities directly with `remove_entity(id)`.
-
-**Example Lua script:**
-
-```lua
-local id = spawn_entity()
-set_component(id, "Health", { current = 2, max = 10 })
-set_component(id, "Position", { x = 0, y = 0 })
-
--- Simulate death by setting health to zero
-set_component(id, "Health", { current = 0, max = 10 })
-
-process_deaths()
-print("Corpse:", get_component(id, "Corpse"))
-print("Decay:", get_component(id, "Decay"))
-
-for i = 1, 5 do
-    process_decay()
-    print("Decay after tick " .. i .. ":", get_component(id, "Decay"))
-end
-
--- After enough calls, get_component(id, "Corpse") and get_component(id, "Decay") will return nil
-```
-
----
-
-### Example: Turn System Script
-
-```lua
-local id = spawn_entity()
-set_component(id, "Position", { x = 0.0, y = 0.0 })
-set_component(id, "Health", { current = 10.0, max = 10.0 })
-
-print_positions()
-print_healths()
-print("Turn: " .. get_turn())
-
-tick()
-print_positions()
-print_healths()
-print("Turn: " .. get_turn())
-```
-
-**Example output:**
-
-```text
-Entity 1: Object {"x": Number(0), "y": Number(0)}
-Entity 1: Object {"max": Number(10), "current": Number(10)}
-Turn: 0
-Entity 1: Object {"x": Number(1.0), "y": Number(0.0)}
-Entity 1: Object {"max": Number(10), "current": Number(9.0)}
-Turn: 1
-```
-
----
-
-## CLI: Running Lua Scripts
-
-You can run any ECS-enabled Lua script using:
-
-```bash
-cargo run --bin mge-cli -- engine/scripts/lua/<script_name>.lua
-```
-
-For example, to run the turn demo:
-
-```bash
-cargo run --bin mge-cli -- engine/scripts/lua/turn_demo.lua
-```
-
-Or to test death/removal and decay:
-
-```bash
-cargo run --bin mge-cli -- engine/scripts/lua/death_removal_demo.lua
-```
-
-Or to play the interactive roguelike demo:
-
-```bash
-cargo run --bin mge-cli -- engine/scripts/lua/roguelike_mvp.lua
-```
-
-This executes your Lua script with full access to the ECS scripting API, including mode enforcement.
-Any errors or output from the script will be shown in your terminal.
 
 ---
 
 ## Getting Started
 
-1. **Explore the ECS Core:**
+1. **Create a World:**
 
-   - See [`engine/core`](engine/core) and [`engine_macros`](engine_macros).
-   - Define components with `#[component(...)]` and auto-generate schemas.
-   - Try switching modes at runtime and see how component access is enforced.
+```rust
+let registry = Arc::new(ComponentRegistry::new());
+let mut world = World::new(registry.clone());
+```
+
+The registry contains all component schemas (macro-defined and external JSON/YAML).
+New schemas can be registered at runtime for dynamic/extensible components.
 
 2. **Run tests:**
 
@@ -233,25 +47,50 @@ Any errors or output from the script will be shown in your terminal.
 cargo test
 ```
 
-3. **Read [`docs/idea.md`](docs/idea.md) for the full blueprint.**
+3. **See [`docs/idea.md`](docs/idea.md) and [`docs/examples.md`](docs/examples.md) for more.**
 
 ---
 
-## Related Crates
+## Schema-Driven Mode Enforcement
 
-- [`engine/core`](engine/core): ECS core, registry, migration, and schema logic.
-- [`engine_macros`](engine_macros): Procedural macros for ergonomic component definition.
+- Component schemas (Rust or external JSON/YAML) specify which game modes they support.
+- The registry loads all schemas at startup.
+- When setting or getting a component, the engine checks the current mode against the schema.
+- Errors are raised if a component is not allowed in the current mode.
+- Add new components at runtime by dropping schema files in `engine/assets/schemas/`.
+
+**Example schema:**
+
+```json
+{
+  "title": "Health",
+  "type": "object",
+  "properties": {
+    "current": { "type": "number", "minimum": 0, "maximum": 100 },
+    "max": { "type": "number", "minimum": 1, "maximum": 100 }
+  },
+  "required": ["current", "max"],
+  "modes": ["colony", "roguelike"]
+}
+```
+
+> **Note:** All new code and tests should use `World::new(registry)` and pass an `Arc<ComponentRegistry>`.
 
 ---
 
-## Continuous Integration & Releases
+## Lua Scripting
 
-- **CI**: All pull requests and pushes to main run automated checks (formatting, linting, tests) via GitHub Actions.
-- **Release**: Merges to main automatically trigger a semantic-release pipeline:
-- Versioning and changelog are managed by semantic-release.
-- Rust crate version is updated using `@timada/semantic-release-cargo`.
-- Releases are published to GitHub Releases
+- Spawn entities, set/get components, and interact with the ECS from Lua.
+- Game systems like movement, health, turns, death, and decay are scriptable.
+- Switch game modes at runtime; only access components valid for the current mode.
+- See [`docs/examples.md`](docs/examples.md) for full Lua scripts and demos.
 
-## Branch Protection
+---
 
-The main branch is protected: all PRs require passing status checks before merging.
+## CLI Usage
+
+Run any ECS-enabled Lua script with:
+
+```bash
+cargo run --bin mge-cli -- engine/scripts/lua/<script_name>.lua
+```
