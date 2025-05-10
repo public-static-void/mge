@@ -1,0 +1,13 @@
+[package]
+name = "mge"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.24.2", features = ["extension-module"] }
+serde_json = "1.0"
+serde-pyobject = "0.6.1"
+engine_core = { path = "../engine/core" }
