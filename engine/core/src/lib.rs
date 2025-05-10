@@ -6,7 +6,7 @@ pub mod ecs;
 pub mod modes;
 pub mod scripting;
 
-pub use ecs::components::{Happiness, Health, Position, Inventory};
+pub use ecs::components::{Happiness, Health, Inventory, Position};
 pub use ecs::{EcsWorld, Error};
 pub use modes::GameMode as Mode;
 pub use scripting::World;

@@ -159,7 +159,9 @@ fn test_schema_driven_mode_enforcement() {
     "#;
 
     let mut registry = ComponentRegistry::new();
-    registry.register_external_schema_from_json(roguelike_inventory_schema).unwrap();
+    registry
+        .register_external_schema_from_json(roguelike_inventory_schema)
+        .unwrap();
     let registry = Arc::new(registry);
 
     let mut world = World::new(registry.clone());
@@ -167,13 +169,27 @@ fn test_schema_driven_mode_enforcement() {
 
     // Not allowed in "colony"
     world.current_mode = "colony".to_string();
-    let result = world.set_component(entity, "Roguelike::Inventory", json!({"slots": [], "weight": 0.0}));
-    assert!(result.is_err(), "Roguelike::Inventory should NOT be allowed in colony mode");
+    let result = world.set_component(
+        entity,
+        "Roguelike::Inventory",
+        json!({"slots": [], "weight": 0.0}),
+    );
+    assert!(
+        result.is_err(),
+        "Roguelike::Inventory should NOT be allowed in colony mode"
+    );
 
     // Allowed in "roguelike"
     world.current_mode = "roguelike".to_string();
-    let result = world.set_component(entity, "Roguelike::Inventory", json!({"slots": [], "weight": 0.0}));
-    assert!(result.is_ok(), "Roguelike::Inventory should be allowed in roguelike mode");
+    let result = world.set_component(
+        entity,
+        "Roguelike::Inventory",
+        json!({"slots": [], "weight": 0.0}),
+    );
+    assert!(
+        result.is_ok(),
+        "Roguelike::Inventory should be allowed in roguelike mode"
+    );
 }
 
 #[test]

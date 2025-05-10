@@ -15,4 +15,3 @@ pub use self::happiness::Happiness;
 pub use self::health::Health;
 pub use self::inventory::Inventory;
 pub use self::position::Position;
-
