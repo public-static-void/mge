@@ -64,6 +64,10 @@ impl World {
         self.components.get(name)?.get(&entity)
     }
 
+    pub fn get_entities(&self) -> Vec<u32> {
+        self.entities.clone()
+    }
+
     pub fn move_all(&mut self, dx: f32, dy: f32) {
         if let Some(positions) = self.components.get_mut("Position") {
             for (_entity, value) in positions.iter_mut() {
