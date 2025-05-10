@@ -178,8 +178,8 @@ fn test_get_entities_with_component() {
     let registry = setup_registry();
     let mut world = World::new(registry.clone());
     world.current_mode = "colony".to_string();
-    let id1 = world.spawn();
-    let id2 = world.spawn();
+    let id1 = world.spawn_entity();
+    let id2 = world.spawn_entity();
     world
         .set_component(id1, "Type", json!({ "kind": "player" }))
         .unwrap();
@@ -197,7 +197,7 @@ fn test_move_entity() {
     let registry = setup_registry();
     let mut world = World::new(registry.clone());
     world.current_mode = "colony".to_string();
-    let id = world.spawn();
+    let id = world.spawn_entity();
     world
         .set_component(id, "Position", json!({ "x": 0.0, "y": 0.0 }))
         .unwrap();
@@ -212,7 +212,7 @@ fn test_is_entity_alive() {
     let registry = setup_registry();
     let mut world = World::new(registry.clone());
     world.current_mode = "colony".to_string();
-    let id = world.spawn();
+    let id = world.spawn_entity();
     world
         .set_component(id, "Health", json!({ "current": 5.0, "max": 5.0 }))
         .unwrap();
@@ -228,7 +228,7 @@ fn test_damage_entity() {
     let registry = setup_registry();
     let mut world = World::new(registry.clone());
     world.current_mode = "colony".to_string();
-    let id = world.spawn();
+    let id = world.spawn_entity();
     world
         .set_component(id, "Health", json!({ "current": 10.0, "max": 10.0 }))
         .unwrap();
@@ -247,9 +247,9 @@ fn test_count_entities_with_type() {
     let registry = setup_registry();
     let mut world = World::new(registry.clone());
     world.current_mode = "colony".to_string();
-    let player = world.spawn();
-    let enemy1 = world.spawn();
-    let enemy2 = world.spawn();
+    let player = world.spawn_entity();
+    let enemy1 = world.spawn_entity();
+    let enemy2 = world.spawn_entity();
 
     world
         .set_component(player, "Type", json!({ "kind": "player" }))

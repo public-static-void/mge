@@ -25,7 +25,7 @@ fn test_schema_driven_mode_enforcement() {
     let registry = Arc::new(registry);
 
     let mut world = World::new(registry.clone());
-    let entity = world.spawn();
+    let entity = world.spawn_entity();
 
     world.current_mode = "colony".to_string();
     let result = world.set_component(entity, "Inventory", json!({"slots": [], "weight": 0.0}));

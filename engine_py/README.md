@@ -6,10 +6,10 @@ This document describes the Python API for interacting with the Modular Game Eng
 
 ### Entity Management
 
-- `spawn() -> int`
+- `spawn_entity() -> int`
   Spawn a new entity and return its ID.
 
-- `despawn(entity_id: int)`
+- `despawn_entity(entity_id: int)`
   Remove an entity and all its components.
 
 ### Component Management
@@ -76,7 +76,7 @@ from mge import PyWorld
 
 world = PyWorld()
 
-eid = world.spawn()
+eid = world.spawn_entity()
 world.set_component(eid, "Health", {"current": 10, "max": 10})
 
 print(world.get_component(eid, "Health"))

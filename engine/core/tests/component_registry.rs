@@ -165,7 +165,7 @@ fn test_schema_driven_mode_enforcement() {
     let registry = Arc::new(registry);
 
     let mut world = World::new(registry.clone());
-    let entity = world.spawn();
+    let entity = world.spawn_entity();
 
     // Not allowed in "colony"
     world.current_mode = "colony".to_string();
@@ -254,7 +254,7 @@ fn test_mode_enforcement_for_runtime_registered_schema() {
     let registry = Arc::new(registry);
 
     let mut world = World::new(registry.clone());
-    let id = world.spawn();
+    let id = world.spawn_entity();
 
     // Allowed in "colony"
     world.current_mode = "colony".to_string();

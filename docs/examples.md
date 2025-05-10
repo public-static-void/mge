@@ -91,7 +91,7 @@ let mut world = World::new(registry.clone());
 world.current_mode = "colony".to_string();
 
 // Spawn an entity and set components
-let entity = world.spawn();
+let entity = world.spawn_entity();
 world.set_component(entity, "Health", serde_json::json!({"current": 10, "max": 10})).unwrap();
 ```
 

@@ -33,11 +33,11 @@ impl ScriptEngine {
 
         // Spawn entity
         let world_spawn = world.clone();
-        let spawn = self.lua.create_function_mut(move |_, ()| {
+        let spawn_entity = self.lua.create_function_mut(move |_, ()| {
             let mut world = world_spawn.borrow_mut();
-            Ok(world.spawn())
+            Ok(world.spawn_entity())
         })?;
-        globals.set("spawn_entity", spawn)?;
+        globals.set("spawn_entity", spawn_entity)?;
 
         // set_component(entity, name, table)
         let world_set = world.clone();
@@ -210,6 +210,65 @@ impl ScriptEngine {
             provider.read_line(&prompt).map_err(mlua::Error::external)
         })?;
         globals.set("get_user_input", get_user_input)?;
+
+        // remove_component(entity, name)
+        let world_remove_component = world.clone();
+        let remove_component =
+            self.lua
+                .create_function_mut(move |_, (entity, name): (u32, String)| {
+                    let mut world = world_remove_component.borrow_mut();
+                    if let Some(comps) = world.components.get_mut(&name) {
+                        comps.remove(&entity);
+                    }
+                    Ok(())
+                })?;
+        globals.set("remove_component", remove_component)?;
+
+        // get_entities()
+        let world_get_entities = world.clone();
+        let get_entities = self.lua.create_function_mut(move |_, ()| {
+            let world = world_get_entities.borrow();
+            Ok(world.entities.clone())
+        })?;
+        globals.set("get_entities", get_entities)?;
+
+        // list_components()
+        let world_list_components = world.clone();
+        let list_components = self.lua.create_function_mut(move |_, ()| {
+            let world = world_list_components.borrow();
+            Ok(world.registry.all_component_names())
+        })?;
+        globals.set("list_components", list_components)?;
+
+        // get_component_schema(name)
+        let world_get_schema = world.clone();
+        let get_component_schema = self.lua.create_function_mut(move |lua, name: String| {
+            let world = world_get_schema.borrow();
+            if let Some(schema) = world.registry.get_schema_by_name(&name) {
+                let json = serde_json::to_value(&schema.schema).map_err(mlua::Error::external)?;
+                super::helpers::json_to_lua_table(lua, &json)
+            } else {
+                Err(mlua::Error::external("Component schema not found"))
+            }
+        })?;
+        globals.set("get_component_schema", get_component_schema)?;
+
+        // get_mode()
+        let world_get_mode = world.clone();
+        let get_mode = self.lua.create_function_mut(move |_, ()| {
+            let world = world_get_mode.borrow();
+            Ok(world.current_mode.clone())
+        })?;
+        globals.set("get_mode", get_mode)?;
+
+        // get_available_modes()
+        let world_get_modes = world.clone();
+        let get_available_modes = self.lua.create_function_mut(move |_, ()| {
+            let world = world_get_modes.borrow();
+            let modes = world.registry.all_modes();
+            Ok(modes.into_iter().collect::<Vec<String>>())
+        })?;
+        globals.set("get_available_modes", get_available_modes)?;
 
         Ok(())
     }

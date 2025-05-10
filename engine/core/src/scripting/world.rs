@@ -24,7 +24,7 @@ impl World {
         }
     }
 
-    pub fn spawn(&mut self) -> u32 {
+    pub fn spawn_entity(&mut self) -> u32 {
         let id = self.next_id;
         self.next_id += 1;
         self.entities.push(id);

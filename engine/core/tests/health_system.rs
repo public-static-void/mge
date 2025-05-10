@@ -20,8 +20,8 @@ fn test_damage_all_reduces_health() {
     let mut world = World::new(registry.clone());
     world.current_mode = "colony".to_string(); // Ensure correct mode
 
-    let id1 = world.spawn();
-    let id2 = world.spawn();
+    let id1 = world.spawn_entity();
+    let id2 = world.spawn_entity();
 
     world
         .set_component(id1, "Health", json!({ "current": 10.0, "max": 10.0 }))

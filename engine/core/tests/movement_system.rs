@@ -20,8 +20,8 @@ fn test_move_all_moves_positions() {
     let mut world = World::new(registry.clone());
     world.current_mode = "colony".to_string();
 
-    let id1 = world.spawn();
-    let id2 = world.spawn();
+    let id1 = world.spawn_entity();
+    let id2 = world.spawn_entity();
 
     // Set initial positions
     world

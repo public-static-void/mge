@@ -10,7 +10,7 @@ def test_spawn_and_set_component():
         os.path.join(here, "../../engine/assets/schemas")
     )
     world = mge.PyWorld(schema_dir)
-    eid = world.spawn()
+    eid = world.spawn_entity()
     world.set_component(eid, "Health", {"current": 10, "max": 10})
     comp = world.get_component(eid, "Health")
     print("Component:", comp)

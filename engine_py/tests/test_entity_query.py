@@ -10,8 +10,8 @@ def test_get_entities_with_component():
     )
     world = mge.PyWorld(schema_dir)
 
-    eid1 = world.spawn()
-    eid2 = world.spawn()
+    eid1 = world.spawn_entity()
+    eid2 = world.spawn_entity()
 
     world.set_component(eid1, "Health", {"current": 5, "max": 10})
 
@@ -28,8 +28,8 @@ def test_get_entities():
     )
     world = mge.PyWorld(schema_dir)
 
-    eid1 = world.spawn()
-    eid2 = world.spawn()
+    eid1 = world.spawn_entity()
+    eid2 = world.spawn_entity()
 
     all_ids = world.get_entities()
 
