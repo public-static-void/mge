@@ -1,0 +1,10 @@
+{
+  "title": "Inventory",
+  "type": "object",
+  "properties": {
+    "slots": { "type": "array", "items": { "type": "string" } },
+    "weight": { "type": "number" }
+  },
+  "required": ["slots", "weight"],
+  "modes": ["colony", "roguelike"]
+}

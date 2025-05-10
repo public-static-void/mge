@@ -31,21 +31,11 @@ impl World {
         id
     }
 
-    pub fn is_component_allowed_in_mode(component: &str, mode: &str) -> bool {
-        match (component, mode) {
-            ("Colony::Happiness", "colony") => true,
-            ("Roguelike::Inventory", "roguelike") => true,
-            ("Position", "colony") => true,
-            ("Position", "roguelike") => true,
-            ("Health", "colony") => true,
-            ("Health", "roguelike") => true,
-            ("Corpse", "colony") => true,
-            ("Corpse", "roguelike") => true,
-            ("Decay", "colony") => true,
-            ("Decay", "roguelike") => true,
-            ("Type", _) => true,
-            // Add more as needed
-            _ => false,
+    pub fn is_component_allowed_in_mode(&self, component: &str, mode: &str) -> bool {
+        if let Some(schema) = self.registry.get_schema_by_name(component) {
+            schema.modes.contains(&mode.to_string())
+        } else {
+            false
         }
     }
 
@@ -56,7 +46,7 @@ impl World {
         name: &str,
         value: JsonValue,
     ) -> Result<(), String> {
-        if !Self::is_component_allowed_in_mode(name, &self.current_mode) {
+        if !self.is_component_allowed_in_mode(name, &self.current_mode) {
             return Err(format!(
                 "Component {} not allowed in mode {}",
                 name, self.current_mode

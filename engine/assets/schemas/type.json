@@ -1,0 +1,9 @@
+{
+  "title": "Type",
+  "type": "object",
+  "properties": {
+    "kind": { "type": "string" }
+  },
+  "required": ["kind"],
+  "modes": ["colony", "roguelike"]
+}

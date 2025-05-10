@@ -1,0 +1,9 @@
+{
+  "title": "Happiness",
+  "type": "object",
+  "properties": {
+    "base_value": { "type": "number", "minimum": 0, "maximum": 1 }
+  },
+  "required": ["base_value"],
+  "modes": ["colony", "roguelike"]
+}

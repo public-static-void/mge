@@ -19,21 +19,16 @@ print("Entity " .. id .. " position: x=" .. pos.x .. " y=" .. pos.y)
 
 ```lua
 set_mode("colony")
--- Allowed to set Colony::Happiness component
-set_component(entity_id, "Colony::Happiness", { value = 75 })
-
-set_mode("roguelike")
--- Allowed to set Roguelike::Inventory component
-set_component(entity_id, "Roguelike::Inventory", { slots = {}, weight = 0.0 })
+-- Allowed to set Happiness component in colony mode
+set_component(entity_id, "Happiness", { base_value = 0.75 })
 
 -- Attempting to set a component not allowed in current mode results in error
 local success, err = pcall(function()
-    set_component(entity_id, "Colony::Happiness", { value = 50 })
+    set_component(entity_id, "Inventory", { slots = {}, weight = 0.0 })
 end)
 if not success then
     print("Error: " .. err)
 end
-
 ```
 
 ### 3. Entity Death and Decay Lifecycle
@@ -75,17 +70,25 @@ print("Turn: " .. get_turn())
 
 ## ECS Usage in Rust
 
-### Creating a World with a Component Registry
+### Creating a World with a Component Registry and Loading Schemas
 
 ```rust
 use std::sync::Arc;
 use engine_core::ecs::registry::ComponentRegistry;
+use engine_core::ecs::schema::load_schemas_from_dir;
 use engine_core::scripting::World;
 
-let registry = Arc::new(ComponentRegistry::new());
-// Load or register schemas as needed here
+let schema_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap() + "/../assets/schemas";
+let schemas = load_schemas_from_dir(&schema_dir).expect("Failed to load schemas");
+
+let mut registry = ComponentRegistry::new();
+for (_name, schema) in schemas {
+    registry.register_external_schema(schema);
+}
+let registry = Arc::new(registry);
 
 let mut world = World::new(registry.clone());
+world.current_mode = "colony".to_string();
 
 // Spawn an entity and set components
 let entity = world.spawn();

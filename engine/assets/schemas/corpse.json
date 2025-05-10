@@ -1,0 +1,6 @@
+{
+  "title": "Corpse",
+  "type": "object",
+  "properties": {},
+  "modes": ["colony", "roguelike"]
+}

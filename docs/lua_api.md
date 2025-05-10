@@ -71,5 +71,7 @@ Use these functions in your Lua scripts to interact with the ECS, control game f
 ## Notes
 
 - All functions are available globally in MGE Lua scripts.
-- Component names are case-sensitive and must match registered schemas.
+- Component names are case-sensitive and must match the `"title"` field in a registered schema (see `engine/assets/schemas/`).
+- Only components allowed in the current mode (as defined in their schema's `"modes"` array) can be accessed or set.
+- You can add new components for scripting by simply adding new schema files-no Rust code required.
 - For more examples, see [docs/examples.md](examples.md).

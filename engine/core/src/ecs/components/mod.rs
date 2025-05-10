@@ -2,16 +2,16 @@
 //!
 //! This module re-exports all built-in components.
 
-mod colony_happiness;
 mod corpse;
 mod decay;
+mod happiness;
 mod health;
+mod inventory;
 mod position;
-mod roguelike_inventory;
 
-pub use self::colony_happiness::ColonyHappiness;
 pub use self::corpse::Corpse;
 pub use self::decay::Decay;
+pub use self::happiness::Happiness;
 pub use self::health::Health;
+pub use self::inventory::Inventory;
 pub use self::position::Position;
-pub use self::roguelike_inventory::RoguelikeInventory;
