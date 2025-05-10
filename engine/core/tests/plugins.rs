@@ -37,3 +37,56 @@ fn test_ffi_spawn_entity_and_set_component() {
     let component = world.get_component(entity_id, "Position");
     assert!(component.is_some());
 }
+
+#[test]
+fn test_ffi_spawn_entity_and_set_component_via_ffi() {
+    use std::ffi::CString;
+    use std::os::raw::c_void;
+
+    // Setup registry and world as before
+    let mut registry = engine_core::ecs::registry::ComponentRegistry::new();
+    let schema_json = r#"
+    {
+        "title": "Position",
+        "type": "object",
+        "properties": {
+            "x": { "type": "number" },
+            "y": { "type": "number" }
+        },
+        "required": ["x", "y"],
+        "modes": ["colony", "roguelike"]
+    }
+    "#;
+    registry
+        .register_external_schema_from_json(schema_json)
+        .unwrap();
+    let registry = std::sync::Arc::new(registry);
+    let mut world = engine_core::scripting::World::new(registry);
+
+    // Prepare FFI call
+    let world_ptr = &mut world as *mut _ as *mut c_void;
+
+    // Call the FFI spawn_entity function (to be implemented)
+    let entity_id = unsafe { engine_core::plugins::ffi_spawn_entity(world_ptr) };
+    assert!(entity_id > 0);
+
+    // Prepare FFI set_component call
+    let comp_name = CString::new("Position").unwrap();
+    let comp_json = CString::new(r#"{"x": 42, "y": 99}"#).unwrap();
+    let set_result = unsafe {
+        engine_core::plugins::ffi_set_component(
+            world_ptr,
+            entity_id,
+            comp_name.as_ptr(),
+            comp_json.as_ptr(),
+        )
+    };
+    assert_eq!(set_result, 0);
+
+    // Verify via native API
+    let comp = world.get_component(entity_id, "Position");
+    assert!(comp.is_some());
+    let comp = comp.unwrap();
+    assert_eq!(comp["x"], 42.0);
+    assert_eq!(comp["y"], 99.0);
+}
