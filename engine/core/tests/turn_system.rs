@@ -21,7 +21,7 @@ fn test_tick_advances_turn_and_runs_systems() {
     let mut world = World::new(registry.clone());
     world.current_mode = "colony".to_string();
 
-    let id = world.spawn();
+    let id = world.spawn_entity();
     world
         .set_component(id, "Position", serde_json::json!({ "x": 0.0, "y": 0.0 }))
         .unwrap();

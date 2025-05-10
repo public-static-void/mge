@@ -22,8 +22,8 @@ world = PyWorld(schema_dir="/path/to/schemas")
 
 | Method                              | Description                             |
 | ----------------------------------- | --------------------------------------- |
-| `spawn()`                           | Spawn a new entity, returns entity ID   |
-| `despawn(entity_id)`                | Remove an entity and all its components |
+| `spawn_entity()`                           | Spawn a new entity, returns entity ID   |
+| `despawn_entity(entity_id)`                | Remove an entity and all its components |
 | `get_entities()`                    | List all entity IDs                     |
 | `get_entities_with_component(name)` | List entity IDs with a given component  |
 
@@ -83,7 +83,7 @@ from mge import PyWorld
 world = PyWorld("/path/to/schemas")
 
 # Spawn a player entity
-player = world.spawn()
+player = world.spawn_entity()
 world.set_component(player, "Type", {"kind": "player"})
 world.set_component(player, "Health", {"current": 10, "max": 10})
 

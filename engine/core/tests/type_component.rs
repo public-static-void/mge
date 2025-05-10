@@ -18,7 +18,7 @@ fn test_set_and_get_type_component() {
     let mut world = World::new(registry.clone());
     world.current_mode = "colony".to_string();
 
-    let id = world.spawn();
+    let id = world.spawn_entity();
     let type_value = json!({ "kind": "player" });
     world.set_component(id, "Type", type_value.clone()).unwrap();
 

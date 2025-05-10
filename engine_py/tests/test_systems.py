@@ -13,13 +13,13 @@ def make_world():
 
 def test_move_and_damage():
     world = make_world()
-    eid = world.spawn()
+    eid = world.spawn_entity()
     world.set_component(eid, "Position", {"x": 0, "y": 0})
     world.move_entity(eid, 2, 3)
     pos = world.get_component(eid, "Position")
     assert pos["x"] == 2 and pos["y"] == 3
 
-    eid2 = world.spawn()
+    eid2 = world.spawn_entity()
     world.set_component(eid2, "Position", {"x": 1, "y": 1})
     world.move_all(1, 1)
     pos1 = world.get_component(eid, "Position")
@@ -30,13 +30,13 @@ def test_move_and_damage():
 
 def test_damage_and_tick():
     world = make_world()
-    eid = world.spawn()
+    eid = world.spawn_entity()
     world.set_component(eid, "Health", {"current": 10, "max": 10})
     world.damage_entity(eid, 3)
     health = world.get_component(eid, "Health")
     assert health["current"] == 7
 
-    eid2 = world.spawn()
+    eid2 = world.spawn_entity()
     world.set_component(eid2, "Health", {"current": 5, "max": 5})
     world.damage_all(2)
     h1 = world.get_component(eid, "Health")
@@ -54,7 +54,7 @@ def test_tick_and_turn():
 
 def test_process_deaths_and_decay():
     world = make_world()
-    eid = world.spawn()
+    eid = world.spawn_entity()
     world.set_component(eid, "Health", {"current": 0, "max": 10})
     world.process_deaths()
     corpse = world.get_component(eid, "Corpse")
@@ -71,8 +71,8 @@ def test_process_deaths_and_decay():
 
 def test_count_entities_with_type():
     world = make_world()
-    e1 = world.spawn()
-    e2 = world.spawn()
+    e1 = world.spawn_entity()
+    e2 = world.spawn_entity()
     world.set_component(e1, "Type", {"kind": "player"})
     world.set_component(e2, "Type", {"kind": "enemy"})
     assert world.count_entities_with_type("player") == 1

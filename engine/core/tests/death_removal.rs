@@ -17,7 +17,7 @@ fn test_death_replaces_health_with_corpse_and_decay() {
 
     world.current_mode = "colony".to_string();
 
-    let id = world.spawn();
+    let id = world.spawn_entity();
     world
         .set_component(id, "Health", json!({ "current": 1.0, "max": 10.0 }))
         .unwrap();
@@ -52,7 +52,7 @@ fn test_decay_removes_entity_after_time() {
 
     world.current_mode = "colony".to_string();
 
-    let id = world.spawn();
+    let id = world.spawn_entity();
     world.set_component(id, "Corpse", json!({})).unwrap();
     world
         .set_component(id, "Decay", json!({ "time_remaining": 2 }))

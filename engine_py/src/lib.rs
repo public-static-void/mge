@@ -45,13 +45,13 @@ impl PyWorld {
     }
 
     /// Spawn a new entity and return its ID.
-    fn spawn(&self) -> u32 {
+    fn spawn_entity(&self) -> u32 {
         let mut world = self.inner.lock().unwrap();
-        world.spawn()
+        world.spawn_entity()
     }
 
     /// Remove an entity and all its components.
-    fn despawn(&self, entity: u32) {
+    fn despawn_entity(&self, entity: u32) {
         let mut world = self.inner.lock().unwrap();
         world.remove_entity(entity);
         // Optionally, also remove from world.entities if not already done
