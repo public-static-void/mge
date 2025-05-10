@@ -96,6 +96,17 @@ impl ComponentRegistry {
         T::migrate(from_version, data)
     }
 
+    pub fn all_component_names(&self) -> Vec<String> {
+        let mut names = std::collections::HashSet::new();
+        for schema in self.components.values() {
+            names.insert(schema.name.clone());
+        }
+        for schema in self.external_components.values() {
+            names.insert(schema.name.clone());
+        }
+        names.into_iter().collect()
+    }
+
     pub fn register_external_schema(&mut self, schema: ComponentSchema) {
         self.external_components.insert(schema.name.clone(), schema);
     }
@@ -134,5 +145,19 @@ impl ComponentRegistry {
         };
         self.external_components.insert(name, cs);
         Ok(())
+    }
+
+    pub fn all_modes(&self) -> std::collections::HashSet<String> {
+        let mut modes = std::collections::HashSet::new();
+        for schema in self
+            .components
+            .values()
+            .chain(self.external_components.values())
+        {
+            for mode in &schema.modes {
+                modes.insert(mode.clone());
+            }
+        }
+        modes
     }
 }
