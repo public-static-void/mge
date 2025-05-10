@@ -90,3 +90,53 @@ fn test_ffi_spawn_entity_and_set_component_via_ffi() {
     assert_eq!(comp["x"], 42.0);
     assert_eq!(comp["y"], 99.0);
 }
+
+#[test]
+#[ignore] // Remove this once you have a real plugin .so/.dll to test with
+fn test_loads_and_initializes_plugin() {
+    use std::ffi::c_void;
+    use std::path::Path;
+
+    // Setup: create a world and registry as before
+    let mut registry = engine_core::ecs::registry::ComponentRegistry::new();
+    let schema_json = r#"
+    {
+        "title": "Position",
+        "type": "object",
+        "properties": {
+            "x": { "type": "number" },
+            "y": { "type": "number" }
+        },
+        "required": ["x", "y"],
+        "modes": ["colony", "roguelike"]
+    }
+    "#;
+    registry
+        .register_external_schema_from_json(schema_json)
+        .unwrap();
+    let registry = std::sync::Arc::new(registry);
+    let mut world = engine_core::scripting::World::new(registry);
+    let world_ptr = &mut world as *mut _ as *mut c_void;
+
+    // Prepare EngineApi struct
+    let engine_api = engine_core::plugins::EngineApi {
+        spawn_entity: engine_core::plugins::ffi_spawn_entity,
+        set_component: engine_core::plugins::ffi_set_component,
+    };
+
+    // Path to your test plugin (adjust as needed)
+    let plugin_path = Path::new("plugins/libtest_plugin.so");
+
+    // Attempt to load plugin and call init
+    let _ = unsafe {
+        engine_core::plugins::load_plugin(plugin_path, &engine_api, world_ptr)
+            .expect("Failed to load plugin")
+    };
+
+    // Optionally, call update/shutdown if you expose those
+    // (loaded_plugin.vtable.update)(0.16);
+
+    // Assert world state was changed by plugin
+    let entities = world.get_entities();
+    assert!(!entities.is_empty());
+}
