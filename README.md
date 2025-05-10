@@ -34,23 +34,37 @@ The demo script (`engine/scripts/lua/roguelike_mvp.lua`) showcases MGE’s scrip
 
 - **Run any Lua script:**
 
-  ```bash
-  cargo run --bin mge-cli -- engine/scripts/lua/<script_name>.lua
-  ```
+```bash
+cargo run --bin mge-cli -- engine/scripts/lua/<script_name>.lua
+```
 
 - **Create a World in Rust:**
 
-  ```rust
-  let registry = Arc::new(ComponentRegistry::new());
-  let mut world = World::new(registry.clone());
-  ```
+```rust
+use std::sync::Arc;
+use engine_core::ecs::registry::ComponentRegistry;
+use engine_core::scripting::World;
 
-- **Add schemas:**
-  Place JSON schemas in `engine/assets/schemas/` (see example below).
+// Load schemas (see below)
+let registry = Arc::new(ComponentRegistry::new());
+let mut world = World::new(registry.clone());
+```
+
+- **Add or modify components:**
+  Place JSON schemas in `engine/assets/schemas/`.
+  All tools, CLI, and tests will pick them up at runtime.
 
 ---
 
-## Schema Example
+## Schema-Driven Components
+
+MGE components are defined by JSON schemas in `engine/assets/schemas/`.
+
+- **No Rust code changes are required** to add, remove, or modify a component for scripting or data-driven systems.
+- Schemas specify component properties, required fields, and which game modes the component is available in.
+- Rust struct components are only needed for native, type-safe systems.
+
+**Example schema:**
 
 ```json
 {
@@ -65,6 +79,34 @@ The demo script (`engine/scripts/lua/roguelike_mvp.lua`) showcases MGE’s scrip
 }
 ```
 
+- **Mode enforcement:**
+  Only components allowed for the current mode (as defined in their schema) can be accessed or set in Rust or Lua.
+
+- **Dynamic components:**
+  You can define components for use in scripting or modding only, without any Rust struct or code.
+
+---
+
+## Example: Adding a New Component
+
+1. Create a schema file in `engine/assets/schemas/`, e.g. `mana.json`:
+   ```json
+   {
+     "title": "Mana",
+     "type": "object",
+     "properties": { "value": { "type": "number", "minimum": 0 } },
+     "required": ["value"],
+     "modes": ["roguelike"]
+   }
+   ```
+2. Use it immediately in Lua or Rust:
+   ```lua
+   set_component(id, "Mana", { value = 42 })
+   ```
+   ```rust
+   world.set_component(entity, "Mana", serde_json::json!({ "value": 42 })).unwrap();
+   ```
+
 ---
 
 ## Lua Scripting
@@ -73,13 +115,6 @@ The demo script (`engine/scripts/lua/roguelike_mvp.lua`) showcases MGE’s scrip
 - Game systems like movement, health, turns, death, and decay are scriptable.
 - Switch game modes at runtime; only access components valid for the current mode.
 - See [docs/examples.md](docs/examples.md) for more.
-
----
-
-## Limitations & Roadmap
-
-- Rust components are not auto-registered; external schemas are loaded only in tests by default.
-- Planned: runtime registration and schema loading, easier API for adding components/schemas.
 
 ---
 
