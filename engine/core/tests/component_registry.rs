@@ -188,3 +188,43 @@ fn test_schema_driven_mode_enforcement() {
             .is_ok()
     );
 }
+
+#[test]
+fn test_register_external_schema_from_json() {
+    let mut registry = ComponentRegistry::new();
+
+    // Example schema JSON string
+    let schema_json = r#"
+    {
+        "title": "MagicPower",
+        "type": "object",
+        "properties": {
+            "mana": { "type": "number", "minimum": 0 }
+        },
+        "required": ["mana"],
+        "modes": ["colony"]
+    }
+    "#;
+
+    // This should fail initially (method not implemented)
+    let result = registry.register_external_schema_from_json(schema_json);
+    assert!(
+        result.is_ok(),
+        "Schema registration failed: {:?}",
+        result.err()
+    );
+
+    // Check if schema is retrievable by name
+    let schema = registry.get_schema_by_name("MagicPower");
+    assert!(
+        schema.is_some(),
+        "Schema 'MagicPower' not found in registry"
+    );
+
+    // Check modes are correctly set
+    let modes = &schema.unwrap().modes;
+    assert!(
+        modes.contains(&"colony".to_string()),
+        "Mode 'colony' not set"
+    );
+}

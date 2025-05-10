@@ -1,5 +1,6 @@
 use crate::ecs::error::{MigrationError, RegistryError};
 use crate::ecs::schema::ComponentSchema;
+use anyhow::Result;
 pub use semver::Version;
 use serde_json;
 use std::any::TypeId;
@@ -97,5 +98,41 @@ impl ComponentRegistry {
 
     pub fn register_external_schema(&mut self, schema: ComponentSchema) {
         self.external_components.insert(schema.name.clone(), schema);
+    }
+
+    /// Register an external component schema from a JSON string at runtime.
+    pub fn register_external_schema_from_json(&mut self, json: &str) -> Result<()> {
+        // Parse the JSON string into a serde_json::Value
+        let v: serde_json::Value = serde_json::from_str(json)?;
+
+        // Parse as RootSchema for validation/storage
+        let schema: schemars::schema::RootSchema = serde_json::from_value(v.clone())?;
+
+        // Extract title (name)
+        let name = v
+            .get("title")
+            .and_then(|t| t.as_str())
+            .map(str::to_string)
+            .ok_or_else(|| anyhow::anyhow!("Missing 'title' in schema"))?;
+
+        // Extract modes
+        let modes = v
+            .get("modes")
+            .and_then(|m| m.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(str::to_string))
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        // Insert into registry
+        let cs = ComponentSchema {
+            name: name.clone(),
+            schema,
+            modes,
+        };
+        self.external_components.insert(name, cs);
+        Ok(())
     }
 }
