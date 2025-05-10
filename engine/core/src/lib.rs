@@ -4,6 +4,7 @@
 
 pub mod ecs;
 pub mod modes;
+pub mod plugins;
 pub mod scripting;
 
 pub use ecs::components::{Happiness, Health, Inventory, Position};
