@@ -1,9 +1,56 @@
-**/target
+# Rust
 **/*.rs.bk
+/target
+engine_macros/target/
+engine_py/target/
+engine/target/
+
+# Python
+*.pyc
+__pycache__/
+**/__pycache__/
+*.pyo
+*.pyd
+*.pdb
+*.egg-info/
+.eggs/
+*.egg
+*.env
+*.venv
+.venv/
+env/
+venv/
+ENV/
+pip-wheel-metadata/
+build/
+dist/
+
+# Editor/OS
 *.swp
 *.swo
 .DS_Store
+*.bak
+*.tmp
+
+# Node
+/node_modules
+
+# Maturin build artifacts
+*.so
+*.dll
+*.dylib
+*.whl
+
+# Editor/IDE project settings
+.ropeproject/
+.vscode/
+.idea/
+.spyderproject
+.spyproject
+
+# Misc
+*.log
+
+# Project-specific
 /scripts/**/*.pyc
 /scripts/**/__pycache__
-/engine/target
-/node_modules
