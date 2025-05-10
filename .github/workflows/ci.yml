@@ -18,10 +18,8 @@ jobs:
         run: cargo fmt --all --check
       - name: Clippy
         run: cargo clippy --all-targets --all-features -- -D warnings
-      - name: Build test plugin
+      - name: Build C test plugin
         run: |
-          cargo build --manifest-path plugins/test_plugin/Cargo.toml --release
-          mkdir -p plugins
-          cp plugins/test_plugin/target/release/libtest_plugin.so plugins/
+          gcc -shared -fPIC -o plugins/libtest_plugin.so plugins/test_plugin.c
       - name: Test
         run: cargo test --all
