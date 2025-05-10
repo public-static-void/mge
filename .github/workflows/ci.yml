@@ -20,6 +20,6 @@ jobs:
         run: cargo clippy --all-targets --all-features -- -D warnings
       - name: Build C test plugin
         run: |
-          gcc -shared -fPIC -o plugins/libtest_plugin.so plugins/test_plugin.c
+          gcc -Iengine -shared -fPIC plugins/test_plugin.c -o plugins/libtest_plugin.so
       - name: Test
         run: cargo test --all
