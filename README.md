@@ -118,6 +118,16 @@ MGE components are defined by JSON schemas in `engine/assets/schemas/`.
 
 ---
 
+## C ABI Plugin System
+
+MGE supports hot-reloadable plugins via a stable C ABI, enabling dynamic extension of the engine in C, Rust (with `extern "C"`), or other languages.
+
+- Plugins export a vtable (`PLUGIN_VTABLE`) with `init`, `update`, and `shutdown` functions as defined in [`engine/engine_plugin_abi.h`](engine/engine_plugin_abi.h).
+- Place compiled plugins (e.g. `.so`, `.dll`) in the project root’s `plugins/` directory.
+- The engine and integration tests will automatically load plugins from this directory at runtime.
+
+See [docs/examples.md](docs/examples.md#c-plugin-example) for a minimal C plugin and build instructions.
+
 ## Resources
 
 - [docs/idea.md](docs/idea.md): Architecture/design

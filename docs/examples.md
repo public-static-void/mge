@@ -111,6 +111,39 @@ cargo run --bin mge-cli -- engine/scripts/lua/turn_demo.lua
 cargo run --bin mge-cli -- engine/scripts/lua/death_removal_demo.lua
 ```
 
+## C Plugin Example
+
+You can extend MGE at runtime with C ABI plugins. Here’s a minimal example:
+
+```c
+#include <stdint.h>
+#include "engine_plugin_abi.h"
+
+static int init(EngineApi* api, void* world) {
+    uint32_t entity = api->spawn_entity(world);
+    api->set_component(world, entity, "Position", "{"x":1,"y":2}");
+    return 0;
+}
+static void shutdown(void) {}
+static void update(float dt) {}
+
+attribute((visibility("default")))
+PluginVTable PLUGIN_VTABLE = {
+    .init = init,
+    .shutdown = shutdown,
+    .update = update,
+};
+```
+
+**Build:**
+
+```bash
+gcc -Iengine -shared -fPIC plugins/test_plugin.c -o plugins/libtest_plugin.so
+```
+
+- Place the resulting `.so` (or `.dll`/`.dylib`) in the project root `plugins/` directory.
+- The engine and tests will discover and load it automatically.
+
 ---
 
 ## Additional Resources

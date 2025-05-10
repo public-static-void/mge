@@ -92,10 +92,8 @@ fn test_ffi_spawn_entity_and_set_component_via_ffi() {
 }
 
 #[test]
-#[ignore] // Remove this once you have a real plugin .so/.dll to test with
 fn test_loads_and_initializes_plugin() {
     use std::ffi::c_void;
-    use std::path::Path;
 
     // Setup: create a world and registry as before
     let mut registry = engine_core::ecs::registry::ComponentRegistry::new();
@@ -124,12 +122,15 @@ fn test_loads_and_initializes_plugin() {
         set_component: engine_core::plugins::ffi_set_component,
     };
 
-    // Path to your test plugin (adjust as needed)
-    let plugin_path = Path::new("plugins/libtest_plugin.so");
+    let plugin_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent() // up to 'engine'
+        .and_then(|p| p.parent()) // up to project root
+        .expect("Failed to find project root")
+        .join("plugins")
+        .join("libtest_plugin.so");
 
-    // Attempt to load plugin and call init
     let _ = unsafe {
-        engine_core::plugins::load_plugin(plugin_path, &engine_api, world_ptr)
+        engine_core::plugins::load_plugin(&plugin_path, &engine_api, world_ptr)
             .expect("Failed to load plugin")
     };
 
