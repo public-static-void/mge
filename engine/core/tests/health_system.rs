@@ -1,30 +1,33 @@
 use engine_core::ecs::registry::ComponentRegistry;
-use engine_core::scripting::{ScriptEngine, World};
+use engine_core::ecs::schema::load_schemas_from_dir;
+use engine_core::scripting::World;
+use serde_json::json;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
 
 #[test]
 fn test_damage_all_reduces_health() {
-    let registry = Arc::new(ComponentRegistry::new());
+    // Load schemas
+    let schema_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap() + "/../assets/schemas";
+    let schemas = load_schemas_from_dir(&schema_dir).expect("Failed to load schemas");
+    let mut registry = ComponentRegistry::new();
+    for (_name, schema) in schemas {
+        registry.register_external_schema(schema);
+    }
+    let registry = Arc::new(registry);
+
     let mut world = World::new(registry.clone());
+    world.current_mode = "colony".to_string(); // Ensure correct mode
 
     let id1 = world.spawn();
     let id2 = world.spawn();
 
     world
-        .set_component(
-            id1,
-            "Health",
-            serde_json::json!({ "current": 10.0, "max": 10.0 }),
-        )
+        .set_component(id1, "Health", json!({ "current": 10.0, "max": 10.0 }))
         .unwrap();
     world
-        .set_component(
-            id2,
-            "Health",
-            serde_json::json!({ "current": 5.0, "max": 8.0 }),
-        )
+        .set_component(id2, "Health", json!({ "current": 5.0, "max": 8.0 }))
         .unwrap();
 
     world.damage_all(3.0);
@@ -38,10 +41,20 @@ fn test_damage_all_reduces_health() {
 
 #[test]
 fn test_lua_damage_all() {
-    let mut engine = ScriptEngine::new();
+    use engine_core::scripting::ScriptEngine;
 
-    let registry = Arc::new(ComponentRegistry::new());
+    // Load schemas
+    let schema_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap() + "/../assets/schemas";
+    let schemas = load_schemas_from_dir(&schema_dir).expect("Failed to load schemas");
+    let mut registry = ComponentRegistry::new();
+    for (_name, schema) in schemas {
+        registry.register_external_schema(schema);
+    }
+    let registry = Arc::new(registry);
+
+    let mut engine = ScriptEngine::new();
     let world = Rc::new(RefCell::new(World::new(registry.clone())));
+    world.borrow_mut().current_mode = "colony".to_string();
     engine.register_world(world.clone()).unwrap();
 
     let script = r#"

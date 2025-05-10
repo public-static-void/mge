@@ -1,52 +1,43 @@
-use engine_core::{ColonyHappiness, EcsWorld, Error, Mode, RoguelikeInventory};
-
 #[test]
-fn test_mode_switching_and_component_access() {
-    let mut world = EcsWorld::new();
+fn test_schema_driven_mode_enforcement() {
+    use engine_core::ecs::registry::ComponentRegistry;
+    use engine_core::scripting::world::World;
+    use serde_json::json;
+    use std::sync::Arc;
 
-    // Register components with mode bindings
-    world.register_component::<ColonyHappiness>();
-    world.register_component::<RoguelikeInventory>();
+    let inventory_schema = r#"
+    {
+      "title": "Inventory",
+      "type": "object",
+      "properties": {
+        "slots": { "type": "array", "items": { "type": "string" } },
+        "weight": { "type": "number" }
+      },
+      "required": ["slots", "weight"],
+      "modes": ["roguelike"]
+    }
+    "#;
 
-    // Start in "colony" mode
-    world.set_mode(Mode::Colony);
+    let mut registry = ComponentRegistry::new();
+    registry
+        .register_external_schema_from_json(inventory_schema)
+        .unwrap();
+    let registry = Arc::new(registry);
 
+    let mut world = World::new(registry.clone());
     let entity = world.spawn();
 
-    // Should succeed: ColonyHappiness is valid in colony mode
+    world.current_mode = "colony".to_string();
+    let result = world.set_component(entity, "Inventory", json!({"slots": [], "weight": 0.0}));
     assert!(
-        world
-            .set_component(entity, ColonyHappiness { base_value: 0.5 })
-            .is_ok()
+        result.is_err(),
+        "Inventory should NOT be allowed in colony mode"
     );
 
-    // Should fail: RoguelikeInventory is not valid in colony mode
-    let res = world.set_component(
-        entity,
-        RoguelikeInventory {
-            slots: 5,
-            weight: 1.0,
-        },
-    );
-    assert!(matches!(res, Err(Error::ComponentUnavailableInMode)));
-
-    // Switch to "roguelike" mode
-    world.set_mode(Mode::Roguelike);
-
-    // Should now succeed for RoguelikeInventory
+    world.current_mode = "roguelike".to_string();
+    let result = world.set_component(entity, "Inventory", json!({"slots": [], "weight": 0.0}));
     assert!(
-        world
-            .set_component(
-                entity,
-                RoguelikeInventory {
-                    slots: 5,
-                    weight: 1.0
-                }
-            )
-            .is_ok()
+        result.is_ok(),
+        "Inventory should be allowed in roguelike mode"
     );
-
-    // Should now fail for ColonyHappiness
-    let res = world.set_component(entity, ColonyHappiness { base_value: 0.5 });
-    assert!(matches!(res, Err(Error::ComponentUnavailableInMode)));
 }

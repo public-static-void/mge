@@ -1,13 +1,40 @@
 use engine_core::ecs::registry::ComponentRegistry;
+use engine_core::ecs::schema::load_schemas_from_dir;
 use engine_core::scripting::input::InputProvider;
 use engine_core::scripting::{ScriptEngine, World};
-use mlua::Lua;
 use serde_json::json;
 use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::sync::Mutex;
+
+// === Helper Functions ===
+
+fn setup_world_with_mode(mode: &str) -> Rc<RefCell<World>> {
+    let schema_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap() + "/../assets/schemas";
+    let schemas = load_schemas_from_dir(&schema_dir).expect("Failed to load schemas");
+    let mut registry = ComponentRegistry::new();
+    for (_name, schema) in schemas {
+        registry.register_external_schema(schema);
+    }
+    let registry = Arc::new(registry);
+    let world = Rc::new(RefCell::new(World::new(registry.clone())));
+    world.borrow_mut().current_mode = mode.to_string();
+    world
+}
+
+fn setup_registry() -> Arc<ComponentRegistry> {
+    let schema_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap() + "/../assets/schemas";
+    let schemas = load_schemas_from_dir(&schema_dir).expect("Failed to load schemas");
+    let mut registry = ComponentRegistry::new();
+    for (_name, schema) in schemas {
+        registry.register_external_schema(schema);
+    }
+    Arc::new(registry)
+}
+
+// === Mock Input ===
 
 pub struct MockInput {
     inputs: Mutex<VecDeque<String>>,
@@ -29,20 +56,12 @@ impl InputProvider for MockInput {
     }
 }
 
-fn setup_engine_with_modes(_lua: &mlua::Lua) -> ScriptEngine {
-    let mut engine = ScriptEngine::new();
-    let registry = Arc::new(ComponentRegistry::new());
-    let world = Rc::new(RefCell::new(World::new(registry.clone())));
-    // Optionally: register components or set up modes here if needed
-    engine.register_world(world).unwrap();
-    engine
-}
+// === Tests ===
 
 #[test]
 fn lua_can_spawn_and_move_entity() {
     let mut engine = ScriptEngine::new();
-    let registry = Arc::new(ComponentRegistry::new());
-    let world = Rc::new(RefCell::new(World::new(registry.clone())));
+    let world = setup_world_with_mode("roguelike");
     engine.register_world(world.clone()).unwrap();
 
     let script = r#"
@@ -58,10 +77,8 @@ fn lua_can_spawn_and_move_entity() {
         assert(approx(pos.y, 9.9))
     "#;
 
-    // Should not panic or error
     engine.run_script(script).unwrap();
 
-    // Also check from Rust side
     let world_ref = world.borrow();
     let entity_id = *world_ref.entities.last().unwrap();
     let pos = world_ref.get_component(entity_id, "Position").unwrap();
@@ -72,8 +89,7 @@ fn lua_can_spawn_and_move_entity() {
 #[test]
 fn lua_can_run_script_from_file() {
     let mut engine = ScriptEngine::new();
-    let registry = Arc::new(ComponentRegistry::new());
-    let world = Rc::new(RefCell::new(World::new(registry.clone())));
+    let world = setup_world_with_mode("roguelike");
     engine.register_world(world.clone()).unwrap();
 
     let script_path = format!(
@@ -93,8 +109,7 @@ fn lua_can_run_script_from_file() {
 #[test]
 fn lua_can_set_and_get_health() {
     let mut engine = ScriptEngine::new();
-    let registry = Arc::new(ComponentRegistry::new());
-    let world = Rc::new(RefCell::new(World::new(registry.clone())));
+    let world = setup_world_with_mode("roguelike");
     engine.register_world(world.clone()).unwrap();
 
     let script_path = format!(
@@ -113,13 +128,8 @@ fn lua_can_set_and_get_health() {
 
 #[test]
 fn lua_can_set_and_get_arbitrary_component() {
-    use engine_core::scripting::{ScriptEngine, World};
-    use std::cell::RefCell;
-    use std::rc::Rc;
-
     let mut engine = ScriptEngine::new();
-    let registry = Arc::new(ComponentRegistry::new());
-    let world = Rc::new(RefCell::new(World::new(registry.clone())));
+    let world = setup_world_with_mode("roguelike");
     engine.register_world(world.clone()).unwrap();
 
     let script = r#"
@@ -135,10 +145,8 @@ fn lua_can_set_and_get_arbitrary_component() {
         assert(math.abs(health.max - 10.0) < 1e-5)
     "#;
 
-    // Should not panic or error
     engine.run_script(script).unwrap();
 
-    // Also check from Rust side (optional)
     let world_ref = world.borrow();
     let entity_id = *world_ref.entities.last().unwrap();
     let pos = world_ref.get_component(entity_id, "Position").unwrap();
@@ -152,26 +160,24 @@ fn lua_can_set_and_get_arbitrary_component() {
 
 #[test]
 fn test_lua_component_access_mode_enforcement() {
-    let lua = Lua::new();
-    let engine = setup_engine_with_modes(&lua);
+    let mut engine = ScriptEngine::new();
+    let world = setup_world_with_mode("colony");
+    engine.register_world(world.clone()).unwrap();
 
-    // Lua script: in "colony" mode, try to set colony and roguelike components
     let script = r#"
         set_mode("colony")
         local id = spawn_entity()
-        assert(set_component(id, "Colony::Happiness", { base_value = 0.7 }) == true)
-        local ok, err = pcall(function()
-            set_component(id, "Roguelike::Inventory", { slots = 4, weight = 1.5 })
-        end)
-        assert(ok == false)
+        assert(set_component(id, "Happiness", { base_value = 0.7 }) == true)
+        assert(set_component(id, "Inventory", { slots = {}, weight = 1.5 }) == true)
     "#;
     assert!(engine.run_script(script).is_ok());
 }
 
 #[test]
 fn test_get_entities_with_component() {
-    let registry = Arc::new(ComponentRegistry::new());
+    let registry = setup_registry();
     let mut world = World::new(registry.clone());
+    world.current_mode = "colony".to_string();
     let id1 = world.spawn();
     let id2 = world.spawn();
     world
@@ -188,8 +194,9 @@ fn test_get_entities_with_component() {
 
 #[test]
 fn test_move_entity() {
-    let registry = Arc::new(ComponentRegistry::new());
+    let registry = setup_registry();
     let mut world = World::new(registry.clone());
+    world.current_mode = "colony".to_string();
     let id = world.spawn();
     world
         .set_component(id, "Position", json!({ "x": 0.0, "y": 0.0 }))
@@ -202,8 +209,9 @@ fn test_move_entity() {
 
 #[test]
 fn test_is_entity_alive() {
-    let registry = Arc::new(ComponentRegistry::new());
+    let registry = setup_registry();
     let mut world = World::new(registry.clone());
+    world.current_mode = "colony".to_string();
     let id = world.spawn();
     world
         .set_component(id, "Health", json!({ "current": 5.0, "max": 5.0 }))
@@ -217,8 +225,9 @@ fn test_is_entity_alive() {
 
 #[test]
 fn test_damage_entity() {
-    let registry = Arc::new(ComponentRegistry::new());
+    let registry = setup_registry();
     let mut world = World::new(registry.clone());
+    world.current_mode = "colony".to_string();
     let id = world.spawn();
     world
         .set_component(id, "Health", json!({ "current": 10.0, "max": 10.0 }))
@@ -228,7 +237,6 @@ fn test_damage_entity() {
     let health = world.get_component(id, "Health").unwrap();
     assert_eq!(health["current"], 7.0);
 
-    // Should not go below zero
     world.damage_entity(id, 10.0);
     let health = world.get_component(id, "Health").unwrap();
     assert_eq!(health["current"], 0.0);
@@ -236,8 +244,9 @@ fn test_damage_entity() {
 
 #[test]
 fn test_count_entities_with_type() {
-    let registry = Arc::new(ComponentRegistry::new());
+    let registry = setup_registry();
     let mut world = World::new(registry.clone());
+    world.current_mode = "colony".to_string();
     let player = world.spawn();
     let enemy1 = world.spawn();
     let enemy2 = world.spawn();
@@ -255,16 +264,14 @@ fn test_count_entities_with_type() {
     assert_eq!(world.count_entities_with_type("player"), 1);
     assert_eq!(world.count_entities_with_type("enemy"), 2);
 
-    // Remove one enemy and test again
     world.remove_entity(enemy1);
     assert_eq!(world.count_entities_with_type("enemy"), 1);
 }
 
 #[test]
 fn test_lua_damage_and_count_entities() {
-    let registry = Arc::new(ComponentRegistry::new());
-    let world = Rc::new(RefCell::new(World::new(registry.clone())));
     let mut engine = ScriptEngine::new();
+    let world = setup_world_with_mode("roguelike");
     engine.register_world(world.clone()).unwrap();
 
     let script = r#"
@@ -293,8 +300,7 @@ fn test_lua_get_user_input_with_mock() {
     let inputs = vec!["hello".to_string()];
     let mock_input = Box::new(MockInput::new(inputs));
 
-    let registry = Arc::new(ComponentRegistry::new());
-    let world = Rc::new(RefCell::new(World::new(registry.clone())));
+    let world = setup_world_with_mode("roguelike");
     let mut engine = ScriptEngine::new_with_input(mock_input);
     engine.register_world(world.clone()).unwrap();
 

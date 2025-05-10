@@ -140,53 +140,40 @@ fn test_external_schema_loading() {
 #[test]
 fn test_schema_driven_mode_enforcement() {
     use engine_core::ecs::registry::ComponentRegistry;
-    use engine_core::ecs::schema::load_schemas_from_dir;
     use engine_core::scripting::world::World;
     use serde_json::json;
     use std::sync::Arc;
 
-    // Load external schemas (assume at least health.json and roguelike_inventory.json exist)
-    let schema_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap() + "/../assets/schemas";
-    let schemas = load_schemas_from_dir(&schema_dir).expect("Failed to load schemas");
-    let mut registry = ComponentRegistry::new();
-    for (_name, schema) in schemas {
-        registry.register_external_schema(schema);
+    // Fabricate a schema for "Roguelike::Inventory" only allowed in "roguelike" mode
+    let roguelike_inventory_schema = r#"
+    {
+      "title": "Roguelike::Inventory",
+      "type": "object",
+      "properties": {
+        "slots": { "type": "array", "items": { "type": "string" } },
+        "weight": { "type": "number" }
+      },
+      "required": ["slots", "weight"],
+      "modes": ["roguelike"]
     }
+    "#;
+
+    let mut registry = ComponentRegistry::new();
+    registry.register_external_schema_from_json(roguelike_inventory_schema).unwrap();
     let registry = Arc::new(registry);
 
     let mut world = World::new(registry.clone());
-
-    // Set mode to "colony" and try to add "Health" (should succeed)
-    world.current_mode = "colony".to_string();
     let entity = world.spawn();
-    assert!(
-        world
-            .set_component(entity, "Health", json!({"current": 10, "max": 10}))
-            .is_ok()
-    );
 
-    // Try to add "Roguelike::Inventory" in "colony" mode (should fail)
-    let result = world.set_component(
-        entity,
-        "Roguelike::Inventory",
-        json!({"slots": [], "weight": 0.0}),
-    );
-    assert!(
-        result.is_err(),
-        "Component should not be allowed in this mode"
-    );
+    // Not allowed in "colony"
+    world.current_mode = "colony".to_string();
+    let result = world.set_component(entity, "Roguelike::Inventory", json!({"slots": [], "weight": 0.0}));
+    assert!(result.is_err(), "Roguelike::Inventory should NOT be allowed in colony mode");
 
-    // Switch to "roguelike" mode and try again (should succeed)
+    // Allowed in "roguelike"
     world.current_mode = "roguelike".to_string();
-    assert!(
-        world
-            .set_component(
-                entity,
-                "Roguelike::Inventory",
-                json!({"slots": [], "weight": 0.0})
-            )
-            .is_ok()
-    );
+    let result = world.set_component(entity, "Roguelike::Inventory", json!({"slots": [], "weight": 0.0}));
+    assert!(result.is_ok(), "Roguelike::Inventory should be allowed in roguelike mode");
 }
 
 #[test]
@@ -227,4 +214,43 @@ fn test_register_external_schema_from_json() {
         modes.contains(&"colony".to_string()),
         "Mode 'colony' not set"
     );
+}
+
+#[test]
+fn test_mode_enforcement_for_runtime_registered_schema() {
+    use engine_core::scripting::world::World;
+    use serde_json::json;
+    use std::sync::Arc;
+
+    let mut registry = ComponentRegistry::new();
+    let schema_json = r#"
+    {
+        "title": "MagicPower",
+        "type": "object",
+        "properties": { "mana": { "type": "number" } },
+        "required": ["mana"],
+        "modes": ["colony"]
+    }
+    "#;
+    registry
+        .register_external_schema_from_json(schema_json)
+        .unwrap();
+    let registry = Arc::new(registry);
+
+    let mut world = World::new(registry.clone());
+    let id = world.spawn();
+
+    // Allowed in "colony"
+    world.current_mode = "colony".to_string();
+    assert!(
+        world
+            .set_component(id, "MagicPower", json!({ "mana": 42 }))
+            .is_ok(),
+        "Should be allowed in colony mode"
+    );
+
+    // Not allowed in "roguelike"
+    world.current_mode = "roguelike".to_string();
+    let result = world.set_component(id, "MagicPower", json!({ "mana": 99 }));
+    assert!(result.is_err(), "Should not be allowed in roguelike mode");
 }

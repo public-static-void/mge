@@ -1,12 +1,21 @@
 use engine_core::ecs::registry::ComponentRegistry;
+use engine_core::ecs::schema::load_schemas_from_dir;
 use engine_core::scripting::World;
 use serde_json::json;
 use std::sync::Arc;
 
 #[test]
 fn test_death_replaces_health_with_corpse_and_decay() {
-    let registry = Arc::new(ComponentRegistry::new());
+    let schema_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap() + "/../assets/schemas";
+    let schemas = load_schemas_from_dir(&schema_dir).expect("Failed to load schemas");
+    let mut registry = ComponentRegistry::new();
+    for (_name, schema) in schemas {
+        registry.register_external_schema(schema);
+    }
+    let registry = Arc::new(registry);
     let mut world = World::new(registry.clone());
+
+    world.current_mode = "colony".to_string();
 
     let id = world.spawn();
     world
@@ -32,8 +41,16 @@ fn test_death_replaces_health_with_corpse_and_decay() {
 
 #[test]
 fn test_decay_removes_entity_after_time() {
-    let registry = Arc::new(ComponentRegistry::new());
+    let schema_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap() + "/../assets/schemas";
+    let schemas = load_schemas_from_dir(&schema_dir).expect("Failed to load schemas");
+    let mut registry = ComponentRegistry::new();
+    for (_name, schema) in schemas {
+        registry.register_external_schema(schema);
+    }
+    let registry = Arc::new(registry);
     let mut world = World::new(registry.clone());
+
+    world.current_mode = "colony".to_string();
 
     let id = world.spawn();
     world.set_component(id, "Corpse", json!({})).unwrap();
