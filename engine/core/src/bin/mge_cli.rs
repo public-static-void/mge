@@ -21,15 +21,22 @@ fn main() {
     });
 
     // --- ECS + Lua context ---
-    let registry = Arc::new(ComponentRegistry::new());
+
+    // Load all schemas!
+    let schema_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap() + "/../assets/schemas";
+    let schemas = engine_core::ecs::schema::load_schemas_from_dir(&schema_dir)
+        .expect("Failed to load schemas");
+    let mut registry = ComponentRegistry::new();
+    for (_name, schema) in schemas {
+        registry.register_external_schema(schema);
+    }
+    let registry = Arc::new(registry);
+
     let world = Rc::new(RefCell::new(World::new(registry.clone())));
     let mut engine = ScriptEngine::new();
     engine
         .register_world(world.clone())
         .expect("Failed to register ECS API");
-
-    // Optionally, override print here if you want to capture output
-    // (Or add a print override to ScriptEngine in the future)
 
     // --- Run script ---
     if let Err(e) = engine.run_script(&script) {
