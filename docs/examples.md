@@ -68,6 +68,21 @@ print_healths()
 print("Turn: " .. get_turn())
 ```
 
+## Python Scripting Examples
+
+```python
+from mge import PyWorld
+
+world = PyWorld()  # Optionally: PyWorld("engine/assets/schemas")
+eid = world.spawn_entity()
+world.set_component(eid, "Health", {"current": 10, "max": 10})
+print(world.get_component(eid, "Health"))
+world.set_mode("roguelike")
+print("Available modes:", world.get_available_modes())
+```
+
+- See [`engine_py/tests/`](../engine_py/tests/) for more tested usage patterns and system examples.
+
 ## ECS Usage in Rust
 
 ### Creating a World with a Component Registry and Loading Schemas

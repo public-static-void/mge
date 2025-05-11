@@ -107,7 +107,7 @@ cargo run -p schema_validator -- engine/assets/schemas/
 - Required fields like `"title"` and `"modes"`
 - All modes in `"modes"` must be from the allowed set:
   `colony`, `roguelike`, `single`, `multi`, `editor`, `simulation`
-- Property constraints (e.g., `minimum` <= `maximum`)
+- Property constraints (e.g., `minimum` < `maximum`)
 
 > Note:
 > This linter is run automatically in CI on every pull request.
@@ -146,6 +146,29 @@ See [`engine/tools/schema_validator/README.md`](engine/tools/schema_validator/RE
 
 ---
 
+## Python Scripting
+
+- Script game logic, systems, and content in Python using the same ECS, schema, and mode system as Rust and Lua.
+- The `mge` Python module exposes a `PyWorld` class for entity, component, and mode management.
+- Supports rapid prototyping, content pipeline scripting, and simulation logic in Python.
+- All component schemas and mode enforcement work identically to Lua and Rust.
+
+**See [docs/examples.md](docs/examples.md#python-scripting-examples) for usage examples.**
+**See [`docs/python_api.md`](docs/python_api.md) for the full API reference.**
+
+**To use Python scripting:**
+
+```bash
+maturin develop  # or: pip install -e ./engine_py
+```
+
+Then import and use the `mge` module in your Python scripts.
+
+---
+
+**Note:**
+Python scripting is ideal for data analysis, content tools, and simulation scripts. For gameplay logic and modding, Lua may be more ergonomic, but both are fully supported and interchangeable.
+
 ## C ABI Plugin System
 
 MGE supports hot-reloadable plugins via a stable C ABI, enabling dynamic extension of the engine in C, Rust (with `extern "C"`), or other languages.
@@ -161,3 +184,4 @@ See [docs/examples.md](docs/examples.md#c-plugin-example) for a minimal C plugin
 - [docs/idea.md](docs/idea.md): Architecture/design
 - [docs/examples.md](docs/examples.md): Usage examples
 - [docs/lua_api.md](docs/lua_api.md): Lua API reference
+- [docs/python_api.md](docs/python_api.md) Python API reference
