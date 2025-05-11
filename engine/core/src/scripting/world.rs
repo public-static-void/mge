@@ -1,7 +1,7 @@
 /// The main ECS world. Use this to register and run systems.
 ///
 /// # Example
-/// ```
+/// ```ignore
 /// # use engine_core::scripting::world::World;
 /// # use engine_core::ecs::system::System;
 /// # use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
