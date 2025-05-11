@@ -82,6 +82,29 @@ impl World {
         self.entities.clone()
     }
 
+    /// Return all entity IDs that have *all* of the given components.
+    pub fn get_entities_with_components(&self, names: &[&str]) -> Vec<u32> {
+        // If no names given, return all entities
+        if names.is_empty() {
+            return self.entities.clone();
+        }
+        // For each component, get the set of entity IDs that have it
+        let mut sets: Vec<std::collections::HashSet<u32>> = names
+            .iter()
+            .filter_map(|name| self.components.get(*name))
+            .map(|comps| comps.keys().cloned().collect())
+            .collect();
+        if sets.is_empty() {
+            return vec![];
+        }
+        // Intersect all sets to get entities that have all components
+        let first = sets.pop().unwrap();
+        sets.into_iter()
+            .fold(first, |acc, set| acc.intersection(&set).cloned().collect())
+            .into_iter()
+            .collect()
+    }
+
     pub fn move_all(&mut self, dx: f32, dy: f32) {
         if let Some(positions) = self.components.get_mut("Position") {
             for (_entity, value) in positions.iter_mut() {
