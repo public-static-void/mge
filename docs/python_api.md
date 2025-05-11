@@ -45,7 +45,7 @@ world = PyWorld(schema_dir="/path/to/schemas")
 | Method                                | Description                                   |
 | ------------------------------------- | --------------------------------------------- |
 | `is_entity_alive(entity_id)`          | Returns True if entity's Health > 0           |
-| `count_entities_with_type(type_str)`      | Count entities with Type.kind == type_str         |
+| `count_entities_with_type(type_str)`  | Count entities with Type.kind == type_str     |
 | `get_entities_with_component(name)`   | List entity IDs with a given component        |
 | `get_entities_with_components(names)` | List entity IDs with all specified components |
 
@@ -63,16 +63,17 @@ world = PyWorld(schema_dir="/path/to/schemas")
 
 ### Systems and Gameplay
 
-| Method                             | Description                                      |
-| ---------------------------------- | ------------------------------------------------ |
-| `move_entity(entity_id, dx, dy)`   | Move an entity by (dx, dy)                       |
-| `move_all(dx, dy)`                 | Move all entities with Position component        |
-| `damage_entity(entity_id, amount)` | Damage an entity (reduces Health)                |
-| `damage_all(amount)`               | Damage all entities with Health component        |
-| `tick()`                           | Advance the game simulation by one tick          |
-| `get_turn()`                       | Get the current turn number                      |
-| `process_deaths()`                 | Process entities with zero or less health        |
-| `process_decay()`                  | Process decay timers and remove decayed entities |
+| Method                                              | Description                                                                                                                   |
+| --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `move_entity(entity_id, dx, dy)`                    | Move an entity by (dx, dy)                                                                                                    |
+| `move_all(dx, dy)`                                  | Move all entities with Position component                                                                                     |
+| `damage_entity(entity_id, amount)`                  | Damage an entity (reduces Health)                                                                                             |
+| `damage_all(amount)`                                | Damage all entities with Health component                                                                                     |
+| `tick()`                                            | Advance the game simulation by one tick                                                                                       |
+| `get_turn()`                                        | Get the current turn number                                                                                                   |
+| `process_deaths()`                                  | Process entities with zero or less health                                                                                     |
+| `process_decay()`                                   | Process decay timers and remove decayed entities                                                                              |
+| `modify_stockpile_resource(entity_id, kind, delta)` | Add or remove (delta can be negative) a specific resource in a Stockpile component. Raises ValueError if not enough resource. |
 
 ---
 
