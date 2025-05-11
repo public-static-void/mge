@@ -334,6 +334,38 @@ impl World {
     pub fn list_systems(&self) -> Vec<String> {
         self.systems.list_systems()
     }
+
+    /// Modify the amount of a resource for a given entity.
+    /// Negative `delta` removes, positive adds. Returns Err if insufficient resource.
+    pub fn modify_resource_amount(
+        &mut self,
+        entity_id: u32,
+        kind: &str,
+        delta: f64,
+    ) -> Result<(), String> {
+        // Find the Resource component for this entity
+        let comp = self
+            .components
+            .get_mut("Resource")
+            .and_then(|map| map.get_mut(&entity_id));
+        if let Some(resource) = comp {
+            if let Some(obj) = resource.as_object_mut() {
+                // Check kind matches
+                if obj.get("kind").and_then(|v| v.as_str()) != Some(kind) {
+                    return Err("Resource kind mismatch".to_string());
+                }
+                // Get current amount
+                let amount = obj.get("amount").and_then(|v| v.as_f64()).unwrap_or(0.0);
+                let new_amount = amount + delta;
+                if new_amount < 0.0 {
+                    return Err("Not enough resource".to_string());
+                }
+                obj.insert("amount".to_string(), serde_json::json!(new_amount));
+                return Ok(());
+            }
+        }
+        Err("Resource component not found".to_string())
+    }
 }
 
 impl Default for World {

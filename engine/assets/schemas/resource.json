@@ -1,0 +1,10 @@
+{
+  "title": "Resource",
+  "type": "object",
+  "properties": {
+    "kind": { "type": "string" },
+    "amount": { "type": "number", "minimum": 0 }
+  },
+  "required": ["kind", "amount"],
+  "modes": ["colony", "economic"]
+}
