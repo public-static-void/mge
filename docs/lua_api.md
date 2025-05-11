@@ -7,38 +7,59 @@ Use these functions in your Lua scripts to interact with the ECS, control game f
 
 ## Entity Management
 
-| Function            | Description                             |
-| ------------------- | --------------------------------------- |
-| `spawn_entity()`    | Spawn a new entity, returns entity id   |
-| `remove_entity(id)` | Remove an entity and all its components |
+| Function                | Description                             |
+| ----------------------- | --------------------------------------- |
+| `spawn_entity()`        | Spawn a new entity, returns entity id   |
+| `remove_entity(id)`     | Remove an entity and all its components |
+| `get_entities()`        | List all entity IDs                     |
 
 ---
 
 ## Component Access
 
-| Function                        | Description                    |
-| ------------------------------- | ------------------------------ |
-| `set_component(id, name, data)` | Set a component on an entity   |
-| `get_component(id, name)`       | Get a component from an entity |
+| Function                                | Description                              |
+| ---------------------------------------- | ---------------------------------------- |
+| `set_component(id, name, data)`          | Set a component on an entity             |
+| `get_component(id, name)`                | Get a component from an entity           |
+| `remove_component(id, name)`             | Remove a component from an entity        |
+| `list_components()`                      | List all registered component names      |
+| `get_component_schema(name)`             | Get the JSON schema for a component      |
+
+---
+
+## Entity Queries
+
+| Function                                 | Description                                         |
+| ----------------------------------------- | --------------------------------------------------- |
+| `get_entities_with_component(name)`       | List entity ids with a given component              |
+| `get_entities_with_components(names)`     | List entity ids with all listed components (table)  |
+| `is_entity_alive(id)`                     | Returns true if entity's Health > 0                 |
+| `count_entities_with_type(type_str)`      | Count entities with Type.kind == type_str           |
 
 ---
 
 ## Game Modes
 
-| Function         | Description      |
-| ---------------- | ---------------- |
-| `set_mode(name)` | Switch game mode |
+| Function             | Description                     |
+| -------------------- | ------------------------------ |
+| `set_mode(name)`     | Switch game mode               |
+| `get_mode()`         | Get the current game mode      |
+| `get_available_modes()` | List all available modes     |
 
 ---
 
 ## Gameplay Systems
 
-| Function             | Description                     |
-| -------------------- | ------------------------------- |
-| `move_all(dx, dy)`   | Move all entities with Position |
-| `damage_all(amount)` | Damage all entities with Health |
-| `tick()`             | Advance the game by one turn    |
-| `get_turn()`         | Get the current turn number     |
+| Function                    | Description                                 |
+| --------------------------- | ------------------------------------------- |
+| `move_entity(id, dx, dy)`   | Move an entity by (dx, dy)                  |
+| `move_all(dx, dy)`          | Move all entities with Position             |
+| `damage_entity(id, amount)` | Damage an entity (reduces Health)           |
+| `damage_all(amount)`        | Damage all entities with Health             |
+| `tick()`                    | Advance the game by one turn                |
+| `get_turn()`                | Get the current turn number                 |
+| `process_deaths()`          | Convert dead entities to corpses and start decay |
+| `process_decay()`           | Decrement decay, remove entities when done  |
 
 ---
 
@@ -51,20 +72,11 @@ Use these functions in your Lua scripts to interact with the ECS, control game f
 
 ---
 
-## Entity Lifecycle
-
-| Function           | Description                                      |
-| ------------------ | ------------------------------------------------ |
-| `process_deaths()` | Convert dead entities to corpses and start decay |
-| `process_decay()`  | Decrement decay, remove entities when done       |
-
----
-
 ## User Input
 
-| Function           | Description                                   |
-| ------------------ | --------------------------------------------- |
-| `get_user_input()` | Prompt the user for input and return a string |
+| Function                 | Description                                   |
+| ------------------------ | --------------------------------------------- |
+| `get_user_input(prompt)` | Prompt the user for input and return a string |
 
 ---
 
