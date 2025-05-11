@@ -1,17 +1,4 @@
-import os
-
-import mge
-
-
-def make_world():
-    here = os.path.dirname(__file__)
-    schema_dir = os.path.abspath(
-        os.path.join(here, "../../engine/assets/schemas")
-    )
-    return mge.PyWorld(schema_dir)
-
-
-def test_despawn_and_remove_component():
+def test_despawn_and_remove_component(make_world):
     world = make_world()
     eid = world.spawn_entity()
     world.set_component(eid, "Health", {"current": 10, "max": 10})
@@ -21,7 +8,7 @@ def test_despawn_and_remove_component():
     assert eid not in world.get_entities()
 
 
-def test_is_entity_alive():
+def test_is_entity_alive(make_world):
     world = make_world()
     eid = world.spawn_entity()
     world.set_component(eid, "Health", {"current": 10, "max": 10})

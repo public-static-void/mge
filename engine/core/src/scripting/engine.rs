@@ -270,6 +270,21 @@ impl ScriptEngine {
         })?;
         globals.set("get_available_modes", get_available_modes)?;
 
+        let world_query = world.clone();
+        let get_entities_with_components =
+            self.lua
+                .create_function_mut(move |_lua, names: mlua::Table| {
+                    let world = world_query.borrow();
+                    // Convert Lua table to Vec<String>
+                    let mut rust_names = Vec::new();
+                    for pair in names.sequence_values::<String>() {
+                        rust_names.push(pair?);
+                    }
+                    let name_refs: Vec<&str> = rust_names.iter().map(|s| s.as_str()).collect();
+                    Ok(world.get_entities_with_components(&name_refs))
+                })?;
+        globals.set("get_entities_with_components", get_entities_with_components)?;
+
         Ok(())
     }
 }

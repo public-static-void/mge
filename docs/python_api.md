@@ -20,12 +20,11 @@ world = PyWorld(schema_dir="/path/to/schemas")
 
 ### Entity Management
 
-| Method                              | Description                             |
-| ----------------------------------- | --------------------------------------- |
-| `spawn_entity()`                           | Spawn a new entity, returns entity ID   |
-| `despawn_entity(entity_id)`                | Remove an entity and all its components |
-| `get_entities()`                    | List all entity IDs                     |
-| `get_entities_with_component(name)` | List entity IDs with a given component  |
+| Method                      | Description                             |
+| --------------------------- | --------------------------------------- |
+| `spawn_entity()`            | Spawn a new entity, returns entity ID   |
+| `despawn_entity(entity_id)` | Remove an entity and all its components |
+| `get_entities()`            | List all entity IDs                     |
 
 ---
 
@@ -43,10 +42,12 @@ world = PyWorld(schema_dir="/path/to/schemas")
 
 ### Entity Queries
 
-| Method                           | Description                           |
-| -------------------------------- | ------------------------------------- |
-| `is_entity_alive(entity_id)`     | Returns True if entity's Health > 0   |
-| `count_entities_with_type(type)` | Count entities with Type.kind == type |
+| Method                                | Description                                   |
+| ------------------------------------- | --------------------------------------------- |
+| `is_entity_alive(entity_id)`          | Returns True if entity's Health > 0           |
+| `count_entities_with_type(type_str)`      | Count entities with Type.kind == type_str         |
+| `get_entities_with_component(name)`   | List entity IDs with a given component        |
+| `get_entities_with_components(names)` | List entity IDs with all specified components |
 
 ---
 
