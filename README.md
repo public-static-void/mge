@@ -87,6 +87,34 @@ MGE components are defined by JSON schemas in `engine/assets/schemas/`.
 
 ---
 
+## Schema Validation
+
+All JSON component schemas in `engine/assets/schemas/` can be automatically validated using the built-in schema linter.
+
+**Usage:**
+
+```bash
+cargo run -p schema_validator -- engine/assets/schemas/
+```
+
+**Options:**
+
+- `--summary-only` - Only print a summary, not per-file results
+- `--fail-fast` - Stop at the first error
+
+**What it checks:**
+
+- Required fields like `"title"` and `"modes"`
+- All modes in `"modes"` must be from the allowed set:
+  `colony`, `roguelike`, `single`, `multi`, `editor`, `simulation`
+- Property constraints (e.g., `minimum` <= `maximum`)
+
+> Note:
+> This linter is run automatically in CI on every pull request.
+> **Make sure schemas pass before pushing!**
+
+See [`engine/tools/schema_validator/README.md`](engine/tools/schema_validator/README.md) for full details.
+
 ## Example: Adding a New Component
 
 1. Create a schema file in `engine/assets/schemas/`, e.g. `mana.json`:
