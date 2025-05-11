@@ -131,6 +131,13 @@ impl PyWorld {
         Ok(world.get_entities_with_component(&name))
     }
 
+    /// Get all entity IDs that have given components.
+    fn get_entities_with_components(&self, names: Vec<String>) -> Vec<u32> {
+        let world = self.inner.lock().unwrap();
+        let name_refs: Vec<&str> = names.iter().map(|s| s.as_str()).collect();
+        world.get_entities_with_components(&name_refs)
+    }
+
     /// Get a list of all entity IDs in the world.
     fn get_entities(&self) -> PyResult<Vec<u32>> {
         let world = self.inner.lock().unwrap();
