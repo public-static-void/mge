@@ -366,6 +366,32 @@ impl World {
         }
         Err("Resource component not found".to_string())
     }
+
+    pub fn modify_stockpile_resource(
+        &mut self,
+        entity_id: u32,
+        kind: &str,
+        delta: f64,
+    ) -> Result<(), String> {
+        let comp = self
+            .components
+            .get_mut("Stockpile")
+            .and_then(|map| map.get_mut(&entity_id));
+        if let Some(stockpile) = comp {
+            if let Some(obj) = stockpile.as_object_mut() {
+                if let Some(resources) = obj.get_mut("resources").and_then(|v| v.as_object_mut()) {
+                    let current = resources.get(kind).and_then(|v| v.as_f64()).unwrap_or(0.0);
+                    let new_amount = current + delta;
+                    if new_amount < 0.0 {
+                        return Err("Not enough resource".to_string());
+                    }
+                    resources.insert(kind.to_string(), serde_json::json!(new_amount));
+                    return Ok(());
+                }
+            }
+        }
+        Err("Stockpile component not found".to_string())
+    }
 }
 
 impl Default for World {
