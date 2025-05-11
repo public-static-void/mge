@@ -1,4 +1,5 @@
 use crate::ecs::registry::ComponentRegistry;
+use crate::ecs::system::SystemRegistry;
 use jsonschema::{Draft, JSONSchema};
 use serde_json::Value as JsonValue;
 use std::collections::HashMap;
@@ -11,6 +12,7 @@ pub struct World {
     pub current_mode: String,
     pub turn: u32,
     pub registry: Arc<ComponentRegistry>,
+    pub systems: SystemRegistry,
 }
 
 impl World {
@@ -22,6 +24,7 @@ impl World {
             current_mode: "colony".to_string(),
             turn: 0,
             registry,
+            systems: SystemRegistry::new(),
         }
     }
 
@@ -294,6 +297,25 @@ impl World {
                     .unwrap_or(false)
             })
             .count()
+    }
+
+    pub fn register_system<S: crate::ecs::system::System + 'static>(&mut self, system: S) {
+        self.systems.register_system(system);
+    }
+
+    pub fn run_system(&mut self, name: &str) -> Result<(), String> {
+        // Take the system out to avoid double mutable borrow
+        if let Some(mut system) = self.systems.take_system(name) {
+            system.run(self);
+            self.systems.register_system_boxed(name.to_string(), system);
+            Ok(())
+        } else {
+            Err(format!("System '{}' not found", name))
+        }
+    }
+
+    pub fn list_systems(&self) -> Vec<String> {
+        self.systems.list_systems()
     }
 }
 

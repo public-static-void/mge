@@ -23,7 +23,6 @@ fn test_register_and_list_systems() {
 
 #[test]
 fn test_run_system() {
-    let mut system_registry = SystemRegistry::new();
     let called = Arc::new(AtomicBool::new(false));
     struct TestSystem {
         called: Arc<AtomicBool>,
@@ -36,24 +35,23 @@ fn test_run_system() {
             self.called.store(true, Ordering::SeqCst);
         }
     }
-    system_registry.register_system(TestSystem {
-        called: called.clone(),
-    });
 
     let component_registry = Arc::new(ComponentRegistry::new());
     let mut world = World::new(component_registry);
 
-    system_registry
-        .run_system("TestSystem", &mut world)
-        .unwrap();
+    // Register the system with the world, not with a separate SystemRegistry!
+    world.register_system(TestSystem {
+        called: called.clone(),
+    });
+
+    world.run_system("TestSystem").unwrap();
     assert!(called.load(Ordering::SeqCst));
 }
 
 #[test]
 fn test_run_nonexistent_system_errors() {
-    let mut system_registry = SystemRegistry::new();
     let component_registry = Arc::new(ComponentRegistry::new());
     let mut world = World::new(component_registry);
-    let result = system_registry.run_system("NoSuchSystem", &mut world);
+    let result = world.run_system("NoSuchSystem");
     assert!(result.is_err());
 }
