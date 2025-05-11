@@ -16,7 +16,14 @@ pub fn validate_schema(schema_json: &str) -> Result<(), String> {
     };
 
     // 3. Check that "modes" is an array of valid strings
-    let allowed_modes = ["colony", "roguelike", "single", "multi"];
+    let allowed_modes = [
+        "colony",
+        "roguelike",
+        "editor",
+        "simulation",
+        "single",
+        "multi",
+    ];
     if let Some(arr) = modes.as_array() {
         for mode in arr {
             let mode_str = mode.as_str().ok_or("Mode must be a string")?;
