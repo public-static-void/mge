@@ -1,3 +1,8 @@
 [workspace]
-members = ["engine/core", "engine_macros", "engine_py"]
+members = [
+  "engine/core",
+  "engine_macros",
+  "engine_py",
+  "engine/tools/schema_validator",
+]
 resolver = "3"
