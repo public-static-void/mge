@@ -51,29 +51,29 @@ impl PyWorld {
     }
 
     /// Remove an entity and all its components.
-    fn despawn_entity(&self, entity: u32) {
+    fn despawn_entity(&self, entity_id: u32) {
         let mut world = self.inner.lock().unwrap();
-        world.remove_entity(entity);
+        world.remove_entity(entity_id);
         // Optionally, also remove from world.entities if not already done
-        world.entities.retain(|&e| e != entity);
+        world.entities.retain(|&e| e != entity_id);
     }
 
     /// Set a component on an entity.
     ///
     /// Args:
-    ///     entity: Entity ID.
+    ///     entity_id: Entity ID.
     ///     name: Component name.
     ///     value: Component data as a Python dict.
     fn set_component(
         &self,
-        entity: u32,
+        entity_id: u32,
         name: String,
         value: Bound<'_, pyo3::types::PyAny>,
     ) -> PyResult<()> {
         let mut world = self.inner.lock().unwrap();
         let json_value: serde_json::Value = from_pyobject(value)?;
         world
-            .set_component(entity, &name, json_value)
+            .set_component(entity_id, &name, json_value)
             .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
     }
 
@@ -83,11 +83,11 @@ impl PyWorld {
     fn get_component(
         &self,
         py: Python<'_>,
-        entity: u32,
+        entity_id: u32,
         name: String,
     ) -> PyResult<Option<PyObject>> {
         let world = self.inner.lock().unwrap();
-        if let Some(val) = world.get_component(entity, &name) {
+        if let Some(val) = world.get_component(entity_id, &name) {
             let py_obj = to_pyobject(py, val)?;
             Ok(Some(py_obj.into()))
         } else {
@@ -118,10 +118,10 @@ impl PyWorld {
     }
 
     /// Remove a component from an entity.
-    fn remove_component(&self, entity: u32, name: String) {
+    fn remove_component(&self, entity_id: u32, name: String) {
         let mut world = self.inner.lock().unwrap();
         if let Some(comps) = world.components.get_mut(&name) {
-            comps.remove(&entity);
+            comps.remove(&entity_id);
         }
     }
 
@@ -145,9 +145,9 @@ impl PyWorld {
     }
 
     /// Return True if the entity is considered alive (Health > 0).
-    fn is_entity_alive(&self, entity: u32) -> bool {
+    fn is_entity_alive(&self, entity_id: u32) -> bool {
         let world = self.inner.lock().unwrap();
-        world.is_entity_alive(entity)
+        world.is_entity_alive(entity_id)
     }
 
     /// Set the current game mode.
@@ -169,9 +169,9 @@ impl PyWorld {
     }
 
     /// Move an entity by (dx, dy).
-    fn move_entity(&self, entity: u32, dx: f32, dy: f32) {
+    fn move_entity(&self, entity_id: u32, dx: f32, dy: f32) {
         let mut world = self.inner.lock().unwrap();
-        world.move_entity(entity, dx, dy);
+        world.move_entity(entity_id, dx, dy);
     }
 
     /// Move all entities with a Position component by (dx, dy).
@@ -181,9 +181,9 @@ impl PyWorld {
     }
 
     /// Damage an entity (reduces its Health).
-    fn damage_entity(&self, entity: u32, amount: f32) {
+    fn damage_entity(&self, entity_id: u32, amount: f32) {
         let mut world = self.inner.lock().unwrap();
-        world.damage_entity(entity, amount);
+        world.damage_entity(entity_id, amount);
     }
 
     /// Damage all entities with a Health component.
