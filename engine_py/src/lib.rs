@@ -227,7 +227,7 @@ impl PyWorld {
         let mut world = self.inner.lock().unwrap();
         world
             .modify_stockpile_resource(entity_id, &kind, delta)
-            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e))
+            .map_err(pyo3::exceptions::PyValueError::new_err)
     }
 }
 
