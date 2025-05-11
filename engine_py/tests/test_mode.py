@@ -1,17 +1,4 @@
-import os
-
-import mge
-
-
-def make_world():
-    here = os.path.dirname(__file__)
-    schema_dir = os.path.abspath(
-        os.path.join(here, "../../engine/assets/schemas")
-    )
-    return mge.PyWorld(schema_dir)
-
-
-def test_mode_management():
+def test_mode_management(make_world):
     world = make_world()
     # Default mode should be "colony"
     assert world.get_mode() == "colony"

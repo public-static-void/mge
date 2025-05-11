@@ -1,17 +1,4 @@
-import os
-
-import mge
-
-
-def make_world():
-    here = os.path.dirname(__file__)
-    schema_dir = os.path.abspath(
-        os.path.join(here, "../../engine/assets/schemas")
-    )
-    return mge.PyWorld(schema_dir)
-
-
-def test_move_and_damage():
+def test_move_and_damage(make_world):
     world = make_world()
     eid = world.spawn_entity()
     world.set_component(eid, "Position", {"x": 0, "y": 0})
@@ -28,7 +15,7 @@ def test_move_and_damage():
     assert pos2["x"] == 2 and pos2["y"] == 2
 
 
-def test_damage_and_tick():
+def test_damage_and_tick(make_world):
     world = make_world()
     eid = world.spawn_entity()
     world.set_component(eid, "Health", {"current": 10, "max": 10})
@@ -45,14 +32,14 @@ def test_damage_and_tick():
     assert h2["current"] == 3
 
 
-def test_tick_and_turn():
+def test_tick_and_turn(make_world):
     world = make_world()
     assert world.get_turn() == 0
     world.tick()
     assert world.get_turn() == 1
 
 
-def test_process_deaths_and_decay():
+def test_process_deaths_and_decay(make_world):
     world = make_world()
     eid = world.spawn_entity()
     world.set_component(eid, "Health", {"current": 0, "max": 10})
@@ -69,7 +56,7 @@ def test_process_deaths_and_decay():
         assert world.get_component(eid, comp) is None
 
 
-def test_count_entities_with_type():
+def test_count_entities_with_type(make_world):
     world = make_world()
     e1 = world.spawn_entity()
     e2 = world.spawn_entity()
