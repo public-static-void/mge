@@ -270,3 +270,54 @@ fn test_mode_enforcement_for_runtime_registered_schema() {
     let result = world.set_component(id, "MagicPower", json!({ "mana": 99 }));
     assert!(result.is_err(), "Should not be allowed in roguelike mode");
 }
+
+#[test]
+fn test_set_component_validation() {
+    use engine_core::ecs::registry::ComponentRegistry;
+    use engine_core::scripting::world::World;
+    use serde_json::json;
+    use std::sync::Arc;
+
+    let mut registry = ComponentRegistry::new();
+    let schema_json = r#"
+    {
+        "title": "TestComponent",
+        "type": "object",
+        "properties": {
+            "value": { "type": "integer", "minimum": 0, "maximum": 10 }
+        },
+        "required": ["value"],
+        "modes": ["colony"]
+    }
+    "#;
+    registry
+        .register_external_schema_from_json(schema_json)
+        .unwrap();
+    let registry = Arc::new(registry);
+
+    let mut world = World::new(registry.clone());
+    let entity = world.spawn_entity();
+
+    world.current_mode = "colony".to_string();
+
+    // Valid data
+    assert!(
+        world
+            .set_component(entity, "TestComponent", json!({ "value": 5 }))
+            .is_ok()
+    );
+
+    // Invalid data (value too high)
+    assert!(
+        world
+            .set_component(entity, "TestComponent", json!({ "value": 20 }))
+            .is_err()
+    );
+
+    // Missing required field
+    assert!(
+        world
+            .set_component(entity, "TestComponent", json!({}))
+            .is_err()
+    );
+}
