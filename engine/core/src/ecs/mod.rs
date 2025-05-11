@@ -6,6 +6,7 @@ pub mod components;
 mod error;
 pub mod registry;
 pub mod schema;
+pub mod system;
 
 use crate::modes::{GameMode, ModeManager, ModeRestrictedComponent};
 pub use components::{Health, Position};
