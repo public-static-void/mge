@@ -16,6 +16,7 @@ thiserror = "2.0.12"
 engine_macros = { path = "../../engine_macros" }
 anyhow = "1.0.98"
 libloading = "0.8"
+jsonschema = "0.16"
 
 [dev-dependencies]
 rstest = "0.18"

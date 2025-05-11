@@ -1,4 +1,5 @@
 use crate::ecs::registry::ComponentRegistry;
+use jsonschema::{Draft, JSONSchema};
 use serde_json::Value as JsonValue;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -52,6 +53,19 @@ impl World {
                 name, self.current_mode
             ));
         }
+
+        if let Some(schema) = self.registry.get_schema_by_name(name) {
+            let compiled = JSONSchema::options()
+                .with_draft(Draft::Draft7)
+                .compile(&serde_json::to_value(&schema.schema).unwrap())
+                .map_err(|e| format!("Schema compile error: {e}"))?;
+            let result = compiled.validate(&value);
+            if let Err(errors) = result {
+                let msg = errors.map(|e| e.to_string()).collect::<Vec<_>>().join(", ");
+                return Err(format!("Schema validation failed: {msg}"));
+            }
+        }
+
         self.components
             .entry(name.to_string())
             .or_default()

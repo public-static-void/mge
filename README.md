@@ -89,29 +89,25 @@ MGE components are defined by JSON schemas in `engine/assets/schemas/`.
 
 ## Schema Validation
 
-All JSON component schemas in `engine/assets/schemas/` can be automatically validated using the built-in schema linter.
+All JSON component schemas in `engine/assets/schemas/` are validated in two ways:
 
-**Usage:**
+- **Static validation:**
+  The built-in schema linter checks for required fields, allowed modes, and property constraints.
+  Run the linter with:
 
-```bash
-cargo run -p schema_validator -- engine/assets/schemas/
-```
+  ```bash
+  cargo run -p schema_validator -- engine/assets/schemas/
+  ```
 
-**Options:**
+  This runs automatically in CI on every pull request.
 
-- `--summary-only` - Only print a summary, not per-file results
-- `--fail-fast` - Stop at the first error
+- **Runtime validation:**
+  Whenever you set component data from Rust, Lua, Python, or plugins, the data is validated against its schema at runtime.
+  - Data that does not match the schema (missing required fields, wrong types, out-of-range values) is **rejected with a clear error**.
+  - This ensures data consistency and prevents silent bugs in scripting and modding.
 
-**What it checks:**
-
-- Required fields like `"title"` and `"modes"`
-- All modes in `"modes"` must be from the allowed set:
-  `colony`, `roguelike`, `single`, `multi`, `editor`, `simulation`
-- Property constraints (e.g., `minimum` < `maximum`)
-
-> Note:
-> This linter is run automatically in CI on every pull request.
-> **Make sure schemas pass before pushing!**
+**Note:**
+When using Lua or Python scripting, empty arrays (such as `slots = {}` for an empty inventory) are fully supported and validated as arrays.
 
 See [`engine/tools/schema_validator/README.md`](engine/tools/schema_validator/README.md) for full details.
 
