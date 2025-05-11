@@ -7,7 +7,7 @@ A CLI tool for validating JSON schema files used in the MGE engine.
 - Validates all JSON schema files in a directory or a single file
 - Checks for required fields (`title`, `modes`, etc.)
 - Ensures `modes` are from a set of allowed game modes
-- Checks for property constraints (e.g., `minimum` =< `maximum`)
+- Checks for property constraints (e.g., `minimum` <= `maximum`)
 - Color-coded, human-friendly CLI output
 - Options for fail-fast and summary-only modes
 - Ready for CI integration
