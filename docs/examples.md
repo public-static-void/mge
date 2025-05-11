@@ -68,6 +68,44 @@ print_healths()
 print("Turn: " .. get_turn())
 ```
 
+### 5. Stockpile Resource Management (Colony/Nation-wide)
+
+```lua
+function dump(o, indent)
+    indent = indent or ""
+    if type(o) == "table" then
+        local s = "{\n"
+        for k, v in pairs(o) do
+            s = s .. indent .. "  [" .. tostring(k) .. "] = " .. dump(v, indent .. "  ") .. ",\n"
+        end
+        return s .. indent .. "}"
+    else
+        return tostring(o)
+    end
+end
+
+local entity = spawn_entity()
+set_component(entity, "Stockpile", { resources = { wood = 10, stone = 5 } })
+
+print("Initial stockpile:")
+print(dump(get_component(entity, "Stockpile")))
+
+modify_stockpile_resource(entity, "food", 3)
+print("After adding food:")
+print(dump(get_component(entity, "Stockpile")))
+
+modify_stockpile_resource(entity, "wood", -2)
+print("After removing wood:")
+print(dump(get_component(entity, "Stockpile")))
+
+local ok, err = pcall(function()
+    modify_stockpile_resource(entity, "stone", -10)
+end)
+if not ok then
+    print("Error removing stone (expected!):", err)
+end
+```
+
 ## Python Scripting Examples
 
 ```python
@@ -79,6 +117,24 @@ world.set_component(eid, "Health", {"current": 10, "max": 10})
 print(world.get_component(eid, "Health"))
 world.set_mode("roguelike")
 print("Available modes:", world.get_available_modes())
+```
+
+```python
+def test_stockpile_resource_management(world):
+    entity = world.spawn_entity()
+    world.set_component(entity, "Stockpile", {"resources": {"wood": 10, "stone": 5}})
+
+    world.modify_stockpile_resource(entity, "food", 3)
+    world.modify_stockpile_resource(entity, "wood", -2)
+
+    stockpile = world.get_component(entity, "Stockpile")
+    print(stockpile)  # {'resources': {'wood': 8, 'stone': 5, 'food': 3}}
+
+    import pytest
+    try:
+        world.modify_stockpile_resource(entity, "stone", -10)
+    except ValueError as e:
+        print("Error removing stone (expected!):", e)
 ```
 
 - See [`engine_py/tests/`](../engine_py/tests/) for more tested usage patterns and system examples.

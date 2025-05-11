@@ -221,6 +221,14 @@ impl PyWorld {
         let world = self.inner.lock().unwrap();
         world.count_entities_with_type(&type_str)
     }
+
+    /// Modify the stockpile resource of an entity.
+    fn modify_stockpile_resource(&self, entity_id: u32, kind: String, delta: f64) -> PyResult<()> {
+        let mut world = self.inner.lock().unwrap();
+        world
+            .modify_stockpile_resource(entity_id, &kind, delta)
+            .map_err(pyo3::exceptions::PyValueError::new_err)
+    }
 }
 
 #[pymodule]

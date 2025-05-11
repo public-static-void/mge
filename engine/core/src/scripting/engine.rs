@@ -285,6 +285,17 @@ impl ScriptEngine {
                 })?;
         globals.set("get_entities_with_components", get_entities_with_components)?;
 
+        let world_modify_stockpile = world.clone();
+        let modify_stockpile_resource =
+            self.lua
+                .create_function_mut(move |_, (entity, kind, delta): (u32, String, f64)| {
+                    let mut world = world_modify_stockpile.borrow_mut();
+                    world
+                        .modify_stockpile_resource(entity, &kind, delta)
+                        .map_err(mlua::Error::external)
+                })?;
+        globals.set("modify_stockpile_resource", modify_stockpile_resource)?;
+
         Ok(())
     }
 }

@@ -1,0 +1,15 @@
+{
+  "title": "Stockpile",
+  "type": "object",
+  "properties": {
+    "resources": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "number",
+        "minimum": 0
+      }
+    }
+  },
+  "required": ["resources"],
+  "modes": ["colony"]
+}
