@@ -6,5 +6,5 @@
     "amount": { "type": "number", "minimum": 0 }
   },
   "required": ["kind", "amount"],
-  "modes": ["colony", "economic"]
+  "modes": ["colony"]
 }

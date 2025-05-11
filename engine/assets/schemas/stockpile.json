@@ -11,5 +11,5 @@
     }
   },
   "required": ["resources"],
-  "modes": ["colony", "economic"]
+  "modes": ["colony"]
 }
