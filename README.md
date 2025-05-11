@@ -50,6 +50,30 @@ let registry = Arc::new(ComponentRegistry::new());
 let mut world = World::new(registry.clone());
 ```
 
+- **Register and Run Systems:**
+
+```rust
+use engine_core::ecs::system::System;
+use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
+
+// Define your system
+struct MySystem;
+impl System for MySystem {
+    fn name(&self) -> &'static str { "MySystem" }
+    fn run(&mut self, world: &mut World) {
+        // Your system logic here
+    }
+}
+
+// Register and run the system
+let mut world = World::new(registry.clone());
+world.register_system(MySystem);
+world.run_system("MySystem").unwrap();
+```
+
+- Systems must be registered with the `World` before they can be executed.
+- You can list all registered systems with `world.list_systems()`.
+
 - **Add or modify components:**
   Place JSON schemas in `engine/assets/schemas/`.
   All tools, CLI, and tests will pick them up at runtime.

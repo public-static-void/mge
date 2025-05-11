@@ -1,3 +1,20 @@
+/// The main ECS world. Use this to register and run systems.
+///
+/// # Example
+/// ```
+/// # use engine_core::scripting::world::World;
+/// # use engine_core::ecs::system::System;
+/// # use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
+/// # struct MySystem;
+/// # impl System for MySystem {
+/// #     fn name(&self) -> &'static str { "MySystem" }
+/// #     fn run(&mut self, _world: &mut World) {}
+/// # }
+/// let registry = Arc::new(ComponentRegistry::new());
+/// let mut world = World::new(registry);
+/// world.register_system(MySystem);
+/// world.run_system("MySystem").unwrap();
+/// ```
 use crate::ecs::registry::ComponentRegistry;
 use crate::ecs::system::SystemRegistry;
 use jsonschema::{Draft, JSONSchema};
