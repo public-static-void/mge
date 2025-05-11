@@ -1,0 +1,23 @@
+name: Lint Schemas
+
+on:
+  push:
+    paths:
+      - "engine/assets/schemas/**"
+      - "engine/tools/schema_validator/**"
+      - ".github/workflows/lint-schemas.yml"
+  pull_request:
+    paths:
+      - "engine/assets/schemas/**"
+      - "engine/tools/schema_validator/**"
+      - ".github/workflows/lint-schemas.yml"
+
+jobs:
+  schema-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Run schema linter
+        run: cargo run -p schema_validator -- engine/assets/schemas/ --summary-only
