@@ -18,17 +18,21 @@
 use crate::ecs::registry::ComponentRegistry;
 use crate::ecs::system::SystemRegistry;
 use jsonschema::{Draft, JSONSchema};
+use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use std::collections::HashMap;
 use std::sync::Arc;
 
+#[derive(Serialize, Deserialize)]
 pub struct World {
     pub entities: Vec<u32>,
     pub components: HashMap<String, HashMap<u32, JsonValue>>,
     next_id: u32,
     pub current_mode: String,
     pub turn: u32,
+    #[serde(skip)]
     pub registry: Arc<ComponentRegistry>,
+    #[serde(skip)]
     pub systems: SystemRegistry,
 }
 
@@ -248,7 +252,8 @@ impl World {
         for comps in self.components.values_mut() {
             comps.remove(&entity);
         }
-        // Optionally remove from entity list if you maintain one
+        // Remove from entity list
+        self.entities.retain(|&id| id != entity);
     }
 
     pub fn get_entities_with_component(&self, name: &str) -> Vec<u32> {
@@ -391,6 +396,21 @@ impl World {
             }
         }
         Err("Stockpile component not found".to_string())
+    }
+
+    pub fn save_to_file(&self, path: &std::path::Path) -> Result<(), std::io::Error> {
+        let json = serde_json::to_string_pretty(&self)?;
+        std::fs::write(path, json)
+    }
+
+    pub fn load_from_file(
+        path: &std::path::Path,
+        registry: Arc<ComponentRegistry>,
+    ) -> Result<Self, std::io::Error> {
+        let json = std::fs::read_to_string(path)?;
+        let mut world: Self = serde_json::from_str(&json)?;
+        world.registry = registry; // Re-inject registry if needed
+        Ok(world)
     }
 }
 

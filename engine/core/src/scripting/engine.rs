@@ -296,6 +296,28 @@ impl ScriptEngine {
                 })?;
         globals.set("modify_stockpile_resource", modify_stockpile_resource)?;
 
+        // save_world(filename)
+        let world_save = world.clone();
+        let save_world = self.lua.create_function_mut(move |_, filename: String| {
+            let world = world_save.borrow();
+            world
+                .save_to_file(std::path::Path::new(&filename))
+                .map_err(mlua::Error::external)
+        })?;
+        globals.set("save_world", save_world)?;
+
+        // load_world(filename)
+        let world_load = world.clone();
+        let registry = world.borrow().registry.clone();
+        let load_world = self.lua.create_function_mut(move |_, filename: String| {
+            let mut world = world_load.borrow_mut();
+            let loaded = World::load_from_file(std::path::Path::new(&filename), registry.clone())
+                .map_err(mlua::Error::external)?;
+            *world = loaded;
+            Ok(())
+        })?;
+        globals.set("load_world", load_world)?;
+
         Ok(())
     }
 }

@@ -3,6 +3,7 @@ use engine_core::ecs::schema::load_schemas_from_dir;
 use engine_core::scripting::world::World;
 use pyo3::PyObject;
 use pyo3::Python;
+use pyo3::exceptions::PyIOError;
 use pyo3::prelude::*;
 use pyo3::types::PyModule;
 use serde_pyobject::{from_pyobject, to_pyobject};
@@ -228,6 +229,28 @@ impl PyWorld {
         world
             .modify_stockpile_resource(entity_id, &kind, delta)
             .map_err(pyo3::exceptions::PyValueError::new_err)
+    }
+
+    /// Save the world to a JSON file.
+    fn save_to_file(&self, path: String) -> PyResult<()> {
+        let world = self.inner.lock().unwrap();
+        world
+            .save_to_file(std::path::Path::new(&path))
+            .map_err(|e| PyIOError::new_err(e.to_string()))
+    }
+
+    /// Load a world from a JSON file, replacing the current world.
+    fn load_from_file(&mut self, path: String) -> PyResult<()> {
+        let registry = {
+            // Clone the registry to pass in
+            let world = self.inner.lock().unwrap();
+            world.registry.clone()
+        };
+        let loaded = World::load_from_file(std::path::Path::new(&path), registry)
+            .map_err(|e| PyIOError::new_err(e.to_string()))?;
+        let mut world = self.inner.lock().unwrap();
+        *world = loaded;
+        Ok(())
     }
 }
 

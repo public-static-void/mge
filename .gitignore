@@ -54,3 +54,4 @@ dist/
 # Project-specific
 /scripts/**/*.pyc
 /scripts/**/__pycache__
+test_save.json
