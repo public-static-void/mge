@@ -81,6 +81,15 @@ Use these functions in your Lua scripts to interact with the ECS, control game f
 
 ---
 
+### Persistence
+
+| Method                 | Description                                                    |
+| ---------------------- | -------------------------------------------------------------- |
+| `save_to_file(path)`   | Save the current world state to a JSON file at the given path  |
+| `load_from_file(path)` | Load world state from a JSON file, replacing the current world |
+
+---
+
 ## Notes
 
 - All functions are available globally in MGE Lua scripts.

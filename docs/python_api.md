@@ -77,6 +77,15 @@ world = PyWorld(schema_dir="/path/to/schemas")
 
 ---
 
+### Persistence
+
+| Method                 | Description                                                    |
+| ---------------------- | -------------------------------------------------------------- |
+| `save_to_file(path)`   | Save the current world state to a JSON file at the given path  |
+| `load_from_file(path)` | Load world state from a JSON file, replacing the current world |
+
+---
+
 ## Example Usage
 
 ```python
