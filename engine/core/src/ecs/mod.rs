@@ -4,6 +4,7 @@
 
 pub mod components;
 mod error;
+pub mod event;
 pub mod registry;
 pub mod schema;
 pub mod system;
