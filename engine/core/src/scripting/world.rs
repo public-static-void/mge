@@ -15,13 +15,14 @@
 /// world.register_system(MySystem);
 /// world.run_system("MySystem").unwrap();
 /// ```
+use crate::ecs::event::EventBus;
 use crate::ecs::registry::ComponentRegistry;
 use crate::ecs::system::SystemRegistry;
 use jsonschema::{Draft, JSONSchema};
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 #[derive(Serialize, Deserialize)]
 pub struct World {
@@ -34,6 +35,8 @@ pub struct World {
     pub registry: Arc<ComponentRegistry>,
     #[serde(skip)]
     pub systems: SystemRegistry,
+    #[serde(skip)]
+    pub event_buses: HashMap<String, Arc<Mutex<EventBus<JsonValue>>>>,
 }
 
 impl World {
@@ -46,6 +49,7 @@ impl World {
             turn: 0,
             registry,
             systems: SystemRegistry::new(),
+            event_buses: HashMap::new(),
         }
     }
 
@@ -411,6 +415,36 @@ impl World {
         let mut world: Self = serde_json::from_str(&json)?;
         world.registry = registry; // Re-inject registry if needed
         Ok(world)
+    }
+
+    pub fn send_event(&mut self, event_type: &str, payload: JsonValue) -> Result<(), String> {
+        println!(
+            "Rust: send_event called for type '{}' with payload {:?}",
+            event_type, payload
+        );
+        let bus = self
+            .event_buses
+            .entry(event_type.to_string())
+            .or_insert_with(|| Arc::new(Mutex::new(EventBus::<JsonValue>::default())));
+        bus.lock().unwrap().send(payload);
+        Ok(())
+    }
+
+    pub fn get_event_bus(&self, event_type: &str) -> Option<Arc<Mutex<EventBus<JsonValue>>>> {
+        self.event_buses.get(event_type).cloned()
+    }
+
+    pub fn get_or_create_event_bus(&mut self, event_type: &str) -> Arc<Mutex<EventBus<JsonValue>>> {
+        self.event_buses
+            .entry(event_type.to_string())
+            .or_insert_with(|| Arc::new(Mutex::new(EventBus::<JsonValue>::default())))
+            .clone()
+    }
+
+    pub fn update_event_buses(&self) {
+        for bus in self.event_buses.values() {
+            bus.lock().unwrap().update();
+        }
     }
 }
 
