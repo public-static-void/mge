@@ -1,13 +1,21 @@
+use engine_core::ecs::event::{EventBus, EventReader};
 use engine_core::ecs::registry::ComponentRegistry;
 use engine_core::ecs::schema::load_schemas_from_dir;
 use engine_core::scripting::world::World;
-use pyo3::PyObject;
-use pyo3::Python;
 use pyo3::exceptions::PyIOError;
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use pyo3::types::PyModule;
+use pyo3::types::{PyAny, PyModule};
+use serde_json::Value;
 use serde_pyobject::{from_pyobject, to_pyobject};
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+
+type EventBusMap = Mutex<HashMap<String, Arc<Mutex<EventBus<Value>>>>>;
+
+/// Global registry of event buses, keyed by event type name.
+static EVENT_BUSES: once_cell::sync::Lazy<EventBusMap> =
+    once_cell::sync::Lazy::new(|| Mutex::new(HashMap::new()));
 
 #[pyclass]
 pub struct PyWorld {
@@ -16,7 +24,6 @@ pub struct PyWorld {
 
 #[pymethods]
 impl PyWorld {
-    /// Create a new world, optionally loading schemas from the given directory.
     #[new]
     #[pyo3(signature = (schema_dir=None))]
     fn new(schema_dir: Option<String>) -> PyResult<Self> {
@@ -28,7 +35,7 @@ impl PyWorld {
         };
 
         let schemas = load_schemas_from_dir(&schema_path).map_err(|e| {
-            pyo3::exceptions::PyValueError::new_err(format!(
+            PyValueError::new_err(format!(
                 "Failed to load schemas from {:?}: {e}",
                 schema_path
             ))
@@ -45,42 +52,25 @@ impl PyWorld {
         })
     }
 
-    /// Spawn a new entity and return its ID.
     fn spawn_entity(&self) -> u32 {
         let mut world = self.inner.lock().unwrap();
         world.spawn_entity()
     }
 
-    /// Remove an entity and all its components.
     fn despawn_entity(&self, entity_id: u32) {
         let mut world = self.inner.lock().unwrap();
         world.remove_entity(entity_id);
-        // Optionally, also remove from world.entities if not already done
         world.entities.retain(|&e| e != entity_id);
     }
 
-    /// Set a component on an entity.
-    ///
-    /// Args:
-    ///     entity_id: Entity ID.
-    ///     name: Component name.
-    ///     value: Component data as a Python dict.
-    fn set_component(
-        &self,
-        entity_id: u32,
-        name: String,
-        value: Bound<'_, pyo3::types::PyAny>,
-    ) -> PyResult<()> {
+    fn set_component(&self, entity_id: u32, name: String, value: Bound<'_, PyAny>) -> PyResult<()> {
         let mut world = self.inner.lock().unwrap();
-        let json_value: serde_json::Value = from_pyobject(value)?;
+        let json_value: Value = from_pyobject(value)?;
         world
             .set_component(entity_id, &name, json_value)
-            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
+            .map_err(|e| PyValueError::new_err(e.to_string()))
     }
 
-    /// Get a component's data from an entity.
-    ///
-    /// Returns the component data as a Python dict, or None if not present.
     fn get_component(
         &self,
         py: Python<'_>,
@@ -96,29 +86,22 @@ impl PyWorld {
         }
     }
 
-    /// List all registered component names.
     fn list_components(&self) -> Vec<String> {
         let world = self.inner.lock().unwrap();
         world.registry.all_component_names()
     }
 
-    /// Get the JSON schema of a component as a Python dict.
-    ///
-    /// Raises ValueError if the component schema is not found.
     fn get_component_schema(&self, name: String) -> PyResult<PyObject> {
         let world = self.inner.lock().unwrap();
         if let Some(schema) = world.registry.get_schema_by_name(&name) {
             let json = serde_json::to_value(&schema.schema)
-                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
-            Python::with_gil(|py| Ok(serde_pyobject::to_pyobject(py, &json)?.into()))
+                .map_err(|e| PyValueError::new_err(e.to_string()))?;
+            Python::with_gil(|py| Ok(to_pyobject(py, &json)?.into()))
         } else {
-            Err(pyo3::exceptions::PyValueError::new_err(
-                "Component schema not found",
-            ))
+            Err(PyValueError::new_err("Component schema not found"))
         }
     }
 
-    /// Remove a component from an entity.
     fn remove_component(&self, entity_id: u32, name: String) {
         let mut world = self.inner.lock().unwrap();
         if let Some(comps) = world.components.get_mut(&name) {
@@ -126,112 +109,94 @@ impl PyWorld {
         }
     }
 
-    /// Get all entity IDs that have a given component.
     fn get_entities_with_component(&self, name: String) -> PyResult<Vec<u32>> {
         let world = self.inner.lock().unwrap();
         Ok(world.get_entities_with_component(&name))
     }
 
-    /// Get all entity IDs that have given components.
     fn get_entities_with_components(&self, names: Vec<String>) -> Vec<u32> {
         let world = self.inner.lock().unwrap();
         let name_refs: Vec<&str> = names.iter().map(|s| s.as_str()).collect();
         world.get_entities_with_components(&name_refs)
     }
 
-    /// Get a list of all entity IDs in the world.
     fn get_entities(&self) -> PyResult<Vec<u32>> {
         let world = self.inner.lock().unwrap();
         Ok(world.get_entities())
     }
 
-    /// Return True if the entity is considered alive (Health > 0).
     fn is_entity_alive(&self, entity_id: u32) -> bool {
         let world = self.inner.lock().unwrap();
         world.is_entity_alive(entity_id)
     }
 
-    /// Set the current game mode.
     fn set_mode(&self, mode: String) {
         let mut world = self.inner.lock().unwrap();
         world.current_mode = mode;
     }
 
-    /// Get the current game mode.
     fn get_mode(&self) -> String {
         let world = self.inner.lock().unwrap();
         world.current_mode.clone()
     }
 
-    /// List all available game modes.
     fn get_available_modes(&self) -> Vec<String> {
         let world = self.inner.lock().unwrap();
         world.registry.all_modes().into_iter().collect()
     }
 
-    /// Move an entity by (dx, dy).
     fn move_entity(&self, entity_id: u32, dx: f32, dy: f32) {
         let mut world = self.inner.lock().unwrap();
         world.move_entity(entity_id, dx, dy);
     }
 
-    /// Move all entities with a Position component by (dx, dy).
     fn move_all(&self, dx: f32, dy: f32) {
         let mut world = self.inner.lock().unwrap();
         world.move_all(dx, dy);
     }
 
-    /// Damage an entity (reduces its Health).
     fn damage_entity(&self, entity_id: u32, amount: f32) {
         let mut world = self.inner.lock().unwrap();
         world.damage_entity(entity_id, amount);
     }
 
-    /// Damage all entities with a Health component.
     fn damage_all(&self, amount: f32) {
         let mut world = self.inner.lock().unwrap();
         world.damage_all(amount);
     }
 
-    /// Advance the game simulation by one tick.
     fn tick(&self) {
         let mut world = self.inner.lock().unwrap();
         world.tick();
     }
 
-    /// Get the current turn number.
     fn get_turn(&self) -> u32 {
         let world = self.inner.lock().unwrap();
         world.turn
     }
 
-    /// Process deaths for entities with zero or less Health.
     fn process_deaths(&self) {
         let mut world = self.inner.lock().unwrap();
         world.process_deaths();
     }
 
-    /// Process decay timers and remove decayed entities.
     fn process_decay(&self) {
         let mut world = self.inner.lock().unwrap();
         world.process_decay();
     }
 
-    /// Count entities with Type.kind equal to the given string.
     fn count_entities_with_type(&self, type_str: String) -> usize {
         let world = self.inner.lock().unwrap();
         world.count_entities_with_type(&type_str)
     }
 
-    /// Modify the stockpile resource of an entity.
     fn modify_stockpile_resource(&self, entity_id: u32, kind: String, delta: f64) -> PyResult<()> {
         let mut world = self.inner.lock().unwrap();
         world
             .modify_stockpile_resource(entity_id, &kind, delta)
-            .map_err(pyo3::exceptions::PyValueError::new_err)
+            .map_err(PyValueError::new_err)
     }
 
-    /// Save the world to a JSON file.
     fn save_to_file(&self, path: String) -> PyResult<()> {
         let world = self.inner.lock().unwrap();
         world
@@ -239,10 +204,8 @@ impl PyWorld {
             .map_err(|e| PyIOError::new_err(e.to_string()))
     }
 
-    /// Load a world from a JSON file, replacing the current world.
     fn load_from_file(&mut self, path: String) -> PyResult<()> {
         let registry = {
-            // Clone the registry to pass in
             let world = self.inner.lock().unwrap();
             world.registry.clone()
         };
@@ -251,6 +214,42 @@ impl PyWorld {
         let mut world = self.inner.lock().unwrap();
         *world = loaded;
         Ok(())
+    }
+
+    /// Send an event of any type (event_type: str, payload: dict or primitive)
+    fn send_event(&self, _py: Python, event_type: String, payload: String) -> PyResult<()> {
+        let mut buses = EVENT_BUSES.lock().unwrap();
+        let bus = buses
+            .entry(event_type.clone())
+            .or_insert_with(|| Arc::new(Mutex::new(EventBus::<Value>::default())))
+            .clone();
+
+        let json_payload: Value = serde_json::from_str(&payload)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+        bus.lock().unwrap().send(json_payload);
+        Ok(())
+    }
+
+    /// Poll all events of a type since last update (returns list of Python objects)
+    fn poll_event(&self, py: Python, event_type: String) -> PyResult<Vec<PyObject>> {
+        let buses = EVENT_BUSES.lock().unwrap();
+        let bus = buses
+            .get(&event_type)
+            .ok_or_else(|| PyValueError::new_err(format!("No bus for event type {event_type}")))?;
+        let mut reader = EventReader::default();
+        let events: Vec<Value> = reader.read(&*bus.lock().unwrap()).cloned().collect();
+        Ok(events
+            .into_iter()
+            .map(|e| to_pyobject(py, &e).unwrap().into())
+            .collect())
+    }
+
+    /// Advance all event buses (should be called once per tick)
+    fn update_event_buses(&self) {
+        let buses = EVENT_BUSES.lock().unwrap();
+        for bus in buses.values() {
+            bus.lock().unwrap().update();
+        }
     }
 }
 

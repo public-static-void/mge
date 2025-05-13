@@ -1,4 +1,3 @@
-use mlua::LuaSerdeExt;
 use mlua::{Lua, Result as LuaResult, Table, Value as LuaValue};
 use serde_json::{Map, Value as JsonValue};
 
@@ -62,11 +61,36 @@ fn lua_value_to_string(val: &LuaValue) -> LuaResult<String> {
     }
 }
 
-pub fn json_to_lua_table<'lua>(lua: &'lua Lua, value: &JsonValue) -> LuaResult<Table<'lua>> {
-    let lua_value = lua.to_value(value)?;
-    if let LuaValue::Table(tbl) = lua_value {
-        Ok(tbl)
-    } else {
-        lua.create_table()
+pub fn json_to_lua_table<'lua>(
+    lua: &'lua mlua::Lua,
+    value: &serde_json::Value,
+) -> mlua::Result<mlua::Value<'lua>> {
+    match value {
+        serde_json::Value::Null => Ok(mlua::Value::Nil),
+        serde_json::Value::Bool(b) => Ok(mlua::Value::Boolean(*b)),
+        serde_json::Value::Number(n) => {
+            if let Some(i) = n.as_i64() {
+                Ok(mlua::Value::Integer(i))
+            } else if let Some(f) = n.as_f64() {
+                Ok(mlua::Value::Number(f))
+            } else {
+                Err(mlua::Error::external("Invalid number"))
+            }
+        }
+        serde_json::Value::String(s) => Ok(mlua::Value::String(lua.create_string(s)?)),
+        serde_json::Value::Array(arr) => {
+            let tbl = lua.create_table()?;
+            for (i, v) in arr.iter().enumerate() {
+                tbl.set(i + 1, json_to_lua_table(lua, v)?)?;
+            }
+            Ok(mlua::Value::Table(tbl))
+        }
+        serde_json::Value::Object(map) => {
+            let tbl = lua.create_table()?;
+            for (k, v) in map {
+                tbl.set(k.as_str(), json_to_lua_table(lua, v)?)?;
+            }
+            Ok(mlua::Value::Table(tbl))
+        }
     }
 }

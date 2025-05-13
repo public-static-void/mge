@@ -967,7 +967,9 @@ name = "mge"
 version = "0.1.0"
 dependencies = [
  "engine_core",
+ "once_cell",
  "pyo3",
+ "serde",
  "serde-pyobject",
  "serde_json",
 ]
