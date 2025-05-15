@@ -2,17 +2,30 @@
 #include <stdint.h>
 #include <stdio.h>
 
-static int init(EngineApi *api, void *world);
+// Forward declarations
+static int init(struct EngineApi *api, void *world);
 static void shutdown(void);
 static void update(float dt);
 
-__attribute__((visibility("default"))) PluginVTable PLUGIN_VTABLE = {
-    .init = init,
-    .shutdown = shutdown,
-    .update = update,
-};
+// Global vtable struct
+static struct PluginVTable vtable;
 
-static int init(EngineApi *api, void *world) {
+// Runtime initialization of vtable after relocation
+__attribute__((constructor)) void init_vtable() {
+  vtable.init = init;
+  vtable.shutdown = shutdown;
+  vtable.update = update;
+  vtable.worldgen_name = NULL;
+  vtable.generate_world = NULL;
+  vtable.free_result_json = NULL;
+}
+
+// Export vtable pointer with default visibility
+__attribute__((visibility("default"))) struct PluginVTable *PLUGIN_VTABLE =
+    &vtable;
+
+// Plugin function implementations
+static int init(struct EngineApi *api, void *world) {
   uint32_t entity = api->spawn_entity(world);
   const char *position_json = "{\"x\": 1.0, \"y\": 2.0}";
   int result = api->set_component(world, entity, "Position", position_json);

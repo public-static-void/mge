@@ -33,7 +33,7 @@ fn is_array_like(table: &Table) -> LuaResult<bool> {
     Ok(count == len)
 }
 
-fn lua_value_to_json(lua: &Lua, val: LuaValue) -> LuaResult<JsonValue> {
+pub fn lua_value_to_json(lua: &Lua, val: LuaValue) -> LuaResult<JsonValue> {
     match val {
         LuaValue::Nil => Ok(JsonValue::Null),
         LuaValue::Boolean(b) => Ok(JsonValue::Bool(b)),

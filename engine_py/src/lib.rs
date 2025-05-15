@@ -2,6 +2,7 @@ use engine_core::ecs::event::{EventBus, EventReader};
 use engine_core::ecs::registry::ComponentRegistry;
 use engine_core::ecs::schema::load_schemas_from_dir;
 use engine_core::scripting::world::World;
+use engine_core::worldgen::{WorldgenPlugin, WorldgenRegistry};
 use pyo3::exceptions::PyIOError;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -17,9 +18,10 @@ type EventBusMap = Mutex<HashMap<String, Arc<Mutex<EventBus<Value>>>>>;
 static EVENT_BUSES: once_cell::sync::Lazy<EventBusMap> =
     once_cell::sync::Lazy::new(|| Mutex::new(HashMap::new()));
 
-#[pyclass]
+#[pyclass(unsendable)]
 pub struct PyWorld {
     inner: Arc<Mutex<World>>,
+    worldgen_registry: std::cell::RefCell<WorldgenRegistry>,
 }
 
 #[pymethods]
@@ -49,6 +51,7 @@ impl PyWorld {
         let world = World::new(Arc::new(registry));
         Ok(PyWorld {
             inner: Arc::new(Mutex::new(world)),
+            worldgen_registry: std::cell::RefCell::new(WorldgenRegistry::new()),
         })
     }
 
@@ -250,6 +253,43 @@ impl PyWorld {
         for bus in buses.values() {
             bus.lock().unwrap().update();
         }
+    }
+
+    fn register_worldgen(&self, py: Python, name: String, callback: Py<PyAny>) -> PyResult<()> {
+        let cb = callback.clone_ref(py);
+        self.worldgen_registry
+            .borrow_mut()
+            .register(WorldgenPlugin::Python {
+                name,
+                generate: Box::new(move |params| {
+                    Python::with_gil(|py| {
+                        let arg = to_pyobject(py, params).unwrap();
+                        let result = cb.call1(py, (arg,)).unwrap();
+                        serde_pyobject::from_pyobject(result.bind(py).clone())
+                            .unwrap_or(serde_json::Value::Null)
+                    })
+                }),
+            });
+        Ok(())
+    }
+
+    fn list_worldgen(&self) -> Vec<String> {
+        self.worldgen_registry.borrow().list_names()
+    }
+
+    fn invoke_worldgen(
+        &self,
+        py: Python,
+        name: String,
+        params: Bound<PyAny>,
+    ) -> PyResult<Py<PyAny>> {
+        let params: serde_json::Value = from_pyobject(params)?;
+        let result = self
+            .worldgen_registry
+            .borrow()
+            .invoke(&name, &params)
+            .map_err(|e| PyValueError::new_err(format!("{:?}", e)))?;
+        Ok(to_pyobject(py, &result)?.into())
     }
 }
 

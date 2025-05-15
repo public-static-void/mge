@@ -9,6 +9,7 @@ MGE is a modular, cross-language game engine blueprint and reference implementat
 - Schema-driven, versioned, and mode-restricted components
 - Runtime mode switching with enforcement in both Rust and scripting
 - Lua scripting bridge for rapid prototyping
+- Flexible worldgen plugin system: register and invoke map generators written in Rust, Lua, Python, or C (via ABI)
 - Extensible architecture for tooling and modding
 
 See [docs/idea.md](docs/idea.md) for a deeper dive.
@@ -71,7 +72,8 @@ world.register_system(MySystem);
 world.run_system("MySystem").unwrap();
 ```
 
-- Systems must be registered with the `World` before they can be executed.
+Systems must be registered with the `World` before they can be executed.
+
 - You can list all registered systems with `world.list_systems()`.
 
 - **Add or modify components:**
@@ -205,3 +207,4 @@ See [docs/examples.md](docs/examples.md#c-plugin-example) for a minimal C plugin
 - [docs/examples.md](docs/examples.md): Usage examples
 - [docs/lua_api.md](docs/lua_api.md): Lua API reference
 - [docs/python_api.md](docs/python_api.md) Python API reference
+- [docs/worldgen.md](docs/worldgen.md) World Generation Plugin System reference

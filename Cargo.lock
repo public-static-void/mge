@@ -355,6 +355,7 @@ dependencies = [
  "libloading",
  "mlua",
  "mockall",
+ "once_cell",
  "rstest",
  "schemars",
  "schemars_derive",

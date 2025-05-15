@@ -17,6 +17,7 @@ engine_macros = { path = "../../engine_macros" }
 anyhow = "1.0.98"
 libloading = "0.8"
 jsonschema = "0.16"
+once_cell = "1.21.3"
 
 [dev-dependencies]
 rstest = "0.18"
