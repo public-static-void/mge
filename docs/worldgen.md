@@ -35,7 +35,7 @@ world.register_worldgen("pygen", pygen)
 
 ### C ABI
 
-See [`engine/engine_plugin_abi.h`](engine/engine_plugin_abi.h) for details on creating C plugins.
+See [`engine/engine_plugin_abi.h`](../engine/engine_plugin_abi.h) for details on creating C plugins.
 
 ---
 
@@ -80,7 +80,7 @@ let result = registry.invoke("simple_square", &params)?;
 
 ## Examples
 
-See [`engine/scripts/lua/test_worldgen.lua`](engine/scripts/lua/test_worldgen.lua) and [`engine_py/tests/test_worldgen.py`](engine_py/tests/test_worldgen.py) for working examples.
+See [`engine/scripts/lua/test_worldgen.lua`](../engine/scripts/lua/test_worldgen.lua) and [`engine_py/tests/test_worldgen.py`](../engine_py/tests/test_worldgen.py) for working examples.
 
 ---
 
