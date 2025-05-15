@@ -3,9 +3,11 @@
 //! Exposes ECS and mode management modules.
 
 pub mod ecs;
+pub mod map;
 pub mod modes;
 pub mod plugins;
 pub mod scripting;
+pub mod worldgen;
 
 pub use ecs::components::{Happiness, Health, Inventory, Position};
 pub use ecs::{EcsWorld, Error};
