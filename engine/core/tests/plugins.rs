@@ -117,7 +117,7 @@ fn test_loads_and_initializes_plugin() {
     let world_ptr = &mut world as *mut _ as *mut c_void;
 
     // Prepare EngineApi struct
-    let engine_api = engine_core::plugins::EngineApi {
+    let mut engine_api = engine_core::plugins::EngineApi {
         spawn_entity: engine_core::plugins::ffi_spawn_entity,
         set_component: engine_core::plugins::ffi_set_component,
     };
@@ -130,7 +130,7 @@ fn test_loads_and_initializes_plugin() {
         .join("libtest_plugin.so");
 
     let _ = unsafe {
-        engine_core::plugins::load_plugin(&plugin_path, &engine_api, world_ptr)
+        engine_core::plugins::load_plugin(&plugin_path, &mut engine_api, world_ptr)
             .expect("Failed to load plugin")
     };
 

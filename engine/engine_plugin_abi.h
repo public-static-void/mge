@@ -1,4 +1,6 @@
-// engine/engine_plugin_abi.h
+#ifndef ENGINE_PLUGIN_ABI_H
+#define ENGINE_PLUGIN_ABI_H
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -12,13 +14,22 @@ typedef struct EngineApi {
 } EngineApi;
 
 typedef struct PluginVTable {
-  int (*init)(EngineApi *api, WorldPtr world);
+  int (*init)(struct EngineApi *api, void *world);
   void (*shutdown)();
   void (*update)(float delta_time);
+  const char *(*worldgen_name)();
+  int (*generate_world)(const char *params_json, char **out_result_json);
+  void (*free_result_json)(char *result_json);
 } PluginVTable;
 
-extern PluginVTable PLUGIN_VTABLE;
+extern PluginVTable *PLUGIN_VTABLE;
+
+const char *worldgen_name(void);
+int generate_world(const char *params_json, char **out_result_json);
+void free_result_json(char *result_json);
 
 #ifdef __cplusplus
 }
 #endif
+
+#endif // ENGINE_PLUGIN_ABI_H
