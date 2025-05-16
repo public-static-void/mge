@@ -1,5 +1,6 @@
 use crate::scripting::world::World;
-use std::collections::HashMap;
+use indexmap::IndexMap;
+use std::cell::RefCell;
 
 pub trait System: Send + Sync {
     fn name(&self) -> &'static str;
@@ -7,33 +8,41 @@ pub trait System: Send + Sync {
 }
 
 pub struct SystemRegistry {
-    systems: HashMap<String, Box<dyn System>>,
+    systems: IndexMap<String, RefCell<Box<dyn System>>>,
 }
 
 impl SystemRegistry {
     pub fn new() -> Self {
         Self {
-            systems: HashMap::new(),
+            systems: IndexMap::new(),
         }
     }
 
     pub fn register_system<S: System + 'static>(&mut self, system: S) {
-        self.systems
-            .insert(system.name().to_string(), Box::new(system));
+        self.systems.insert(
+            system.name().to_string(),
+            std::cell::RefCell::new(Box::new(system)),
+        );
     }
 
-    /// Internal: Used by World to avoid borrow checker issues.
-    pub fn take_system(&mut self, name: &str) -> Option<Box<dyn System>> {
-        self.systems.remove(name)
+    pub fn take_system(&mut self, name: &str) -> Option<std::cell::RefCell<Box<dyn System>>> {
+        self.systems.shift_remove(name)
     }
 
-    /// Internal: Used by World to re-insert a system after running it.
-    pub fn register_system_boxed(&mut self, name: String, system: Box<dyn System>) {
+    pub fn register_system_boxed(
+        &mut self,
+        name: String,
+        system: std::cell::RefCell<Box<dyn System>>,
+    ) {
         self.systems.insert(name, system);
     }
 
     pub fn list_systems(&self) -> Vec<String> {
         self.systems.keys().cloned().collect()
+    }
+
+    pub fn get_system_mut(&self, name: &str) -> Option<std::cell::RefMut<Box<dyn System>>> {
+        self.systems.get(name).map(|cell| cell.borrow_mut())
     }
 }
 

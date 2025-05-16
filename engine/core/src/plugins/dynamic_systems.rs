@@ -1,5 +1,5 @@
 use crate::scripting::World;
-use std::collections::HashMap;
+use indexmap::IndexMap;
 use std::sync::Arc;
 
 pub type DynSystemFn = Box<dyn Fn(&mut World, f32) + Send + Sync>;
@@ -11,13 +11,13 @@ pub struct DynamicSystem {
 
 #[derive(Default)]
 pub struct DynamicSystemRegistry {
-    systems: HashMap<String, Arc<DynamicSystem>>,
+    systems: IndexMap<String, Arc<DynamicSystem>>,
 }
 
 impl DynamicSystemRegistry {
     pub fn new() -> Self {
         Self {
-            systems: HashMap::new(),
+            systems: IndexMap::new(),
         }
     }
 
