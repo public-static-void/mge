@@ -457,8 +457,8 @@ impl World {
     }
 
     pub fn run_system(&mut self, name: &str) -> Result<(), String> {
-        if let Some(mut system) = self.systems.take_system(name) {
-            system.run(self);
+        if let Some(system) = self.systems.take_system(name) {
+            system.borrow_mut().run(self);
             self.systems.register_system_boxed(name.to_string(), system);
             Ok(())
         } else {
@@ -467,6 +467,34 @@ impl World {
             self.dynamic_systems = dynamic_systems;
             result
         }
+    }
+
+    pub fn simulation_tick(&mut self) {
+        // 1. Run all registered static systems in order
+        let system_names: Vec<String> = self.systems.list_systems();
+        for name in &system_names {
+            // Remove the system temporarily
+            if let Some(cell) = self.systems.take_system(name) {
+                {
+                    let mut system = cell.borrow_mut();
+                    system.run(self);
+                }
+                // Re-insert the system after running
+                self.systems.register_system_boxed(name.clone(), cell);
+            }
+        }
+
+        // 2. Run all registered dynamic systems
+        let dynamic_names = self.dynamic_systems.list_systems();
+        for name in dynamic_names {
+            let _ = self.run_dynamic_system(&name);
+        }
+
+        // 3. Update event buses (process queued events)
+        self.update_event_buses();
+
+        // 4. Increment turn
+        self.turn += 1;
     }
 }
 
