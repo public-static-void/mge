@@ -10,6 +10,24 @@ static void update(float dt);
 // Global vtable struct
 static struct PluginVTable vtable;
 
+void hello_system(WorldPtr world, float delta_time) {
+  (void)world;
+  (void)delta_time;
+  printf("[PLUGIN] Hello from system!\n");
+}
+
+static SystemPlugin system_plugins[] = {{"hello_system", hello_system}};
+
+// Register systems function
+int register_systems(struct EngineApi *api, void *world, SystemPlugin **systems,
+                     int *count) {
+  (void)api;
+  (void)world;
+  *systems = system_plugins;
+  *count = 1;
+  return 0;
+}
+
 // Runtime initialization of vtable after relocation
 __attribute__((constructor)) void init_vtable() {
   vtable.init = init;
@@ -18,6 +36,7 @@ __attribute__((constructor)) void init_vtable() {
   vtable.worldgen_name = NULL;
   vtable.generate_world = NULL;
   vtable.free_result_json = NULL;
+  vtable.register_systems = register_systems;
 }
 
 // Export vtable pointer with default visibility

@@ -7,6 +7,14 @@ extern "C" {
 
 typedef void *WorldPtr;
 
+typedef void (*SystemRunFn)(WorldPtr, float delta_time);
+
+typedef struct SystemPlugin {
+  const char *name;
+  SystemRunFn run;
+  // Optional: add metadata fields here (e.g., required components)
+} SystemPlugin;
+
 typedef struct EngineApi {
   unsigned int (*spawn_entity)(WorldPtr);
   int (*set_component)(WorldPtr, unsigned int, const char *name,
@@ -20,6 +28,8 @@ typedef struct PluginVTable {
   const char *(*worldgen_name)();
   int (*generate_world)(const char *params_json, char **out_result_json);
   void (*free_result_json)(char *result_json);
+  int (*register_systems)(struct EngineApi *api, void *world,
+                          SystemPlugin **systems, int *count);
 } PluginVTable;
 
 extern PluginVTable *PLUGIN_VTABLE;
