@@ -141,3 +141,63 @@ fn test_loads_and_initializes_plugin() {
     let entities = world.get_entities();
     assert!(!entities.is_empty());
 }
+
+#[test]
+fn test_plugin_registers_system() {
+    use std::ffi::c_void;
+
+    // Setup registry and world
+    let mut registry = engine_core::ecs::registry::ComponentRegistry::new();
+    let schema_json = r#"
+    {
+        "title": "Position",
+        "type": "object",
+        "properties": {
+            "x": { "type": "number" },
+            "y": { "type": "number" }
+        },
+        "required": ["x", "y"],
+        "modes": ["colony", "roguelike"]
+    }
+    "#;
+    registry
+        .register_external_schema_from_json(schema_json)
+        .unwrap();
+    let registry = std::sync::Arc::new(registry);
+    let mut world = engine_core::scripting::World::new(registry);
+    let world_ptr = &mut world as *mut _ as *mut c_void;
+
+    // Prepare EngineApi struct
+    let mut engine_api = engine_core::plugins::EngineApi {
+        spawn_entity: engine_core::plugins::ffi_spawn_entity,
+        set_component: engine_core::plugins::ffi_set_component,
+    };
+
+    // This is the new loader you will implement!
+    let plugin_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(|p| p.parent())
+        .expect("Failed to find project root")
+        .join("plugins")
+        .join("libtest_plugin.so");
+
+    let _ = unsafe {
+        engine_core::plugins::load_plugin_and_register_systems(
+            &plugin_path,
+            &mut engine_api,
+            world_ptr,
+            &mut world,
+        )
+        .expect("Failed to load plugin and register systems")
+    };
+
+    // Assert the system is now registered
+    let systems = world.dynamic_systems.list_systems();
+    assert!(
+        systems.contains(&"hello_system".to_string()),
+        "System 'hello_system' should be registered by plugin"
+    );
+
+    // Optionally, run the system and check for a side effect
+    // world.run_system("hello_system").expect("System run failed");
+}
