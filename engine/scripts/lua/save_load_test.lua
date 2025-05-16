@@ -2,7 +2,7 @@ local e = spawn_entity()
 set_component(e, "Health", { current = 99, max = 100 })
 save_to_file("test_save.json")
 
-remove_entity(e)
+despawn_entity(e)
 print("Entities after remove:", #get_entities())
 for _, id in ipairs(get_entities()) do
 	print("Entity:", id)

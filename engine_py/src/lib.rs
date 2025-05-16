@@ -65,7 +65,7 @@ impl PyWorld {
 
     fn despawn_entity(&self, entity_id: u32) {
         let mut world = self.inner.lock().unwrap();
-        world.remove_entity(entity_id);
+        world.despawn_entity(entity_id);
         world.entities.retain(|&e| e != entity_id);
     }
 
@@ -310,6 +310,13 @@ impl PyWorld {
         } else {
             Err(PyValueError::new_err("System not found"))
         }
+    }
+
+    fn get_user_input(&self, py: pyo3::Python<'_>, prompt: String) -> PyResult<String> {
+        let builtins = py.import("builtins")?;
+        let input_func = builtins.getattr("input")?;
+        let result = input_func.call1((prompt,))?;
+        result.extract::<String>()
     }
 }
 

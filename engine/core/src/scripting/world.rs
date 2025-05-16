@@ -232,7 +232,7 @@ impl World {
     }
 
     pub fn process_decay(&mut self) {
-        let mut to_remove_entities = Vec::new();
+        let mut to_despawn_entities = Vec::new();
 
         if let Some(decays) = self.components.get_mut("Decay") {
             for (&entity, value) in decays.iter_mut() {
@@ -240,7 +240,7 @@ impl World {
                     if let Some(time_remaining) = obj.get_mut("time_remaining") {
                         if let Some(t) = time_remaining.as_u64() {
                             if t <= 1 {
-                                to_remove_entities.push(entity);
+                                to_despawn_entities.push(entity);
                             } else {
                                 *time_remaining = serde_json::json!(t - 1);
                             }
@@ -250,12 +250,12 @@ impl World {
             }
         }
 
-        for entity in to_remove_entities {
-            self.remove_entity(entity);
+        for entity in to_despawn_entities {
+            self.despawn_entity(entity);
         }
     }
 
-    pub fn remove_entity(&mut self, entity: u32) {
+    pub fn despawn_entity(&mut self, entity: u32) {
         // Remove all components associated with the entity
         for comps in self.components.values_mut() {
             comps.remove(&entity);
