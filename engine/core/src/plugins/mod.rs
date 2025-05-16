@@ -82,6 +82,10 @@ impl LoadedPlugin {
 }
 
 impl SystemPlugin {
+    /// Returns the system's name as a string slice.
+    ///
+    /// # Safety
+    /// The caller must ensure that `self.name` is a valid, null-terminated C string.
     pub unsafe fn name_str(&self) -> &str {
         unsafe { std::ffi::CStr::from_ptr(self.name).to_str().unwrap() }
     }
@@ -176,6 +180,12 @@ pub unsafe fn load_plugin_and_register_worldgen<P: AsRef<Path>>(
     Ok(LoadedPlugin::new(lib, plugin_vtable))
 }
 
+/// Loads a plugin and registers its systems.
+///
+/// # Safety
+/// The caller must ensure the plugin at `path` is ABI-compatible and exposes a valid vtable.
+/// `engine_api` and `world` must be valid for the duration of the plugin.
+/// This function performs FFI operations and dynamic loading, which may cause undefined behavior if misused.
 pub unsafe fn load_plugin_and_register_systems<P: AsRef<Path>>(
     path: P,
     engine_api: &mut EngineApi,
