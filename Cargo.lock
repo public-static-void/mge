@@ -351,6 +351,7 @@ dependencies = [
  "bson",
  "engine_macros",
  "hecs",
+ "indexmap",
  "jsonschema",
  "libloading",
  "mlua",
