@@ -1,6 +1,7 @@
 use engine_core::ecs::registry::ComponentRegistry;
 use engine_core::ecs::schema::load_schemas_from_dir;
 use engine_core::scripting::{ScriptEngine, World};
+use engine_core::systems::standard::{DamageAll, MoveAll, ProcessDeaths, ProcessDecay};
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
@@ -34,7 +35,15 @@ fn test_tick_advances_turn_and_runs_systems() {
         .unwrap();
 
     // Set up a tick: move all + damage all
-    world.tick();
+    world.register_system(MoveAll { dx: 1.0, dy: 0.0 });
+    world.run_system("MoveAll").unwrap();
+    world.register_system(DamageAll { amount: 1.0 });
+    world.run_system("DamageAll").unwrap();
+    world.register_system(ProcessDeaths);
+    world.run_system("ProcessDeaths").unwrap();
+    world.register_system(ProcessDecay);
+    world.run_system("ProcessDecay").unwrap();
+    world.turn += 1;
 
     // Position should be x+1, Health should be -1
     let pos = world.get_component(id, "Position").unwrap();
@@ -51,6 +60,14 @@ fn test_lua_tick() {
     let registry = setup_registry();
     let world = Rc::new(RefCell::new(World::new(registry.clone())));
     world.borrow_mut().current_mode = "colony".to_string();
+    world
+        .borrow_mut()
+        .register_system(MoveAll { dx: 1.0, dy: 0.0 });
+    world
+        .borrow_mut()
+        .register_system(DamageAll { amount: 1.0 });
+    world.borrow_mut().register_system(ProcessDeaths);
+    world.borrow_mut().register_system(ProcessDecay);
     engine.register_world(world.clone()).unwrap();
 
     let script = r#"

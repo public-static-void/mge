@@ -7,6 +7,7 @@ pub mod map;
 pub mod modes;
 pub mod plugins;
 pub mod scripting;
+pub mod systems;
 pub mod worldgen;
 
 pub use ecs::components::{Happiness, Health, Inventory, Position};

@@ -1,6 +1,7 @@
 use engine_core::ecs::registry::ComponentRegistry;
 use engine_core::ecs::schema::load_schemas_from_dir;
 use engine_core::scripting::World;
+use engine_core::systems::standard::DamageAll;
 use serde_json::json;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -30,7 +31,8 @@ fn test_damage_all_reduces_health() {
         .set_component(id2, "Health", json!({ "current": 5.0, "max": 8.0 }))
         .unwrap();
 
-    world.damage_all(3.0);
+    world.register_system(DamageAll { amount: 3.0 });
+    world.run_system("DamageAll").unwrap();
 
     let health1 = world.get_component(id1, "Health").unwrap();
     let health2 = world.get_component(id2, "Health").unwrap();
