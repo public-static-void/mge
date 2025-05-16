@@ -1,5 +1,6 @@
 use engine_core::ecs::registry::ComponentRegistry;
 use engine_core::scripting::{ScriptEngine, World};
+use engine_core::systems::standard::{DamageAll, MoveAll, ProcessDeaths, ProcessDecay};
 use std::cell::RefCell;
 use std::env;
 use std::fs;
@@ -33,6 +34,14 @@ fn main() {
     let registry = Arc::new(registry);
 
     let world = Rc::new(RefCell::new(World::new(registry.clone())));
+    world
+        .borrow_mut()
+        .register_system(MoveAll { dx: 1.0, dy: 0.0 });
+    world
+        .borrow_mut()
+        .register_system(DamageAll { amount: 1.0 });
+    world.borrow_mut().register_system(ProcessDeaths);
+    world.borrow_mut().register_system(ProcessDecay);
     let mut engine = ScriptEngine::new();
     engine
         .register_world(world.clone())

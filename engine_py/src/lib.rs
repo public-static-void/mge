@@ -2,6 +2,7 @@ use engine_core::ecs::event::{EventBus, EventReader};
 use engine_core::ecs::registry::ComponentRegistry;
 use engine_core::ecs::schema::load_schemas_from_dir;
 use engine_core::scripting::world::World;
+use engine_core::systems::standard::{DamageAll, MoveAll, ProcessDeaths, ProcessDecay};
 use engine_core::worldgen::{WorldgenPlugin, WorldgenRegistry};
 use pyo3::exceptions::PyIOError;
 use pyo3::exceptions::PyValueError;
@@ -50,7 +51,11 @@ impl PyWorld {
             registry.register_external_schema(schema);
         }
 
-        let world = World::new(Arc::new(registry));
+        let mut world = World::new(Arc::new(registry));
+        world.register_system(MoveAll { dx: 1.0, dy: 0.0 });
+        world.register_system(DamageAll { amount: 1.0 });
+        world.register_system(ProcessDeaths);
+        world.register_system(ProcessDecay);
         Ok(PyWorld {
             inner: Arc::new(Mutex::new(world)),
             worldgen_registry: std::cell::RefCell::new(WorldgenRegistry::new()),
@@ -158,7 +163,8 @@ impl PyWorld {
 
     fn move_all(&self, dx: f32, dy: f32) {
         let mut world = self.inner.lock().unwrap();
-        world.move_all(dx, dy);
+        world.register_system(MoveAll { dx, dy });
+        world.run_system("MoveAll").unwrap();
     }
 
     fn damage_entity(&self, entity_id: u32, amount: f32) {
@@ -168,12 +174,17 @@ impl PyWorld {
 
     fn damage_all(&self, amount: f32) {
         let mut world = self.inner.lock().unwrap();
-        world.damage_all(amount);
+        world.register_system(DamageAll { amount });
+        world.run_system("DamageAll").unwrap();
     }
 
     fn tick(&self) {
         let mut world = self.inner.lock().unwrap();
-        world.tick();
+        world.run_system("MoveAll").unwrap();
+        world.run_system("DamageAll").unwrap();
+        world.run_system("ProcessDeaths").unwrap();
+        world.run_system("ProcessDecay").unwrap();
+        world.turn += 1;
     }
 
     fn get_turn(&self) -> u32 {
@@ -183,12 +194,14 @@ impl PyWorld {
 
     fn process_deaths(&self) {
         let mut world = self.inner.lock().unwrap();
-        world.process_deaths();
+        world.register_system(ProcessDeaths);
+        world.run_system("ProcessDeaths").unwrap();
     }
 
     fn process_decay(&self) {
         let mut world = self.inner.lock().unwrap();
-        world.process_decay();
+        world.register_system(ProcessDecay);
+        world.run_system("ProcessDecay").unwrap();
     }
 
     fn count_entities_with_type(&self, type_str: String) -> usize {
