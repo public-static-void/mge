@@ -106,6 +106,17 @@ if not ok then
 end
 ```
 
+### 6. Dynamic System Registration
+
+```lua
+local ran = false
+register_system("test_lua_system", function(dt)
+    ran = true
+end)
+run_system("test_lua_system")
+assert(ran == true, "System did not run!")
+```
+
 ## Python Scripting Examples
 
 ```python
@@ -135,6 +146,17 @@ def test_stockpile_resource_management(world):
         world.modify_stockpile_resource(entity, "stone", -10)
     except ValueError as e:
         print("Error removing stone (expected!):", e)
+```
+
+### Dynamic System Registration
+
+```python
+ran = {"flag": False}
+def sys(dt):
+    ran["flag"] = True
+world.register_system("test_py_system", sys)
+world.run_system("test_py_system")
+assert ran["flag"] is True
 ```
 
 - See [`engine_py/tests/`](../engine_py/tests/) for more tested usage patterns and system examples.
