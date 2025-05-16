@@ -199,7 +199,8 @@ MGE supports hot-reloadable plugins via a stable C ABI, enabling dynamic extensi
 - Place compiled plugins (e.g. `.so`, `.dll`) in the project root’s `plugins/` directory.
 - The engine and integration tests will automatically load plugins from this directory at runtime.
 
-See [docs/examples.md](docs/examples.md#c-plugin-example) for a minimal C plugin and build instructions.
+- See [docs/c_plugin_abi.md](docs/c_plugin_abi.md) for the full ABI reference and plugin authoring guide.
+- See [docs/examples.md](docs/examples.md#c-plugin-example) for a minimal C plugin and build instructions.
 
 ## Resources
 
@@ -207,4 +208,5 @@ See [docs/examples.md](docs/examples.md#c-plugin-example) for a minimal C plugin
 - [docs/examples.md](docs/examples.md): Usage examples
 - [docs/lua_api.md](docs/lua_api.md): Lua API reference
 - [docs/python_api.md](docs/python_api.md) Python API reference
+- [docs/c_plugin_abi.md](docs/c_plugin_abi.md) C ABI reference
 - [docs/worldgen.md](docs/worldgen.md) World Generation Plugin System reference
