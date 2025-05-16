@@ -2,6 +2,7 @@ use super::helpers::{json_to_lua_table, lua_table_to_json};
 use super::input::{InputProvider, StdinInput};
 use super::world::World;
 use crate::ecs::event::{EventBus, EventReader};
+use crate::systems::standard::{DamageAll, MoveAll, ProcessDeaths, ProcessDecay};
 use crate::worldgen::{WorldgenError, WorldgenPlugin, WorldgenRegistry};
 use mlua::RegistryKey;
 use mlua::{Lua, Result as LuaResult, Table, Value as LuaValue};
@@ -102,42 +103,31 @@ impl ScriptEngine {
             .lua
             .create_function_mut(move |_, (dx, dy): (f32, f32)| {
                 let mut world = world_move.borrow_mut();
-                world.move_all(dx, dy);
+                world.register_system(MoveAll { dx, dy });
+                world.run_system("MoveAll").unwrap();
                 Ok(())
             })?;
         globals.set("move_all", move_all)?;
-
-        let world_print = world.clone();
-        let print_positions = self.lua.create_function_mut(move |_, ()| {
-            let world = world_print.borrow();
-            world.print_positions();
-            Ok(())
-        })?;
-        globals.set("print_positions", print_positions)?;
 
         // damage_all(amount)
         let world_damage = world.clone();
         let damage_all = self.lua.create_function_mut(move |_, amount: f32| {
             let mut world = world_damage.borrow_mut();
-            world.damage_all(amount);
+            world.register_system(DamageAll { amount });
+            world.run_system("DamageAll").unwrap();
             Ok(())
         })?;
         globals.set("damage_all", damage_all)?;
-
-        // print_healths()
-        let world_print_health = world.clone();
-        let print_healths = self.lua.create_function_mut(move |_, ()| {
-            let world = world_print_health.borrow();
-            world.print_healths();
-            Ok(())
-        })?;
-        globals.set("print_healths", print_healths)?;
 
         // tick()
         let world_tick = world.clone();
         let tick = self.lua.create_function_mut(move |_, ()| {
             let mut world = world_tick.borrow_mut();
-            world.tick();
+            world.run_system("MoveAll").unwrap();
+            world.run_system("DamageAll").unwrap();
+            world.run_system("ProcessDeaths").unwrap();
+            world.run_system("ProcessDecay").unwrap();
+            world.turn += 1;
             Ok(())
         })?;
         globals.set("tick", tick)?;
@@ -154,7 +144,8 @@ impl ScriptEngine {
         let world_deaths = world.clone();
         let process_deaths = self.lua.create_function_mut(move |_, ()| {
             let mut world = world_deaths.borrow_mut();
-            world.process_deaths();
+            world.register_system(ProcessDeaths);
+            world.run_system("ProcessDeaths").unwrap();
             Ok(())
         })?;
         globals.set("process_deaths", process_deaths)?;
@@ -163,7 +154,8 @@ impl ScriptEngine {
         let world_decay = world.clone();
         let process_decay = self.lua.create_function_mut(move |_, ()| {
             let mut world = world_decay.borrow_mut();
-            world.process_decay();
+            world.register_system(ProcessDecay);
+            world.run_system("ProcessDecay").unwrap();
             Ok(())
         })?;
         globals.set("process_decay", process_decay)?;
@@ -453,7 +445,43 @@ impl ScriptEngine {
         })?;
         globals.set("run_system", run_system)?;
 
+        let world_for_print = world.clone();
+        let print_positions_fn = self.lua.create_function_mut(move |_, ()| {
+            let world = world_for_print.borrow();
+            print_positions(&world);
+            Ok(())
+        })?;
+        globals.set("print_positions", print_positions_fn)?;
+
+        let world_for_print = world.clone();
+        let print_healths_fn = self.lua.create_function_mut(move |_, ()| {
+            let world = world_for_print.borrow();
+            print_healths(&world);
+            Ok(())
+        })?;
+        globals.set("print_healths", print_healths_fn)?;
+
         Ok(())
+    }
+}
+
+pub fn print_positions(world: &World) {
+    if let Some(positions) = world.components.get("Position") {
+        for (entity, value) in positions {
+            println!("Entity {}: {:?}", entity, value);
+        }
+    } else {
+        println!("No Position components found.");
+    }
+}
+
+pub fn print_healths(world: &World) {
+    if let Some(healths) = world.components.get("Health") {
+        for (entity, value) in healths {
+            println!("Entity {}: {:?}", entity, value);
+        }
+    } else {
+        println!("No Health components found.");
     }
 }
 
