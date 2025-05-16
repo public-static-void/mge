@@ -5,6 +5,7 @@ MGE is a modular, cross-language game engine blueprint and reference implementat
 ## Features
 
 - Macro-driven ECS in Rust
+- Modular, deterministic simulation tick scheduler (runs all systems in order each tick, with event bus integration)
 - Hot-reloadable plugins & cross-language scripting (Lua, Python, WASM)
 - Schema-driven, versioned, and mode-restricted components
 - Runtime mode switching with enforcement in both Rust and scripting
