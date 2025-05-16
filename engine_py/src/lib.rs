@@ -9,6 +9,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyModule};
 use serde_json::Value;
 use serde_pyobject::{from_pyobject, to_pyobject};
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
@@ -22,6 +23,7 @@ static EVENT_BUSES: once_cell::sync::Lazy<EventBusMap> =
 pub struct PyWorld {
     inner: Arc<Mutex<World>>,
     worldgen_registry: std::cell::RefCell<WorldgenRegistry>,
+    systems: RefCell<HashMap<String, Py<PyAny>>>,
 }
 
 #[pymethods]
@@ -52,6 +54,7 @@ impl PyWorld {
         Ok(PyWorld {
             inner: Arc::new(Mutex::new(world)),
             worldgen_registry: std::cell::RefCell::new(WorldgenRegistry::new()),
+            systems: RefCell::new(HashMap::new()),
         })
     }
 
@@ -290,6 +293,23 @@ impl PyWorld {
             .invoke(&name, &params)
             .map_err(|e| PyValueError::new_err(format!("{:?}", e)))?;
         Ok(to_pyobject(py, &result)?.into())
+    }
+
+    fn register_system(&self, py: Python, name: String, callback: Py<PyAny>) -> PyResult<()> {
+        // Store the callback in a dict or registry
+        self.systems
+            .borrow_mut()
+            .insert(name, callback.clone_ref(py));
+        Ok(())
+    }
+
+    fn run_system(&self, py: Python, name: String) -> PyResult<()> {
+        if let Some(cb) = self.systems.borrow().get(&name) {
+            cb.call1(py, (0.0,))?; // Pass dt=0.0 or whatever you expect
+            Ok(())
+        } else {
+            Err(PyValueError::new_err("System not found"))
+        }
     }
 }
 
