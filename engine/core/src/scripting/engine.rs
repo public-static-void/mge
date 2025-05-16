@@ -168,14 +168,14 @@ impl ScriptEngine {
         })?;
         globals.set("process_decay", process_decay)?;
 
-        // remove_entity(id)
+        // despawn_entity(id)
         let world_remove = world.clone();
-        let remove_entity = self.lua.create_function_mut(move |_, entity_id: u32| {
+        let despawn_entity = self.lua.create_function_mut(move |_, entity_id: u32| {
             let mut world = world_remove.borrow_mut();
-            world.remove_entity(entity_id);
+            world.despawn_entity(entity_id);
             Ok(())
         })?;
-        globals.set("remove_entity", remove_entity)?;
+        globals.set("despawn_entity", despawn_entity)?;
 
         let world_get_entities = world.clone();
         let get_entities_with_component =

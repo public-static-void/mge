@@ -264,7 +264,7 @@ fn test_count_entities_with_type() {
     assert_eq!(world.count_entities_with_type("player"), 1);
     assert_eq!(world.count_entities_with_type("enemy"), 2);
 
-    world.remove_entity(enemy1);
+    world.despawn_entity(enemy1);
     assert_eq!(world.count_entities_with_type("enemy"), 1);
 }
 
