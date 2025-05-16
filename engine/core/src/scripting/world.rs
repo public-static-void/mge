@@ -18,6 +18,7 @@
 use crate::ecs::event::EventBus;
 use crate::ecs::registry::ComponentRegistry;
 use crate::ecs::system::SystemRegistry;
+use crate::plugins::dynamic_systems::DynamicSystemRegistry;
 use jsonschema::{Draft, JSONSchema};
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
@@ -37,6 +38,8 @@ pub struct World {
     pub systems: SystemRegistry,
     #[serde(skip)]
     pub event_buses: HashMap<String, Arc<Mutex<EventBus<JsonValue>>>>,
+    #[serde(skip)]
+    pub dynamic_systems: DynamicSystemRegistry,
 }
 
 impl World {
@@ -50,6 +53,7 @@ impl World {
             registry,
             systems: SystemRegistry::new(),
             event_buses: HashMap::new(),
+            dynamic_systems: DynamicSystemRegistry::new(),
         }
     }
 
@@ -329,17 +333,6 @@ impl World {
         self.systems.register_system(system);
     }
 
-    pub fn run_system(&mut self, name: &str) -> Result<(), String> {
-        // Take the system out to avoid double mutable borrow
-        if let Some(mut system) = self.systems.take_system(name) {
-            system.run(self);
-            self.systems.register_system_boxed(name.to_string(), system);
-            Ok(())
-        } else {
-            Err(format!("System '{}' not found", name))
-        }
-    }
-
     pub fn list_systems(&self) -> Vec<String> {
         self.systems.list_systems()
     }
@@ -444,6 +437,35 @@ impl World {
     pub fn update_event_buses(&self) {
         for bus in self.event_buses.values() {
             bus.lock().unwrap().update();
+        }
+    }
+
+    pub fn register_dynamic_system<F>(&mut self, name: &str, run: F)
+    where
+        F: Fn(&mut World, f32) + Send + Sync + 'static,
+    {
+        self.dynamic_systems
+            .register_system(name.to_string(), Box::new(run));
+    }
+
+    pub fn run_dynamic_system(&mut self, name: &str) -> Result<(), String> {
+        let name = name.to_string();
+        let dynamic_systems = std::mem::take(&mut self.dynamic_systems);
+        let result = dynamic_systems.run_system(self, &name, 0.0);
+        self.dynamic_systems = dynamic_systems;
+        result
+    }
+
+    pub fn run_system(&mut self, name: &str) -> Result<(), String> {
+        if let Some(mut system) = self.systems.take_system(name) {
+            system.run(self);
+            self.systems.register_system_boxed(name.to_string(), system);
+            Ok(())
+        } else {
+            let dynamic_systems = std::mem::take(&mut self.dynamic_systems);
+            let result = dynamic_systems.run_system(self, name, 0.0);
+            self.dynamic_systems = dynamic_systems;
+            result
         }
     }
 }
