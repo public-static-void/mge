@@ -1,6 +1,7 @@
 use engine_core::ecs::registry::ComponentRegistry;
 use engine_core::ecs::schema::load_schemas_from_dir;
 use engine_core::scripting::{ScriptEngine, World};
+use engine_core::systems::standard::MoveAll;
 use serde_json::json;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -32,7 +33,8 @@ fn test_move_all_moves_positions() {
         .unwrap();
 
     // Call move_all (to be implemented)
-    world.move_all(1.0, -1.0);
+    world.register_system(MoveAll { dx: 1.0, dy: -1.0 });
+    world.run_system("MoveAll").unwrap();
 
     // Check new positions
     let pos1 = world.get_component(id1, "Position").unwrap();
