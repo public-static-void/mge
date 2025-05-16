@@ -1,0 +1,117 @@
+use std::sync::Arc;
+
+#[test]
+fn systems_execute_in_registered_order() {
+    use engine_core::ecs::system::System;
+    use engine_core::scripting::world::World;
+    use std::sync::{Arc, Mutex};
+
+    let registry = Arc::new(engine_core::ecs::registry::ComponentRegistry::new());
+    let mut world = World::new(registry);
+
+    let log = Arc::new(Mutex::new(Vec::new()));
+
+    struct SysA(Arc<Mutex<Vec<&'static str>>>);
+    impl System for SysA {
+        fn name(&self) -> &'static str {
+            "A"
+        }
+        fn run(&mut self, _world: &mut World) {
+            self.0.lock().unwrap().push("A");
+        }
+    }
+    struct SysB(Arc<Mutex<Vec<&'static str>>>);
+    impl System for SysB {
+        fn name(&self) -> &'static str {
+            "B"
+        }
+        fn run(&mut self, _world: &mut World) {
+            self.0.lock().unwrap().push("B");
+        }
+    }
+
+    world.register_system(SysA(log.clone()));
+    world.register_system(SysB(log.clone()));
+
+    world.simulation_tick(); // <-- to be implemented
+
+    let log = log.lock().unwrap();
+    assert_eq!(&log[..], &["A", "B"]);
+}
+
+#[test]
+fn dynamic_systems_are_executed_in_tick() {
+    use engine_core::scripting::world::World;
+    use std::sync::{Arc, Mutex};
+
+    let registry = Arc::new(engine_core::ecs::registry::ComponentRegistry::new());
+    let mut world = World::new(registry);
+
+    let log = Arc::new(Mutex::new(Vec::new()));
+
+    world.register_dynamic_system("dyn", {
+        let log = log.clone();
+        move |_, _| log.lock().unwrap().push("dyn")
+    });
+
+    world.simulation_tick();
+
+    let log = log.lock().unwrap();
+    assert!(log.contains(&"dyn"));
+}
+
+#[test]
+fn systems_can_emit_and_receive_events_in_tick() {
+    use engine_core::ecs::system::System;
+    use engine_core::scripting::world::World;
+    use serde_json::json;
+    use std::sync::{Arc, Mutex};
+
+    let registry = Arc::new(engine_core::ecs::registry::ComponentRegistry::new());
+    let mut world = World::new(registry);
+
+    let events = Arc::new(Mutex::new(Vec::new()));
+
+    struct Emitter;
+    impl System for Emitter {
+        fn name(&self) -> &'static str {
+            "Emitter"
+        }
+        fn run(&mut self, world: &mut World) {
+            world.send_event("test", json!({"val": 1})).unwrap();
+        }
+    }
+    struct Receiver(Arc<Mutex<Vec<i64>>>);
+    impl System for Receiver {
+        fn name(&self) -> &'static str {
+            "Receiver"
+        }
+        fn run(&mut self, world: &mut World) {
+            let bus = world.get_or_create_event_bus("test");
+            let mut bus = bus.lock().unwrap();
+            while let Some(event) = bus.try_recv() {
+                if let Some(val) = event.get("val").and_then(|v| v.as_i64()) {
+                    self.0.lock().unwrap().push(val);
+                }
+            }
+        }
+    }
+
+    world.register_system(Emitter);
+    world.register_system(Receiver(events.clone()));
+
+    world.simulation_tick();
+
+    let events = events.lock().unwrap();
+    assert_eq!(&events[..], &[1]);
+}
+
+#[test]
+fn simulation_tick_increments_turn() {
+    use engine_core::scripting::world::World;
+    let registry = Arc::new(engine_core::ecs::registry::ComponentRegistry::new());
+    let mut world = World::new(registry);
+    let turn = world.turn;
+    world.simulation_tick();
+    assert_eq!(world.turn, turn + 1);
+}
