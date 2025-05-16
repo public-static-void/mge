@@ -3,10 +3,12 @@ use super::input::{InputProvider, StdinInput};
 use super::world::World;
 use crate::ecs::event::{EventBus, EventReader};
 use crate::worldgen::{WorldgenError, WorldgenPlugin, WorldgenRegistry};
+use mlua::RegistryKey;
 use mlua::{Lua, Result as LuaResult, Table, Value as LuaValue};
 use mlua::{UserData, UserDataMethods};
 use serde_json::Value as JsonValue;
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
@@ -14,6 +16,7 @@ pub struct ScriptEngine {
     lua: Lua,
     input_provider: Arc<Mutex<Box<dyn InputProvider + Send + Sync>>>,
     worldgen_registry: Rc<RefCell<WorldgenRegistry>>,
+    lua_systems: Rc<RefCell<HashMap<String, RegistryKey>>>,
 }
 
 #[derive(Clone)]
@@ -33,6 +36,7 @@ impl ScriptEngine {
             lua: Lua::new(),
             input_provider: Arc::new(Mutex::new(input_provider)),
             worldgen_registry: Rc::new(RefCell::new(WorldgenRegistry::new())),
+            lua_systems: Rc::new(RefCell::new(HashMap::new())),
         }
     }
 
@@ -425,6 +429,29 @@ impl ScriptEngine {
                     }
                 })?;
         globals.set("invoke_worldgen", invoke_worldgen)?;
+
+        let lua_systems = Rc::clone(&self.lua_systems);
+        let register_system =
+            self.lua
+                .create_function_mut(move |lua, (name, func): (String, mlua::Function)| {
+                    let key = lua.create_registry_value(func)?;
+                    lua_systems.borrow_mut().insert(name, key);
+                    Ok(())
+                })?;
+        globals.set("register_system", register_system)?;
+
+        let lua_systems = Rc::clone(&self.lua_systems);
+        let run_system = self.lua.create_function_mut(move |lua, name: String| {
+            let systems = lua_systems.borrow();
+            if let Some(key) = systems.get(&name) {
+                let func: mlua::Function = lua.registry_value(key)?;
+                func.call::<_, ()>(())?;
+                Ok(())
+            } else {
+                Err(mlua::Error::external("system not found"))
+            }
+        })?;
+        globals.set("run_system", run_system)?;
 
         Ok(())
     }
