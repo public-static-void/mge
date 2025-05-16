@@ -30,6 +30,10 @@ impl<E: Clone> EventBus<E> {
     pub fn last_events(&self) -> &VecDeque<E> {
         &self.last_events
     }
+
+    pub fn try_recv(&mut self) -> Option<E> {
+        self.events.pop_front()
+    }
 }
 
 /// Reader for events, tracks which events have been read.
