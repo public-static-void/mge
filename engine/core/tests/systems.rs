@@ -1,12 +1,11 @@
 use engine_core::ecs::registry::ComponentRegistry;
+use engine_core::ecs::schema::ComponentSchema;
 use engine_core::scripting::world::World;
 use engine_core::systems::standard::{MoveAll, ProcessDeaths};
 use schemars::schema::RootSchema;
 use serde_json::Value;
 use serde_json::json;
-use std::sync::Arc;
-
-use engine_core::ecs::schema::ComponentSchema;
+use std::sync::{Arc, Mutex};
 
 /// Helper: Convert a serde_json::Value into a RootSchema for registration.
 fn make_schema_from_json(value: Value) -> RootSchema {
@@ -14,25 +13,27 @@ fn make_schema_from_json(value: Value) -> RootSchema {
 }
 
 pub fn make_test_world_with_positions() -> World {
-    let mut registry = ComponentRegistry::new();
-    let schema_json = json!({
-        "title": "Position",
-        "type": "object",
-        "properties": {
-            "x": { "type": "number" },
-            "y": { "type": "number" }
-        },
-        "required": ["x", "y"],
-        "modes": ["colony", "roguelike"]
-    });
-    let schema = make_schema_from_json(schema_json);
-    registry.register_external_schema(ComponentSchema {
-        name: "Position".to_string(),
-        schema,
-        modes: vec!["colony".to_string(), "roguelike".to_string()],
-    });
-    let registry = Arc::new(registry); // Only wrap in Arc after mutation
-    let mut world = World::new(registry);
+    let registry = Arc::new(Mutex::new(ComponentRegistry::new()));
+    {
+        let mut reg = registry.lock().unwrap();
+        let schema_json = json!({
+            "title": "Position",
+            "type": "object",
+            "properties": {
+                "x": { "type": "number" },
+                "y": { "type": "number" }
+            },
+            "required": ["x", "y"],
+            "modes": ["colony", "roguelike"]
+        });
+        let schema = make_schema_from_json(schema_json);
+        reg.register_external_schema(ComponentSchema {
+            name: "Position".to_string(),
+            schema: schema.clone(),
+            modes: vec!["colony".to_string(), "roguelike".to_string()],
+        });
+    } // lock is dropped here
+    let mut world = World::new(registry.clone());
     for i in 0..3 {
         let eid = world.spawn_entity();
         world
@@ -43,25 +44,27 @@ pub fn make_test_world_with_positions() -> World {
 }
 
 pub fn make_test_world_with_health() -> (World, u32) {
-    let mut registry = ComponentRegistry::new();
-    let schema_json = json!({
-        "title": "Health",
-        "type": "object",
-        "properties": {
-            "current": { "type": "number" },
-            "max": { "type": "number" }
-        },
-        "required": ["current", "max"],
-        "modes": ["colony", "roguelike"]
-    });
-    let schema = make_schema_from_json(schema_json);
-    registry.register_external_schema(ComponentSchema {
-        name: "Health".to_string(),
-        schema,
-        modes: vec!["colony".to_string(), "roguelike".to_string()],
-    });
-    let registry = Arc::new(registry);
-    let mut world = World::new(registry);
+    let registry = Arc::new(Mutex::new(ComponentRegistry::new()));
+    {
+        let mut reg = registry.lock().unwrap();
+        let schema_json = json!({
+            "title": "Health",
+            "type": "object",
+            "properties": {
+                "current": { "type": "number" },
+                "max": { "type": "number" }
+            },
+            "required": ["current", "max"],
+            "modes": ["colony", "roguelike"]
+        });
+        let schema = make_schema_from_json(schema_json);
+        reg.register_external_schema(ComponentSchema {
+            name: "Health".to_string(),
+            schema: schema.clone(),
+            modes: vec!["colony".to_string(), "roguelike".to_string()],
+        });
+    } // lock is dropped here
+    let mut world = World::new(registry.clone());
     let eid = world.spawn_entity();
     world
         .set_component(eid, "Health", json!({"current": 10, "max": 10}))

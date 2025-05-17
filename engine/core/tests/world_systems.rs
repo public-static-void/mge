@@ -2,13 +2,13 @@ use engine_core::ecs::registry::ComponentRegistry;
 use engine_core::ecs::system::System;
 use engine_core::scripting::world::World;
 use std::sync::{
-    Arc,
+    Arc, Mutex,
     atomic::{AtomicBool, Ordering},
 };
 
 #[test]
 fn test_world_can_register_and_run_system() {
-    let registry = Arc::new(ComponentRegistry::new());
+    let registry = Arc::new(Mutex::new(ComponentRegistry::new()));
     let mut world = World::new(registry);
 
     let called = Arc::new(AtomicBool::new(false));
@@ -33,7 +33,7 @@ fn test_world_can_register_and_run_system() {
 
 #[test]
 fn test_world_lists_systems() {
-    let registry = Arc::new(ComponentRegistry::new());
+    let registry = Arc::new(Mutex::new(ComponentRegistry::new()));
     let mut world = World::new(registry);
 
     struct DummySystem;

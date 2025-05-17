@@ -5,7 +5,7 @@ use std::cell::RefCell;
 use std::env;
 use std::fs;
 use std::rc::Rc;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -27,11 +27,10 @@ fn main() {
     let schema_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap() + "/../assets/schemas";
     let schemas = engine_core::ecs::schema::load_schemas_from_dir(&schema_dir)
         .expect("Failed to load schemas");
-    let mut registry = ComponentRegistry::new();
+    let registry = Arc::new(Mutex::new(ComponentRegistry::new()));
     for (_name, schema) in schemas {
-        registry.register_external_schema(schema);
+        registry.lock().unwrap().register_external_schema(schema);
     }
-    let registry = Arc::new(registry);
 
     let world = Rc::new(RefCell::new(World::new(registry.clone())));
     world

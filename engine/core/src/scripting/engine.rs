@@ -14,7 +14,7 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 pub struct ScriptEngine {
-    lua: Lua,
+    lua: Rc<Lua>,
     input_provider: Arc<Mutex<Box<dyn InputProvider + Send + Sync>>>,
     worldgen_registry: Rc<RefCell<WorldgenRegistry>>,
     lua_systems: Rc<RefCell<HashMap<String, RegistryKey>>>,
@@ -34,7 +34,7 @@ impl ScriptEngine {
 
     pub fn new_with_input(input_provider: Box<dyn InputProvider + Send + Sync>) -> Self {
         Self {
-            lua: Lua::new(),
+            lua: Rc::new(Lua::new()),
             input_provider: Arc::new(Mutex::new(input_provider)),
             worldgen_registry: Rc::new(RefCell::new(WorldgenRegistry::new())),
             lua_systems: Rc::new(RefCell::new(HashMap::new())),
@@ -247,7 +247,7 @@ impl ScriptEngine {
         let world_list_components = world.clone();
         let list_components = self.lua.create_function_mut(move |_, ()| {
             let world = world_list_components.borrow();
-            Ok(world.registry.all_component_names())
+            Ok(world.registry.lock().unwrap().all_component_names())
         })?;
         globals.set("list_components", list_components)?;
 
@@ -255,7 +255,7 @@ impl ScriptEngine {
         let world_get_schema = world.clone();
         let get_component_schema = self.lua.create_function_mut(move |lua, name: String| {
             let world = world_get_schema.borrow();
-            if let Some(schema) = world.registry.get_schema_by_name(&name) {
+            if let Some(schema) = world.registry.lock().unwrap().get_schema_by_name(&name) {
                 let json = serde_json::to_value(&schema.schema).map_err(mlua::Error::external)?;
                 super::helpers::json_to_lua_table(lua, &json)
             } else {
@@ -276,7 +276,7 @@ impl ScriptEngine {
         let world_get_modes = world.clone();
         let get_available_modes = self.lua.create_function_mut(move |_, ()| {
             let world = world_get_modes.borrow();
-            let modes = world.registry.all_modes();
+            let modes = world.registry.lock().unwrap().all_modes();
             Ok(modes.into_iter().collect::<Vec<String>>())
         })?;
         globals.set("get_available_modes", get_available_modes)?;
@@ -422,14 +422,46 @@ impl ScriptEngine {
                 })?;
         globals.set("invoke_worldgen", invoke_worldgen)?;
 
-        let lua_systems = Rc::clone(&self.lua_systems);
-        let register_system =
-            self.lua
-                .create_function_mut(move |lua, (name, func): (String, mlua::Function)| {
-                    let key = lua.create_registry_value(func)?;
-                    lua_systems.borrow_mut().insert(name, key);
-                    Ok(())
-                })?;
+        let lua_systems_outer = Rc::clone(&self.lua_systems);
+        let world_rc = world.clone();
+        let lua = Rc::clone(&self.lua);
+
+        let register_system = self.lua.create_function_mut(
+            move |_, (name, func, opts): (String, mlua::Function, Option<mlua::Table>)| {
+                let key = lua.create_registry_value(func)?;
+                lua_systems_outer.borrow_mut().insert(name.clone(), key);
+
+                let mut dependencies = Vec::new();
+                if let Some(opts) = opts {
+                    if let Ok(dep_table) = opts.get::<_, mlua::Table>("dependencies") {
+                        for dep in dep_table.sequence_values::<String>() {
+                            dependencies.push(dep?);
+                        }
+                    }
+                }
+
+                let system_name_for_closure = name.clone();
+                let system_name_for_fn = system_name_for_closure.clone();
+                let lua_systems_inner = Rc::clone(&lua_systems_outer); // <-- CLONE HERE
+                let lua = lua.clone();
+
+                world_rc.borrow_mut().register_dynamic_system_with_deps(
+                    &system_name_for_closure,
+                    dependencies,
+                    move |_world, dt| {
+                        let binding = lua_systems_inner.borrow();
+                        let key = binding
+                            .get(&system_name_for_fn)
+                            .expect("Lua system not found");
+                        let func: mlua::Function =
+                            lua.registry_value(key).expect("Invalid Lua registry key");
+                        let _ = func.call::<_, ()>((dt,));
+                    },
+                );
+
+                Ok(())
+            },
+        )?;
         globals.set("register_system", register_system)?;
 
         let lua_systems = Rc::clone(&self.lua_systems);

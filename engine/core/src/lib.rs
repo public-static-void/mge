@@ -5,6 +5,7 @@
 pub mod ecs;
 pub mod map;
 pub mod modes;
+pub mod mods;
 pub mod plugins;
 pub mod scripting;
 pub mod systems;

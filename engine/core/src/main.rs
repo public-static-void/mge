@@ -3,17 +3,16 @@ use engine_core::ecs::schema::load_schemas_from_dir;
 use engine_core::scripting::{ScriptEngine, World};
 use std::cell::RefCell;
 use std::rc::Rc;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 fn main() {
     // Load all schemas!
     let schema_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap() + "/../assets/schemas";
     let schemas = load_schemas_from_dir(&schema_dir).expect("Failed to load schemas");
-    let mut registry = ComponentRegistry::new();
+    let registry = Arc::new(Mutex::new(ComponentRegistry::new()));
     for (_name, schema) in schemas {
-        registry.register_external_schema(schema);
+        registry.lock().unwrap().register_external_schema(schema);
     }
-    let registry = Arc::new(registry);
 
     let mut engine = ScriptEngine::new();
     let world = Rc::new(RefCell::new(World::new(registry.clone())));

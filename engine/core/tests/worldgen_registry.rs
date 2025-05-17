@@ -4,7 +4,7 @@ use engine_core::scripting::World;
 use engine_core::worldgen::{WorldgenError, WorldgenPlugin, WorldgenRegistry};
 use mlua::Lua;
 use serde_json::json;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 #[test]
 fn test_register_and_list_worldgen_plugins() {
@@ -83,7 +83,7 @@ fn test_register_and_invoke_cabi_worldgen_plugin() {
         set_component: dummy_set_component,
     };
 
-    let component_registry = Arc::new(ComponentRegistry::new());
+    let component_registry = Arc::new(Mutex::new(ComponentRegistry::new()));
     let mut dummy_world = World::new(component_registry);
     let world: *mut std::os::raw::c_void = &mut dummy_world as *mut _ as *mut std::os::raw::c_void;
 

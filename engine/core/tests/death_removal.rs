@@ -3,7 +3,7 @@ use engine_core::ecs::schema::load_schemas_from_dir;
 use engine_core::scripting::World;
 use engine_core::systems::standard::{DamageAll, ProcessDeaths, ProcessDecay};
 use serde_json::json;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 #[test]
 fn test_death_replaces_health_with_corpse_and_decay() {
@@ -13,7 +13,7 @@ fn test_death_replaces_health_with_corpse_and_decay() {
     for (_name, schema) in schemas {
         registry.register_external_schema(schema);
     }
-    let registry = Arc::new(registry);
+    let registry = Arc::new(Mutex::new(registry));
     let mut world = World::new(registry.clone());
 
     world.current_mode = "colony".to_string();
@@ -50,7 +50,7 @@ fn test_decay_removes_entity_after_time() {
     for (_name, schema) in schemas {
         registry.register_external_schema(schema);
     }
-    let registry = Arc::new(registry);
+    let registry = Arc::new(Mutex::new(registry));
     let mut world = World::new(registry.clone());
 
     world.current_mode = "colony".to_string();

@@ -96,7 +96,7 @@ let mut registry = ComponentRegistry::new();
 for (_name, schema) in schemas {
     registry.register_external_schema(schema);
 }
-let registry = Arc::new(registry);
+let registry = Arc::new(std::sync::Mutex::new(registry));
 
 let mut world = World::new(registry.clone());
 let entity = world.spawn_entity();

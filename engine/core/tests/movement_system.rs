@@ -3,9 +3,7 @@ use engine_core::ecs::schema::load_schemas_from_dir;
 use engine_core::scripting::{ScriptEngine, World};
 use engine_core::systems::standard::MoveAll;
 use serde_json::json;
-use std::cell::RefCell;
-use std::rc::Rc;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 #[test]
 fn test_move_all_moves_positions() {
@@ -16,8 +14,7 @@ fn test_move_all_moves_positions() {
     for (_name, schema) in schemas {
         registry.register_external_schema(schema);
     }
-    let registry = Arc::new(registry);
-
+    let registry = Arc::new(Mutex::new(registry));
     let mut world = World::new(registry.clone());
     world.current_mode = "colony".to_string();
 
@@ -54,10 +51,10 @@ fn test_lua_move_all() {
     for (_name, schema) in schemas {
         registry.register_external_schema(schema);
     }
-    let registry = Arc::new(registry);
+    let registry = Arc::new(Mutex::new(registry));
 
     let mut engine = ScriptEngine::new();
-    let world = Rc::new(RefCell::new(World::new(registry.clone())));
+    let world = std::rc::Rc::new(std::cell::RefCell::new(World::new(registry.clone())));
     world.borrow_mut().current_mode = "colony".to_string();
     engine.register_world(world.clone()).unwrap();
 

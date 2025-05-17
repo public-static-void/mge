@@ -4,7 +4,7 @@ fn test_get_entities_with_components() {
     use engine_core::ecs::schema::load_schemas_from_dir;
     use engine_core::scripting::world::World;
     use serde_json::json;
-    use std::sync::Arc;
+    use std::sync::{Arc, Mutex};
 
     // Load all schemas from disk
     let schemas = load_schemas_from_dir("../../engine/assets/schemas").unwrap();
@@ -12,9 +12,9 @@ fn test_get_entities_with_components() {
     for (_name, schema) in schemas {
         registry.register_external_schema(schema);
     }
-    let registry = Arc::new(registry);
+    let registry = Arc::new(Mutex::new(registry));
 
-    let mut world = World::new(registry);
+    let mut world = World::new(registry.clone());
 
     let e1 = world.spawn_entity();
     let e2 = world.spawn_entity();
