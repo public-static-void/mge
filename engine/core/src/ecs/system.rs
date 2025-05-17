@@ -1,7 +1,7 @@
 use crate::scripting::world::World;
 use indexmap::IndexMap;
 use std::cell::RefCell;
-use std::collections::{HashMap, HashSet, VecDeque};
+use topo_sort::{SortResults, TopoSort};
 
 pub trait System: Send + Sync {
     fn name(&self) -> &'static str;
@@ -51,57 +51,28 @@ impl SystemRegistry {
 
     /// Returns a topologically sorted list of system names, or panics if a cycle is detected.
     pub fn sorted_system_names(&self) -> Vec<String> {
-        // Build dependency graph: name -> set of dependencies
-        let mut graph: HashMap<String, HashSet<String>> = HashMap::new();
+        // Create a new topo sorter
+        let mut sorter = TopoSort::new();
+
+        // Insert all nodes and their dependencies
         for (name, cell) in &self.systems {
             let deps = cell.borrow().dependencies();
-            graph
-                .entry(name.clone())
-                .or_default()
-                .extend(deps.iter().map(|&s| s.to_string()));
+            // Only add dependencies that are registered systems
+            let filtered_deps = deps
+                .iter()
+                .filter(|&&dep| self.systems.contains_key(dep))
+                .map(|&s| s.to_string())
+                .collect::<Vec<_>>();
+            sorter.insert(name.clone(), filtered_deps);
         }
 
-        // Kahn's algorithm for topological sort
-        let mut in_degree: HashMap<String, usize> = HashMap::new();
-        for (name, deps) in &graph {
-            in_degree.entry(name.clone()).or_insert(0);
-            for dep in deps {
-                *in_degree.entry(dep.clone()).or_insert(0) += 1;
+        // Perform the topological sort
+        match sorter.into_vec_nodes() {
+            SortResults::Full(order) => order,
+            SortResults::Partial(cycle) => {
+                panic!("Cycle detected in system dependencies: {:?}", cycle);
             }
         }
-
-        let mut queue: VecDeque<String> = in_degree
-            .iter()
-            .filter_map(|(name, &deg)| if deg == 0 { Some(name.clone()) } else { None })
-            .collect();
-        let mut sorted = Vec::new();
-
-        while let Some(name) = queue.pop_front() {
-            sorted.push(name.clone());
-            if let Some(deps) = graph.get(&name) {
-                for dep in deps {
-                    if let Some(deg) = in_degree.get_mut(dep) {
-                        *deg -= 1;
-                        if *deg == 0 {
-                            queue.push_back(dep.clone());
-                        }
-                    }
-                }
-            }
-        }
-
-        if sorted.len() != self.systems.len() {
-            panic!("Cycle detected in system dependencies!");
-        }
-
-        // Reverse to get the correct order (from roots to leaves)
-        sorted.reverse();
-
-        // Only return systems that are registered (ignore unknown dependencies)
-        sorted
-            .into_iter()
-            .filter(|name| self.systems.contains_key(name))
-            .collect()
     }
 }
 
