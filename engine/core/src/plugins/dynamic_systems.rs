@@ -1,17 +1,11 @@
 use crate::scripting::World;
 use indexmap::IndexMap;
-use std::sync::Arc;
 
-pub type DynSystemFn = Box<dyn Fn(&mut World, f32) + Send + Sync>;
-
-pub struct DynamicSystem {
-    pub name: String,
-    pub run: DynSystemFn,
-}
+pub type DynSystemFn = Box<dyn Fn(&mut World, f32) + 'static>;
 
 #[derive(Default)]
 pub struct DynamicSystemRegistry {
-    systems: IndexMap<String, Arc<DynamicSystem>>,
+    systems: IndexMap<String, DynSystemFn>,
 }
 
 impl DynamicSystemRegistry {
@@ -22,16 +16,22 @@ impl DynamicSystemRegistry {
     }
 
     pub fn register_system(&mut self, name: String, run: DynSystemFn) {
-        let system = Arc::new(DynamicSystem {
-            name: name.clone(),
-            run,
-        });
-        self.systems.insert(name, system);
+        self.systems.insert(name, run);
+    }
+
+    pub fn register_system_with_deps(
+        &mut self,
+        name: String,
+        _dependencies: Vec<String>,
+        run: DynSystemFn,
+    ) {
+        // TODO: Store dependencies if needed
+        self.systems.insert(name, run);
     }
 
     pub fn run_system(&self, world: &mut World, name: &str, delta_time: f32) -> Result<(), String> {
         if let Some(system) = self.systems.get(name) {
-            (system.run)(world, delta_time);
+            (system)(world, delta_time);
             Ok(())
         } else {
             Err(format!("Dynamic system '{}' not found", name))
