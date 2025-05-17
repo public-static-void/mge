@@ -1,6 +1,6 @@
 use engine_core::ecs::registry::ComponentRegistry;
 use engine_core::scripting::World;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use tempfile::NamedTempFile;
 
 #[test]
@@ -17,7 +17,7 @@ fn save_and_load_world_roundtrip() {
             registry.register_external_schema_from_json(&json).unwrap();
         }
     }
-    let registry = Arc::new(registry);
+    let registry = Arc::new(Mutex::new(registry));
 
     let mut world = World::new(registry.clone());
     world.current_mode = "roguelike".to_string();

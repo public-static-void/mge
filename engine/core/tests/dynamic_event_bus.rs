@@ -1,11 +1,11 @@
 use engine_core::ecs::registry::ComponentRegistry;
 use engine_core::scripting::world::World;
 use serde_json::json;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 #[test]
 fn test_dynamic_event_bus_send_and_read() {
-    let registry = Arc::new(ComponentRegistry::new());
+    let registry = Arc::new(Mutex::new(ComponentRegistry::new()));
     let mut world = World::new(registry);
 
     // Send FooEvent (as JSON)

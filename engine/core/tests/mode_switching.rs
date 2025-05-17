@@ -3,7 +3,7 @@ fn test_schema_driven_mode_enforcement() {
     use engine_core::ecs::registry::ComponentRegistry;
     use engine_core::scripting::world::World;
     use serde_json::json;
-    use std::sync::Arc;
+    use std::sync::{Arc, Mutex};
 
     let inventory_schema = r#"
     {
@@ -22,7 +22,7 @@ fn test_schema_driven_mode_enforcement() {
     registry
         .register_external_schema_from_json(inventory_schema)
         .unwrap();
-    let registry = Arc::new(registry);
+    let registry = Arc::new(Mutex::new(registry));
 
     let mut world = World::new(registry.clone());
     let entity = world.spawn_entity();

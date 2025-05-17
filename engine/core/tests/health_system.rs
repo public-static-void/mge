@@ -5,7 +5,7 @@ use engine_core::systems::standard::DamageAll;
 use serde_json::json;
 use std::cell::RefCell;
 use std::rc::Rc;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 #[test]
 fn test_damage_all_reduces_health() {
@@ -16,7 +16,7 @@ fn test_damage_all_reduces_health() {
     for (_name, schema) in schemas {
         registry.register_external_schema(schema);
     }
-    let registry = Arc::new(registry);
+    let registry = Arc::new(Mutex::new(registry));
 
     let mut world = World::new(registry.clone());
     world.current_mode = "colony".to_string(); // Ensure correct mode
@@ -52,7 +52,7 @@ fn test_lua_damage_all() {
     for (_name, schema) in schemas {
         registry.register_external_schema(schema);
     }
-    let registry = Arc::new(registry);
+    let registry = Arc::new(Mutex::new(registry));
 
     let mut engine = ScriptEngine::new();
     let world = Rc::new(RefCell::new(World::new(registry.clone())));

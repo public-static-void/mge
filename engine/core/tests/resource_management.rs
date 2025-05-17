@@ -1,7 +1,7 @@
 use engine_core::ecs::registry::ComponentRegistry;
 use engine_core::ecs::schema::load_schemas_from_dir;
 use engine_core::scripting::world::World;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 #[test]
 fn test_add_and_remove_resource() {
@@ -14,7 +14,8 @@ fn test_add_and_remove_resource() {
         registry.register_external_schema(schema);
     }
 
-    let mut world = World::new(Arc::new(registry));
+    let registry = Arc::new(Mutex::new(registry));
+    let mut world = World::new(registry.clone());
     world.current_mode = "colony".to_string();
 
     // Add 10 wood

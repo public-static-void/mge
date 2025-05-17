@@ -4,16 +4,16 @@ use engine_core::scripting::{ScriptEngine, World};
 use engine_core::systems::standard::{DamageAll, MoveAll, ProcessDeaths, ProcessDecay};
 use std::cell::RefCell;
 use std::rc::Rc;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
-fn setup_registry() -> Arc<ComponentRegistry> {
+fn setup_registry() -> Arc<Mutex<ComponentRegistry>> {
     let schema_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap() + "/../assets/schemas";
     let schemas = load_schemas_from_dir(&schema_dir).expect("Failed to load schemas");
     let mut registry = ComponentRegistry::new();
     for (_name, schema) in schemas {
         registry.register_external_schema(schema);
     }
-    Arc::new(registry)
+    Arc::new(Mutex::new(registry))
 }
 
 #[test]

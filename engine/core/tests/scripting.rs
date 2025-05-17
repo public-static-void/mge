@@ -6,8 +6,7 @@ use serde_json::json;
 use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::rc::Rc;
-use std::sync::Arc;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 // === Helper Functions ===
 
@@ -18,20 +17,20 @@ fn setup_world_with_mode(mode: &str) -> Rc<RefCell<World>> {
     for (_name, schema) in schemas {
         registry.register_external_schema(schema);
     }
-    let registry = Arc::new(registry);
+    let registry = Arc::new(Mutex::new(registry));
     let world = Rc::new(RefCell::new(World::new(registry.clone())));
     world.borrow_mut().current_mode = mode.to_string();
     world
 }
 
-fn setup_registry() -> Arc<ComponentRegistry> {
+fn setup_registry() -> Arc<Mutex<ComponentRegistry>> {
     let schema_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap() + "/../assets/schemas";
     let schemas = load_schemas_from_dir(&schema_dir).expect("Failed to load schemas");
     let mut registry = ComponentRegistry::new();
     for (_name, schema) in schemas {
         registry.register_external_schema(schema);
     }
-    Arc::new(registry)
+    Arc::new(Mutex::new(registry))
 }
 
 // === Mock Input ===

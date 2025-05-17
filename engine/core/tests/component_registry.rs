@@ -119,6 +119,7 @@ fn test_macro_generated_migration() {
 fn test_external_schema_loading() {
     use engine_core::ecs::registry::ComponentRegistry;
     use engine_core::ecs::schema::load_schemas_from_dir;
+    use std::sync::{Arc, Mutex};
 
     let schema_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap() + "/../assets/schemas";
     let schemas = load_schemas_from_dir(&schema_dir).expect("Failed to load schemas");
@@ -127,14 +128,15 @@ fn test_external_schema_loading() {
         "Health schema should be loaded"
     );
 
-    let mut registry = ComponentRegistry::default();
+    let registry = Arc::new(Mutex::new(ComponentRegistry::default()));
 
     for (_name, schema) in schemas {
-        registry.register_external_schema(schema);
+        registry.lock().unwrap().register_external_schema(schema);
     }
 
     // Now you can check that the registry has the schema
-    assert!(registry.get_schema_by_name("Health").is_some());
+    let guard = registry.lock().unwrap();
+    assert!(guard.get_schema_by_name("Health").is_some());
 }
 
 #[test]
@@ -142,7 +144,7 @@ fn test_schema_driven_mode_enforcement() {
     use engine_core::ecs::registry::ComponentRegistry;
     use engine_core::scripting::world::World;
     use serde_json::json;
-    use std::sync::Arc;
+    use std::sync::{Arc, Mutex};
 
     // Fabricate a schema for "Roguelike::Inventory" only allowed in "roguelike" mode
     let roguelike_inventory_schema = r#"
@@ -162,7 +164,7 @@ fn test_schema_driven_mode_enforcement() {
     registry
         .register_external_schema_from_json(roguelike_inventory_schema)
         .unwrap();
-    let registry = Arc::new(registry);
+    let registry = Arc::new(Mutex::new(registry));
 
     let mut world = World::new(registry.clone());
     let entity = world.spawn_entity();
@@ -194,6 +196,8 @@ fn test_schema_driven_mode_enforcement() {
 
 #[test]
 fn test_register_external_schema_from_json() {
+    use std::sync::{Arc, Mutex};
+
     let mut registry = ComponentRegistry::new();
 
     // Example schema JSON string
@@ -209,7 +213,6 @@ fn test_register_external_schema_from_json() {
     }
     "#;
 
-    // This should fail initially (method not implemented)
     let result = registry.register_external_schema_from_json(schema_json);
     assert!(
         result.is_ok(),
@@ -217,8 +220,11 @@ fn test_register_external_schema_from_json() {
         result.err()
     );
 
-    // Check if schema is retrievable by name
-    let schema = registry.get_schema_by_name("MagicPower");
+    let registry = Arc::new(Mutex::new(registry));
+
+    // FIX: Avoid E0716 by binding the lock guard
+    let guard = registry.lock().unwrap();
+    let schema = guard.get_schema_by_name("MagicPower");
     assert!(
         schema.is_some(),
         "Schema 'MagicPower' not found in registry"
@@ -236,7 +242,7 @@ fn test_register_external_schema_from_json() {
 fn test_mode_enforcement_for_runtime_registered_schema() {
     use engine_core::scripting::world::World;
     use serde_json::json;
-    use std::sync::Arc;
+    use std::sync::{Arc, Mutex};
 
     let mut registry = ComponentRegistry::new();
     let schema_json = r#"
@@ -251,7 +257,7 @@ fn test_mode_enforcement_for_runtime_registered_schema() {
     registry
         .register_external_schema_from_json(schema_json)
         .unwrap();
-    let registry = Arc::new(registry);
+    let registry = Arc::new(Mutex::new(registry));
 
     let mut world = World::new(registry.clone());
     let id = world.spawn_entity();
@@ -276,7 +282,7 @@ fn test_set_component_validation() {
     use engine_core::ecs::registry::ComponentRegistry;
     use engine_core::scripting::world::World;
     use serde_json::json;
-    use std::sync::Arc;
+    use std::sync::{Arc, Mutex};
 
     let mut registry = ComponentRegistry::new();
     let schema_json = r#"
@@ -293,7 +299,7 @@ fn test_set_component_validation() {
     registry
         .register_external_schema_from_json(schema_json)
         .unwrap();
-    let registry = Arc::new(registry);
+    let registry = Arc::new(Mutex::new(registry));
 
     let mut world = World::new(registry.clone());
     let entity = world.spawn_entity();

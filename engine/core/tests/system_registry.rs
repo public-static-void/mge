@@ -1,8 +1,8 @@
 use engine_core::ecs::registry::ComponentRegistry;
 use engine_core::ecs::system::{System, SystemRegistry};
 use engine_core::scripting::world::World;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 
 // Dummy system for registration/listing test
 struct DummySystem;
@@ -36,10 +36,9 @@ fn test_run_system() {
         }
     }
 
-    let component_registry = Arc::new(ComponentRegistry::new());
-    let mut world = World::new(component_registry);
+    let component_registry = Arc::new(Mutex::new(ComponentRegistry::new()));
+    let mut world = World::new(component_registry.clone());
 
-    // Register the system with the world, not with a separate SystemRegistry!
     world.register_system(TestSystem {
         called: called.clone(),
     });
@@ -50,8 +49,8 @@ fn test_run_system() {
 
 #[test]
 fn test_run_nonexistent_system_errors() {
-    let component_registry = Arc::new(ComponentRegistry::new());
-    let mut world = World::new(component_registry);
+    let component_registry = Arc::new(Mutex::new(ComponentRegistry::new()));
+    let mut world = World::new(component_registry.clone());
     let result = world.run_system("NoSuchSystem");
     assert!(result.is_err());
 }
