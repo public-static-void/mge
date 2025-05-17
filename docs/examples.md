@@ -160,7 +160,7 @@ let schemas = load_schemas_from_dir(&schema_dir).expect("Failed to load schemas"
 
 let mut registry = ComponentRegistry::new();
 for (_name, schema) in schemas {
-    registry.register_external_schema(schema);
+    registry.lock().unwrap().register_external_schema(schema);
 }
 let registry = Arc::new(registry);
 
