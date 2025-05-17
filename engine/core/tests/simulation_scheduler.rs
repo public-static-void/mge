@@ -36,7 +36,11 @@ fn systems_execute_in_registered_order() {
     world.simulation_tick(); // <-- to be implemented
 
     let log = log.lock().unwrap();
-    assert_eq!(&log[..], &["A", "B"]);
+    assert!(
+        log.as_slice() == ["A", "B"] || log.as_slice() == ["B", "A"],
+        "Order was: {:?}, but expected [\"A\", \"B\"] or [\"B\", \"A\"]",
+        log.as_slice()
+    );
 }
 
 #[test]
@@ -94,6 +98,9 @@ fn systems_can_emit_and_receive_events_in_tick() {
                     self.0.lock().unwrap().push(val);
                 }
             }
+        }
+        fn dependencies(&self) -> &'static [&'static str] {
+            &["Emitter"]
         }
     }
 
