@@ -219,6 +219,10 @@ impl World {
         self.systems.list_systems()
     }
 
+    pub fn list_systems_in_dependency_order(&self) -> Vec<String> {
+        self.systems.sorted_system_names()
+    }
+
     /// Modify the amount of a resource for a given entity.
     /// Negative `delta` removes, positive adds. Returns Err if insufficient resource.
     pub fn modify_resource_amount(
@@ -353,15 +357,13 @@ impl World {
 
     pub fn simulation_tick(&mut self) {
         // 1. Run all registered static systems in order
-        let system_names: Vec<String> = self.systems.list_systems();
+        let system_names: Vec<String> = self.systems.sorted_system_names();
         for name in &system_names {
-            // Remove the system temporarily
             if let Some(cell) = self.systems.take_system(name) {
                 {
                     let mut system = cell.borrow_mut();
                     system.run(self);
                 }
-                // Re-insert the system after running
                 self.systems.register_system_boxed(name.clone(), cell);
             }
         }
