@@ -12,6 +12,7 @@ use serde_json::Value;
 use serde_pyobject::{from_pyobject, to_pyobject};
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 type EventBusMap = Mutex<HashMap<String, Arc<Mutex<EventBus<Value>>>>>;
@@ -22,7 +23,7 @@ static EVENT_BUSES: once_cell::sync::Lazy<EventBusMap> =
 
 #[pyclass(unsendable)]
 pub struct PyWorld {
-    inner: Arc<Mutex<World>>,
+    inner: Rc<RefCell<World>>,
     worldgen_registry: std::cell::RefCell<WorldgenRegistry>,
     systems: RefCell<HashMap<String, Py<PyAny>>>,
 }
@@ -51,31 +52,31 @@ impl PyWorld {
             registry.register_external_schema(schema);
         }
 
-        let mut world = World::new(Arc::new(registry));
+        let mut world = World::new(Arc::new(Mutex::new(registry)));
         world.register_system(MoveAll { dx: 1.0, dy: 0.0 });
         world.register_system(DamageAll { amount: 1.0 });
         world.register_system(ProcessDeaths);
         world.register_system(ProcessDecay);
         Ok(PyWorld {
-            inner: Arc::new(Mutex::new(world)),
+            inner: Rc::new(RefCell::new(world)),
             worldgen_registry: std::cell::RefCell::new(WorldgenRegistry::new()),
             systems: RefCell::new(HashMap::new()),
         })
     }
 
     fn spawn_entity(&self) -> u32 {
-        let mut world = self.inner.lock().unwrap();
+        let mut world = self.inner.borrow_mut();
         world.spawn_entity()
     }
 
     fn despawn_entity(&self, entity_id: u32) {
-        let mut world = self.inner.lock().unwrap();
+        let mut world = self.inner.borrow_mut();
         world.despawn_entity(entity_id);
         world.entities.retain(|&e| e != entity_id);
     }
 
     fn set_component(&self, entity_id: u32, name: String, value: Bound<'_, PyAny>) -> PyResult<()> {
-        let mut world = self.inner.lock().unwrap();
+        let mut world = self.inner.borrow_mut();
         let json_value: Value = from_pyobject(value)?;
         world
             .set_component(entity_id, &name, json_value)
@@ -88,7 +89,7 @@ impl PyWorld {
         entity_id: u32,
         name: String,
     ) -> PyResult<Option<PyObject>> {
-        let world = self.inner.lock().unwrap();
+        let world = self.inner.borrow_mut();
         if let Some(val) = world.get_component(entity_id, &name) {
             let py_obj = to_pyobject(py, val)?;
             Ok(Some(py_obj.into()))
@@ -98,13 +99,13 @@ impl PyWorld {
     }
 
     fn list_components(&self) -> Vec<String> {
-        let world = self.inner.lock().unwrap();
-        world.registry.all_component_names()
+        let world = self.inner.borrow_mut();
+        world.registry.lock().unwrap().all_component_names()
     }
 
     fn get_component_schema(&self, name: String) -> PyResult<PyObject> {
-        let world = self.inner.lock().unwrap();
-        if let Some(schema) = world.registry.get_schema_by_name(&name) {
+        let world = self.inner.borrow_mut();
+        if let Some(schema) = world.registry.lock().unwrap().get_schema_by_name(&name) {
             let json = serde_json::to_value(&schema.schema)
                 .map_err(|e| PyValueError::new_err(e.to_string()))?;
             Python::with_gil(|py| Ok(to_pyobject(py, &json)?.into()))
@@ -114,72 +115,78 @@ impl PyWorld {
     }
 
     fn remove_component(&self, entity_id: u32, name: String) {
-        let mut world = self.inner.lock().unwrap();
+        let mut world = self.inner.borrow_mut();
         if let Some(comps) = world.components.get_mut(&name) {
             comps.remove(&entity_id);
         }
     }
 
     fn get_entities_with_component(&self, name: String) -> PyResult<Vec<u32>> {
-        let world = self.inner.lock().unwrap();
+        let world = self.inner.borrow_mut();
         Ok(world.get_entities_with_component(&name))
     }
 
     fn get_entities_with_components(&self, names: Vec<String>) -> Vec<u32> {
-        let world = self.inner.lock().unwrap();
+        let world = self.inner.borrow_mut();
         let name_refs: Vec<&str> = names.iter().map(|s| s.as_str()).collect();
         world.get_entities_with_components(&name_refs)
     }
 
     fn get_entities(&self) -> PyResult<Vec<u32>> {
-        let world = self.inner.lock().unwrap();
+        let world = self.inner.borrow_mut();
         Ok(world.get_entities())
     }
 
     fn is_entity_alive(&self, entity_id: u32) -> bool {
-        let world = self.inner.lock().unwrap();
+        let world = self.inner.borrow_mut();
         world.is_entity_alive(entity_id)
     }
 
     fn set_mode(&self, mode: String) {
-        let mut world = self.inner.lock().unwrap();
+        let mut world = self.inner.borrow_mut();
         world.current_mode = mode;
     }
 
     fn get_mode(&self) -> String {
-        let world = self.inner.lock().unwrap();
+        let world = self.inner.borrow_mut();
         world.current_mode.clone()
     }
 
     fn get_available_modes(&self) -> Vec<String> {
-        let world = self.inner.lock().unwrap();
-        world.registry.all_modes().into_iter().collect()
+        let world = self.inner.borrow_mut();
+        world
+            .registry
+            .lock()
+            .unwrap()
+            .all_modes()
+            .into_iter()
+            .collect()
     }
 
     fn move_entity(&self, entity_id: u32, dx: f32, dy: f32) {
-        let mut world = self.inner.lock().unwrap();
+        let mut world = self.inner.borrow_mut();
         world.move_entity(entity_id, dx, dy);
     }
 
     fn move_all(&self, dx: f32, dy: f32) {
-        let mut world = self.inner.lock().unwrap();
+        let mut world = self.inner.borrow_mut();
         world.register_system(MoveAll { dx, dy });
         world.run_system("MoveAll").unwrap();
     }
 
     fn damage_entity(&self, entity_id: u32, amount: f32) {
-        let mut world = self.inner.lock().unwrap();
+        let mut world = self.inner.borrow_mut();
         world.damage_entity(entity_id, amount);
     }
 
     fn damage_all(&self, amount: f32) {
-        let mut world = self.inner.lock().unwrap();
+        let mut world = self.inner.borrow_mut();
         world.register_system(DamageAll { amount });
         world.run_system("DamageAll").unwrap();
     }
 
     fn tick(&self) {
-        let mut world = self.inner.lock().unwrap();
+        let mut world = self.inner.borrow_mut();
         world.run_system("MoveAll").unwrap();
         world.run_system("DamageAll").unwrap();
         world.run_system("ProcessDeaths").unwrap();
@@ -188,36 +195,36 @@ impl PyWorld {
     }
 
     fn get_turn(&self) -> u32 {
-        let world = self.inner.lock().unwrap();
+        let world = self.inner.borrow_mut();
         world.turn
     }
 
     fn process_deaths(&self) {
-        let mut world = self.inner.lock().unwrap();
+        let mut world = self.inner.borrow_mut();
         world.register_system(ProcessDeaths);
         world.run_system("ProcessDeaths").unwrap();
     }
 
     fn process_decay(&self) {
-        let mut world = self.inner.lock().unwrap();
+        let mut world = self.inner.borrow_mut();
         world.register_system(ProcessDecay);
         world.run_system("ProcessDecay").unwrap();
     }
 
     fn count_entities_with_type(&self, type_str: String) -> usize {
-        let world = self.inner.lock().unwrap();
+        let world = self.inner.borrow_mut();
         world.count_entities_with_type(&type_str)
     }
 
     fn modify_stockpile_resource(&self, entity_id: u32, kind: String, delta: f64) -> PyResult<()> {
-        let mut world = self.inner.lock().unwrap();
+        let mut world = self.inner.borrow_mut();
         world
             .modify_stockpile_resource(entity_id, &kind, delta)
             .map_err(PyValueError::new_err)
     }
 
     fn save_to_file(&self, path: String) -> PyResult<()> {
-        let world = self.inner.lock().unwrap();
+        let world = self.inner.borrow_mut();
         world
             .save_to_file(std::path::Path::new(&path))
             .map_err(|e| PyIOError::new_err(e.to_string()))
@@ -225,12 +232,12 @@ impl PyWorld {
 
     fn load_from_file(&mut self, path: String) -> PyResult<()> {
         let registry = {
-            let world = self.inner.lock().unwrap();
+            let world = self.inner.borrow_mut();
             world.registry.clone()
         };
         let loaded = World::load_from_file(std::path::Path::new(&path), registry)
             .map_err(|e| PyIOError::new_err(e.to_string()))?;
-        let mut world = self.inner.lock().unwrap();
+        let mut world = self.inner.borrow_mut();
         *world = loaded;
         Ok(())
     }
