@@ -1,12 +1,13 @@
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 #[test]
 fn systems_execute_in_registered_order() {
     use engine_core::ecs::system::System;
     use engine_core::scripting::world::World;
-    use std::sync::{Arc, Mutex};
 
-    let registry = Arc::new(engine_core::ecs::registry::ComponentRegistry::new());
+    let registry = Arc::new(Mutex::new(
+        engine_core::ecs::registry::ComponentRegistry::new(),
+    ));
     let mut world = World::new(registry);
 
     let log = Arc::new(Mutex::new(Vec::new()));
@@ -33,7 +34,7 @@ fn systems_execute_in_registered_order() {
     world.register_system(SysA(log.clone()));
     world.register_system(SysB(log.clone()));
 
-    world.simulation_tick(); // <-- to be implemented
+    world.simulation_tick();
 
     let log = log.lock().unwrap();
     assert!(
@@ -46,9 +47,10 @@ fn systems_execute_in_registered_order() {
 #[test]
 fn dynamic_systems_are_executed_in_tick() {
     use engine_core::scripting::world::World;
-    use std::sync::{Arc, Mutex};
 
-    let registry = Arc::new(engine_core::ecs::registry::ComponentRegistry::new());
+    let registry = Arc::new(Mutex::new(
+        engine_core::ecs::registry::ComponentRegistry::new(),
+    ));
     let mut world = World::new(registry);
 
     let log = Arc::new(Mutex::new(Vec::new()));
@@ -69,9 +71,10 @@ fn systems_can_emit_and_receive_events_in_tick() {
     use engine_core::ecs::system::System;
     use engine_core::scripting::world::World;
     use serde_json::json;
-    use std::sync::{Arc, Mutex};
 
-    let registry = Arc::new(engine_core::ecs::registry::ComponentRegistry::new());
+    let registry = Arc::new(Mutex::new(
+        engine_core::ecs::registry::ComponentRegistry::new(),
+    ));
     let mut world = World::new(registry);
 
     let events = Arc::new(Mutex::new(Vec::new()));
@@ -91,9 +94,11 @@ fn systems_can_emit_and_receive_events_in_tick() {
             "Receiver"
         }
         fn run(&mut self, world: &mut World) {
+            use engine_core::ecs::event::EventReader;
             let bus = world.get_or_create_event_bus("test");
-            let mut bus = bus.lock().unwrap();
-            while let Some(event) = bus.try_recv() {
+            let mut reader = EventReader::default();
+            let bus = bus.lock().unwrap();
+            for event in reader.read(&bus) {
                 if let Some(val) = event.get("val").and_then(|v| v.as_i64()) {
                     self.0.lock().unwrap().push(val);
                 }
@@ -107,7 +112,8 @@ fn systems_can_emit_and_receive_events_in_tick() {
     world.register_system(Emitter);
     world.register_system(Receiver(events.clone()));
 
-    world.simulation_tick();
+    world.simulation_tick(); // Emitter sends, Receiver does NOT see it yet
+    world.simulation_tick(); // Receiver sees the event
 
     let events = events.lock().unwrap();
     assert_eq!(&events[..], &[1]);
@@ -116,7 +122,9 @@ fn systems_can_emit_and_receive_events_in_tick() {
 #[test]
 fn simulation_tick_increments_turn() {
     use engine_core::scripting::world::World;
-    let registry = Arc::new(engine_core::ecs::registry::ComponentRegistry::new());
+    let registry = Arc::new(Mutex::new(
+        engine_core::ecs::registry::ComponentRegistry::new(),
+    ));
     let mut world = World::new(registry);
     let turn = world.turn;
     world.simulation_tick();

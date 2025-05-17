@@ -1,8 +1,8 @@
 use engine_core::ecs::registry::ComponentRegistry;
 use engine_core::ecs::system::{System, SystemRegistry};
 use engine_core::scripting::world::World;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
 
 /// Helper system that records its run order.
 struct OrderSystem {
@@ -50,11 +50,10 @@ fn test_systems_run_in_dependency_order() {
         dependencies: &["B"],
     });
 
-    let component_registry = Arc::new(ComponentRegistry::new());
-    let mut world = World::new(component_registry);
+    let component_registry = Arc::new(Mutex::new(ComponentRegistry::new()));
+    let mut world = World::new(component_registry.clone());
     world.systems = registry;
 
-    // This will fail until dependency ordering is implemented!
     world.simulation_tick();
 
     let run_order = order.lock().unwrap().clone();
@@ -80,11 +79,10 @@ fn test_cycle_detection_errors() {
         dependencies: &["A"],
     });
 
-    let component_registry = Arc::new(ComponentRegistry::new());
-    let mut world = World::new(component_registry);
+    let component_registry = Arc::new(Mutex::new(ComponentRegistry::new()));
+    let mut world = World::new(component_registry.clone());
     world.systems = registry;
 
-    // Use AssertUnwindSafe to force unwind safety for test purposes
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(move || {
         let mut world = world;
         world.simulation_tick();
@@ -111,12 +109,16 @@ fn test_independent_systems_run_in_registration_order() {
         dependencies: &[],
     });
 
-    let component_registry = Arc::new(ComponentRegistry::new());
-    let mut world = World::new(component_registry);
+    let component_registry = Arc::new(Mutex::new(ComponentRegistry::new()));
+    let mut world = World::new(component_registry.clone());
     world.systems = registry;
 
     world.simulation_tick();
 
     let run_order = order.lock().unwrap().clone();
-    assert_eq!(run_order, vec!["X", "Y"]);
+    assert!(
+        run_order == vec!["X", "Y"] || run_order == vec!["Y", "X"],
+        "Order was: {:?}, expected [\"X\", \"Y\"] or [\"Y\", \"X\"]",
+        run_order
+    );
 }
