@@ -10,8 +10,8 @@
 /// #     fn name(&self) -> &'static str { "MySystem" }
 /// #     fn run(&mut self, _world: &mut World) {}
 /// # }
-/// let registry = Arc::new(ComponentRegistry::new());
-/// let mut world = World::new(registry);
+/// let registry = Arc::new(M;utex::new(ComponentRegistry::new()));
+/// let mut world = World::new(registry.clone());
 /// world.register_system(MySystem);
 /// world.run_system("MySystem").unwrap();
 /// ```
@@ -19,6 +19,7 @@ use crate::ecs::event::EventBus;
 use crate::ecs::registry::ComponentRegistry;
 use crate::ecs::system::SystemRegistry;
 use crate::plugins::dynamic_systems::DynamicSystemRegistry;
+use crate::scripting::ScriptEngine;
 use jsonschema::{Draft, JSONSchema};
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
@@ -33,17 +34,19 @@ pub struct World {
     pub current_mode: String,
     pub turn: u32,
     #[serde(skip)]
-    pub registry: Arc<ComponentRegistry>,
+    pub registry: Arc<Mutex<ComponentRegistry>>,
     #[serde(skip)]
     pub systems: SystemRegistry,
     #[serde(skip)]
     pub event_buses: HashMap<String, Arc<Mutex<EventBus<JsonValue>>>>,
     #[serde(skip)]
     pub dynamic_systems: DynamicSystemRegistry,
+    #[serde(skip)]
+    pub lua_engine: Option<ScriptEngine>,
 }
 
 impl World {
-    pub fn new(registry: Arc<ComponentRegistry>) -> Self {
+    pub fn new(registry: Arc<Mutex<ComponentRegistry>>) -> Self {
         World {
             entities: Vec::new(),
             components: HashMap::new(),
@@ -54,6 +57,7 @@ impl World {
             systems: SystemRegistry::new(),
             event_buses: HashMap::new(),
             dynamic_systems: DynamicSystemRegistry::new(),
+            lua_engine: None,
         }
     }
 
@@ -65,7 +69,7 @@ impl World {
     }
 
     pub fn is_component_allowed_in_mode(&self, component: &str, mode: &str) -> bool {
-        if let Some(schema) = self.registry.get_schema_by_name(component) {
+        if let Some(schema) = self.registry.lock().unwrap().get_schema_by_name(component) {
             schema.modes.contains(&mode.to_string())
         } else {
             false
@@ -86,7 +90,7 @@ impl World {
             ));
         }
 
-        if let Some(schema) = self.registry.get_schema_by_name(name) {
+        if let Some(schema) = self.registry.lock().unwrap().get_schema_by_name(name) {
             let compiled = JSONSchema::options()
                 .with_draft(Draft::Draft7)
                 .compile(&serde_json::to_value(&schema.schema).unwrap())
@@ -216,11 +220,15 @@ impl World {
     }
 
     pub fn list_systems(&self) -> Vec<String> {
-        self.systems.list_systems()
+        let mut all = self.systems.list_systems();
+        all.extend(self.dynamic_systems.list_systems());
+        all
     }
 
     pub fn list_systems_in_dependency_order(&self) -> Vec<String> {
-        self.systems.sorted_system_names()
+        let mut all = self.systems.sorted_system_names();
+        all.extend(self.dynamic_systems.list_systems());
+        all
     }
 
     /// Modify the amount of a resource for a given entity.
@@ -288,7 +296,7 @@ impl World {
 
     pub fn load_from_file(
         path: &std::path::Path,
-        registry: Arc<ComponentRegistry>,
+        registry: Arc<Mutex<ComponentRegistry>>,
     ) -> Result<Self, std::io::Error> {
         let json = std::fs::read_to_string(path)?;
         let mut world: Self = serde_json::from_str(&json)?;
@@ -328,10 +336,25 @@ impl World {
 
     pub fn register_dynamic_system<F>(&mut self, name: &str, run: F)
     where
-        F: Fn(&mut World, f32) + Send + Sync + 'static,
+        F: Fn(&mut World, f32) + 'static,
     {
         self.dynamic_systems
             .register_system(name.to_string(), Box::new(run));
+    }
+
+    pub fn register_dynamic_system_with_deps<F>(
+        &mut self,
+        name: &str,
+        dependencies: Vec<String>,
+        run: F,
+    ) where
+        F: Fn(&mut World, f32) + 'static,
+    {
+        self.dynamic_systems.register_system_with_deps(
+            name.to_string(),
+            dependencies,
+            Box::new(run),
+        );
     }
 
     pub fn run_dynamic_system(&mut self, name: &str) -> Result<(), String> {
