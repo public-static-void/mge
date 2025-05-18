@@ -1,4 +1,5 @@
 use engine_core::ecs::World;
+use engine_core::ecs::components::position::{Position, PositionComponent};
 use engine_core::ecs::registry::ComponentRegistry;
 use std::sync::{Arc, Mutex};
 use tempfile::NamedTempFile;
@@ -33,8 +34,11 @@ fn save_and_load_world_roundtrip() {
         .unwrap();
 
     let e2 = world.spawn_entity();
+    let pos = PositionComponent {
+        pos: Position::Square { x: 1, y: 2, z: 0 },
+    };
     world
-        .set_component(e2, "Position", serde_json::json!({ "x": 1, "y": 2 }))
+        .set_component(e2, "PositionComponent", serde_json::to_value(&pos).unwrap())
         .unwrap();
 
     // Save world to file
@@ -51,7 +55,7 @@ fn save_and_load_world_roundtrip() {
         loaded_world.get_component(e1, "Health")
     );
     assert_eq!(
-        world.get_component(e2, "Position"),
-        loaded_world.get_component(e2, "Position")
+        world.get_component(e2, "PositionComponent"),
+        loaded_world.get_component(e2, "PositionComponent")
     );
 }

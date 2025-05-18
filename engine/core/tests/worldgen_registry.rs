@@ -1,5 +1,6 @@
 use engine_core::ecs::ComponentRegistry;
 use engine_core::ecs::World;
+use engine_core::map::{CellKey, Map};
 use engine_core::plugins::{EngineApi, load_plugin_and_register_worldgen};
 use engine_core::worldgen::{WorldgenError, WorldgenPlugin, WorldgenRegistry};
 use mlua::Lua;
@@ -125,4 +126,64 @@ unsafe extern "C" fn dummy_set_component(
     _json_value: *const std::os::raw::c_char,
 ) -> i32 {
     0
+}
+
+#[test]
+fn test_map_from_json_square() {
+    let value = json!({
+        "topology": "square",
+        "cells": [
+            { "x": 0, "y": 0, "z": 0, "neighbors": [ { "x": 1, "y": 0, "z": 0 } ] },
+            { "x": 1, "y": 0, "z": 0, "neighbors": [ { "x": 0, "y": 0, "z": 0 } ] }
+        ]
+    });
+    let map = Map::from_json(&value).expect("should parse square map");
+    assert_eq!(map.topology_type(), "square");
+    assert!(map.contains(&CellKey::Square { x: 0, y: 0, z: 0 }));
+    assert_eq!(
+        map.neighbors(&CellKey::Square { x: 0, y: 0, z: 0 }),
+        vec![CellKey::Square { x: 1, y: 0, z: 0 }]
+    );
+}
+
+#[test]
+fn test_map_from_json_hex() {
+    let value = json!({
+        "topology": "hex",
+        "cells": [
+            { "q": 0, "r": 0, "z": 0, "neighbors": [ { "q": 1, "r": 0, "z": 0 } ] },
+            { "q": 1, "r": 0, "z": 0, "neighbors": [ { "q": 0, "r": 0, "z": 0 } ] }
+        ]
+    });
+    let map = Map::from_json(&value).expect("should parse hex map");
+    assert_eq!(map.topology_type(), "hex");
+    assert!(map.contains(&CellKey::Hex { q: 0, r: 0, z: 0 }));
+    assert_eq!(
+        map.neighbors(&CellKey::Hex { q: 0, r: 0, z: 0 }),
+        vec![CellKey::Hex { q: 1, r: 0, z: 0 }]
+    );
+}
+
+#[test]
+fn test_map_from_json_region() {
+    let value = json!({
+        "topology": "region",
+        "cells": [
+            { "id": "A", "neighbors": ["B"] },
+            { "id": "B", "neighbors": ["A"] }
+        ]
+    });
+    let map = Map::from_json(&value).expect("should parse region map");
+    assert_eq!(map.topology_type(), "region");
+    assert!(map.contains(&CellKey::Region {
+        id: "A".to_string()
+    }));
+    assert_eq!(
+        map.neighbors(&CellKey::Region {
+            id: "A".to_string()
+        }),
+        vec![CellKey::Region {
+            id: "B".to_string()
+        }]
+    );
 }

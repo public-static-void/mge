@@ -1,49 +1,52 @@
-use engine_core::map::Map;
+use engine_core::map::{CellKey, HexGridMap, Map, RegionMap, SquareGridMap};
 
 #[test]
-fn test_add_cells_and_neighbors_square() {
-    let mut map = Map::new("square");
-    map.add_cell("A");
-    map.add_cell("B");
-    map.add_cell("C");
+fn test_square_grid_map() {
+    let mut grid = SquareGridMap::new();
+    grid.add_cell(0, 0, 0);
+    grid.add_cell(1, 0, 0);
+    grid.add_cell(0, 1, 0);
+    grid.add_neighbor((0, 0, 0), (1, 0, 0));
+    grid.add_neighbor((0, 0, 0), (0, 1, 0));
 
-    map.add_neighbor("A", "B");
-    map.add_neighbor("A", "C");
-
-    let neighbors = map.neighbors("A").unwrap();
-    assert!(neighbors.contains("B"));
-    assert!(neighbors.contains("C"));
-    assert_eq!(neighbors.len(), 2);
+    let map = Map::new(Box::new(grid));
+    let cell = CellKey::Square { x: 0, y: 0, z: 0 };
+    let neighbors = map.neighbors(&cell);
+    assert!(neighbors.contains(&CellKey::Square { x: 1, y: 0, z: 0 }));
+    assert!(neighbors.contains(&CellKey::Square { x: 0, y: 1, z: 0 }));
 }
 
 #[test]
-fn test_hex_topology_cells() {
-    let mut map = Map::new("hex");
-    map.add_cell("H1");
-    map.add_cell("H2");
+fn test_hex_grid_map() {
+    let mut grid = HexGridMap::new();
+    grid.add_cell(0, 0, 0);
+    grid.add_cell(1, 0, 0);
+    grid.add_neighbor((0, 0, 0), (1, 0, 0));
 
-    map.add_neighbor("H1", "H2");
-
-    let neighbors = map.neighbors("H1").unwrap();
-    assert!(neighbors.contains("H2"));
-    assert_eq!(neighbors.len(), 1);
+    let map = Map::new(Box::new(grid));
+    let cell = CellKey::Hex { q: 0, r: 0, z: 0 };
+    let neighbors = map.neighbors(&cell);
+    assert_eq!(neighbors, vec![CellKey::Hex { q: 1, r: 0, z: 0 }]);
 }
 
 #[test]
-fn test_arbitrary_graph_topology() {
-    let mut map = Map::new("graph");
-    map.add_cell("X");
-    map.add_cell("Y");
-    map.add_cell("Z");
+fn test_region_map() {
+    let mut region = RegionMap::new();
+    region.add_cell("A");
+    region.add_cell("B");
+    region.add_cell("C");
+    region.add_neighbor("A", "B");
+    region.add_neighbor("A", "C");
 
-    map.add_neighbor("X", "Y");
-    map.add_neighbor("Y", "Z");
-
-    let neighbors_x = map.neighbors("X").unwrap();
-    let neighbors_y = map.neighbors("Y").unwrap();
-
-    assert!(neighbors_x.contains("Y"));
-    assert!(neighbors_y.contains("Z"));
-    assert_eq!(neighbors_x.len(), 1);
-    assert_eq!(neighbors_y.len(), 1);
+    let map = Map::new(Box::new(region));
+    let cell = CellKey::Region {
+        id: "A".to_string(),
+    };
+    let neighbors = map.neighbors(&cell);
+    assert!(neighbors.contains(&CellKey::Region {
+        id: "B".to_string()
+    }));
+    assert!(neighbors.contains(&CellKey::Region {
+        id: "C".to_string()
+    }));
 }

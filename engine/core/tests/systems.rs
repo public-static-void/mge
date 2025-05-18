@@ -1,7 +1,7 @@
 use engine_core::ecs::registry::ComponentRegistry;
 use engine_core::ecs::schema::ComponentSchema;
 use engine_core::ecs::world::World;
-use engine_core::systems::standard::{MoveAll, ProcessDeaths};
+use engine_core::systems::standard::{MoveAll, MoveDelta, ProcessDeaths};
 use schemars::schema::RootSchema;
 use serde_json::Value;
 use serde_json::json;
@@ -75,7 +75,13 @@ pub fn make_test_world_with_health() -> (World, u32) {
 #[test]
 fn test_move_all_system_moves_entities() {
     let mut world = make_test_world_with_positions();
-    world.register_system(MoveAll { dx: 1.0, dy: 2.0 });
+    world.register_system(MoveAll {
+        delta: MoveDelta::Square {
+            dx: 1,
+            dy: 2,
+            dz: 0,
+        },
+    });
     world.run_system("MoveAll", None).unwrap();
     // Assert positions incremented
 }
