@@ -1,0 +1,6 @@
+{
+  "name": "DigTunnel",
+  "requirements": ["Tool:Pickaxe"],
+  "duration": 5,
+  "effects": [{ "action": "ModifyTerrain", "from": "rock", "to": "tunnel" }]
+}
