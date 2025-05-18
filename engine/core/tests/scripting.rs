@@ -139,15 +139,25 @@ fn lua_can_run_script_from_file() {
 
 #[test]
 fn lua_can_set_and_get_health() {
+    use std::env;
+    use std::path::PathBuf;
+
+    // Set LUA_PATH for Lua interpreter
+    let lua_test_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap()
+        .join("scripts/lua/tests");
+    let lua_path = format!("{}/?.lua;;", lua_test_dir.display());
+    unsafe {
+        env::set_var("LUA_PATH", &lua_path);
+    }
+
     let mut engine = ScriptEngine::new();
     let world = setup_world_with_mode("roguelike");
     engine.register_world(world.clone()).unwrap();
 
-    let script_path = format!(
-        "{}/../scripts/lua/health_test.lua",
-        env!("CARGO_MANIFEST_DIR")
-    );
-    let script = std::fs::read_to_string(script_path).unwrap();
+    let script_path = lua_test_dir.join("test_health.lua");
+    let script = std::fs::read_to_string(&script_path).unwrap();
     engine.run_script(&script).unwrap();
 
     let world_ref = world.borrow();

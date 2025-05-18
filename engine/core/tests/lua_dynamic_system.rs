@@ -2,12 +2,23 @@ use engine_core::ecs::registry::ComponentRegistry;
 use engine_core::ecs::world::World;
 use engine_core::scripting::engine::ScriptEngine;
 use std::cell::RefCell;
+use std::env;
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 #[test]
 fn test_lua_dynamic_system_registration_and_run() {
+    // Set LUA_PATH so Lua can find luaunit.lua in the tests directory
+    let lua_test_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap()
+        .join("scripts/lua/tests");
+    let lua_path = format!("{}/?.lua;;", lua_test_dir.display());
+    unsafe {
+        env::set_var("LUA_PATH", &lua_path);
+    }
+
     let mut engine = ScriptEngine::new();
 
     // Create a registry and world
@@ -17,10 +28,7 @@ fn test_lua_dynamic_system_registration_and_run() {
     engine.register_world(world.clone()).unwrap();
 
     // Load and run the Lua test script
-    let script_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .unwrap() // go up from engine/core to engine/
-        .join("scripts/lua/test_dynamic_system.lua");
+    let script_path = lua_test_dir.join("test_dynamic_system.lua");
 
     println!("Looking for Lua script at: {:?}", script_path);
 
@@ -31,5 +39,7 @@ fn test_lua_dynamic_system_registration_and_run() {
     );
 
     let code = std::fs::read_to_string(&script_path).unwrap();
-    assert!(engine.run_script(&code).is_ok());
+    if let Err(e) = engine.run_script(&code) {
+        panic!("Lua script execution failed: {:?}", e);
+    }
 }

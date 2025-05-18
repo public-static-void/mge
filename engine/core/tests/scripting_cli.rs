@@ -4,7 +4,7 @@ use std::process::Command;
 #[test]
 fn test_lua_cli_runs_script_successfully() {
     let script_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../engine/scripts/lua/position_demo.lua")
+        .join("../../engine/scripts/lua/demos/health_demo.lua")
         .canonicalize()
         .expect("Failed to canonicalize script path");
 
@@ -22,5 +22,12 @@ fn test_lua_cli_runs_script_successfully() {
     assert!(output.status.success(), "CLI did not exit successfully");
 
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("pos.x"), "Expected output not found");
+    assert!(
+        stdout.contains("\"current\": Number(10)"),
+        "Initial health not found"
+    );
+    assert!(
+        stdout.contains("\"current\": Number(7.0)"),
+        "Damaged health not found"
+    );
 }

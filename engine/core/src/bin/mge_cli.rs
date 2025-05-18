@@ -1,5 +1,6 @@
 use engine_core::ecs::registry::ComponentRegistry;
 use engine_core::ecs::world::World;
+use engine_core::map::{Map, SquareGridMap};
 use engine_core::scripting::ScriptEngine;
 use engine_core::systems::job::{JobSystem, JobTypeRegistry, load_job_types_from_dir};
 use engine_core::systems::standard::{DamageAll, MoveAll, MoveDelta, ProcessDeaths, ProcessDecay};
@@ -35,6 +36,18 @@ fn main() {
     }
 
     let world = Rc::new(RefCell::new(World::new(registry.clone())));
+
+    // Create the square grid map and add the required cells
+    let mut grid = SquareGridMap::new();
+    grid.add_cell(0, 2, 0); // starting cell for your test entity
+    grid.add_cell(1, 2, 0); // cell you want to move to
+
+    // Optionally, you can set neighbors if needed for other logic, but MoveAll only checks contains()
+
+    // Wrap in Map and assign to world
+    let map = Map::new(Box::new(grid));
+    world.borrow_mut().map = Some(map);
+
     world.borrow_mut().register_system(MoveAll {
         delta: MoveDelta::Square {
             dx: 1,

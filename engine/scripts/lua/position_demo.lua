@@ -1,7 +1,0 @@
-local id = spawn_entity()
-set_component(id, "PositionComponent", { pos = { Square = { x = 0, y = 2, z = 0 } } })
-local pos = get_component(id, "PositionComponent")
-print("From file: pos.x=" .. tostring(pos.pos.Square.x) .. " pos.y=" .. tostring(pos.pos.Square.y))
-print_positions()
-move_all(1, 0)
-print_positions()
