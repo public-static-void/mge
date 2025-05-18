@@ -1,5 +1,5 @@
 pub mod dynamic_systems;
-use crate::scripting::World;
+use crate::ecs::World;
 use crate::worldgen::{WorldgenPlugin, WorldgenRegistry};
 use libloading::{Library, Symbol};
 use serde_json::Value;

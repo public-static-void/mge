@@ -1,6 +1,6 @@
 use crate::ecs::event::{EventBus, EventReader};
+use crate::ecs::world::World;
 use crate::scripting::helpers::json_to_lua_table;
-use crate::scripting::world::World;
 use mlua::{Lua, Result as LuaResult, Table, UserData, UserDataMethods};
 use serde_json::Value as JsonValue;
 use std::cell::RefCell;

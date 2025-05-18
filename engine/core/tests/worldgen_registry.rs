@@ -1,6 +1,6 @@
 use engine_core::ecs::ComponentRegistry;
+use engine_core::ecs::World;
 use engine_core::plugins::{EngineApi, load_plugin_and_register_worldgen};
-use engine_core::scripting::World;
 use engine_core::worldgen::{WorldgenError, WorldgenPlugin, WorldgenRegistry};
 use mlua::Lua;
 use serde_json::json;

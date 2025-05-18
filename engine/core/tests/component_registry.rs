@@ -142,7 +142,7 @@ fn test_external_schema_loading() {
 #[test]
 fn test_schema_driven_mode_enforcement() {
     use engine_core::ecs::registry::ComponentRegistry;
-    use engine_core::scripting::world::World;
+    use engine_core::ecs::world::World;
     use serde_json::json;
     use std::sync::{Arc, Mutex};
 
@@ -240,7 +240,7 @@ fn test_register_external_schema_from_json() {
 
 #[test]
 fn test_mode_enforcement_for_runtime_registered_schema() {
-    use engine_core::scripting::world::World;
+    use engine_core::ecs::world::World;
     use serde_json::json;
     use std::sync::{Arc, Mutex};
 
@@ -280,7 +280,7 @@ fn test_mode_enforcement_for_runtime_registered_schema() {
 #[test]
 fn test_set_component_validation() {
     use engine_core::ecs::registry::ComponentRegistry;
-    use engine_core::scripting::world::World;
+    use engine_core::ecs::world::World;
     use serde_json::json;
     use std::sync::{Arc, Mutex};
 

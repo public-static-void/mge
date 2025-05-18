@@ -1,6 +1,6 @@
+use crate::ecs::world::World;
 use crate::mods::manifest::ModManifest;
 use crate::scripting::engine::ScriptEngine;
-use crate::scripting::world::World;
 use std::cell::RefCell;
 use std::fs;
 use std::path::Path;

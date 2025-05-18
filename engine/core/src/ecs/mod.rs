@@ -9,6 +9,9 @@ pub mod registry;
 pub mod schema;
 pub mod system;
 
+pub mod world;
+pub use world::World;
+
 use crate::modes::{GameMode, ModeManager, ModeRestrictedComponent};
 pub use components::{Health, Position};
 pub use error::{MigrationError, RegistryError};

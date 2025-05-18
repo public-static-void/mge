@@ -21,7 +21,7 @@ fn test_ffi_spawn_entity_and_set_component() {
         .unwrap();
 
     let registry = Arc::new(Mutex::new(registry));
-    let mut world = engine_core::scripting::World::new(registry.clone());
+    let mut world = engine_core::ecs::World::new(registry.clone());
 
     let entity_id = world.spawn_entity();
     assert!(entity_id > 0);
@@ -57,7 +57,7 @@ fn test_ffi_spawn_entity_and_set_component_via_ffi() {
         .register_external_schema_from_json(schema_json)
         .unwrap();
     let registry = Arc::new(Mutex::new(registry));
-    let mut world = engine_core::scripting::World::new(registry.clone());
+    let mut world = engine_core::ecs::World::new(registry.clone());
 
     let world_ptr = &mut world as *mut _ as *mut c_void;
 
@@ -104,7 +104,7 @@ fn test_loads_and_initializes_plugin() {
         .register_external_schema_from_json(schema_json)
         .unwrap();
     let registry = Arc::new(Mutex::new(registry));
-    let mut world = engine_core::scripting::World::new(registry.clone());
+    let mut world = engine_core::ecs::World::new(registry.clone());
     let world_ptr = &mut world as *mut _ as *mut c_void;
 
     let mut engine_api = engine_core::plugins::EngineApi {
@@ -149,7 +149,7 @@ fn test_plugin_registers_system() {
         .register_external_schema_from_json(schema_json)
         .unwrap();
     let registry = Arc::new(Mutex::new(registry));
-    let mut world = engine_core::scripting::World::new(registry.clone());
+    let mut world = engine_core::ecs::World::new(registry.clone());
     let world_ptr = &mut world as *mut _ as *mut c_void;
 
     let mut engine_api = engine_core::plugins::EngineApi {

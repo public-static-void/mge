@@ -1,6 +1,6 @@
 use engine_core::ecs::registry::ComponentRegistry;
 use engine_core::ecs::schema::load_schemas_from_dir;
-use engine_core::scripting::world::World;
+use engine_core::ecs::world::World;
 use std::sync::{Arc, Mutex};
 
 #[test]

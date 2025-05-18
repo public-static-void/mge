@@ -1,5 +1,5 @@
 use engine_core::ecs::registry::ComponentRegistry;
-use engine_core::scripting::world::World;
+use engine_core::ecs::world::World;
 use serde_json::json;
 use std::sync::{Arc, Mutex};
 
@@ -97,7 +97,7 @@ fn job_system_advances_progress_and_completes_job() {
 #[test]
 fn job_system_emits_event_on_completion() {
     use engine_core::ecs::registry::ComponentRegistry;
-    use engine_core::scripting::world::World;
+    use engine_core::ecs::world::World;
     use engine_core::systems::job::JobSystem;
     use serde_json::json;
     use std::sync::{Arc, Mutex};
@@ -149,7 +149,7 @@ fn job_system_emits_event_on_completion() {
 #[test]
 fn job_system_emits_event_on_failure() {
     use engine_core::ecs::registry::ComponentRegistry;
-    use engine_core::scripting::world::World;
+    use engine_core::ecs::world::World;
     use engine_core::systems::job::JobSystem;
     use serde_json::json;
     use std::sync::{Arc, Mutex};
@@ -199,7 +199,7 @@ fn job_system_emits_event_on_failure() {
 #[test]
 fn job_system_uses_custom_job_type_logic() {
     use engine_core::ecs::registry::ComponentRegistry;
-    use engine_core::scripting::world::World;
+    use engine_core::ecs::world::World;
     use engine_core::systems::job::{JobSystem, JobTypeRegistry};
     use serde_json::json;
     use std::sync::{Arc, Mutex};

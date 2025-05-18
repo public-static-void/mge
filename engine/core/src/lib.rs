@@ -11,10 +11,10 @@ pub mod scripting;
 pub mod systems;
 pub mod worldgen;
 
+pub use ecs::World;
 pub use ecs::components::{Happiness, Health, Inventory, Position};
 pub use ecs::{EcsWorld, Error};
 pub use modes::GameMode as Mode;
-pub use scripting::World;
 
 #[cfg(test)]
 mod tests {

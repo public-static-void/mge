@@ -1,7 +1,7 @@
 use engine_core::ecs::event::{EventBus, EventReader};
 use engine_core::ecs::registry::ComponentRegistry;
 use engine_core::ecs::schema::load_schemas_from_dir;
-use engine_core::scripting::world::World;
+use engine_core::ecs::world::World;
 use engine_core::systems::job::JobSystem;
 use engine_core::systems::standard::{DamageAll, MoveAll, ProcessDeaths, ProcessDecay};
 use engine_core::worldgen::{WorldgenPlugin, WorldgenRegistry};

@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 #[test]
 fn systems_execute_in_registered_order() {
     use engine_core::ecs::system::System;
-    use engine_core::scripting::world::World;
+    use engine_core::ecs::world::World;
 
     let registry = Arc::new(Mutex::new(
         engine_core::ecs::registry::ComponentRegistry::new(),
@@ -46,7 +46,7 @@ fn systems_execute_in_registered_order() {
 
 #[test]
 fn dynamic_systems_are_executed_in_tick() {
-    use engine_core::scripting::world::World;
+    use engine_core::ecs::world::World;
 
     let registry = Arc::new(Mutex::new(
         engine_core::ecs::registry::ComponentRegistry::new(),
@@ -69,7 +69,7 @@ fn dynamic_systems_are_executed_in_tick() {
 #[test]
 fn systems_can_emit_and_receive_events_in_tick() {
     use engine_core::ecs::system::System;
-    use engine_core::scripting::world::World;
+    use engine_core::ecs::world::World;
     use serde_json::json;
 
     let registry = Arc::new(Mutex::new(
@@ -121,7 +121,7 @@ fn systems_can_emit_and_receive_events_in_tick() {
 
 #[test]
 fn simulation_tick_increments_turn() {
-    use engine_core::scripting::world::World;
+    use engine_core::ecs::world::World;
     let registry = Arc::new(Mutex::new(
         engine_core::ecs::registry::ComponentRegistry::new(),
     ));

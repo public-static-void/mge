@@ -1,7 +1,7 @@
 #[test]
 fn test_schema_driven_mode_enforcement() {
     use engine_core::ecs::registry::ComponentRegistry;
-    use engine_core::scripting::world::World;
+    use engine_core::ecs::world::World;
     use serde_json::json;
     use std::sync::{Arc, Mutex};
 

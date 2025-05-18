@@ -1,6 +1,6 @@
 use engine_core::ecs::registry::ComponentRegistry;
 use engine_core::ecs::schema::ComponentSchema;
-use engine_core::scripting::world::World;
+use engine_core::ecs::world::World;
 use engine_core::systems::standard::{MoveAll, ProcessDeaths};
 use schemars::schema::RootSchema;
 use serde_json::Value;

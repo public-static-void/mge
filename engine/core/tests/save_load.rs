@@ -1,5 +1,5 @@
+use engine_core::ecs::World;
 use engine_core::ecs::registry::ComponentRegistry;
-use engine_core::scripting::World;
 use std::sync::{Arc, Mutex};
 use tempfile::NamedTempFile;
 
