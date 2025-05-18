@@ -36,13 +36,13 @@ fn test_tick_advances_turn_and_runs_systems() {
 
     // Set up a tick: move all + damage all
     world.register_system(MoveAll { dx: 1.0, dy: 0.0 });
-    world.run_system("MoveAll").unwrap();
+    world.run_system("MoveAll", None).unwrap();
     world.register_system(DamageAll { amount: 1.0 });
-    world.run_system("DamageAll").unwrap();
+    world.run_system("DamageAll", None).unwrap();
     world.register_system(ProcessDeaths);
-    world.run_system("ProcessDeaths").unwrap();
+    world.run_system("ProcessDeaths", None).unwrap();
     world.register_system(ProcessDecay);
-    world.run_system("ProcessDecay").unwrap();
+    world.run_system("ProcessDecay", None).unwrap();
     world.turn += 1;
 
     // Position should be x+1, Health should be -1

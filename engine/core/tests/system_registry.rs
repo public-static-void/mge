@@ -10,7 +10,7 @@ impl System for DummySystem {
     fn name(&self) -> &'static str {
         "DummySystem"
     }
-    fn run(&mut self, _world: &mut World) {}
+    fn run(&mut self, _world: &mut World, _lua: Option<&mlua::Lua>) {}
 }
 
 #[test]
@@ -31,7 +31,7 @@ fn test_run_system() {
         fn name(&self) -> &'static str {
             "TestSystem"
         }
-        fn run(&mut self, _world: &mut World) {
+        fn run(&mut self, _world: &mut World, _lua: Option<&mlua::Lua>) {
             self.called.store(true, Ordering::SeqCst);
         }
     }
@@ -43,7 +43,7 @@ fn test_run_system() {
         called: called.clone(),
     });
 
-    world.run_system("TestSystem").unwrap();
+    world.run_system("TestSystem", None).unwrap();
     assert!(called.load(Ordering::SeqCst));
 }
 
@@ -51,6 +51,6 @@ fn test_run_system() {
 fn test_run_nonexistent_system_errors() {
     let component_registry = Arc::new(Mutex::new(ComponentRegistry::new()));
     let mut world = World::new(component_registry.clone());
-    let result = world.run_system("NoSuchSystem");
+    let result = world.run_system("NoSuchSystem", None);
     assert!(result.is_err());
 }
