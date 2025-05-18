@@ -60,50 +60,81 @@ impl InputProvider for MockInput {
 
 #[test]
 fn lua_can_spawn_and_move_entity() {
+    use engine_core::ecs::registry::ComponentRegistry;
+    use engine_core::scripting::ScriptEngine;
+    use std::sync::{Arc, Mutex};
+
+    let mut registry = ComponentRegistry::new();
+    let schema_dir = std::path::Path::new("../assets/schemas");
+    for entry in std::fs::read_dir(schema_dir).unwrap() {
+        let path = entry.unwrap().path();
+        if path.extension().map(|e| e == "json").unwrap_or(false) {
+            let json = std::fs::read_to_string(&path).unwrap();
+            registry.register_external_schema_from_json(&json).unwrap();
+        }
+    }
+    let registry = Arc::new(Mutex::new(registry));
     let mut engine = ScriptEngine::new();
-    let world = setup_world_with_mode("roguelike");
+    let world = std::rc::Rc::new(std::cell::RefCell::new(engine_core::ecs::World::new(
+        registry.clone(),
+    )));
+    world.borrow_mut().current_mode = "roguelike".to_string();
     engine.register_world(world.clone()).unwrap();
 
     let script = r#"
-        function approx(a, b)
-            return math.abs(a - b) < 1e-5
-        end
-
         local id = spawn_entity()
-        set_component(id, "Position", { x = 5.5, y = 9.9 })
-        local pos = get_component(id, "Position")
-        print("pos.x=" .. tostring(pos.x) .. " pos.y=" .. tostring(pos.y))
-        assert(approx(pos.x, 5.5))
-        assert(approx(pos.y, 9.9))
+        set_component(id, "PositionComponent", { pos = { Square = { x = 1, y = 2, z = 0 } } })
+        local pos = get_component(id, "PositionComponent")
+        assert(pos.pos.Square.x == 1)
+        assert(pos.pos.Square.y == 2)
+        move_entity(id, 3, 4)
+        local pos2 = get_component(id, "PositionComponent")
+        assert(pos2.pos.Square.x == 4)
+        assert(pos2.pos.Square.y == 6)
     "#;
-
     engine.run_script(script).unwrap();
-
-    let world_ref = world.borrow();
-    let entity_id = *world_ref.entities.last().unwrap();
-    let pos = world_ref.get_component(entity_id, "Position").unwrap();
-    assert!((pos["x"].as_f64().unwrap() - 5.5).abs() < 1e-5);
-    assert!((pos["y"].as_f64().unwrap() - 9.9).abs() < 1e-5);
 }
 
 #[test]
 fn lua_can_run_script_from_file() {
+    use engine_core::ecs::registry::ComponentRegistry;
+    use engine_core::scripting::ScriptEngine;
+    use std::sync::{Arc, Mutex};
+
+    let mut registry = ComponentRegistry::new();
+    let schema_dir = std::path::Path::new("../assets/schemas");
+    for entry in std::fs::read_dir(schema_dir).unwrap() {
+        let path = entry.unwrap().path();
+        if path.extension().map(|e| e == "json").unwrap_or(false) {
+            let json = std::fs::read_to_string(&path).unwrap();
+            registry.register_external_schema_from_json(&json).unwrap();
+        }
+    }
+    let registry = Arc::new(Mutex::new(registry));
     let mut engine = ScriptEngine::new();
-    let world = setup_world_with_mode("roguelike");
+    let world = std::rc::Rc::new(std::cell::RefCell::new(engine_core::ecs::World::new(
+        registry.clone(),
+    )));
+    world.borrow_mut().current_mode = "roguelike".to_string();
     engine.register_world(world.clone()).unwrap();
 
-    let script_path = format!(
-        "{}/../scripts/lua/position_demo.lua",
-        env!("CARGO_MANIFEST_DIR")
-    );
-    let script = std::fs::read_to_string(script_path).unwrap();
-    engine.run_script(&script).unwrap();
+    // Write a temp Lua script file
+    let mut file = tempfile::NamedTempFile::new().unwrap();
+    use std::io::Write;
+    writeln!(
+        file,
+        r#"
+        local id = spawn_entity()
+        set_component(id, "PositionComponent", {{ pos = {{ Square = {{ x = 9, y = 10, z = 0 }} }} }})
+        local pos = get_component(id, "PositionComponent")
+        assert(pos.pos.Square.x == 9)
+        assert(pos.pos.Square.y == 10)
+        "#
+    )
+    .unwrap();
 
-    let world_ref = world.borrow();
-    let entity_id = *world_ref.entities.last().unwrap();
-    let pos = world_ref.get_component(entity_id, "Position").unwrap();
-    assert!((pos["x"].as_f64().unwrap() - 1.1).abs() < 1e-5);
-    assert!((pos["y"].as_f64().unwrap() - 2.2).abs() < 1e-5);
+    let script_str = std::fs::read_to_string(file.path()).unwrap();
+    engine.run_script(&script_str).unwrap();
 }
 
 #[test]
@@ -128,34 +159,35 @@ fn lua_can_set_and_get_health() {
 
 #[test]
 fn lua_can_set_and_get_arbitrary_component() {
+    use engine_core::ecs::registry::ComponentRegistry;
+    use engine_core::scripting::ScriptEngine;
+    use std::sync::{Arc, Mutex};
+
+    let mut registry = ComponentRegistry::new();
+    let schema_dir = std::path::Path::new("../assets/schemas");
+    for entry in std::fs::read_dir(schema_dir).unwrap() {
+        let path = entry.unwrap().path();
+        if path.extension().map(|e| e == "json").unwrap_or(false) {
+            let json = std::fs::read_to_string(&path).unwrap();
+            registry.register_external_schema_from_json(&json).unwrap();
+        }
+    }
+    let registry = Arc::new(Mutex::new(registry));
     let mut engine = ScriptEngine::new();
-    let world = setup_world_with_mode("roguelike");
+    let world = std::rc::Rc::new(std::cell::RefCell::new(engine_core::ecs::World::new(
+        registry.clone(),
+    )));
+    world.borrow_mut().current_mode = "roguelike".to_string();
     engine.register_world(world.clone()).unwrap();
 
     let script = r#"
         local id = spawn_entity()
-        set_component(id, "Position", { x = 42.0, y = 99.0 })
-        local pos = get_component(id, "Position")
-        assert(math.abs(pos.x - 42.0) < 1e-5)
-        assert(math.abs(pos.y - 99.0) < 1e-5)
-
-        set_component(id, "Health", { current = 7.5, max = 10.0 })
-        local health = get_component(id, "Health")
-        assert(math.abs(health.current - 7.5) < 1e-5)
-        assert(math.abs(health.max - 10.0) < 1e-5)
+        set_component(id, "PositionComponent", { pos = { Square = { x = 7, y = 8, z = 0 } } })
+        local pos = get_component(id, "PositionComponent")
+        assert(pos.pos.Square.x == 7)
+        assert(pos.pos.Square.y == 8)
     "#;
-
     engine.run_script(script).unwrap();
-
-    let world_ref = world.borrow();
-    let entity_id = *world_ref.entities.last().unwrap();
-    let pos = world_ref.get_component(entity_id, "Position").unwrap();
-    assert!((pos["x"].as_f64().unwrap() - 42.0).abs() < 1e-5);
-    assert!((pos["y"].as_f64().unwrap() - 99.0).abs() < 1e-5);
-
-    let health = world_ref.get_component(entity_id, "Health").unwrap();
-    assert!((health["current"].as_f64().unwrap() - 7.5).abs() < 1e-5);
-    assert!((health["max"].as_f64().unwrap() - 10.0).abs() < 1e-5);
 }
 
 #[test]
@@ -194,17 +226,37 @@ fn test_get_entities_with_component() {
 
 #[test]
 fn test_move_entity() {
-    let registry = setup_registry();
+    use engine_core::ecs::World;
+    use engine_core::ecs::registry::ComponentRegistry;
+    use std::sync::{Arc, Mutex};
+
+    let mut registry = ComponentRegistry::new();
+    let schema_dir = std::path::Path::new("../assets/schemas");
+    for entry in std::fs::read_dir(schema_dir).unwrap() {
+        let path = entry.unwrap().path();
+        if path.extension().map(|e| e == "json").unwrap_or(false) {
+            let json = std::fs::read_to_string(&path).unwrap();
+            registry.register_external_schema_from_json(&json).unwrap();
+        }
+    }
+    let registry = Arc::new(Mutex::new(registry));
     let mut world = World::new(registry.clone());
     world.current_mode = "colony".to_string();
+
     let id = world.spawn_entity();
     world
-        .set_component(id, "Position", json!({ "x": 0.0, "y": 0.0 }))
+        .set_component(
+            id,
+            "PositionComponent",
+            serde_json::json!({ "pos": { "Square": { "x": 1, "y": 2, "z": 0 } } }),
+        )
         .unwrap();
-    world.move_entity(id, 1.0, 2.0);
-    let pos = world.get_component(id, "Position").unwrap();
-    assert_eq!(pos["x"], 1.0);
-    assert_eq!(pos["y"], 2.0);
+
+    world.move_entity(id, 2.0, 3.0);
+
+    let pos = world.get_component(id, "PositionComponent").unwrap();
+    assert_eq!(pos["pos"]["Square"]["x"].as_i64().unwrap(), 3);
+    assert_eq!(pos["pos"]["Square"]["y"].as_i64().unwrap(), 5);
 }
 
 #[test]

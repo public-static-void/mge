@@ -1,6 +1,7 @@
 use crate::ecs::event::EventBus;
 use crate::ecs::registry::ComponentRegistry;
 use crate::ecs::system::SystemRegistry;
+use crate::map::Map;
 use crate::plugins::dynamic_systems::DynamicSystemRegistry;
 use crate::scripting::ScriptEngine;
 use crate::systems::job::JobTypeRegistry;
@@ -36,6 +37,8 @@ pub struct World {
     pub lua_engine: Option<ScriptEngine>,
     #[serde(skip)]
     pub job_types: JobTypeRegistry,
+    #[serde(skip)]
+    pub map: Option<Map>,
 }
 
 impl World {
@@ -52,6 +55,7 @@ impl World {
             dynamic_systems: DynamicSystemRegistry::new(),
             lua_engine: None,
             job_types: JobTypeRegistry::default(),
+            map: None,
         }
     }
 }

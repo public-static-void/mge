@@ -1,16 +1,15 @@
-//! Tests for the ECS component registry, schema handling, and migration logic.
-
 use engine_core::ecs::Component;
-use engine_core::ecs::{ComponentRegistry, Health, Position};
+use engine_core::ecs::components::position::{Position, PositionComponent};
+use engine_core::ecs::{ComponentRegistry, Health};
 use semver::Version;
 
 #[test]
 fn test_component_registration() {
     let mut registry = ComponentRegistry::new();
-    registry.register::<Position>().unwrap();
-    assert!(registry.get_schema::<Position>().is_some());
+    registry.register::<PositionComponent>().unwrap();
+    assert!(registry.get_schema::<PositionComponent>().is_some());
 
-    let json = registry.schema_to_json::<Position>().unwrap();
+    let json = registry.schema_to_json::<PositionComponent>().unwrap();
     println!("Position schema: {}", json);
     assert!(
         json.contains("\"x\""),
@@ -63,22 +62,26 @@ fn test_unregistered_component() {
 #[test]
 fn test_component_migration() {
     use bson::{doc, to_vec};
-    use engine_core::ecs::{Component, Position};
 
     // Create test data
     let old_position = doc! { "x": 5.0, "y": 3.0 };
     let data = to_vec(&old_position).unwrap();
 
     // Perform migration
-    let position = Position::migrate(Position::version(), &data).unwrap();
+    let position = PositionComponent::migrate(Version::parse("1.0.0").unwrap(), &data).unwrap();
 
-    assert_eq!(position.x, 5.0);
-    assert_eq!(position.y, 3.0);
+    if let Position::Square { x, y, .. } = position.pos {
+        assert_eq!(x, 5);
+        assert_eq!(y, 3);
+        // (z as needed)
+    } else {
+        panic!("Expected Position::Square");
+    }
 }
 
 #[test]
 fn test_version_migration() {
-    use engine_core::ecs::{MigrationError, Position};
+    use engine_core::ecs::MigrationError;
     use semver::Version;
 
     // Legacy v1 format
@@ -92,12 +95,17 @@ fn test_version_migration() {
     let data = bson::to_vec(&old_pos).unwrap();
 
     // Test migration from v1.0.0
-    let pos = Position::migrate(Version::parse("1.0.0").unwrap(), &data).unwrap();
-    assert_eq!(pos.x, 5.0);
-    assert_eq!(pos.y, 3.0);
+    let pos = PositionComponent::migrate(Version::parse("1.0.0").unwrap(), &data).unwrap();
+    if let Position::Square { x, y, .. } = pos.pos {
+        assert_eq!(x, 5);
+        assert_eq!(y, 3);
+        // (z as needed)
+    } else {
+        panic!("Expected Position::Square");
+    }
 
     // Test invalid version
-    let result = Position::migrate(Version::parse("3.0.0").unwrap(), &data);
+    let result = PositionComponent::migrate(Version::parse("3.0.0").unwrap(), &data);
     assert!(matches!(result, Err(MigrationError::UnsupportedVersion(_))));
 }
 
@@ -110,9 +118,13 @@ fn test_macro_generated_migration() {
     }
 
     let data = bson::to_vec(&LegacyPosition { x: 5.0, y: 3.0 }).unwrap();
-    let pos = Position::migrate(Version::parse("1.0.0").unwrap(), &data).unwrap();
-    assert_eq!(pos.x, 5.0);
-    assert_eq!(pos.y, 3.0);
+    let pos = PositionComponent::migrate(Version::parse("1.0.0").unwrap(), &data).unwrap();
+    if let Position::Square { x, y, .. } = pos.pos {
+        assert_eq!(x, 5);
+        assert_eq!(y, 3);
+    } else {
+        panic!("Expected Position::Square");
+    }
 }
 
 #[test]

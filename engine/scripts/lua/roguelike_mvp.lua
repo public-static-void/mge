@@ -4,7 +4,7 @@
 -- Setup player
 local player = spawn_entity()
 set_component(player, "Type", { kind = "player" })
-set_component(player, "Position", { x = 0, y = 0 })
+set_component(player, "PositionComponent", { pos = { Square = { x = 0, y = 0, z = 0 } } })
 set_component(player, "Health", { current = 10, max = 10 })
 
 -- Setup enemies
@@ -12,7 +12,7 @@ local enemies = {}
 for i = 1, 3 do
 	local enemy = spawn_entity()
 	set_component(enemy, "Type", { kind = "enemy" })
-	set_component(enemy, "Position", { x = i * 2, y = 1 })
+	set_component(enemy, "PositionComponent", { pos = { Square = { x = i * 2, y = 1, z = 0 } } })
 	set_component(enemy, "Health", { current = 3, max = 3 })
 	table.insert(enemies, enemy)
 end
@@ -20,24 +20,29 @@ end
 local directions = { w = { 0, -1 }, a = { -1, 0 }, s = { 0, 1 }, d = { 1, 0 } }
 local turn = 1
 
+function get_xy(entity)
+	local pos = get_component(entity, "PositionComponent")
+	return pos.pos.Square.x, pos.pos.Square.y
+end
+
 function print_state()
 	print("\n--- Turn " .. turn .. " ---")
-	local pos = get_component(player, "Position")
+	local px, py = get_xy(player)
 	local health = get_component(player, "Health")
-	print("Player at (" .. pos.x .. "," .. pos.y .. ") HP: " .. health.current .. "/" .. health.max)
+	print("Player at (" .. px .. "," .. py .. ") HP: " .. health.current .. "/" .. health.max)
 	for _, e in ipairs(enemies) do
 		if is_entity_alive(e) then
-			local pos = get_component(e, "Position")
+			local ex, ey = get_xy(e)
 			local health = get_component(e, "Health")
-			print("Enemy " .. e .. " at (" .. pos.x .. "," .. pos.y .. ") HP: " .. health.current .. "/" .. health.max)
+			print("Enemy " .. e .. " at (" .. ex .. "," .. ey .. ") HP: " .. health.current .. "/" .. health.max)
 		end
 	end
 end
 
 function adjacent(a, b)
-	local pa = get_component(a, "Position")
-	local pb = get_component(b, "Position")
-	return math.abs(pa.x - pb.x) + math.abs(pa.y - pb.y) == 1
+	local ax, ay = get_xy(a)
+	local bx, by = get_xy(b)
+	return math.abs(ax - bx) + math.abs(ay - by) == 1
 end
 
 while true do
@@ -75,12 +80,12 @@ while true do
 	end
 
 	-- Enemy turn
-	local player_pos = get_component(player, "Position")
+	local px, py = get_xy(player)
 	for _, e in ipairs(enemies) do
 		if is_entity_alive(e) then
-			local epos = get_component(e, "Position")
-			local dx = player_pos.x - epos.x
-			local dy = player_pos.y - epos.y
+			local ex, ey = get_xy(e)
+			local dx = px - ex
+			local dy = py - ey
 			if math.abs(dx) + math.abs(dy) == 1 then
 				print("Enemy " .. e .. " attacks you!")
 				damage_entity(player, 1)

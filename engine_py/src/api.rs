@@ -1,6 +1,7 @@
 use engine_core::ecs::world::World;
+use engine_core::map::{Map, SquareGridMap};
 use engine_core::systems::job::JobSystem;
-use engine_core::systems::standard::{DamageAll, MoveAll, ProcessDeaths, ProcessDecay};
+use engine_core::systems::standard::{DamageAll, MoveAll, MoveDelta, ProcessDeaths, ProcessDecay};
 use engine_core::worldgen::WorldgenRegistry;
 use pyo3::exceptions::{PyIOError, PyValueError};
 use pyo3::prelude::*;
@@ -50,7 +51,19 @@ impl PyWorld {
         }
 
         let mut world = World::new(Arc::new(Mutex::new(registry)));
-        world.register_system(MoveAll { dx: 1.0, dy: 0.0 });
+
+        // Always initialize a map for the world (so add_cell and movement will work)
+        let grid = SquareGridMap::new();
+        let map = Map::new(Box::new(grid));
+        world.map = Some(map);
+
+        world.register_system(MoveAll {
+            delta: MoveDelta::Square {
+                dx: 1,
+                dy: 0,
+                dz: 0,
+            },
+        });
         world.register_system(DamageAll { amount: 1.0 });
         world.register_system(ProcessDeaths);
         world.register_system(ProcessDecay);
@@ -172,10 +185,27 @@ impl PyWorld {
         world.move_entity(entity_id, dx, dy);
     }
 
-    fn move_all(&self, dx: f32, dy: f32) {
+    fn move_all(&self, dx: i32, dy: i32) {
         let mut world = self.inner.borrow_mut();
-        world.register_system(MoveAll { dx, dy });
+        world.register_system(MoveAll {
+            delta: MoveDelta::Square { dx, dy, dz: 0 },
+        });
         world.run_system("MoveAll", None).unwrap();
+    }
+
+    /// Add a cell to the map (only works for SquareGridMap).
+    fn add_cell(&self, x: i32, y: i32, z: i32) {
+        let mut world = self.inner.borrow_mut();
+        if let Some(map) = &mut world.map {
+            // Try downcasting to SquareGridMap
+            if let Some(square) = map
+                .topology
+                .as_any_mut()
+                .downcast_mut::<engine_core::map::SquareGridMap>()
+            {
+                square.add_cell(x, y, z);
+            }
+        }
     }
 
     fn damage_entity(&self, entity_id: u32, amount: f32) {
