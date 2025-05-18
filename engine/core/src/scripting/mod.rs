@@ -15,9 +15,6 @@
 
 pub mod input;
 
-pub mod world;
-pub use world::World;
-
 pub mod engine;
 pub use engine::ScriptEngine;
 

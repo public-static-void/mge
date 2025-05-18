@@ -1,5 +1,6 @@
 use engine_core::ecs::registry::ComponentRegistry;
-use engine_core::scripting::{ScriptEngine, World};
+use engine_core::ecs::world::World;
+use engine_core::scripting::ScriptEngine;
 use engine_core::systems::job::{JobSystem, JobTypeRegistry, load_job_types_from_dir};
 use engine_core::systems::standard::{DamageAll, MoveAll, ProcessDeaths, ProcessDecay};
 use std::cell::RefCell;

@@ -1,6 +1,6 @@
 use engine_core::ecs::registry::ComponentRegistry;
+use engine_core::ecs::world::World;
 use engine_core::scripting::engine::ScriptEngine;
-use engine_core::scripting::world::World;
 use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::Rc;

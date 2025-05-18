@@ -1,5 +1,5 @@
 use crate::ecs::system::System;
-use crate::scripting::world::World;
+use crate::ecs::world::World;
 use serde_json::json;
 
 pub struct MoveAll {

@@ -1,4 +1,4 @@
-use crate::scripting::world::World;
+use crate::ecs::world::World;
 use indexmap::IndexMap;
 use std::cell::RefCell;
 use topo_sort::{SortResults, TopoSort};

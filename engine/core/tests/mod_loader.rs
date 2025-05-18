@@ -1,7 +1,7 @@
 use engine_core::ecs::registry::ComponentRegistry;
+use engine_core::ecs::world::World;
 use engine_core::mods::loader::load_mod;
 use engine_core::scripting::ScriptEngine;
-use engine_core::scripting::world::World;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};

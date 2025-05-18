@@ -1,5 +1,5 @@
+use crate::ecs::world::World;
 use crate::scripting::helpers::{json_to_lua_table, lua_table_to_json};
-use crate::scripting::world::World;
 use crate::systems::standard::{DamageAll, MoveAll, ProcessDeaths, ProcessDecay};
 use mlua::{Lua, Result as LuaResult, Table, Value as LuaValue};
 use serde_json::Value as JsonValue;

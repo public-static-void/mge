@@ -1,6 +1,7 @@
 use engine_core::ecs::registry::ComponentRegistry;
 use engine_core::ecs::schema::load_schemas_from_dir;
-use engine_core::scripting::{ScriptEngine, World};
+use engine_core::ecs::world::World;
+use engine_core::scripting::ScriptEngine;
 use engine_core::systems::standard::MoveAll;
 use serde_json::json;
 use std::sync::{Arc, Mutex};

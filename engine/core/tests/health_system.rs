@@ -1,6 +1,6 @@
+use engine_core::ecs::World;
 use engine_core::ecs::registry::ComponentRegistry;
 use engine_core::ecs::schema::load_schemas_from_dir;
-use engine_core::scripting::World;
 use engine_core::systems::standard::DamageAll;
 use serde_json::json;
 use std::cell::RefCell;

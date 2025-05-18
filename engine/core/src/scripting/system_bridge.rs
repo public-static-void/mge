@@ -1,5 +1,5 @@
+use crate::ecs::world::World;
 use crate::scripting::helpers::{json_to_lua_table, lua_table_to_json};
-use crate::scripting::world::World;
 use mlua::{Function, Lua, RegistryKey, Result as LuaResult, Table};
 use serde_json::Value as JsonValue;
 use std::cell::RefCell;

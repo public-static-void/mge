@@ -1,4 +1,4 @@
-use crate::scripting::World;
+use crate::ecs::World;
 use indexmap::IndexMap;
 
 pub type DynSystemFn = Box<dyn Fn(&mut World, f32) + 'static>;

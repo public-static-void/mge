@@ -1,6 +1,6 @@
 use engine_core::ecs::registry::ComponentRegistry;
 use engine_core::ecs::system::{System, SystemRegistry};
-use engine_core::scripting::world::World;
+use engine_core::ecs::world::World;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
