@@ -12,14 +12,15 @@
 /// # }
 /// let registry = Arc::new(M;utex::new(ComponentRegistry::new()));
 /// let mut world = World::new(registry.clone());
-/// world.register_system(MySystem);
-/// world.run_system("MySystem").unwrap();
+/// world.register_system(MySystem, Some(lua));
+/// world.run_system("MySystem", None).unwrap();
 /// ```
 use crate::ecs::event::EventBus;
 use crate::ecs::registry::ComponentRegistry;
 use crate::ecs::system::SystemRegistry;
 use crate::plugins::dynamic_systems::DynamicSystemRegistry;
 use crate::scripting::ScriptEngine;
+use crate::systems::job::JobTypeRegistry;
 use jsonschema::{Draft, JSONSchema};
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
@@ -43,6 +44,8 @@ pub struct World {
     pub dynamic_systems: DynamicSystemRegistry,
     #[serde(skip)]
     pub lua_engine: Option<ScriptEngine>,
+    #[serde(skip)]
+    pub job_types: JobTypeRegistry,
 }
 
 impl World {
@@ -58,6 +61,7 @@ impl World {
             event_buses: HashMap::new(),
             dynamic_systems: DynamicSystemRegistry::new(),
             lua_engine: None,
+            job_types: JobTypeRegistry::default(),
         }
     }
 
@@ -365,9 +369,9 @@ impl World {
         result
     }
 
-    pub fn run_system(&mut self, name: &str) -> Result<(), String> {
+    pub fn run_system(&mut self, name: &str, lua: Option<&mlua::Lua>) -> Result<(), String> {
         if let Some(system) = self.systems.take_system(name) {
-            system.borrow_mut().run(self);
+            system.borrow_mut().run(self, lua);
             self.systems.register_system_boxed(name.to_string(), system);
             Ok(())
         } else {
@@ -385,7 +389,7 @@ impl World {
             if let Some(cell) = self.systems.take_system(name) {
                 {
                     let mut system = cell.borrow_mut();
-                    system.run(self);
+                    system.run(self, None);
                 }
                 self.systems.register_system_boxed(name.clone(), cell);
             }
@@ -402,6 +406,17 @@ impl World {
 
         // 4. Increment turn
         self.turn += 1;
+    }
+
+    pub fn take_events(&mut self, event_type: &str) -> Vec<serde_json::Value> {
+        if let Some(bus) = self.event_buses.get_mut(event_type) {
+            let mut reader = crate::ecs::event::EventReader::default();
+            let events: Vec<_> = reader.read(&*bus.lock().unwrap()).cloned().collect();
+            bus.lock().unwrap().update();
+            events
+        } else {
+            Vec::new()
+        }
     }
 }
 

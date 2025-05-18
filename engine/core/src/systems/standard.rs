@@ -10,7 +10,7 @@ impl System for MoveAll {
     fn name(&self) -> &'static str {
         "MoveAll"
     }
-    fn run(&mut self, world: &mut World) {
+    fn run(&mut self, world: &mut World, _lua: Option<&mlua::Lua>) {
         if let Some(positions) = world.components.get_mut("Position") {
             for (_entity, value) in positions.iter_mut() {
                 if let Some(obj) = value.as_object_mut() {
@@ -35,7 +35,7 @@ impl System for ProcessDeaths {
     fn name(&self) -> &'static str {
         "ProcessDeaths"
     }
-    fn run(&mut self, world: &mut World) {
+    fn run(&mut self, world: &mut World, _lua: Option<&mlua::Lua>) {
         let mut to_process = Vec::new();
 
         // Collect entities with Health <= 0
@@ -74,7 +74,7 @@ impl System for DamageAll {
     fn name(&self) -> &'static str {
         "DamageAll"
     }
-    fn run(&mut self, world: &mut World) {
+    fn run(&mut self, world: &mut World, _lua: Option<&mlua::Lua>) {
         if let Some(healths) = world.components.get_mut("Health") {
             for (_entity, value) in healths.iter_mut() {
                 if let Some(obj) = value.as_object_mut() {
@@ -96,7 +96,7 @@ impl System for ProcessDecay {
     fn name(&self) -> &'static str {
         "ProcessDecay"
     }
-    fn run(&mut self, world: &mut World) {
+    fn run(&mut self, world: &mut World, _lua: Option<&mlua::Lua>) {
         let mut to_despawn_entities = Vec::new();
         if let Some(decays) = world.components.get_mut("Decay") {
             for (&entity, value) in decays.iter_mut() {

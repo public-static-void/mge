@@ -31,7 +31,7 @@ fn test_move_all_moves_positions() {
 
     // Call move_all (to be implemented)
     world.register_system(MoveAll { dx: 1.0, dy: -1.0 });
-    world.run_system("MoveAll").unwrap();
+    world.run_system("MoveAll", None).unwrap();
 
     // Check new positions
     let pos1 = world.get_component(id1, "Position").unwrap();

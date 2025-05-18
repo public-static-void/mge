@@ -1,0 +1,16 @@
+{
+  "name": "Job",
+  "title": "Job",
+  "type": "object",
+  "modes": ["colony", "roguelike"],
+  "properties": {
+    "job_type": { "type": "string" },
+    "target": { "type": "integer" },
+    "status": {
+      "type": "string",
+      "enum": ["pending", "in_progress", "complete", "failed"]
+    },
+    "progress": { "type": "number", "minimum": 0 }
+  },
+  "required": ["job_type", "status"]
+}

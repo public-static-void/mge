@@ -25,11 +25,11 @@ fn test_death_replaces_health_with_corpse_and_decay() {
 
     // Simulate damage that kills the entity
     world.register_system(DamageAll { amount: 2.0 });
-    world.run_system("DamageAll").unwrap();
+    world.run_system("DamageAll", None).unwrap();
 
     // Process deaths (to be implemented)
     world.register_system(ProcessDeaths);
-    world.run_system("ProcessDeaths").unwrap();
+    world.run_system("ProcessDeaths", None).unwrap();
 
     // Health component should be removed
     assert!(world.get_component(id, "Health").is_none());
@@ -63,13 +63,13 @@ fn test_decay_removes_entity_after_time() {
 
     // Tick 1
     world.register_system(ProcessDecay);
-    world.run_system("ProcessDecay").unwrap();
+    world.run_system("ProcessDecay", None).unwrap();
     let decay = world.get_component(id, "Decay").unwrap();
     assert_eq!(decay["time_remaining"].as_u64().unwrap(), 1);
 
     // Tick 2 - entity should be removed
     world.register_system(ProcessDecay);
-    world.run_system("ProcessDecay").unwrap();
+    world.run_system("ProcessDecay", None).unwrap();
     assert!(world.get_component(id, "Decay").is_none());
     // Optionally, check entity no longer exists (depends on your ECS API)
 }

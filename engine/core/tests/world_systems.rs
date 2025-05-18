@@ -19,7 +19,7 @@ fn test_world_can_register_and_run_system() {
         fn name(&self) -> &'static str {
             "TestSystem"
         }
-        fn run(&mut self, _world: &mut World) {
+        fn run(&mut self, _world: &mut World, _lua: Option<&mlua::Lua>) {
             self.called.store(true, Ordering::SeqCst);
         }
     }
@@ -27,7 +27,7 @@ fn test_world_can_register_and_run_system() {
     world.register_system(TestSystem {
         called: called.clone(),
     });
-    world.run_system("TestSystem").unwrap();
+    world.run_system("TestSystem", None).unwrap();
     assert!(called.load(Ordering::SeqCst));
 }
 
@@ -41,7 +41,8 @@ fn test_world_lists_systems() {
         fn name(&self) -> &'static str {
             "DummySystem"
         }
-        fn run(&mut self, _world: &mut World) {}
+
+        fn run(&mut self, _world: &mut World, _lua: Option<&mlua::Lua>) {}
     }
 
     world.register_system(DummySystem);

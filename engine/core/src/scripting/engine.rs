@@ -104,7 +104,7 @@ impl ScriptEngine {
             .create_function_mut(move |_, (dx, dy): (f32, f32)| {
                 let mut world = world_move.borrow_mut();
                 world.register_system(MoveAll { dx, dy });
-                world.run_system("MoveAll").unwrap();
+                world.run_system("MoveAll", None).unwrap();
                 Ok(())
             })?;
         globals.set("move_all", move_all)?;
@@ -114,7 +114,7 @@ impl ScriptEngine {
         let damage_all = self.lua.create_function_mut(move |_, amount: f32| {
             let mut world = world_damage.borrow_mut();
             world.register_system(DamageAll { amount });
-            world.run_system("DamageAll").unwrap();
+            world.run_system("DamageAll", None).unwrap();
             Ok(())
         })?;
         globals.set("damage_all", damage_all)?;
@@ -123,10 +123,10 @@ impl ScriptEngine {
         let world_tick = world.clone();
         let tick = self.lua.create_function_mut(move |_, ()| {
             let mut world = world_tick.borrow_mut();
-            world.run_system("MoveAll").unwrap();
-            world.run_system("DamageAll").unwrap();
-            world.run_system("ProcessDeaths").unwrap();
-            world.run_system("ProcessDecay").unwrap();
+            world.run_system("MoveAll", None).unwrap();
+            world.run_system("DamageAll", None).unwrap();
+            world.run_system("ProcessDeaths", None).unwrap();
+            world.run_system("ProcessDecay", None).unwrap();
             world.turn += 1;
             Ok(())
         })?;
@@ -145,7 +145,7 @@ impl ScriptEngine {
         let process_deaths = self.lua.create_function_mut(move |_, ()| {
             let mut world = world_deaths.borrow_mut();
             world.register_system(ProcessDeaths);
-            world.run_system("ProcessDeaths").unwrap();
+            world.run_system("ProcessDeaths", None).unwrap();
             Ok(())
         })?;
         globals.set("process_deaths", process_deaths)?;
@@ -155,7 +155,7 @@ impl ScriptEngine {
         let process_decay = self.lua.create_function_mut(move |_, ()| {
             let mut world = world_decay.borrow_mut();
             world.register_system(ProcessDecay);
-            world.run_system("ProcessDecay").unwrap();
+            world.run_system("ProcessDecay", None).unwrap();
             Ok(())
         })?;
         globals.set("process_decay", process_decay)?;
@@ -477,6 +477,13 @@ impl ScriptEngine {
         })?;
         globals.set("run_system", run_system)?;
 
+        let world_native_run = world.clone();
+        let run_native_system = self.lua.create_function_mut(move |_, name: String| {
+            let mut world = world_native_run.borrow_mut();
+            world.run_system(&name, None).map_err(mlua::Error::external)
+        })?;
+        globals.set("run_native_system", run_native_system)?;
+
         let world_for_print = world.clone();
         let print_positions_fn = self.lua.create_function_mut(move |_, ()| {
             let world = world_for_print.borrow();
@@ -492,6 +499,65 @@ impl ScriptEngine {
             Ok(())
         })?;
         globals.set("print_healths", print_healths_fn)?;
+
+        // assign_job(entity, job_type, fields)
+        let world_assign_job = world.clone();
+        let assign_job = self.lua.create_function_mut(
+            move |lua, (entity, job_type, fields): (u32, String, Option<Table>)| {
+                let mut world = world_assign_job.borrow_mut();
+                let mut job_val = serde_json::json!({
+                    "job_type": job_type,
+                    "status": "pending",
+                    "progress": 0.0
+                });
+                if let Some(tbl) = fields {
+                    let extra: JsonValue = lua_table_to_json(lua, &tbl)?;
+                    if let Some(obj) = extra.as_object() {
+                        for (k, v) in obj {
+                            job_val[k] = v.clone();
+                        }
+                    }
+                }
+                world
+                    .set_component(entity, "Job", job_val)
+                    .map_err(mlua::Error::external)
+            },
+        )?;
+        globals.set("assign_job", assign_job)?;
+
+        let world_take_events = world.clone();
+        let poll_ecs_event = self
+            .lua
+            .create_function_mut(move |lua, event_type: String| {
+                let mut world = world_take_events.borrow_mut();
+                let events = world.take_events(&event_type);
+                let tbl = lua.create_table()?;
+                for (i, val) in events.into_iter().enumerate() {
+                    tbl.set(i + 1, json_to_lua_table(lua, &val)?)?;
+                }
+                Ok(tbl)
+            })?;
+        globals.set("poll_ecs_event", poll_ecs_event)?;
+
+        let world_for_job_types = world.clone();
+        let get_job_types = self.lua.create_function(move |_, ()| {
+            let world = world_for_job_types.borrow();
+            let job_types = world.job_types.job_type_names();
+            Ok(job_types)
+        })?;
+        globals.set("get_job_types", get_job_types)?;
+
+        let world_for_jobs = world.clone();
+        let lua = Rc::clone(&self.lua);
+        let register_job_type =
+            self.lua
+                .create_function_mut(move |_, (name, func): (String, mlua::Function)| {
+                    let key = lua.create_registry_value(func)?;
+                    let mut world = world_for_jobs.borrow_mut();
+                    world.job_types.register_lua(&name, key);
+                    Ok(())
+                })?;
+        globals.set("register_job_type", register_job_type)?;
 
         Ok(())
     }

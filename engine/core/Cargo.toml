@@ -20,6 +20,8 @@ jsonschema = "0.16"
 once_cell = "1.21.3"
 indexmap = "2"
 topo_sort = "0.4.0"
+serde_yaml = "0.9.34"
+toml = "0.8.22"
 
 [dev-dependencies]
 rstest = "0.18"

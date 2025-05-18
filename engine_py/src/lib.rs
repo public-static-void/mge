@@ -2,12 +2,15 @@ use engine_core::ecs::event::{EventBus, EventReader};
 use engine_core::ecs::registry::ComponentRegistry;
 use engine_core::ecs::schema::load_schemas_from_dir;
 use engine_core::scripting::world::World;
+use engine_core::systems::job::JobSystem;
 use engine_core::systems::standard::{DamageAll, MoveAll, ProcessDeaths, ProcessDecay};
 use engine_core::worldgen::{WorldgenPlugin, WorldgenRegistry};
 use pyo3::exceptions::PyIOError;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
+use pyo3::types::PyDict;
 use pyo3::types::{PyAny, PyModule};
+use pythonize::depythonize;
 use serde_json::Value;
 use serde_pyobject::{from_pyobject, to_pyobject};
 use std::cell::RefCell;
@@ -57,6 +60,7 @@ impl PyWorld {
         world.register_system(DamageAll { amount: 1.0 });
         world.register_system(ProcessDeaths);
         world.register_system(ProcessDecay);
+        world.register_system(JobSystem::default());
         Ok(PyWorld {
             inner: Rc::new(RefCell::new(world)),
             worldgen_registry: std::cell::RefCell::new(WorldgenRegistry::new()),
@@ -171,7 +175,7 @@ impl PyWorld {
     fn move_all(&self, dx: f32, dy: f32) {
         let mut world = self.inner.borrow_mut();
         world.register_system(MoveAll { dx, dy });
-        world.run_system("MoveAll").unwrap();
+        world.run_system("MoveAll", None).unwrap();
     }
 
     fn damage_entity(&self, entity_id: u32, amount: f32) {
@@ -182,15 +186,15 @@ impl PyWorld {
     fn damage_all(&self, amount: f32) {
         let mut world = self.inner.borrow_mut();
         world.register_system(DamageAll { amount });
-        world.run_system("DamageAll").unwrap();
+        world.run_system("DamageAll", None).unwrap();
     }
 
     fn tick(&self) {
         let mut world = self.inner.borrow_mut();
-        world.run_system("MoveAll").unwrap();
-        world.run_system("DamageAll").unwrap();
-        world.run_system("ProcessDeaths").unwrap();
-        world.run_system("ProcessDecay").unwrap();
+        world.run_system("MoveAll", None).unwrap();
+        world.run_system("DamageAll", None).unwrap();
+        world.run_system("ProcessDeaths", None).unwrap();
+        world.run_system("ProcessDecay", None).unwrap();
         world.turn += 1;
     }
 
@@ -202,13 +206,13 @@ impl PyWorld {
     fn process_deaths(&self) {
         let mut world = self.inner.borrow_mut();
         world.register_system(ProcessDeaths);
-        world.run_system("ProcessDeaths").unwrap();
+        world.run_system("ProcessDeaths", None).unwrap();
     }
 
     fn process_decay(&self) {
         let mut world = self.inner.borrow_mut();
         world.register_system(ProcessDecay);
-        world.run_system("ProcessDecay").unwrap();
+        world.run_system("ProcessDecay", None).unwrap();
     }
 
     fn count_entities_with_type(&self, type_str: String) -> usize {
@@ -258,12 +262,23 @@ impl PyWorld {
 
     /// Poll all events of a type since last update (returns list of Python objects)
     fn poll_event(&self, py: Python, event_type: String) -> PyResult<Vec<PyObject>> {
-        let buses = EVENT_BUSES.lock().unwrap();
+        let mut buses = EVENT_BUSES.lock().unwrap();
+        // Create the bus if it doesn't exist
         let bus = buses
-            .get(&event_type)
-            .ok_or_else(|| PyValueError::new_err(format!("No bus for event type {event_type}")))?;
+            .entry(event_type.clone())
+            .or_insert_with(|| Arc::new(Mutex::new(EventBus::<Value>::default())))
+            .clone();
         let mut reader = EventReader::default();
         let events: Vec<Value> = reader.read(&*bus.lock().unwrap()).cloned().collect();
+        Ok(events
+            .into_iter()
+            .map(|e| to_pyobject(py, &e).unwrap().into())
+            .collect())
+    }
+
+    fn poll_ecs_event(&self, py: Python, event_type: String) -> PyResult<Vec<PyObject>> {
+        let mut world = self.inner.borrow_mut();
+        let events = world.take_events(&event_type);
         Ok(events
             .into_iter()
             .map(|e| to_pyobject(py, &e).unwrap().into())
@@ -332,11 +347,59 @@ impl PyWorld {
         }
     }
 
+    /// Run any system by name (including native Rust systems)
+    fn run_native_system(&self, name: String) -> PyResult<()> {
+        let mut world = self.inner.borrow_mut();
+        world
+            .run_system(&name, None)
+            .map_err(|e| PyValueError::new_err(e.to_string()))
+    }
+
     fn get_user_input(&self, py: pyo3::Python<'_>, prompt: String) -> PyResult<String> {
         let builtins = py.import("builtins")?;
         let input_func = builtins.getattr("input")?;
         let result = input_func.call1((prompt,))?;
         result.extract::<String>()
+    }
+
+    #[pyo3(signature = (entity_id, job_type, **kwargs))]
+    fn assign_job(
+        &self,
+        entity_id: u32,
+        job_type: String,
+        kwargs: Option<&Bound<'_, PyDict>>,
+    ) -> PyResult<()> {
+        let mut world = self.inner.borrow_mut();
+        let mut job_val = serde_json::json!({
+            "job_type": job_type,
+            "status": "pending",
+            "progress": 0.0
+        });
+        if let Some(kwargs) = kwargs {
+            let extra: serde_json::Value = depythonize(kwargs)?;
+            if let Some(obj) = extra.as_object() {
+                for (k, v) in obj {
+                    job_val[k] = v.clone();
+                }
+            }
+        }
+        world
+            .set_component(entity_id, "Job", job_val)
+            .map_err(|e| PyValueError::new_err(e.to_string()))
+    }
+
+    fn register_job_type(&self, _py: Python, name: String, callback: Py<PyAny>) {
+        let mut world = self.inner.borrow_mut();
+        world.job_types.register_native(
+            &name,
+            Box::new(move |old_job, progress| {
+                Python::with_gil(|py| {
+                    let job_obj = to_pyobject(py, old_job).unwrap();
+                    let result = callback.call1(py, (job_obj, progress)).unwrap();
+                    serde_pyobject::from_pyobject(result.bind(py).clone()).unwrap()
+                })
+            }),
+        );
     }
 }
 

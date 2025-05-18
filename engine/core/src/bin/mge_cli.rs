@@ -1,5 +1,6 @@
 use engine_core::ecs::registry::ComponentRegistry;
 use engine_core::scripting::{ScriptEngine, World};
+use engine_core::systems::job::{JobSystem, JobTypeRegistry, load_job_types_from_dir};
 use engine_core::systems::standard::{DamageAll, MoveAll, ProcessDeaths, ProcessDecay};
 use std::cell::RefCell;
 use std::env;
@@ -41,6 +42,15 @@ fn main() {
         .register_system(DamageAll { amount: 1.0 });
     world.borrow_mut().register_system(ProcessDeaths);
     world.borrow_mut().register_system(ProcessDecay);
+
+    let job_types = load_job_types_from_dir("assets/jobs");
+    let mut job_registry = JobTypeRegistry::default();
+    for job in job_types {
+        job_registry.register_data_job(job);
+    }
+    let job_system = JobSystem::with_registry(job_registry);
+    world.borrow_mut().register_system(job_system);
+
     let mut engine = ScriptEngine::new();
     engine
         .register_world(world.clone())

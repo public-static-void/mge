@@ -32,7 +32,7 @@ fn test_damage_all_reduces_health() {
         .unwrap();
 
     world.register_system(DamageAll { amount: 3.0 });
-    world.run_system("DamageAll").unwrap();
+    world.run_system("DamageAll", None).unwrap();
 
     let health1 = world.get_component(id1, "Health").unwrap();
     let health2 = world.get_component(id2, "Health").unwrap();

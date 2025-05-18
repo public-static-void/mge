@@ -17,7 +17,7 @@ fn systems_execute_in_registered_order() {
         fn name(&self) -> &'static str {
             "A"
         }
-        fn run(&mut self, _world: &mut World) {
+        fn run(&mut self, _world: &mut World, _lua: Option<&mlua::Lua>) {
             self.0.lock().unwrap().push("A");
         }
     }
@@ -26,7 +26,7 @@ fn systems_execute_in_registered_order() {
         fn name(&self) -> &'static str {
             "B"
         }
-        fn run(&mut self, _world: &mut World) {
+        fn run(&mut self, _world: &mut World, _lua: Option<&mlua::Lua>) {
             self.0.lock().unwrap().push("B");
         }
     }
@@ -84,7 +84,7 @@ fn systems_can_emit_and_receive_events_in_tick() {
         fn name(&self) -> &'static str {
             "Emitter"
         }
-        fn run(&mut self, world: &mut World) {
+        fn run(&mut self, world: &mut World, _lua: Option<&mlua::Lua>) {
             world.send_event("test", json!({"val": 1})).unwrap();
         }
     }
@@ -93,7 +93,7 @@ fn systems_can_emit_and_receive_events_in_tick() {
         fn name(&self) -> &'static str {
             "Receiver"
         }
-        fn run(&mut self, world: &mut World) {
+        fn run(&mut self, world: &mut World, _lua: Option<&mlua::Lua>) {
             use engine_core::ecs::event::EventReader;
             let bus = world.get_or_create_event_bus("test");
             let mut reader = EventReader::default();

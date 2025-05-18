@@ -76,7 +76,7 @@ pub fn make_test_world_with_health() -> (World, u32) {
 fn test_move_all_system_moves_entities() {
     let mut world = make_test_world_with_positions();
     world.register_system(MoveAll { dx: 1.0, dy: 2.0 });
-    world.run_system("MoveAll").unwrap();
+    world.run_system("MoveAll", None).unwrap();
     // Assert positions incremented
 }
 
@@ -87,6 +87,6 @@ fn test_process_deaths_creates_corpse_and_decay() {
     world
         .set_component(entity, "Health", json!({"current": 0, "max": 10}))
         .unwrap();
-    world.run_system("ProcessDeaths").unwrap();
+    world.run_system("ProcessDeaths", None).unwrap();
     // Assert Corpse and Decay components present
 }
