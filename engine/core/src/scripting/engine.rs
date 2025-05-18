@@ -1,8 +1,10 @@
+use super::event_bus::register_event_bus_and_globals;
 use super::helpers::{json_to_lua_table, lua_table_to_json};
 use super::input::{InputProvider, StdinInput};
 use super::world::World;
+use super::worldgen_bridge::register_worldgen_functions;
 use crate::systems::standard::{DamageAll, MoveAll, ProcessDeaths, ProcessDecay};
-use crate::worldgen::{WorldgenError, WorldgenPlugin, WorldgenRegistry};
+use crate::worldgen::WorldgenRegistry;
 use mlua::RegistryKey;
 use mlua::{Lua, Result as LuaResult, Table, Value as LuaValue};
 use serde_json::Value as JsonValue;
@@ -316,51 +318,7 @@ impl ScriptEngine {
         })?;
         globals.set("load_from_file", load_from_file)?;
 
-        let worldgen_registry_register = self.worldgen_registry.clone();
-        let worldgen_registry_list = self.worldgen_registry.clone();
-        let worldgen_registry_invoke = self.worldgen_registry.clone();
-
-        let register_worldgen = self.lua.create_function({
-            let worldgen_registry_register = worldgen_registry_register.clone();
-            move |lua, (name, func): (String, mlua::Function)| {
-                // Store the Lua function in the registry and keep the key
-                let func_registry_key = lua.create_registry_value(func)?;
-                worldgen_registry_register
-                    .borrow_mut()
-                    .register(WorldgenPlugin::Lua {
-                        name,
-                        registry_key: func_registry_key,
-                    });
-                Ok(())
-            }
-        })?;
-        globals.set("register_worldgen", register_worldgen)?;
-
-        let list_worldgen = self
-            .lua
-            .create_function(move |_, ()| Ok(worldgen_registry_list.borrow().list_names()))?;
-        globals.set("list_worldgen", list_worldgen)?;
-
-        let invoke_worldgen =
-            self.lua
-                .create_function(move |lua, (name, params): (String, mlua::Table)| {
-                    // Convert Lua params to serde_json::Value
-                    let params_json = lua_table_to_json(lua, &params)?;
-                    // Call the Lua worldgen plugin via the registry
-                    let registry = worldgen_registry_invoke.borrow();
-                    match registry.invoke_lua(lua, &name, &params_json) {
-                        Ok(result_json) => {
-                            // Convert result back to Lua value/table
-                            json_to_lua_table(lua, &result_json)
-                        }
-                        Err(WorldgenError::NotFound) => Err(mlua::Error::external(format!(
-                            "Worldgen plugin '{}' not found",
-                            name
-                        ))),
-                        Err(WorldgenError::LuaError(e)) => Err(e),
-                    }
-                })?;
-        globals.set("invoke_worldgen", invoke_worldgen)?;
+        register_worldgen_functions(&self.lua, &globals, self.worldgen_registry.clone())?;
 
         let lua_systems_outer = Rc::clone(&self.lua_systems);
         let world_rc = world.clone();
@@ -499,7 +457,6 @@ impl ScriptEngine {
                 })?;
         globals.set("register_job_type", register_job_type)?;
 
-        use super::event_bus::register_event_bus_and_globals;
         register_event_bus_and_globals(&self.lua, &globals, world.clone())?;
 
         Ok(())

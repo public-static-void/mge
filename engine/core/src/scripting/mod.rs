@@ -23,3 +23,4 @@ pub use engine::ScriptEngine;
 
 pub mod event_bus;
 pub mod helpers;
+pub mod worldgen_bridge;
