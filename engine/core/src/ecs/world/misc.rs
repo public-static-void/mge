@@ -1,21 +1,19 @@
 use super::World;
+use crate::ecs::components::position::{Position, PositionComponent};
 
 impl World {
     pub fn move_entity(&mut self, entity: u32, dx: f32, dy: f32) {
-        if let Some(positions) = self.components.get_mut("Position") {
-            if let Some(value) = positions.get_mut(&entity) {
-                if let Some(obj) = value.as_object_mut() {
-                    if let Some(x) = obj.get_mut("x") {
-                        if let Some(x_val) = x.as_f64() {
-                            *x = serde_json::json!(x_val + dx as f64);
-                        }
-                    }
-                    if let Some(y) = obj.get_mut("y") {
-                        if let Some(y_val) = y.as_f64() {
-                            *y = serde_json::json!(y_val + dy as f64);
-                        }
-                    }
+        if let Some(value) = self.get_component(entity, "PositionComponent").cloned() {
+            if let Ok(mut pos_comp) = serde_json::from_value::<PositionComponent>(value) {
+                if let Position::Square { x, y, .. } = &mut pos_comp.pos {
+                    *x += dx as i32;
+                    *y += dy as i32;
                 }
+                let _ = self.set_component(
+                    entity,
+                    "PositionComponent",
+                    serde_json::to_value(&pos_comp).unwrap(),
+                );
             }
         }
     }
