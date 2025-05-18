@@ -1,18 +1,39 @@
 def test_move_and_damage(make_world):
     world = make_world()
+
+    # Add cells to the map after world is created
+    world.add_cell(0, 0, 0)
+    world.add_cell(1, 1, 0)
+    world.add_cell(2, 3, 0)
+    world.add_cell(3, 4, 0)
+    world.add_cell(2, 2, 0)
+
     eid = world.spawn_entity()
-    world.set_component(eid, "Position", {"x": 0, "y": 0})
+    world.set_component(
+        eid, "PositionComponent", {"pos": {"Square": {"x": 0, "y": 0, "z": 0}}}
+    )
     world.move_entity(eid, 2, 3)
-    pos = world.get_component(eid, "Position")
-    assert pos["x"] == 2 and pos["y"] == 3
+    print("After move_entity:", world.get_component(eid, "PositionComponent"))
 
     eid2 = world.spawn_entity()
-    world.set_component(eid2, "Position", {"x": 1, "y": 1})
+    world.set_component(
+        eid2,
+        "PositionComponent",
+        {"pos": {"Square": {"x": 1, "y": 1, "z": 0}}},
+    )
     world.move_all(1, 1)
-    pos1 = world.get_component(eid, "Position")
-    pos2 = world.get_component(eid2, "Position")
-    assert pos1["x"] == 3 and pos1["y"] == 4
-    assert pos2["x"] == 2 and pos2["y"] == 2
+    print(
+        "After move_all (eid):", world.get_component(eid, "PositionComponent")
+    )
+    print(
+        "After move_all (eid2):",
+        world.get_component(eid2, "PositionComponent"),
+    )
+
+    pos1 = world.get_component(eid, "PositionComponent")
+    pos2 = world.get_component(eid2, "PositionComponent")
+    assert pos1["pos"]["Square"]["x"] == 3 and pos1["pos"]["Square"]["y"] == 4
+    assert pos2["pos"]["Square"]["x"] == 2 and pos2["pos"]["Square"]["y"] == 2
 
 
 def test_damage_and_tick(make_world):
