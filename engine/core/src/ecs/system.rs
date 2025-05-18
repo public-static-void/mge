@@ -5,7 +5,7 @@ use topo_sort::{SortResults, TopoSort};
 
 pub trait System: Send + Sync {
     fn name(&self) -> &'static str;
-    fn run(&mut self, world: &mut World);
+    fn run(&mut self, world: &mut World, lua: Option<&mlua::Lua>);
     fn dependencies(&self) -> &'static [&'static str] {
         &[]
     }

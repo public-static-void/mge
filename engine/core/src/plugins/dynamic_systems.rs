@@ -34,7 +34,7 @@ impl DynamicSystemRegistry {
             (system)(world, delta_time);
             Ok(())
         } else {
-            Err(format!("Dynamic system '{}' not found", name))
+            Err(format!("System '{}' not found", name))
         }
     }
 
