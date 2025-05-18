@@ -1,12 +1,10 @@
 use super::helpers::{json_to_lua_table, lua_table_to_json};
 use super::input::{InputProvider, StdinInput};
 use super::world::World;
-use crate::ecs::event::{EventBus, EventReader};
 use crate::systems::standard::{DamageAll, MoveAll, ProcessDeaths, ProcessDecay};
 use crate::worldgen::{WorldgenError, WorldgenPlugin, WorldgenRegistry};
 use mlua::RegistryKey;
 use mlua::{Lua, Result as LuaResult, Table, Value as LuaValue};
-use mlua::{UserData, UserDataMethods};
 use serde_json::Value as JsonValue;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -18,13 +16,6 @@ pub struct ScriptEngine {
     input_provider: Arc<Mutex<Box<dyn InputProvider + Send + Sync>>>,
     worldgen_registry: Rc<RefCell<WorldgenRegistry>>,
     lua_systems: Rc<RefCell<HashMap<String, RegistryKey>>>,
-}
-
-#[derive(Clone)]
-pub struct MyEvent(pub u32);
-
-pub struct LuaEventBus {
-    inner: Arc<Mutex<EventBus<MyEvent>>>,
 }
 
 impl ScriptEngine {
@@ -47,10 +38,6 @@ impl ScriptEngine {
 
     pub fn register_world(&mut self, world: Rc<RefCell<World>>) -> mlua::Result<()> {
         let globals = self.lua.globals();
-        let event_readers = std::rc::Rc::new(std::cell::RefCell::new(std::collections::HashMap::<
-            String,
-            EventReader,
-        >::new()));
 
         // Spawn entity
         let world_spawn = world.clone();
@@ -329,53 +316,6 @@ impl ScriptEngine {
         })?;
         globals.set("load_from_file", load_from_file)?;
 
-        let event_bus = LuaEventBus::new();
-        globals.set("event_bus", event_bus)?;
-
-        let world_send_event = world.clone();
-        let send_event =
-            self.lua
-                .create_function_mut(move |_, (event_type, payload): (String, String)| {
-                    let mut world = world_send_event.borrow_mut();
-                    // Parse payload as JSON (to match your Rust event bus)
-                    let json_payload: JsonValue =
-                        serde_json::from_str(&payload).map_err(mlua::Error::external)?;
-                    // (You may need to implement a send_event method on World if not present)
-                    world
-                        .send_event(&event_type, json_payload)
-                        .map_err(mlua::Error::external)
-                })?;
-        globals.set("send_event", send_event)?;
-
-        let event_readers_for_closure = event_readers.clone();
-        let world_for_closure = world.clone();
-
-        let poll_event = self
-            .lua
-            .create_function_mut(move |lua, event_type: String| {
-                let mut world = world_for_closure.borrow_mut();
-                let bus = world.get_or_create_event_bus(&event_type);
-                let mut readers = event_readers_for_closure.borrow_mut();
-                let reader = readers.entry(event_type.clone()).or_default();
-                let events: Vec<JsonValue> =
-                    reader.read_all(&*bus.lock().unwrap()).cloned().collect();
-                println!("Rust: events to Lua: {:?}", events);
-                let tbl = lua.create_table()?;
-                for (i, val) in events.into_iter().enumerate() {
-                    tbl.set(i + 1, json_to_lua_table(lua, &val)?)?;
-                }
-                Ok(tbl)
-            })?;
-        globals.set("poll_event", poll_event)?;
-
-        let world_update_event_buses = world.clone();
-        let update_event_buses = self.lua.create_function_mut(move |_, ()| {
-            let world = world_update_event_buses.borrow();
-            world.update_event_buses();
-            Ok(())
-        })?;
-        globals.set("update_event_buses", update_event_buses)?;
-
         let worldgen_registry_register = self.worldgen_registry.clone();
         let worldgen_registry_list = self.worldgen_registry.clone();
         let worldgen_registry_invoke = self.worldgen_registry.clone();
@@ -559,6 +499,9 @@ impl ScriptEngine {
                 })?;
         globals.set("register_job_type", register_job_type)?;
 
+        use super::event_bus::register_event_bus_and_globals;
+        register_event_bus_and_globals(&self.lua, &globals, world.clone())?;
+
         Ok(())
     }
 }
@@ -583,42 +526,7 @@ pub fn print_healths(world: &World) {
     }
 }
 
-impl LuaEventBus {
-    pub fn new() -> Self {
-        Self {
-            inner: Arc::new(Mutex::new(EventBus::default())),
-        }
-    }
-}
-
-impl UserData for LuaEventBus {
-    fn add_methods<'lua, M: UserDataMethods<'lua, Self>>(methods: &mut M) {
-        methods.add_method_mut("send", |_, this, value: u32| {
-            this.inner.lock().unwrap().send(MyEvent(value));
-            Ok(())
-        });
-
-        methods.add_method("poll", |_, this, ()| {
-            let mut reader = EventReader::default();
-            let bus = this.inner.lock().unwrap();
-            let events: Vec<u32> = reader.read(&*bus).map(|e| e.0).collect();
-            Ok(events)
-        });
-
-        methods.add_method_mut("update", |_, this, ()| {
-            this.inner.lock().unwrap().update();
-            Ok(())
-        });
-    }
-}
-
 impl Default for ScriptEngine {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl Default for LuaEventBus {
     fn default() -> Self {
         Self::new()
     }

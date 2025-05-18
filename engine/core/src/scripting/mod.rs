@@ -22,3 +22,4 @@ pub mod engine;
 pub use engine::ScriptEngine;
 
 pub mod helpers;
+pub mod event_bus;
