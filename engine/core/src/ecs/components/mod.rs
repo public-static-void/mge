@@ -7,7 +7,7 @@ mod decay;
 mod happiness;
 mod health;
 mod inventory;
-mod position;
+pub mod position;
 
 pub use self::corpse::Corpse;
 pub use self::decay::Decay;
