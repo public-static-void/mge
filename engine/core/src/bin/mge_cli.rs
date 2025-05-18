@@ -2,7 +2,7 @@ use engine_core::ecs::registry::ComponentRegistry;
 use engine_core::ecs::world::World;
 use engine_core::scripting::ScriptEngine;
 use engine_core::systems::job::{JobSystem, JobTypeRegistry, load_job_types_from_dir};
-use engine_core::systems::standard::{DamageAll, MoveAll, ProcessDeaths, ProcessDecay};
+use engine_core::systems::standard::{DamageAll, MoveAll, MoveDelta, ProcessDeaths, ProcessDecay};
 use std::cell::RefCell;
 use std::env;
 use std::fs;
@@ -35,9 +35,13 @@ fn main() {
     }
 
     let world = Rc::new(RefCell::new(World::new(registry.clone())));
-    world
-        .borrow_mut()
-        .register_system(MoveAll { dx: 1.0, dy: 0.0 });
+    world.borrow_mut().register_system(MoveAll {
+        delta: MoveDelta::Square {
+            dx: 1,
+            dy: 0,
+            dz: 0,
+        },
+    });
     world
         .borrow_mut()
         .register_system(DamageAll { amount: 1.0 });

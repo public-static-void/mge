@@ -1,6 +1,6 @@
 use crate::ecs::world::World;
 use crate::scripting::helpers::{json_to_lua_table, lua_table_to_json};
-use crate::systems::standard::{DamageAll, MoveAll, ProcessDeaths, ProcessDecay};
+use crate::systems::standard::{DamageAll, MoveAll, MoveDelta, ProcessDeaths, ProcessDecay};
 use mlua::{Lua, Result as LuaResult, Table, Value as LuaValue};
 use serde_json::Value as JsonValue;
 use std::cell::RefCell;
@@ -126,9 +126,11 @@ pub fn register_api_functions(
 
     // move_all(dx, dy)
     let world_move = world.clone();
-    let move_all = lua.create_function_mut(move |_, (dx, dy): (f32, f32)| {
+    let move_all = lua.create_function_mut(move |_, (dx, dy): (i32, i32)| {
         let mut world = world_move.borrow_mut();
-        world.register_system(MoveAll { dx, dy });
+        world.register_system(MoveAll {
+            delta: MoveDelta::Square { dx, dy, dz: 0 },
+        });
         world.run_system("MoveAll", None).unwrap();
         Ok(())
     })?;
