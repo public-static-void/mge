@@ -1,5 +1,5 @@
 local id = spawn_entity()
-set_component(id, "Position", { x = 0.0, y = 0.0 })
+set_component(id, "PositionComponent", { pos = { Square = { x = 0.0, y = 0.0, z = 0.0 } } })
 set_component(id, "Health", { current = 10.0, max = 10.0 })
 
 print_positions()
