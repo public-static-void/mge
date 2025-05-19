@@ -1,0 +1,8 @@
+{
+  "title": "BaseStats",
+  "type": "object",
+  "description": "Base stats for an entity.",
+  "properties": {},
+  "additionalProperties": { "type": "number" },
+  "modes": ["colony", "roguelike"]
+}
