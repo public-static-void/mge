@@ -2,6 +2,7 @@ use engine_core::ecs::registry::ComponentRegistry;
 use engine_core::ecs::schema::load_schemas_from_dir;
 use engine_core::ecs::world::World;
 use engine_core::scripting::ScriptEngine;
+use engine_core::systems::inventory::InventoryConstraintSystem;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
@@ -19,6 +20,10 @@ fn main() {
     let world = Rc::new(RefCell::new(World::new(registry.clone())));
     world.borrow_mut().current_mode = "colony".to_string(); // or "roguelike" as needed
     engine.register_world(world.clone()).unwrap();
+
+    world
+        .borrow_mut()
+        .register_system(InventoryConstraintSystem);
 
     // Example Lua script: spawn and move an entity
     let script = r#"
