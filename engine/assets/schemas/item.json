@@ -1,0 +1,23 @@
+{
+  "title": "Item",
+  "type": "object",
+  "description": "Metadata for items including slot compatibility and requirements.",
+  "properties": {
+    "id": { "type": "string" },
+    "name": { "type": "string" },
+    "slot": {
+      "type": "string",
+      "description": "Valid equipment slot for this item"
+    },
+    "two_handed": { "type": "boolean", "default": false },
+    "requirements": {
+      "type": "object",
+      "properties": {
+        "strength": { "type": "number" }
+      },
+      "required": []
+    }
+  },
+  "required": ["id", "name", "slot"],
+  "modes": ["colony", "roguelike"]
+}
