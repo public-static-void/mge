@@ -252,3 +252,137 @@ fn job_system_uses_custom_job_type_logic() {
     assert_eq!(job.get("status").unwrap(), "complete");
     assert!(job.get("progress").unwrap().as_f64().unwrap() >= 10.0);
 }
+
+#[test]
+fn hierarchical_job_completes_only_when_all_children_complete() {
+    use engine_core::systems::job::JobSystem;
+    use serde_json::json;
+
+    // Setup registry and world
+    let mut registry = ComponentRegistry::new();
+    let job_schema_json = include_str!("../../assets/schemas/job.json");
+    registry
+        .register_external_schema_from_json(job_schema_json)
+        .unwrap();
+    let registry = Arc::new(Mutex::new(registry));
+    let mut world = World::new(registry.clone());
+    world.current_mode = "colony".to_string();
+
+    // Spawn parent entity with a Job that has two children
+    let eid = world.spawn_entity();
+    let child1 = json!({
+        "job_type": "child_job",
+        "status": "pending",
+        "progress": 0.0
+    });
+    let child2 = json!({
+        "job_type": "child_job",
+        "status": "pending",
+        "progress": 0.0
+    });
+    let parent_job = json!({
+        "job_type": "parent_job",
+        "status": "pending",
+        "progress": 0.0,
+        "children": [child1, child2]
+    });
+    world.set_component(eid, "Job", parent_job).unwrap();
+
+    world.register_system(JobSystem::default());
+
+    // Simulate ticks: children should complete first
+    for _ in 0..4 {
+        world.run_system("JobSystem", None).unwrap();
+    }
+
+    let job = world.get_component(eid, "Job").unwrap();
+    // Parent should only be complete if both children are complete
+    let children = job.get("children").unwrap().as_array().unwrap();
+    assert!(
+        children
+            .iter()
+            .all(|c| c.get("status").unwrap() == "complete")
+    );
+    assert_eq!(job.get("status").unwrap(), "complete");
+}
+
+#[test]
+fn cancelling_parent_job_cancels_all_children() {
+    use engine_core::systems::job::JobSystem;
+    use serde_json::json;
+
+    let mut registry = ComponentRegistry::new();
+    let job_schema_json = include_str!("../../assets/schemas/job.json");
+    registry
+        .register_external_schema_from_json(job_schema_json)
+        .unwrap();
+    let registry = Arc::new(Mutex::new(registry));
+    let mut world = World::new(registry.clone());
+    world.current_mode = "colony".to_string();
+
+    // Parent job with two children
+    let eid = world.spawn_entity();
+    let child1 = json!({
+        "job_type": "child_job",
+        "status": "pending",
+        "progress": 0.0
+    });
+    let child2 = json!({
+        "job_type": "child_job",
+        "status": "pending",
+        "progress": 0.0
+    });
+    let parent_job = json!({
+        "job_type": "parent_job",
+        "status": "in_progress",
+        "progress": 0.0,
+        "cancelled": true,
+        "children": [child1, child2]
+    });
+    world.set_component(eid, "Job", parent_job).unwrap();
+
+    world.register_system(JobSystem::default());
+    world.run_system("JobSystem", None).unwrap();
+
+    let job = world.get_component(eid, "Job").unwrap();
+    assert_eq!(job.get("status").unwrap(), "cancelled");
+    let children = job.get("children").unwrap().as_array().unwrap();
+    assert!(
+        children
+            .iter()
+            .all(|c| c.get("status").unwrap() == "cancelled")
+    );
+}
+
+#[test]
+fn job_assignment_is_recorded_and_queryable() {
+    use engine_core::systems::job::JobSystem;
+    use serde_json::json;
+
+    let mut registry = ComponentRegistry::new();
+    let job_schema_json = include_str!("../../assets/schemas/job.json");
+    registry
+        .register_external_schema_from_json(job_schema_json)
+        .unwrap();
+    let registry = Arc::new(Mutex::new(registry));
+    let mut world = World::new(registry.clone());
+    world.current_mode = "colony".to_string();
+
+    // Assign job to a worker entity
+    let worker_eid = world.spawn_entity();
+    let job_eid = world.spawn_entity();
+    let job_val = json!({
+        "job_type": "dig_tunnel",
+        "status": "pending",
+        "assigned_to": worker_eid
+    });
+    world
+        .set_component(job_eid, "Job", job_val.clone())
+        .unwrap();
+
+    let job = world.get_component(job_eid, "Job").unwrap();
+    assert_eq!(
+        job.get("assigned_to").unwrap().as_u64().unwrap(),
+        worker_eid as u64
+    );
+}
