@@ -41,7 +41,7 @@ impl JobTypeRegistry {
         let logic = move |old_job: &JsonValue, progress: f64| {
             let mut job = old_job.clone();
             let status = job.get("status").and_then(|v| v.as_str()).unwrap_or("");
-            if status == "failed" || status == "complete" {
+            if status == "failed" || status == "complete" || status == "cancelled" {
                 // Do nothing
             } else if status == "pending" {
                 job["status"] = json!("in_progress");
@@ -84,46 +84,80 @@ impl JobSystem {
     pub fn with_registry(job_types: JobTypeRegistry) -> Self {
         JobSystem { job_types }
     }
-}
 
-impl System for JobSystem {
-    fn name(&self) -> &'static str {
-        "JobSystem"
-    }
+    // Recursive function to process a single job
+    fn process_job(
+        &self,
+        world: &mut World,
+        lua: Option<&mlua::Lua>,
+        eid: u32,
+        mut job: JsonValue,
+    ) -> JsonValue {
+        // Extract all needed fields up front
+        let job_type = job
+            .get("job_type")
+            .and_then(|v| v.as_str())
+            .unwrap_or("default")
+            .to_string();
+        let progress = job.get("progress").and_then(|v| v.as_f64()).unwrap_or(0.0);
+        let is_cancelled = job
+            .get("cancelled")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
 
-    fn run(&mut self, world: &mut World, lua: Option<&mlua::Lua>) {
-        let entities = world.get_entities_with_component("Job");
-        for eid in entities {
-            let old_job = world.get_component(eid, "Job").unwrap().clone();
-            let old_status = old_job.get("status").and_then(|v| v.as_str()).unwrap_or("");
-            let job_type = old_job
-                .get("job_type")
-                .and_then(|v| v.as_str())
-                .unwrap_or("default");
-            let progress = old_job
-                .get("progress")
-                .and_then(|v| v.as_f64())
-                .unwrap_or(0.0);
+        // Handle cancellation up front
+        if is_cancelled {
+            job["status"] = json!("cancelled");
+        }
 
-            let job = match self.job_types.get(job_type) {
-                Some(JobLogic::Native(logic)) => logic(&old_job, progress),
+        // Recursively process children, if present
+        if let Some(children_val) = job.get_mut("children") {
+            // Move the array out to avoid borrow checker issues
+            let mut children = std::mem::take(children_val)
+                .as_array_mut()
+                .map(|arr| std::mem::take(arr))
+                .unwrap_or_default();
+
+            let mut all_children_complete = true;
+            for child in &mut children {
+                // Recursively process each child
+                let processed = self.process_job(world, lua, eid, child.take());
+                if is_cancelled {
+                    *child = processed;
+                    child["status"] = json!("cancelled");
+                } else {
+                    *child = processed;
+                }
+                if child.get("status").and_then(|v| v.as_str()) != Some("complete") {
+                    all_children_complete = false;
+                }
+            }
+            // Put the array back into the parent job
+            *children_val = JsonValue::Array(children);
+
+            // If all children are complete and not cancelled, mark parent complete
+            if !is_cancelled && all_children_complete {
+                job["status"] = json!("complete");
+            }
+        }
+
+        // Only apply job logic if not cancelled or terminal
+        let status = job.get("status").and_then(|v| v.as_str()).unwrap_or("");
+        if !matches!(status, "failed" | "complete" | "cancelled") {
+            let new_job = match self.job_types.get(&job_type) {
+                Some(JobLogic::Native(logic)) => logic(&job, progress),
                 Some(JobLogic::Lua(key)) => {
-                    use mlua::LuaSerdeExt; // Make sure this is at the top of your file!
-
+                    use mlua::LuaSerdeExt;
                     let lua = lua.expect("Lua context required for Lua job logic");
-                    let job_table = lua.to_value(&old_job).unwrap();
+                    let job_table = lua.to_value(&job).unwrap();
                     let func: mlua::Function = lua.registry_value(key).unwrap();
                     let result = func.call((job_table, progress)).unwrap();
-                    let new_job: serde_json::Value = lua.from_value(result).unwrap();
-                    new_job
+                    lua.from_value(result).unwrap()
                 }
                 None => {
-                    // fallback: original logic
-                    let mut job = old_job.clone();
-                    let status = job.get("status").and_then(|v| v.as_str()).unwrap_or("");
-                    if status == "failed" || status == "complete" {
-                        // Do nothing: terminal state
-                    } else if job
+                    // fallback logic
+                    let mut job = job.clone();
+                    if job
                         .get("should_fail")
                         .and_then(|v| v.as_bool())
                         .unwrap_or(false)
@@ -141,8 +175,37 @@ impl System for JobSystem {
                     job
                 }
             };
+            // Overwrite all fields except children (which we've already processed)
+            if job.get("children").is_some() {
+                let children = job.get("children").cloned();
+                job = new_job;
+                if let Some(children) = children {
+                    job["children"] = children;
+                }
+            } else {
+                job = new_job;
+            }
+        }
 
-            // Check for status transition and emit events
+        job
+    }
+}
+
+impl System for JobSystem {
+    fn name(&self) -> &'static str {
+        "JobSystem"
+    }
+
+    fn run(&mut self, world: &mut World, lua: Option<&mlua::Lua>) {
+        let entities = world.get_entities_with_component("Job");
+        for eid in entities {
+            let old_job = world.get_component(eid, "Job").unwrap().clone();
+            let old_status = old_job
+                .get("status")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            let job = self.process_job(world, lua, eid, old_job);
             let new_status = job.get("status").and_then(|v| v.as_str()).unwrap_or("");
             if old_status != new_status {
                 if new_status == "complete" {
@@ -157,9 +220,14 @@ impl System for JobSystem {
                         "job_type": job.get("job_type").cloned().unwrap_or(json!(null))
                     });
                     let _ = world.send_event("job_failed", event);
+                } else if new_status == "cancelled" {
+                    let event = json!({
+                        "entity": eid,
+                        "job_type": job.get("job_type").cloned().unwrap_or(json!(null))
+                    });
+                    let _ = world.send_event("job_cancelled", event);
                 }
             }
-
             world.set_component(eid, "Job", job).unwrap();
         }
     }
