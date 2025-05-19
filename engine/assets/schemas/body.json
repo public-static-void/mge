@@ -1,0 +1,69 @@
+{
+  "title": "Body",
+  "type": "object",
+  "description": "Hierarchical, schema-driven body structure for any entity.",
+  "properties": {
+    "parts": {
+      "type": "array",
+      "description": "Top-level body parts (can be recursively nested).",
+      "items": { "$ref": "#/definitions/BodyPart" }
+    }
+  },
+  "required": ["parts"],
+  "modes": ["colony", "roguelike"],
+  "definitions": {
+    "BodyPart": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name of the body part (e.g., 'left arm')"
+        },
+        "kind": {
+          "type": "string",
+          "description": "Type/category (e.g., 'arm', 'leg', 'head')"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["healthy", "wounded", "broken", "missing"],
+          "default": "healthy"
+        },
+        "temperature": {
+          "type": "number",
+          "description": "Current temperature of this part (e.g., in Celsius)."
+        },
+        "ideal_temperature": {
+          "type": "number",
+          "description": "Preferred/comfort temperature for this part."
+        },
+        "insulation": {
+          "type": "number",
+          "description": "Total insulation provided by worn gear/clothing."
+        },
+        "heat_loss": {
+          "type": "number",
+          "description": "Current heat loss rate (computed by simulation)."
+        },
+        "children": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/BodyPart" },
+          "description": "Nested sub-parts (e.g., hand/fingers on an arm)"
+        },
+        "equipped": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "IDs or names of items equipped on this part (e.g., rings, gloves, clothes)"
+        }
+      },
+      "required": [
+        "name",
+        "kind",
+        "status",
+        "temperature",
+        "ideal_temperature",
+        "insulation",
+        "heat_loss"
+      ]
+    }
+  }
+}
