@@ -649,3 +649,101 @@ fn inventory_constraint_system_sets_encumbered_status() {
     let updated = world.get_component(eid, "Inventory").unwrap();
     assert_eq!(updated["encumbered"], true);
 }
+
+#[test]
+fn can_register_equipment_schema_and_equip_items() {
+    use engine_core::ecs::registry::ComponentRegistry;
+    use engine_core::ecs::world::World;
+    use serde_json::json;
+    use std::sync::{Arc, Mutex};
+
+    let mut registry = ComponentRegistry::new();
+    let equipment_schema_json = include_str!("../../assets/schemas/equipment.json");
+    registry
+        .register_external_schema_from_json(equipment_schema_json)
+        .unwrap();
+    let registry = Arc::new(Mutex::new(registry));
+
+    let mut world = World::new(registry.clone());
+    world.current_mode = "roguelike".to_string();
+
+    let eid = world.spawn_entity();
+    let equipment = json!({
+        "slots": {
+            "head": null,
+            "torso": null,
+            "left_hand": null,
+            "right_hand": null
+        }
+    });
+    assert!(
+        world
+            .set_component(eid, "Equipment", equipment.clone())
+            .is_ok()
+    );
+
+    // Equip a helmet
+    let mut updated = equipment.clone();
+    updated["slots"]["head"] = json!("iron_helmet");
+    assert!(
+        world
+            .set_component(eid, "Equipment", updated.clone())
+            .is_ok()
+    );
+
+    // Unequip the helmet
+    updated["slots"]["head"] = json!(null);
+    assert!(
+        world
+            .set_component(eid, "Equipment", updated.clone())
+            .is_ok()
+    );
+}
+
+#[test]
+fn can_nest_inventories() {
+    use engine_core::ecs::registry::ComponentRegistry;
+    use engine_core::ecs::world::World;
+    use serde_json::json;
+    use std::sync::{Arc, Mutex};
+
+    let mut registry = ComponentRegistry::new();
+    let inventory_schema_json = include_str!("../../assets/schemas/inventory.json");
+    registry
+        .register_external_schema_from_json(inventory_schema_json)
+        .unwrap();
+    let registry = Arc::new(Mutex::new(registry));
+
+    let mut world = World::new(registry.clone());
+    world.current_mode = "roguelike".to_string();
+
+    // Create a bag (container)
+    let bag_id = world.spawn_entity();
+    let bag_inventory = json!({
+        "slots": [],
+        "max_slots": 10,
+        "weight": 0.5,
+        "max_weight": 5.0,
+        "volume": 0.5,
+        "max_volume": 5.0
+    });
+    world
+        .set_component(bag_id, "Inventory", bag_inventory)
+        .unwrap();
+
+    // Create a player inventory containing the bag
+    let player_id = world.spawn_entity();
+    let player_inventory = json!({
+        "slots": [bag_id.to_string()],
+        "max_slots": 5,
+        "weight": 1.0,
+        "max_weight": 10.0,
+        "volume": 1.0,
+        "max_volume": 10.0
+    });
+    world
+        .set_component(player_id, "Inventory", player_inventory)
+        .unwrap();
+
+    // Optionally: Test for nested queries, constraints, etc.
+}

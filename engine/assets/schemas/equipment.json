@@ -1,0 +1,16 @@
+{
+  "title": "Equipment",
+  "type": "object",
+  "description": "Schema-driven equipment slots for entities.",
+  "properties": {
+    "slots": {
+      "type": "object",
+      "description": "Mapping of slot names to equipped item IDs or null.",
+      "additionalProperties": {
+        "type": ["string", "null"]
+      }
+    }
+  },
+  "required": ["slots"],
+  "modes": ["colony", "roguelike"]
+}
