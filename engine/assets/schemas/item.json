@@ -16,6 +16,16 @@
         "strength": { "type": "number" }
       },
       "required": []
+    },
+    "effects": {
+      "type": "object",
+      "description": "Stat bonuses or effects applied when equipped",
+      "properties": {
+        "strength": { "type": "number" },
+        "dexterity": { "type": "number" },
+        "intelligence": { "type": "number" }
+      },
+      "additionalProperties": false
     }
   },
   "required": ["id", "name", "slot"],

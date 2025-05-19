@@ -5,8 +5,10 @@
   "properties": {
     "slots": {
       "type": "array",
-      "description": "Slots or contained items (could be item IDs or objects).",
-      "items": { "type": "string" }
+      "description": "Slots or contained items (could be item IDs or nested inventories).",
+      "items": {
+        "oneOf": [{ "type": "string" }, { "$ref": "#" }]
+      }
     },
     "max_slots": {
       "type": "integer",

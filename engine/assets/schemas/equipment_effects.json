@@ -1,0 +1,8 @@
+{
+  "title": "EquipmentEffects",
+  "type": "object",
+  "description": "Aggregated stat/effect bonuses from equipped items.",
+  "properties": {},
+  "additionalProperties": { "type": "number" },
+  "modes": ["colony", "roguelike"]
+}
