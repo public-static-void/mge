@@ -8,9 +8,24 @@
     "target": { "type": "integer" },
     "status": {
       "type": "string",
-      "enum": ["pending", "in_progress", "complete", "failed"]
+      "enum": ["pending", "in_progress", "complete", "failed", "cancelled"]
     },
-    "progress": { "type": "number", "minimum": 0 }
+    "progress": { "type": "number", "minimum": 0 },
+    "assigned_to": {
+      "type": "integer",
+      "description": "Entity ID assigned to this job"
+    },
+    "children": {
+      "type": "array",
+      "items": { "$ref": "#" },
+      "description": "Subtasks of this job"
+    },
+    "dependencies": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "IDs or references of prerequisite jobs"
+    },
+    "cancelled": { "type": "boolean", "default": false }
   },
   "required": ["job_type", "status"]
 }
