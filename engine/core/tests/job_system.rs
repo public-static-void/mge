@@ -356,7 +356,6 @@ fn cancelling_parent_job_cancels_all_children() {
 
 #[test]
 fn job_assignment_is_recorded_and_queryable() {
-    use engine_core::systems::job::JobSystem;
     use serde_json::json;
 
     let mut registry = ComponentRegistry::new();

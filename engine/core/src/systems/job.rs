@@ -88,9 +88,9 @@ impl JobSystem {
     // Recursive function to process a single job
     fn process_job(
         &self,
-        world: &mut World,
+        _world: &mut World,
         lua: Option<&mlua::Lua>,
-        eid: u32,
+        _eid: u32,
         mut job: JsonValue,
     ) -> JsonValue {
         // Extract all needed fields up front
@@ -115,13 +115,13 @@ impl JobSystem {
             // Move the array out to avoid borrow checker issues
             let mut children = std::mem::take(children_val)
                 .as_array_mut()
-                .map(|arr| std::mem::take(arr))
+                .map(std::mem::take)
                 .unwrap_or_default();
 
             let mut all_children_complete = true;
             for child in &mut children {
                 // Recursively process each child
-                let processed = self.process_job(world, lua, eid, child.take());
+                let processed = self.process_job(_world, lua, _eid, child.take());
                 if is_cancelled {
                     *child = processed;
                     child["status"] = json!("cancelled");
