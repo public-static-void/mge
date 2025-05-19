@@ -1,0 +1,9 @@
+{
+  "title": "Stats",
+  "type": "object",
+  "properties": {
+    "strength": { "type": "number" }
+  },
+  "required": [],
+  "modes": ["colony", "roguelike"]
+}
