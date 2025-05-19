@@ -747,3 +747,69 @@ fn can_nest_inventories() {
 
     // Optionally: Test for nested queries, constraints, etc.
 }
+
+#[test]
+fn cannot_equip_incompatible_item() {
+    use engine_core::ecs::registry::ComponentRegistry;
+    use engine_core::ecs::world::World;
+    use engine_core::systems::equipment_logic::EquipmentLogicSystem;
+    use serde_json::json;
+    use std::sync::{Arc, Mutex};
+
+    let mut registry = ComponentRegistry::new();
+    let equipment_schema_json = include_str!("../../assets/schemas/equipment.json");
+    let item_schema_json = include_str!("../../assets/schemas/item.json");
+    registry
+        .register_external_schema_from_json(equipment_schema_json)
+        .unwrap();
+    registry
+        .register_external_schema_from_json(item_schema_json)
+        .unwrap();
+    let registry = Arc::new(Mutex::new(registry));
+
+    let mut world = World::new(registry.clone());
+    world.current_mode = "roguelike".to_string();
+
+    // Register the equipment logic system
+    world.register_system(EquipmentLogicSystem);
+
+    // Create an item that can only go in "head"
+    let helmet_id = world.spawn_entity();
+    let helmet = json!({
+        "id": "iron_helmet",
+        "name": "Iron Helmet",
+        "slot": "head"
+    });
+    world.set_component(helmet_id, "Item", helmet).unwrap();
+
+    // Create equipment with empty slots
+    let eid = world.spawn_entity();
+    let equipment = json!({
+        "slots": {
+            "head": null,
+            "left_hand": null
+        }
+    });
+    world
+        .set_component(eid, "Equipment", equipment.clone())
+        .unwrap();
+
+    // Try to equip helmet in left_hand (should succeed at schema level)
+    let mut updated = equipment.clone();
+    updated["slots"]["left_hand"] = json!("iron_helmet");
+    let result = world.set_component(eid, "Equipment", updated.clone());
+    assert!(
+        result.is_ok(),
+        "set_component should succeed for schema-valid data"
+    );
+
+    // Run the logic system to enforce slot compatibility
+    world.run_system("EquipmentLogicSystem", None).unwrap();
+
+    // The system should have auto-unequipped the incompatible item
+    let equipment_after = world.get_component(eid, "Equipment").unwrap();
+    assert!(
+        equipment_after["slots"]["left_hand"].is_null(),
+        "Incompatible item should be auto-unequipped"
+    );
+}
