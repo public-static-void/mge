@@ -2,6 +2,7 @@ use engine_core::ecs::registry::ComponentRegistry;
 use engine_core::ecs::world::World;
 use engine_core::map::{Map, SquareGridMap};
 use engine_core::scripting::ScriptEngine;
+use engine_core::systems::equipment_logic::EquipmentLogicSystem;
 use engine_core::systems::inventory::InventoryConstraintSystem;
 use engine_core::systems::job::{JobSystem, JobTypeRegistry, load_job_types_from_dir};
 use engine_core::systems::standard::{DamageAll, MoveAll, MoveDelta, ProcessDeaths, ProcessDecay};
@@ -73,6 +74,8 @@ fn main() {
     world
         .borrow_mut()
         .register_system(InventoryConstraintSystem);
+
+    world.borrow_mut().register_system(EquipmentLogicSystem);
 
     let mut engine = ScriptEngine::new();
     engine

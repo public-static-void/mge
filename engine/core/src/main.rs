@@ -2,6 +2,7 @@ use engine_core::ecs::registry::ComponentRegistry;
 use engine_core::ecs::schema::load_schemas_from_dir;
 use engine_core::ecs::world::World;
 use engine_core::scripting::ScriptEngine;
+use engine_core::systems::equipment_logic::EquipmentLogicSystem;
 use engine_core::systems::inventory::InventoryConstraintSystem;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -24,6 +25,7 @@ fn main() {
     world
         .borrow_mut()
         .register_system(InventoryConstraintSystem);
+    world.borrow_mut().register_system(EquipmentLogicSystem);
 
     // Example Lua script: spawn and move an entity
     let script = r#"
