@@ -107,7 +107,6 @@ impl System for EquipmentLogicSystem {
             }
 
             // Second pass: handle two-handed weapons
-            // Collect two-handed items equipped and enforce blocking both hands
             let mut two_handed_items: Vec<(String, String)> = Vec::new(); // (slot_name, item_id)
             for (slot_name, item_id_value) in slots_mut.iter() {
                 if item_id_value.is_null() {
@@ -127,13 +126,8 @@ impl System for EquipmentLogicSystem {
             }
 
             if !two_handed_items.is_empty() {
-                // For simplicity, only allow one two-handed weapon equipped
                 let (_two_handed_slot, two_handed_id) = &two_handed_items[0];
-
-                // Both hands to be set to the two-handed weapon
                 let hands = ["left_hand", "right_hand"];
-
-                // Check if either hand is occupied by a different item
                 let mut conflict = false;
                 for hand in hands.iter() {
                     if let Some(item_val) = slots_mut.get(*hand) {
@@ -146,20 +140,51 @@ impl System for EquipmentLogicSystem {
                         }
                     }
                 }
-
                 if conflict {
-                    // Unequip two-handed weapon from all slots
                     for (slot, _) in &two_handed_items {
                         slots_mut.insert(slot.clone(), JsonValue::Null);
                     }
                 } else {
-                    // Equip two-handed weapon in both hands
                     for hand in hands.iter() {
                         slots_mut
                             .insert(hand.to_string(), JsonValue::String(two_handed_id.clone()));
                     }
                 }
             }
+
+            // --- Equipment Effects Application ---
+            let mut total_effects: HashMap<String, f64> = HashMap::new();
+            for (_slot_name, item_id_value) in slots_mut.iter() {
+                if item_id_value.is_null() {
+                    continue;
+                }
+                let item_id = match item_id_value.as_str() {
+                    Some(id) => id,
+                    None => continue,
+                };
+                let item_metadata = match get_item_metadata(item_id) {
+                    Some(meta) => meta,
+                    None => continue,
+                };
+                if let Some(effects) = item_metadata.get("effects").and_then(JsonValue::as_object) {
+                    for (stat, delta) in effects {
+                        if let Some(d) = delta.as_f64() {
+                            *total_effects.entry(stat.clone()).or_insert(0.0) += d;
+                        }
+                    }
+                }
+            }
+
+            // Get base stats (before equipment effects)
+            let mut new_stats = entity_stats.clone();
+            for (stat, bonus) in total_effects {
+                let base = new_stats
+                    .get(&stat)
+                    .and_then(JsonValue::as_f64)
+                    .unwrap_or(0.0);
+                new_stats[stat] = JsonValue::from(base + bonus);
+            }
+            let _ = world.set_component(eid, "Stats", new_stats);
 
             // Apply changes if any
             let _ = world.set_component(eid, "Equipment", new_equipment);
