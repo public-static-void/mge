@@ -83,7 +83,7 @@ fn test_death_event_flow() {
         std::env::var("CARGO_MANIFEST_DIR").unwrap().to_string() + "/../assets/schemas";
     println!("Loading schemas from: {}", schema_dir);
     let schemas = load_schemas_from_dir(&schema_dir)
-        .expect(&format!("Failed to load schemas from {schema_dir}"));
+        .unwrap_or_else(|_| panic!("Failed to load schemas from {schema_dir}"));
     {
         let mut reg = registry.lock().unwrap();
         for (_name, schema) in schemas {
