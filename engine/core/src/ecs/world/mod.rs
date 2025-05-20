@@ -7,7 +7,7 @@ use crate::scripting::ScriptEngine;
 use crate::systems::job::JobTypeRegistry;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, Mutex};
 
 mod component;
@@ -39,6 +39,7 @@ pub struct World {
     pub job_types: JobTypeRegistry,
     #[serde(skip)]
     pub map: Option<Map>,
+    event_queues: HashMap<String, (VecDeque<JsonValue>, VecDeque<JsonValue>)>, // (write, read)
 }
 
 impl World {
@@ -56,6 +57,7 @@ impl World {
             lua_engine: None,
             job_types: JobTypeRegistry::default(),
             map: None,
+            event_queues: HashMap::new(),
         }
     }
 }
