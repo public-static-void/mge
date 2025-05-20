@@ -27,6 +27,7 @@ toml = "0.8.22"
 rstest = "0.18"
 mockall = "0.12"
 tempfile = "3.20.0"
+serial_test = "3"
 
 [[bin]]
 name = "mge-cli"

@@ -4,6 +4,7 @@ use engine_core::ecs::world::World;
 use engine_core::scripting::ScriptEngine;
 use engine_core::scripting::input::InputProvider;
 use serde_json::json;
+use serial_test::serial;
 use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::rc::Rc;
@@ -138,6 +139,7 @@ fn lua_can_run_script_from_file() {
 }
 
 #[test]
+#[serial]
 fn lua_can_set_and_get_health() {
     use std::env;
     use std::path::PathBuf;
@@ -210,9 +212,12 @@ fn test_lua_component_access_mode_enforcement() {
         set_mode("colony")
         local id = spawn_entity()
         assert(set_component(id, "Happiness", { base_value = 0.7 }) == true)
-        assert(set_component(id, "Inventory", { slots = {}, weight = 1.5 }) == true)
+        assert(set_component(id, "Inventory", { slots = {}, weight = 1.5, volume = 10 }) == true)
     "#;
-    assert!(engine.run_script(script).is_ok());
+    if let Err(e) = engine.run_script(script) {
+        println!("Lua error: {e}");
+        panic!("Lua script failed: {e}");
+    }
 }
 
 #[test]

@@ -14,7 +14,6 @@ pub struct JobTypeData {
     pub requirements: Option<Vec<String>>,
     pub duration: Option<f64>,
     pub effects: Option<Vec<serde_json::Value>>,
-    // Add more fields as needed (e.g. script hooks)
 }
 
 pub enum JobLogic {
@@ -42,7 +41,6 @@ impl JobTypeRegistry {
             let mut job = old_job.clone();
             let status = job.get("status").and_then(|v| v.as_str()).unwrap_or("");
             if status == "failed" || status == "complete" || status == "cancelled" {
-                // Do nothing
             } else if status == "pending" {
                 job["status"] = json!("in_progress");
             } else if status == "in_progress" {
@@ -85,15 +83,36 @@ impl JobSystem {
         JobSystem { job_types }
     }
 
-    // Recursive function to process a single job
+    fn dependencies_complete(&self, world: &World, job: &serde_json::Value) -> bool {
+        if let Some(deps) = job.get("dependencies").and_then(|v| v.as_array()) {
+            for dep in deps {
+                if let Some(dep_id) = dep.as_str() {
+                    if let Ok(dep_eid) = dep_id.parse::<u32>() {
+                        if let Some(dep_job) = world.get_component(dep_eid, "Job") {
+                            let status =
+                                dep_job.get("status").and_then(|v| v.as_str()).unwrap_or("");
+                            if status != "complete" {
+                                return false;
+                            }
+                        } else {
+                            return false;
+                        }
+                    } else {
+                        return false;
+                    }
+                }
+            }
+        }
+        true
+    }
+
     fn process_job(
         &self,
-        _world: &mut World,
+        world: &mut World,
         lua: Option<&mlua::Lua>,
         _eid: u32,
         mut job: JsonValue,
     ) -> JsonValue {
-        // Extract all needed fields up front
         let job_type = job
             .get("job_type")
             .and_then(|v| v.as_str())
@@ -105,14 +124,16 @@ impl JobSystem {
             .and_then(|v| v.as_bool())
             .unwrap_or(false);
 
-        // Handle cancellation up front
+        let status = job.get("status").and_then(|v| v.as_str()).unwrap_or("");
+        if status == "pending" && !self.dependencies_complete(world, &job) {
+            return job;
+        }
+
         if is_cancelled {
             job["status"] = json!("cancelled");
         }
 
-        // Recursively process children, if present
         if let Some(children_val) = job.get_mut("children") {
-            // Move the array out to avoid borrow checker issues
             let mut children = std::mem::take(children_val)
                 .as_array_mut()
                 .map(std::mem::take)
@@ -120,8 +141,7 @@ impl JobSystem {
 
             let mut all_children_complete = true;
             for child in &mut children {
-                // Recursively process each child
-                let processed = self.process_job(_world, lua, _eid, child.take());
+                let processed = self.process_job(world, lua, _eid, child.take());
                 if is_cancelled {
                     *child = processed;
                     child["status"] = json!("cancelled");
@@ -132,16 +152,13 @@ impl JobSystem {
                     all_children_complete = false;
                 }
             }
-            // Put the array back into the parent job
             *children_val = JsonValue::Array(children);
 
-            // If all children are complete and not cancelled, mark parent complete
             if !is_cancelled && all_children_complete {
                 job["status"] = json!("complete");
             }
         }
 
-        // Only apply job logic if not cancelled or terminal
         let status = job.get("status").and_then(|v| v.as_str()).unwrap_or("");
         if !matches!(status, "failed" | "complete" | "cancelled") {
             let new_job = match self.job_types.get(&job_type) {
@@ -155,7 +172,6 @@ impl JobSystem {
                     lua.from_value(result).unwrap()
                 }
                 None => {
-                    // fallback logic
                     let mut job = job.clone();
                     if job
                         .get("should_fail")
@@ -175,7 +191,6 @@ impl JobSystem {
                     job
                 }
             };
-            // Overwrite all fields except children (which we've already processed)
             if job.get("children").is_some() {
                 let children = job.get("children").cloned();
                 job = new_job;
@@ -237,7 +252,7 @@ pub fn load_job_types_from_dir<P: AsRef<Path>>(dir: P) -> Vec<JobTypeData> {
     let mut jobs = Vec::new();
     let entries = match fs::read_dir(dir) {
         Ok(entries) => entries,
-        Err(_) => return jobs, // Gracefully handle missing directory
+        Err(_) => return jobs,
     };
     for entry in entries {
         let entry = entry.expect("Failed to read entry");
