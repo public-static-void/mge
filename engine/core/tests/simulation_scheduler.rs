@@ -1,3 +1,6 @@
+use engine_core::ecs::system::{System, SystemRegistry};
+use engine_core::ecs::world::World;
+use serde_json::json;
 use std::sync::{Arc, Mutex};
 
 #[test]
@@ -129,4 +132,79 @@ fn simulation_tick_increments_turn() {
     let turn = world.turn;
     world.simulation_tick();
     assert_eq!(world.turn, turn + 1);
+}
+
+#[test]
+fn event_driven_tick_system_runs_in_order_and_processes_events() {
+    // Setup world and registry
+    let registry = Arc::new(Mutex::new(
+        engine_core::ecs::registry::ComponentRegistry::new(),
+    ));
+    let mut world = World::new(registry.clone());
+
+    // Shared vector to record actions for assertion
+    let actions = Arc::new(Mutex::new(Vec::new()));
+
+    // System 1: Emits an event
+    struct Emitter {
+        actions: Arc<Mutex<Vec<String>>>,
+    }
+    impl System for Emitter {
+        fn name(&self) -> &'static str {
+            "Emitter"
+        }
+        fn run(&mut self, world: &mut World, _lua: Option<&mlua::Lua>) {
+            world.emit_event("TestEvent", json!({"value": 42}));
+            self.actions.lock().unwrap().push("emitted".into());
+        }
+        fn dependencies(&self) -> &'static [&'static str] {
+            &[]
+        }
+    }
+
+    // System 2: Subscribes to the event
+    struct Receiver {
+        actions: Arc<Mutex<Vec<String>>>,
+    }
+    impl System for Receiver {
+        fn name(&self) -> &'static str {
+            "Receiver"
+        }
+        fn run(&mut self, world: &mut World, _lua: Option<&mlua::Lua>) {
+            let mut received = false;
+            world.process_events("TestEvent", |payload| {
+                if payload.get("value") == Some(&json!(42)) {
+                    received = true;
+                }
+            });
+            if received {
+                self.actions.lock().unwrap().push("received".into());
+            }
+        }
+        fn dependencies(&self) -> &'static [&'static str] {
+            &["Emitter"]
+        }
+    }
+
+    // Register systems
+    let mut sys_registry = SystemRegistry::new();
+    sys_registry.register_system(Emitter {
+        actions: actions.clone(),
+    });
+    sys_registry.register_system(Receiver {
+        actions: actions.clone(),
+    });
+
+    // Run the new tick loop
+    let sorted = sys_registry.sorted_system_names();
+    for sys_name in sorted {
+        let mut sys = sys_registry.get_system_mut(&sys_name).unwrap();
+        sys.run(&mut world, None);
+        // After each system, process all events for all event types
+        world.update_event_queues();
+    }
+
+    // Assert both systems ran and the event was delivered in order
+    let actions = actions.lock().unwrap();
+    assert_eq!(actions.as_slice(), ["emitted", "received"]);
 }

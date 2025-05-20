@@ -1,7 +1,10 @@
 use super::World;
 use crate::ecs::event::EventBus;
 use serde_json::Value as JsonValue;
-use std::sync::{Arc, Mutex};
+use std::{
+    collections::VecDeque,
+    sync::{Arc, Mutex},
+};
 
 impl World {
     pub fn send_event(&mut self, event_type: &str, payload: JsonValue) -> Result<(), String> {
@@ -42,6 +45,32 @@ impl World {
             events
         } else {
             Vec::new()
+        }
+    }
+
+    /// Emit an event of the given type. Events are delivered after the next update.
+    pub fn emit_event(&mut self, event_type: &str, payload: JsonValue) {
+        let queue = self
+            .event_queues
+            .entry(event_type.to_string())
+            .or_insert_with(|| (VecDeque::new(), VecDeque::new()));
+        queue.0.push_back(payload);
+    }
+
+    /// Process and consume all events of the given type, calling the handler for each.
+    pub fn process_events<F: FnMut(&JsonValue)>(&mut self, event_type: &str, mut handler: F) {
+        if let Some((_, read_queue)) = self.event_queues.get_mut(event_type) {
+            while let Some(event) = read_queue.pop_front() {
+                handler(&event);
+            }
+        }
+    }
+
+    /// Swap event buffers and clear the old read buffer.
+    pub fn update_event_queues(&mut self) {
+        for (_event_type, (write, read)) in self.event_queues.iter_mut() {
+            std::mem::swap(write, read);
+            write.clear();
         }
     }
 }
