@@ -8,7 +8,7 @@ use std::sync::{Arc, Mutex};
 
 fn make_test_world_with_job_schema() -> World {
     let schema_dir = "../../engine/assets/schemas";
-    let schemas = load_schemas_from_dir(&schema_dir).expect("Failed to load schemas");
+    let schemas = load_schemas_from_dir(schema_dir).expect("Failed to load schemas");
     let mut registry = ComponentRegistry::new();
     for (_name, schema) in schemas {
         registry.register_external_schema(schema);
