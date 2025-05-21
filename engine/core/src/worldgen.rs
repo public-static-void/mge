@@ -2,12 +2,21 @@ use crate::scripting::helpers::{json_to_lua_table, lua_value_to_json};
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use serde_json::Value as JsonValue;
+use std::fmt;
 
 #[derive(Debug)]
 pub enum WorldgenError {
     NotFound,
     LuaError(mlua::Error),
 }
+
+impl fmt::Display for WorldgenError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self) // or provide a more descriptive message
+    }
+}
+
+impl std::error::Error for WorldgenError {}
 
 pub enum WorldgenPlugin {
     CAbi {

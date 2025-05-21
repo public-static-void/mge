@@ -2,7 +2,6 @@ use engine_core::ecs::world::World;
 use engine_core::map::{Map, SquareGridMap};
 use engine_core::systems::job::JobSystem;
 use engine_core::systems::standard::{DamageAll, MoveAll, MoveDelta, ProcessDeaths, ProcessDecay};
-use engine_core::worldgen::WorldgenRegistry;
 use pyo3::exceptions::{PyIOError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict};
@@ -15,13 +14,11 @@ use std::sync::{Arc, Mutex};
 
 use crate::event_bus;
 use crate::system_bridge::SystemBridge;
-use crate::worldgen_bridge::WorldgenBridge;
 
 #[pyclass(unsendable)]
 pub struct PyWorld {
     pub inner: Rc<RefCell<World>>,
     pub systems: Rc<SystemBridge>,
-    pub worldgen: Rc<WorldgenBridge>,
 }
 
 #[pymethods]
@@ -72,9 +69,6 @@ impl PyWorld {
             inner: Rc::new(RefCell::new(world)),
             systems: Rc::new(SystemBridge {
                 systems: RefCell::new(HashMap::new()),
-            }),
-            worldgen: Rc::new(WorldgenBridge {
-                worldgen_registry: RefCell::new(WorldgenRegistry::new()),
             }),
         })
     }
@@ -365,24 +359,5 @@ impl PyWorld {
                 })
             }),
         );
-    }
-
-    // --- Worldgen bridge ---
-
-    fn register_worldgen(&self, py: Python, name: String, callback: Py<PyAny>) -> PyResult<()> {
-        self.worldgen.register_worldgen(py, name, callback)
-    }
-
-    fn list_worldgen(&self) -> Vec<String> {
-        self.worldgen.list_worldgen()
-    }
-
-    fn invoke_worldgen<'py>(
-        &self,
-        py: Python<'py>,
-        name: String,
-        params: Bound<'py, PyAny>,
-    ) -> PyResult<PyObject> {
-        self.worldgen.invoke_worldgen(py, name, params)
     }
 }

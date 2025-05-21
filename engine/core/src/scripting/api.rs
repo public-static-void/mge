@@ -1,13 +1,13 @@
 use crate::ecs::world::World;
 use crate::scripting::helpers::{json_to_lua_table, lua_table_to_json};
+use crate::scripting::input::InputProvider;
 use crate::systems::standard::{DamageAll, MoveAll, MoveDelta, ProcessDeaths, ProcessDecay};
+use crate::worldgen::WorldgenRegistry;
 use mlua::{Lua, Result as LuaResult, Table, Value as LuaValue};
 use serde_json::Value as JsonValue;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
-
-use crate::scripting::input::InputProvider;
 
 pub fn register_api_functions(
     lua: &Lua,
@@ -243,23 +243,6 @@ pub fn register_api_functions(
     })?;
     globals.set("get_user_input", get_user_input)?;
 
-    // process_deaths()
-    let world_deaths = world.clone();
-    let process_deaths = lua.create_function_mut(move |_, ()| {
-        let mut world = world_deaths.borrow_mut();
-        world.register_system(ProcessDeaths);
-        world.run_system("ProcessDeaths", None).unwrap();
-        Ok(())
-    })?;
-    globals.set("process_deaths", process_deaths)?;
-
-    let world_is_alive = world.clone();
-    let is_entity_alive = lua.create_function_mut(move |_, entity: u32| {
-        let world = world_is_alive.borrow();
-        Ok(world.is_entity_alive(entity))
-    })?;
-    globals.set("is_entity_alive", is_entity_alive)?;
-
     let world_count_type = world.clone();
     let count_entities_with_type = lua.create_function_mut(move |_, type_str: String| {
         let world = world_count_type.borrow();
@@ -298,6 +281,34 @@ pub fn register_api_functions(
         Ok(())
     })?;
     globals.set("load_from_file", load_from_file)?;
+
+    Ok(())
+}
+
+/// Registers worldgen functions to Lua:
+/// - list_worldgen_plugins() -> { "plugin1", "plugin2", ... }
+/// - invoke_worldgen(name, params_table) -> map_table
+pub fn register_worldgen_api(
+    lua: &Lua,
+    globals: &Table,
+    worldgen_registry: Rc<WorldgenRegistry>,
+) -> LuaResult<()> {
+    let registry_for_list = Rc::clone(&worldgen_registry);
+    let list_plugins = lua.create_function(move |_, ()| {
+        let plugins = registry_for_list.list_names();
+        Ok(plugins)
+    })?;
+    globals.set("list_worldgen_plugins", list_plugins)?;
+
+    let registry_for_invoke = Rc::clone(&worldgen_registry);
+    let invoke_worldgen = lua.create_function(move |lua, (name, params): (String, Table)| {
+        let params_json: JsonValue = crate::scripting::helpers::lua_table_to_json(lua, &params)?;
+        let result = registry_for_invoke
+            .invoke(&name, &params_json)
+            .map_err(mlua::Error::external)?;
+        crate::scripting::helpers::json_to_lua_table(lua, &result)
+    })?;
+    globals.set("invoke_worldgen", invoke_worldgen)?;
 
     Ok(())
 }
