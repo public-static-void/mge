@@ -360,4 +360,166 @@ impl PyWorld {
             }),
         );
     }
+
+    // --- Inventory ---
+
+    fn get_inventory(&self, py: Python<'_>, entity_id: u32) -> PyResult<Option<PyObject>> {
+        self.get_component(py, entity_id, "Inventory".to_string())
+    }
+
+    fn set_inventory(&self, entity_id: u32, value: Bound<'_, PyAny>) -> PyResult<()> {
+        self.set_component(entity_id, "Inventory".to_string(), value)
+    }
+
+    fn add_item_to_inventory(&self, entity_id: u32, item_id: String) -> PyResult<()> {
+        let mut world = self.inner.borrow_mut();
+        let mut inv = if let Some(val) = world.get_component(entity_id, "Inventory") {
+            val.clone()
+        } else {
+            serde_json::json!({})
+        };
+        let slots_opt = inv.get_mut("slots").and_then(|v| v.as_array_mut());
+        let slots = if let Some(slots) = slots_opt {
+            slots
+        } else {
+            inv["slots"] = serde_json::json!([]);
+            inv.get_mut("slots").unwrap().as_array_mut().unwrap()
+        };
+        slots.push(serde_json::Value::String(item_id));
+        world
+            .set_component(entity_id, "Inventory", inv)
+            .map_err(|e| PyValueError::new_err(e.to_string()))
+    }
+
+    fn remove_item_from_inventory(
+        &self,
+        _py: Python<'_>,
+        entity_id: u32,
+        index: usize,
+    ) -> PyResult<()> {
+        let mut world = self.inner.borrow_mut();
+        let mut inv = if let Some(val) = world.get_component(entity_id, "Inventory") {
+            val.clone()
+        } else {
+            return Err(PyValueError::new_err("No Inventory component found"));
+        };
+        if let Some(slots) = inv.get_mut("slots").and_then(|v| v.as_array_mut()) {
+            if index < slots.len() {
+                slots.remove(index);
+                world
+                    .set_component(entity_id, "Inventory", inv)
+                    .map_err(|e| PyValueError::new_err(e.to_string()))
+            } else {
+                Err(PyValueError::new_err("Index out of bounds"))
+            }
+        } else {
+            Err(PyValueError::new_err("No slots array in Inventory"))
+        }
+    }
+
+    fn get_equipment(&self, py: Python<'_>, entity_id: u32) -> PyResult<PyObject> {
+        let world = self.inner.borrow();
+        use pyo3::types::{PyDict, PyTuple};
+        if let Some(val) = world.get_component(entity_id, "Equipment") {
+            let any = serde_pyobject::to_pyobject(py, val)?;
+            if let Ok(dict) = any.downcast::<PyDict>() {
+                if let Ok(Some(slots_any)) = dict.get_item("slots") {
+                    if let Ok(slots) = slots_any.downcast::<PyDict>() {
+                        for (k, v) in slots.iter() {
+                            if v.is_instance_of::<PyTuple>() && v.len().unwrap_or(1) == 0 {
+                                slots.set_item(k, py.None())?;
+                            }
+                        }
+                    }
+                }
+            }
+            Ok(any.into())
+        } else {
+            Ok(PyDict::new(py).into())
+        }
+    }
+
+    fn equip_item(&self, entity_id: u32, item_id: String, slot: String) -> PyResult<()> {
+        let mut world = self.inner.borrow_mut();
+
+        // 1. Check inventory
+        let inv = world
+            .get_component(entity_id, "Inventory")
+            .ok_or_else(|| PyValueError::new_err("Entity has no inventory"))?;
+        let slots = inv
+            .get("slots")
+            .and_then(|v| v.as_array())
+            .ok_or_else(|| PyValueError::new_err("No slots array in Inventory"))?;
+        if !slots
+            .iter()
+            .any(|v| v == &serde_json::Value::String(item_id.clone()))
+        {
+            return Err(PyValueError::new_err("Item not in inventory"));
+        }
+
+        // 2. Check item metadata
+        let mut found = None;
+        for item_eid in world.get_entities_with_component("Item") {
+            if let Some(item_comp) = world.get_component(item_eid, "Item") {
+                if item_comp.get("id") == Some(&serde_json::Value::String(item_id.clone())) {
+                    found = Some(item_comp);
+                    break;
+                }
+            }
+        }
+        let item_meta = found.ok_or_else(|| PyValueError::new_err("Item not found"))?;
+
+        // 3. Check slot compatibility
+        let valid_slot = item_meta
+            .get("slot")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| PyValueError::new_err("Item missing slot info"))?;
+        if valid_slot != slot {
+            return Err(PyValueError::new_err("invalid slot"));
+        }
+
+        // 4. Get or create Equipment component with correct structure
+        let mut equipment = if let Some(val) = world.get_component(entity_id, "Equipment") {
+            val.clone()
+        } else {
+            let mut map = serde_json::Map::new();
+            map.insert("slots".to_string(), serde_json::json!({}));
+            serde_json::Value::Object(map)
+        };
+
+        // 5. Ensure "slots" is an object
+        let slots_obj = equipment
+            .get_mut("slots")
+            .and_then(|v| v.as_object_mut())
+            .ok_or_else(|| PyValueError::new_err("Equipment slots must be an object"))?;
+
+        // 6. Check if slot is already occupied
+        if let Some(existing) = slots_obj.get(&slot) {
+            if !existing.is_null() {
+                return Err(PyValueError::new_err("already equipped"));
+            }
+        }
+
+        // 7. Equip
+        slots_obj.insert(slot.clone(), serde_json::Value::String(item_id.clone()));
+        world
+            .set_component(entity_id, "Equipment", equipment)
+            .map_err(|e| PyValueError::new_err(e.to_string()))
+    }
+
+    fn unequip_item(&self, entity_id: u32, slot: String) -> PyResult<()> {
+        let mut world = self.inner.borrow_mut();
+        let mut equipment = world
+            .get_component(entity_id, "Equipment")
+            .ok_or_else(|| PyValueError::new_err("No Equipment component"))?
+            .clone();
+        let slots_obj = equipment
+            .get_mut("slots")
+            .and_then(|v| v.as_object_mut())
+            .ok_or_else(|| PyValueError::new_err("Equipment slots must be an object"))?;
+        slots_obj.insert(slot, serde_json::Value::Null);
+        world
+            .set_component(entity_id, "Equipment", equipment)
+            .map_err(|e| PyValueError::new_err(e.to_string()))
+    }
 }
