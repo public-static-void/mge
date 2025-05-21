@@ -357,6 +357,7 @@ dependencies = [
  "mlua",
  "mockall",
  "once_cell",
+ "rand",
  "rstest",
  "schemars",
  "schemars_derive",
