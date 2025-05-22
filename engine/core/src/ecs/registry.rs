@@ -160,4 +160,9 @@ impl ComponentRegistry {
         }
         modes
     }
+
+    /// Unregister an external component schema by name.
+    pub fn unregister_external_schema(&mut self, name: &str) {
+        self.external_components.remove(name);
+    }
 }

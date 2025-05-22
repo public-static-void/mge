@@ -41,4 +41,8 @@ impl DynamicSystemRegistry {
     pub fn list_systems(&self) -> Vec<String> {
         self.systems.keys().cloned().collect()
     }
+
+    pub fn unregister_system(&mut self, name: &str) {
+        self.systems.swap_remove(name);
+    }
 }

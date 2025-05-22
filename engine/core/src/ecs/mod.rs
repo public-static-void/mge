@@ -7,24 +7,16 @@ mod error;
 pub mod event;
 pub mod registry;
 pub mod schema;
+pub use schema::ComponentSchema;
 pub mod system;
-
 pub mod world;
-pub use world::World;
-
 use crate::modes::{GameMode, ModeManager, ModeRestrictedComponent};
 pub use components::{Health, Position};
 pub use error::{MigrationError, RegistryError};
 pub use registry::{Component, ComponentRegistry};
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
-
-/// Represents the JSON schema for a component, used for dynamic registration and validation.
-#[derive(Debug)]
-pub struct ComponentSchema {
-    pub name: String,
-    pub schema: Option<schemars::schema::RootSchema>,
-}
+pub use world::World;
 
 pub struct EcsWorld {
     entities: Vec<u32>,

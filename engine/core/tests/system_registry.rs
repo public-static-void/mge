@@ -54,3 +54,13 @@ fn test_run_nonexistent_system_errors() {
     let result = world.run_system("NoSuchSystem", None);
     assert!(result.is_err());
 }
+
+#[test]
+fn test_register_and_unregister_system() {
+    let mut registry = SystemRegistry::new();
+    registry.register_system(DummySystem);
+    assert!(registry.list_systems().contains(&"DummySystem".to_string()));
+
+    registry.unregister_system("DummySystem");
+    assert!(!registry.list_systems().contains(&"DummySystem".to_string()));
+}

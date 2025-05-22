@@ -46,4 +46,18 @@ impl World {
             false
         }
     }
+
+    /// Unregister a component schema and remove all component data of that type.
+    pub fn unregister_component_and_cleanup(&mut self, name: &str) {
+        self.registry
+            .lock()
+            .unwrap()
+            .unregister_external_schema(name);
+        self.components.remove(name);
+    }
+
+    /// Unregister a dynamic system by name.
+    pub fn unregister_dynamic_system(&mut self, name: &str) {
+        self.dynamic_systems.unregister_system(name);
+    }
 }

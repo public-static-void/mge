@@ -1,5 +1,8 @@
+use engine_core::ecs::ComponentSchema;
+use engine_core::ecs::Health;
 use engine_core::ecs::components::position::PositionComponent;
-use engine_core::ecs::{ComponentRegistry, Health};
+use engine_core::ecs::registry::ComponentRegistry;
+use schemars::schema::RootSchema;
 
 #[test]
 fn test_component_registration() {
@@ -268,4 +271,19 @@ fn test_set_component_validation() {
             .set_component(entity, "TestComponent", json!({}))
             .is_err()
     );
+}
+
+#[test]
+fn test_register_and_unregister_external_schema() {
+    let mut registry = ComponentRegistry::new();
+    let schema = ComponentSchema {
+        name: "TestComponent".to_string(),
+        schema: RootSchema::default(),
+        modes: vec!["test".to_string()],
+    };
+    registry.register_external_schema(schema.clone());
+    assert!(registry.get_schema_by_name("TestComponent").is_some());
+
+    registry.unregister_external_schema("TestComponent");
+    assert!(registry.get_schema_by_name("TestComponent").is_none());
 }
