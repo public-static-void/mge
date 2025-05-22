@@ -48,6 +48,10 @@ impl EventBusRegistry {
     pub fn get_event_bus(&self, name: &str) -> Option<Arc<Mutex<EventBus<JsonValue>>>> {
         self.buses.get(name).cloned()
     }
+
+    pub fn iter(&self) -> impl Iterator<Item = &Arc<Mutex<EventBus<JsonValue>>>> {
+        self.buses.values()
+    }
 }
 
 impl Default for EventBusRegistry {

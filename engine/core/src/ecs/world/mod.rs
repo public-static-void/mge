@@ -1,4 +1,3 @@
-use crate::ecs::event::EventBus;
 use crate::ecs::registry::ComponentRegistry;
 use crate::ecs::system::SystemRegistry;
 use crate::map::Map;
@@ -29,7 +28,7 @@ pub struct World {
     #[serde(skip)]
     pub systems: SystemRegistry,
     #[serde(skip)]
-    pub event_buses: HashMap<String, Arc<Mutex<EventBus<JsonValue>>>>,
+    pub event_buses: crate::ecs::event_bus_registry::EventBusRegistry,
     #[serde(skip)]
     pub dynamic_systems: DynamicSystemRegistry,
     #[serde(skip)]
@@ -51,7 +50,7 @@ impl World {
             turn: 0,
             registry,
             systems: SystemRegistry::new(),
-            event_buses: HashMap::new(),
+            event_buses: crate::ecs::event_bus_registry::EventBusRegistry::new(),
             dynamic_systems: DynamicSystemRegistry::new(),
             lua_engine: None,
             job_types: JobTypeRegistry::default(),
