@@ -1,4 +1,5 @@
 use std::collections::VecDeque;
+use std::sync::{Arc, Weak};
 
 pub type SubscriberId = usize;
 pub type FilterFn<E> = Box<dyn Fn(&E) -> bool + Send + Sync>;
@@ -8,6 +9,7 @@ pub struct Subscriber<E> {
     pub id: SubscriberId,
     pub handler: Box<dyn Fn(&E) + Send + Sync>,
     pub once: bool,
+    pub weak_owner: Option<Weak<()>>,
 }
 
 /// Double-buffered event bus for events of type E.
@@ -38,17 +40,22 @@ impl<E> EventBus<E> {
 impl<E: Clone + Send + Sync + 'static> EventBus<E> {
     /// Send (emit) an event.
     pub fn send(&mut self, event: E) {
-        // Track which once-only subscribers should be removed
         let mut to_remove = Vec::new();
 
         for sub in &self.subscribers {
+            // Remove if weak_owner has been dropped
+            if let Some(weak) = &sub.weak_owner {
+                if weak.upgrade().is_none() {
+                    to_remove.push(sub.id);
+                    continue;
+                }
+            }
             (sub.handler)(&event);
             if sub.once {
                 to_remove.push(sub.id);
             }
         }
 
-        // Remove once-only subscribers that have been called
         if !to_remove.is_empty() {
             self.subscribers.retain(|s| !to_remove.contains(&s.id));
         }
@@ -67,6 +74,7 @@ impl<E: Clone + Send + Sync + 'static> EventBus<E> {
             id,
             handler: Box::new(handler),
             once: false,
+            weak_owner: None,
         });
         id
     }
@@ -130,6 +138,24 @@ impl<E: Clone + Send + Sync + 'static> EventBus<E> {
             id,
             handler: Box::new(handler),
             once: true,
+            weak_owner: None,
+        });
+        id
+    }
+
+    /// Subscribe a handler that is automatically unsubscribed when the owner is dropped.
+    /// Returns the subscriber ID.
+    pub fn subscribe_weak<F>(&mut self, owner: &Arc<()>, handler: F) -> SubscriberId
+    where
+        F: Fn(&E) + Send + Sync + 'static,
+    {
+        let id = self.next_subscriber_id;
+        self.next_subscriber_id += 1;
+        self.subscribers.push(Subscriber {
+            id,
+            handler: Box::new(handler),
+            once: false,
+            weak_owner: Some(Arc::downgrade(owner)),
         });
         id
     }
