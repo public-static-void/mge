@@ -74,6 +74,11 @@ impl SystemRegistry {
             }
         }
     }
+
+    /// Unregister a system by name.
+    pub fn unregister_system(&mut self, name: &str) {
+        self.systems.shift_remove(name);
+    }
 }
 
 impl Default for SystemRegistry {
