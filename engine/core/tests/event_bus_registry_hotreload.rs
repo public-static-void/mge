@@ -10,7 +10,7 @@ fn test_event_bus_register_update_unregister() {
     // Register initial event bus
     let bus_name = "TestBus".to_string();
     let bus = Arc::new(Mutex::new(EventBus::default()));
-    registry.register_event_bus(bus_name.clone(), bus.clone());
+    registry.register_event_bus::<serde_json::Value>(bus_name.clone(), bus.clone());
 
     // Send event and verify
     bus.lock().unwrap().send(json!({"value": 42}));
@@ -19,19 +19,23 @@ fn test_event_bus_register_update_unregister() {
     let events: Vec<_> = reader.read(&*bus.lock().unwrap()).cloned().collect();
     assert_eq!(events, vec![json!({"value": 42})]);
 
-    // Hot-reload: update event bus with fresh instance
+    // Hot-reload: just re-register with the same name/type
     let new_bus = Arc::new(Mutex::new(EventBus::default()));
-    registry
-        .update_event_bus(bus_name.clone(), new_bus.clone())
-        .unwrap();
+    registry.register_event_bus::<serde_json::Value>(bus_name.clone(), new_bus.clone());
 
     // After update, old bus is replaced
     assert!(Arc::ptr_eq(
-        &registry.get_event_bus(&bus_name).unwrap(),
+        &registry
+            .get_event_bus::<serde_json::Value>(&bus_name)
+            .unwrap(),
         &new_bus
     ));
 
     // Unregister event bus
-    registry.unregister_event_bus(&bus_name).unwrap();
-    assert!(registry.get_event_bus(&bus_name).is_none());
+    assert!(registry.unregister_event_bus::<serde_json::Value>(&bus_name));
+    assert!(
+        registry
+            .get_event_bus::<serde_json::Value>(&bus_name)
+            .is_none()
+    );
 }

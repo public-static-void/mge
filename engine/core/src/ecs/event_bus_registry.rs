@@ -1,10 +1,10 @@
 use crate::ecs::event::EventBus;
-use serde_json::Value as JsonValue;
+use std::any::{Any, TypeId};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 pub struct EventBusRegistry {
-    buses: HashMap<String, Arc<Mutex<EventBus<JsonValue>>>>,
+    buses: HashMap<(TypeId, String), Arc<dyn Any + Send + Sync>>,
 }
 
 impl EventBusRegistry {
@@ -14,43 +14,52 @@ impl EventBusRegistry {
         }
     }
 
-    /// Register or overwrite an event bus.
-    pub fn register_event_bus(&mut self, name: String, bus: Arc<Mutex<EventBus<JsonValue>>>) {
-        self.buses.insert(name, bus);
-    }
-
-    /// Update (replace) an event bus if it exists.
-    pub fn update_event_bus(
+    pub fn register_event_bus<T: 'static + Send + Sync>(
         &mut self,
         name: String,
-        bus: Arc<Mutex<EventBus<JsonValue>>>,
-    ) -> Result<(), String> {
-        use std::collections::hash_map::Entry;
-        match self.buses.entry(name) {
-            Entry::Occupied(mut e) => {
-                e.insert(bus);
-                Ok(())
+        bus: Arc<Mutex<EventBus<T>>>,
+    ) {
+        self.buses
+            .insert((TypeId::of::<T>(), name), bus as Arc<dyn Any + Send + Sync>);
+    }
+
+    pub fn get_event_bus<T: 'static + Send + Sync>(
+        &self,
+        name: &str,
+    ) -> Option<Arc<Mutex<EventBus<T>>>> {
+        self.buses
+            .get(&(TypeId::of::<T>(), name.to_string()))
+            .and_then(|arc_any| arc_any.clone().downcast::<Mutex<EventBus<T>>>().ok())
+    }
+
+    pub fn unregister_event_bus<T: 'static + Send + Sync>(&mut self, name: &str) -> bool {
+        self.buses
+            .remove(&(TypeId::of::<T>(), name.to_string()))
+            .is_some()
+    }
+
+    /// Iterate over all event buses of type T.
+    pub fn iter<T: 'static + Send + Sync>(
+        &self,
+    ) -> impl Iterator<Item = (&String, Arc<Mutex<EventBus<T>>>)> {
+        self.buses.iter().filter_map(|((type_id, name), arc_any)| {
+            if *type_id == TypeId::of::<T>() {
+                arc_any
+                    .clone()
+                    .downcast::<Mutex<EventBus<T>>>()
+                    .ok()
+                    .map(|arc| (name, arc))
+            } else {
+                None
             }
-            Entry::Vacant(e) => Err(format!("Event bus '{}' not found", e.key())),
+        })
+    }
+
+    /// Update all event buses of type T.
+    pub fn update_event_buses<T: 'static + Send + Sync + Clone>(&self) {
+        for (_name, bus) in self.iter::<T>() {
+            bus.lock().unwrap().update();
         }
-    }
-
-    /// Unregister (remove) an event bus.
-    pub fn unregister_event_bus(&mut self, name: &str) -> Result<(), String> {
-        if self.buses.remove(name).is_some() {
-            Ok(())
-        } else {
-            Err(format!("Event bus '{}' not found", name))
-        }
-    }
-
-    /// Get an event bus by name.
-    pub fn get_event_bus(&self, name: &str) -> Option<Arc<Mutex<EventBus<JsonValue>>>> {
-        self.buses.get(name).cloned()
-    }
-
-    pub fn iter(&self) -> impl Iterator<Item = &Arc<Mutex<EventBus<JsonValue>>>> {
-        self.buses.values()
     }
 }
 

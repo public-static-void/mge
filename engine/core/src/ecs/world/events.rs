@@ -25,25 +25,26 @@ impl World {
         Ok(())
     }
 
-    pub fn get_event_bus(&self, event_type: &str) -> Option<Arc<Mutex<EventBus<JsonValue>>>> {
-        self.event_buses.get_event_bus(event_type)
+    pub fn get_event_bus<T: 'static + Send + Sync>(
+        &self,
+        name: &str,
+    ) -> Option<Arc<Mutex<EventBus<T>>>> {
+        self.event_buses.get_event_bus::<T>(name)
     }
 
-    pub fn get_or_create_event_bus(&mut self, event_type: &str) -> Arc<Mutex<EventBus<JsonValue>>> {
-        if let Some(bus) = self.event_buses.get_event_bus(event_type) {
+    pub fn get_or_create_event_bus<T: 'static + Send + Sync>(
+        &mut self,
+        name: &str,
+    ) -> Arc<Mutex<EventBus<T>>> {
+        if let Some(bus) = self.event_buses.get_event_bus::<T>(name) {
             bus
         } else {
-            let new_bus = Arc::new(Mutex::new(EventBus::<JsonValue>::default()));
-            self.event_buses
-                .register_event_bus(event_type.to_string(), new_bus.clone());
-            new_bus
+            self.register_event_bus::<T>(name)
         }
     }
 
-    pub fn update_event_buses(&self) {
-        for bus in self.event_buses.iter() {
-            bus.lock().unwrap().update();
-        }
+    pub fn update_event_buses<T: 'static + Send + Sync + Clone>(&self) {
+        self.event_buses.update_event_buses::<T>();
     }
 
     pub fn take_events(&mut self, event_type: &str) -> Vec<serde_json::Value> {
@@ -81,5 +82,15 @@ impl World {
             std::mem::swap(write, read);
             write.clear();
         }
+    }
+
+    pub fn register_event_bus<T: 'static + Send + Sync>(
+        &mut self,
+        name: &str,
+    ) -> Arc<Mutex<EventBus<T>>> {
+        let bus = Arc::new(Mutex::new(EventBus::<T>::default()));
+        self.event_buses
+            .register_event_bus::<T>(name.to_string(), bus.clone());
+        bus
     }
 }

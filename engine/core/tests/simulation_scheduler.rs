@@ -98,7 +98,7 @@ fn systems_can_emit_and_receive_events_in_tick() {
         }
         fn run(&mut self, world: &mut World, _lua: Option<&mlua::Lua>) {
             use engine_core::ecs::event::EventReader;
-            let bus = world.get_or_create_event_bus("test");
+            let bus = world.get_or_create_event_bus::<serde_json::Value>("test");
             let mut reader = EventReader::default();
             let bus = bus.lock().unwrap();
             for event in reader.read(&bus) {
