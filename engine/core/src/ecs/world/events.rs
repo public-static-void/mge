@@ -1,5 +1,5 @@
 use super::World;
-use crate::ecs::event::EventBus;
+use crate::ecs::event::{EventBus, SubscriberId};
 use serde_json::Value as JsonValue;
 use std::{
     collections::VecDeque,
@@ -92,5 +92,20 @@ impl World {
         self.event_buses
             .register_event_bus::<T>(name.to_string(), bus.clone());
         bus
+    }
+
+    pub fn subscribe<T, F>(&self, name: &str, handler: F) -> Option<SubscriberId>
+    where
+        T: 'static + Send + Sync + Clone,
+        F: Fn(&T) + Send + Sync + 'static,
+    {
+        self.event_buses.subscribe::<T, F>(name, handler)
+    }
+
+    pub fn unsubscribe<T>(&self, name: &str, id: SubscriberId) -> bool
+    where
+        T: 'static + Send + Sync + Clone,
+    {
+        self.event_buses.unsubscribe::<T>(name, id)
     }
 }

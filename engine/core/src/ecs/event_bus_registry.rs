@@ -1,4 +1,4 @@
-use crate::ecs::event::EventBus;
+use crate::ecs::event::{EventBus, SubscriberId};
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -60,6 +60,24 @@ impl EventBusRegistry {
         for (_name, bus) in self.iter::<T>() {
             bus.lock().unwrap().update();
         }
+    }
+
+    pub fn subscribe<T, F>(&self, name: &str, handler: F) -> Option<SubscriberId>
+    where
+        T: 'static + Send + Sync + Clone,
+        F: Fn(&T) + Send + Sync + 'static,
+    {
+        self.get_event_bus::<T>(name)
+            .map(|bus| bus.lock().unwrap().subscribe(handler))
+    }
+
+    pub fn unsubscribe<T>(&self, name: &str, id: SubscriberId) -> bool
+    where
+        T: 'static + Send + Sync + Clone,
+    {
+        self.get_event_bus::<T>(name)
+            .map(|bus| bus.lock().unwrap().unsubscribe(id))
+            .unwrap_or(false)
     }
 }
 
