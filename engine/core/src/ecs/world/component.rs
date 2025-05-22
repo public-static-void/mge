@@ -60,7 +60,7 @@ impl World {
 
     /// Unregister a dynamic system by name.
     pub fn unregister_dynamic_system(&mut self, name: &str) {
-        self.dynamic_systems.unregister_system(name);
+        let _ = self.dynamic_systems.unregister_system(name);
     }
 
     /// Hot-reload a component schema in the registry.
