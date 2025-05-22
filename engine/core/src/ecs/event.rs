@@ -22,6 +22,12 @@ impl<E> Default for EventBus<E> {
     }
 }
 
+impl<E> EventBus<E> {
+    pub fn subscriber_count(&self) -> usize {
+        self.subscribers.len()
+    }
+}
+
 impl<E: Clone + Send + Sync + 'static> EventBus<E> {
     /// Send (emit) an event.
     pub fn send(&mut self, event: E) {
