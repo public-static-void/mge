@@ -67,4 +67,26 @@ impl World {
     pub fn hotreload_schema(&mut self, schema: ComponentSchema) -> Result<(), RegistryError> {
         self.registry.lock().unwrap().update_external_schema(schema)
     }
+
+    pub fn hotreload_schema_with_migration<F>(
+        &mut self,
+        schema: ComponentSchema,
+        migrate: F,
+    ) -> Result<(), RegistryError>
+    where
+        F: Fn(&serde_json::Value) -> serde_json::Value,
+    {
+        if let Some(data) = self.components.get_mut(&schema.name) {
+            self.registry
+                .lock()
+                .unwrap()
+                .update_external_schema_with_migration(schema, data, migrate)
+        } else {
+            if let Err(e) = self.registry.lock().unwrap().update_external_schema(schema) {
+                // Handle or log the error as appropriate
+                eprintln!("Failed to update schema: {:?}", e);
+            }
+            Ok(())
+        }
+    }
 }

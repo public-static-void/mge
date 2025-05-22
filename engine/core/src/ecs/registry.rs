@@ -172,4 +172,21 @@ impl ComponentRegistry {
         self.external_components.insert(schema.name.clone(), schema);
         Ok(())
     }
+
+    /// Update (hot-reload) an external component schema by name, migrating all data.
+    pub fn update_external_schema_with_migration<F>(
+        &mut self,
+        schema: ComponentSchema,
+        component_data: &mut std::collections::HashMap<u32, serde_json::Value>,
+        migrate: F,
+    ) -> Result<(), RegistryError>
+    where
+        F: Fn(&serde_json::Value) -> serde_json::Value,
+    {
+        for value in component_data.values_mut() {
+            *value = migrate(value);
+        }
+        self.external_components.insert(schema.name.clone(), schema);
+        Ok(())
+    }
 }
