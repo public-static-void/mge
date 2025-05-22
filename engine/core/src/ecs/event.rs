@@ -2,6 +2,8 @@ use std::collections::VecDeque;
 
 pub type SubscriberId = usize;
 pub type Subscriber<E> = (SubscriberId, Box<dyn Fn(&E) + Send + Sync>);
+pub type FilterFn<E> = Box<dyn Fn(&E) -> bool + Send + Sync>;
+pub type MapFn<E, U> = Box<dyn Fn(&E) -> Option<U> + Send + Sync>;
 
 /// Double-buffered event bus for events of type E.
 pub struct EventBus<E> {
@@ -68,6 +70,33 @@ impl<E: Clone + Send + Sync + 'static> EventBus<E> {
 
     pub fn try_recv(&mut self) -> Option<E> {
         self.events.pop_front()
+    }
+
+    /// Subscribe with a filter predicate. Handler is called only if predicate returns true.
+    pub fn subscribe_with_filter<F, P>(&mut self, handler: F, predicate: P) -> SubscriberId
+    where
+        F: Fn(&E) + Send + Sync + 'static,
+        P: Fn(&E) -> bool + Send + Sync + 'static,
+    {
+        self.subscribe(move |e| {
+            if predicate(e) {
+                handler(e);
+            }
+        })
+    }
+
+    /// Subscribe with a mapping function. Handler is called with mapped value if mapping returns Some.
+    pub fn subscribe_with_map<F, U, M>(&mut self, handler: F, map: M) -> SubscriberId
+    where
+        F: Fn(U) + Send + Sync + 'static,
+        M: Fn(&E) -> Option<U> + Send + Sync + 'static,
+        U: 'static,
+    {
+        self.subscribe(move |e| {
+            if let Some(mapped) = map(e) {
+                handler(mapped);
+            }
+        })
     }
 }
 
