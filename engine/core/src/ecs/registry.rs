@@ -165,4 +165,11 @@ impl ComponentRegistry {
     pub fn unregister_external_schema(&mut self, name: &str) {
         self.external_components.remove(name);
     }
+
+    /// Update (hot-reload) an external component schema by name.
+    /// If the schema exists, it is replaced. If not, it is registered anew.
+    pub fn update_external_schema(&mut self, schema: ComponentSchema) -> Result<(), RegistryError> {
+        self.external_components.insert(schema.name.clone(), schema);
+        Ok(())
+    }
 }
