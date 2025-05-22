@@ -14,31 +14,40 @@ impl World {
         );
         let bus = self
             .event_buses
-            .entry(event_type.to_string())
-            .or_insert_with(|| Arc::new(Mutex::new(EventBus::<JsonValue>::default())));
+            .get_event_bus(event_type)
+            .unwrap_or_else(|| {
+                let new_bus = Arc::new(Mutex::new(EventBus::<JsonValue>::default()));
+                self.event_buses
+                    .register_event_bus(event_type.to_string(), new_bus.clone());
+                new_bus
+            });
         bus.lock().unwrap().send(payload);
         Ok(())
     }
 
     pub fn get_event_bus(&self, event_type: &str) -> Option<Arc<Mutex<EventBus<JsonValue>>>> {
-        self.event_buses.get(event_type).cloned()
+        self.event_buses.get_event_bus(event_type)
     }
 
     pub fn get_or_create_event_bus(&mut self, event_type: &str) -> Arc<Mutex<EventBus<JsonValue>>> {
-        self.event_buses
-            .entry(event_type.to_string())
-            .or_insert_with(|| Arc::new(Mutex::new(EventBus::<JsonValue>::default())))
-            .clone()
+        if let Some(bus) = self.event_buses.get_event_bus(event_type) {
+            bus
+        } else {
+            let new_bus = Arc::new(Mutex::new(EventBus::<JsonValue>::default()));
+            self.event_buses
+                .register_event_bus(event_type.to_string(), new_bus.clone());
+            new_bus
+        }
     }
 
     pub fn update_event_buses(&self) {
-        for bus in self.event_buses.values() {
+        for bus in self.event_buses.iter() {
             bus.lock().unwrap().update();
         }
     }
 
     pub fn take_events(&mut self, event_type: &str) -> Vec<serde_json::Value> {
-        if let Some(bus) = self.event_buses.get_mut(event_type) {
+        if let Some(bus) = self.event_buses.get_event_bus(event_type) {
             let mut reader = crate::ecs::event::EventReader::default();
             let events: Vec<_> = reader.read(&*bus.lock().unwrap()).cloned().collect();
             bus.lock().unwrap().update();
