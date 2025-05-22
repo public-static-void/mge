@@ -96,7 +96,7 @@ pub fn register_event_bus_and_globals(
     let world_update_event_buses = world.clone();
     let update_event_buses = lua.create_function_mut(move |_, ()| {
         let world = world_update_event_buses.borrow();
-        world.update_event_buses();
+        world.update_event_buses::<serde_json::Value>();
         Ok(())
     })?;
     globals.set("update_event_buses", update_event_buses)?;

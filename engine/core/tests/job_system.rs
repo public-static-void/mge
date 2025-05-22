@@ -129,7 +129,7 @@ fn job_system_emits_event_on_completion() {
         world.run_system("JobSystem", None).unwrap();
     }
 
-    world.update_event_buses();
+    world.update_event_buses::<serde_json::Value>();
 
     // Poll the event bus for "job_completed"
     let bus = world
@@ -140,9 +140,9 @@ fn job_system_emits_event_on_completion() {
 
     // There should be at least one event, and it should reference our entity
     assert!(!events.is_empty(), "No job_completed events emitted");
-    let found = events
-        .iter()
-        .any(|event| event.get("entity").and_then(|v| v.as_u64()) == Some(eid as u64));
+    let found = events.iter().any(|event: &serde_json::Value| {
+        event.get("entity").and_then(|v| v.as_u64()) == Some(eid as u64)
+    });
     assert!(found, "No job_completed event for our entity");
 }
 
@@ -181,7 +181,7 @@ fn job_system_emits_event_on_failure() {
     for _ in 0..6 {
         world.run_system("JobSystem", None).unwrap();
     }
-    world.update_event_buses();
+    world.update_event_buses::<serde_json::Value>();
 
     // Poll the event bus for "job_failed"
     let bus = world.get_event_bus("job_failed").expect("event bus exists");
@@ -190,9 +190,9 @@ fn job_system_emits_event_on_failure() {
 
     // There should be at least one event, and it should reference our entity
     assert!(!events.is_empty(), "No job_failed events emitted");
-    let found = events
-        .iter()
-        .any(|event| event.get("entity").and_then(|v| v.as_u64()) == Some(eid as u64));
+    let found = events.iter().any(|event: &serde_json::Value| {
+        event.get("entity").and_then(|v| v.as_u64()) == Some(eid as u64)
+    });
     assert!(found, "No job_failed event for our entity");
 }
 
@@ -245,7 +245,7 @@ fn job_system_uses_custom_job_type_logic() {
     // Register and run the job system
     world.register_system(job_system);
     world.run_system("JobSystem", None).unwrap();
-    world.update_event_buses();
+    world.update_event_buses::<serde_json::Value>();
 
     // Check that the job is now complete
     let job = world.get_component(eid, "Job").unwrap();

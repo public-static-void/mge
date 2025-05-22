@@ -19,14 +19,16 @@ fn test_world_eventbus_integration() {
     let new_bus = Arc::new(Mutex::new(engine_core::ecs::event::EventBus::default()));
     world
         .event_buses
-        .update_event_bus("TestBus".to_string(), new_bus.clone())
-        .unwrap();
+        .register_event_bus::<serde_json::Value>("TestBus".to_string(), new_bus.clone());
     assert!(Arc::ptr_eq(
         &world.get_event_bus("TestBus").unwrap(),
         &new_bus
     ));
 
     // Unregister event bus via registry
-    world.event_buses.unregister_event_bus("TestBus").unwrap();
-    assert!(world.get_event_bus("TestBus").is_none());
+    assert!(
+        world
+            .event_buses
+            .unregister_event_bus::<serde_json::Value>("TestBus")
+    );
 }

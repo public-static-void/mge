@@ -17,7 +17,7 @@ fn test_dynamic_event_bus_send_and_read() {
     bar_bus.lock().unwrap().send(json!({ "value": "hello" }));
 
     // Advance event buses
-    world.update_event_buses();
+    world.update_event_buses::<serde_json::Value>();
 
     // Read FooEvent
     let mut foo_reader = engine_core::ecs::event::EventReader::default();

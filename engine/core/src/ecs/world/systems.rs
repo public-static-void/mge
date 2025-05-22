@@ -78,7 +78,7 @@ impl World {
             let _ = self.run_dynamic_system(&name);
         }
 
-        self.update_event_buses();
+        self.update_event_buses::<serde_json::Value>();
         self.turn += 1;
     }
 }
