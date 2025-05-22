@@ -11,6 +11,7 @@ pub use schema::ComponentSchema;
 pub mod system;
 pub mod world;
 use crate::modes::{GameMode, ModeManager, ModeRestrictedComponent};
+pub mod event_bus_registry;
 pub use components::{Health, Position};
 pub use error::{MigrationError, RegistryError};
 pub use registry::{Component, ComponentRegistry};
