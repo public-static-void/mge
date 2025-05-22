@@ -1,9 +1,14 @@
 use std::collections::VecDeque;
 
 pub type SubscriberId = usize;
-pub type Subscriber<E> = (SubscriberId, Box<dyn Fn(&E) + Send + Sync>);
 pub type FilterFn<E> = Box<dyn Fn(&E) -> bool + Send + Sync>;
 pub type MapFn<E, U> = Box<dyn Fn(&E) -> Option<U> + Send + Sync>;
+
+pub struct Subscriber<E> {
+    pub id: SubscriberId,
+    pub handler: Box<dyn Fn(&E) + Send + Sync>,
+    pub once: bool,
+}
 
 /// Double-buffered event bus for events of type E.
 pub struct EventBus<E> {
@@ -33,10 +38,21 @@ impl<E> EventBus<E> {
 impl<E: Clone + Send + Sync + 'static> EventBus<E> {
     /// Send (emit) an event.
     pub fn send(&mut self, event: E) {
-        // Dispatch to subscribers immediately
-        for (_, handler) in &self.subscribers {
-            handler(&event);
+        // Track which once-only subscribers should be removed
+        let mut to_remove = Vec::new();
+
+        for sub in &self.subscribers {
+            (sub.handler)(&event);
+            if sub.once {
+                to_remove.push(sub.id);
+            }
         }
+
+        // Remove once-only subscribers that have been called
+        if !to_remove.is_empty() {
+            self.subscribers.retain(|s| !to_remove.contains(&s.id));
+        }
+
         self.events.push_back(event);
     }
 
@@ -47,14 +63,18 @@ impl<E: Clone + Send + Sync + 'static> EventBus<E> {
     {
         let id = self.next_subscriber_id;
         self.next_subscriber_id += 1;
-        self.subscribers.push((id, Box::new(handler)));
+        self.subscribers.push(Subscriber {
+            id,
+            handler: Box::new(handler),
+            once: false,
+        });
         id
     }
 
     /// Unsubscribe a handler by its id.
     pub fn unsubscribe(&mut self, id: SubscriberId) -> bool {
         let prev_len = self.subscribers.len();
-        self.subscribers.retain(|(sid, _)| *sid != id);
+        self.subscribers.retain(|s| s.id != id);
         prev_len != self.subscribers.len()
     }
 
@@ -97,6 +117,21 @@ impl<E: Clone + Send + Sync + 'static> EventBus<E> {
                 handler(mapped);
             }
         })
+    }
+
+    /// Subscribe a handler that is called only once, then automatically unsubscribed.
+    pub fn subscribe_once<F>(&mut self, handler: F) -> SubscriberId
+    where
+        F: Fn(&E) + Send + Sync + 'static,
+    {
+        let id = self.next_subscriber_id;
+        self.next_subscriber_id += 1;
+        self.subscribers.push(Subscriber {
+            id,
+            handler: Box::new(handler),
+            once: true,
+        });
+        id
     }
 }
 
