@@ -1,3 +1,4 @@
+use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use std::sync::{Arc, Weak};
 
@@ -13,6 +14,7 @@ pub struct Subscriber<E> {
 }
 
 /// Double-buffered event bus for events of type E.
+/// Only the event buffers are serializable; subscribers are always runtime-only.
 pub struct EventBus<E> {
     events: VecDeque<E>,
     last_events: VecDeque<E>,
@@ -34,6 +36,38 @@ impl<E> Default for EventBus<E> {
 impl<E> EventBus<E> {
     pub fn subscriber_count(&self) -> usize {
         self.subscribers.len()
+    }
+
+    /// Serialize the event bus (events and last_events only).
+    pub fn serialize_events<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        E: Serialize,
+        S: serde::Serializer,
+    {
+        (&self.events, &self.last_events).serialize(serializer)
+    }
+
+    /// Deserialize into a new event bus (subscribers will be empty).
+    pub fn deserialize_events<'de, D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        E: Deserialize<'de>,
+        D: serde::Deserializer<'de>,
+    {
+        let (events, last_events) = <(VecDeque<E>, VecDeque<E>)>::deserialize(deserializer)?;
+        Ok(EventBus {
+            events,
+            last_events,
+            subscribers: Vec::new(),
+            next_subscriber_id: 0,
+        })
+    }
+
+    pub fn set_events(&mut self, events: std::collections::VecDeque<E>) {
+        self.events = events;
+    }
+
+    pub fn set_last_events(&mut self, last_events: std::collections::VecDeque<E>) {
+        self.last_events = last_events;
     }
 }
 
