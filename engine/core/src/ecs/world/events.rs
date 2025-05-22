@@ -108,4 +108,23 @@ impl World {
     {
         self.event_buses.unsubscribe::<T>(name, id)
     }
+
+    pub fn list_event_buses(&self) -> Vec<crate::ecs::event_bus_registry::EventBusInfo> {
+        self.event_buses.list_buses()
+    }
+
+    pub fn list_event_bus_names(&self) -> Vec<String> {
+        self.event_buses.list_bus_names()
+    }
+
+    pub fn list_event_bus_types_and_names(&self) -> Vec<(String, String)> {
+        self.event_buses.list_bus_types_and_names()
+    }
+
+    pub fn event_bus_subscriber_count<T: 'static + Send + Sync>(
+        &self,
+        name: &str,
+    ) -> Option<usize> {
+        self.event_buses.subscriber_count::<T>(name)
+    }
 }

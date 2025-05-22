@@ -3,6 +3,13 @@ use std::any::{Any, TypeId};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
+pub struct EventBusInfo {
+    pub type_id: TypeId,
+    pub type_name: &'static str,
+    pub name: String,
+    pub subscriber_count: usize,
+}
+
 pub struct EventBusRegistry {
     buses: HashMap<(TypeId, String), Arc<dyn Any + Send + Sync>>,
 }
@@ -78,6 +85,66 @@ impl EventBusRegistry {
         self.get_event_bus::<T>(name)
             .map(|bus| bus.lock().unwrap().unsubscribe(id))
             .unwrap_or(false)
+    }
+
+    /// List all registered event buses with metadata.
+    pub fn list_buses(&self) -> Vec<EventBusInfo> {
+        self.buses
+            .iter()
+            .map(|((type_id, name), arc_any)| {
+                // Try to downcast to EventBus of any type to get subscriber count.
+                // We'll use type_name for a best-effort type display.
+                let type_name = "<unknown>";
+                let subscriber_count = {
+                    // Try to get subscriber count for common types (JsonValue, etc.)
+                    // If you want to support more types, add them here.
+                    if let Ok(bus) = arc_any
+                        .clone()
+                        .downcast::<Mutex<EventBus<serde_json::Value>>>()
+                    {
+                        bus.lock().unwrap().subscriber_count()
+                    } else {
+                        // For other types, we can't get subscriber count without type info.
+                        0
+                    }
+                };
+                EventBusInfo {
+                    type_id: *type_id,
+                    type_name,
+                    name: name.clone(),
+                    subscriber_count,
+                }
+            })
+            .collect()
+    }
+
+    /// List all event bus names.
+    pub fn list_bus_names(&self) -> Vec<String> {
+        self.buses.keys().map(|(_, name)| name.clone()).collect()
+    }
+
+    /// List all event bus type_ids.
+    pub fn list_bus_type_ids(&self) -> Vec<TypeId> {
+        self.buses.keys().map(|(type_id, _)| *type_id).collect()
+    }
+
+    /// List all (type_name, name) pairs for all buses.
+    pub fn list_bus_types_and_names(&self) -> Vec<(String, String)> {
+        self.buses
+            .iter()
+            .map(|((type_id, name), _)| {
+                (
+                    format!("{:?}", type_id), // Or use a registry of type_name if you maintain one
+                    name.clone(),
+                )
+            })
+            .collect()
+    }
+
+    /// Get subscriber count for a bus of type T.
+    pub fn subscriber_count<T: 'static + Send + Sync>(&self, name: &str) -> Option<usize> {
+        self.get_event_bus::<T>(name)
+            .map(|bus| bus.lock().unwrap().subscriber_count())
     }
 }
 
