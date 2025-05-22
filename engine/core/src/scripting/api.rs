@@ -282,6 +282,183 @@ pub fn register_api_functions(
     })?;
     globals.set("load_from_file", load_from_file)?;
 
+    // get_inventory(entity)
+    let world_get_inventory = world.clone();
+    let get_inventory = lua.create_function_mut(move |lua, entity: u32| {
+        let world = world_get_inventory.borrow();
+        if let Some(val) = world.get_component(entity, "Inventory") {
+            json_to_lua_table(lua, val)
+        } else {
+            Ok(mlua::Value::Nil)
+        }
+    })?;
+    globals.set("get_inventory", get_inventory)?;
+
+    // set_inventory(entity, table)
+    let world_set_inventory = world.clone();
+    let set_inventory = lua.create_function_mut(move |lua, (entity, table): (u32, Table)| {
+        let mut world = world_set_inventory.borrow_mut();
+        let json_value = lua_table_to_json(lua, &table)?;
+        world
+            .set_component(entity, "Inventory", json_value)
+            .map_err(mlua::Error::external)
+    })?;
+    globals.set("set_inventory", set_inventory)?;
+
+    // add_item_to_inventory(entity, item)
+    let world_add_item = world.clone();
+    let add_item_to_inventory =
+        lua.create_function_mut(move |_, (entity, item_id): (u32, String)| {
+            let mut world = world_add_item.borrow_mut();
+            let mut inv = if let Some(val) = world.get_component(entity, "Inventory") {
+                val.clone()
+            } else {
+                serde_json::json!({})
+            };
+            let slots_opt = inv.get_mut("slots").and_then(|v| v.as_array_mut());
+            let slots = if let Some(slots) = slots_opt {
+                slots
+            } else {
+                inv["slots"] = serde_json::json!([]);
+                inv.get_mut("slots").unwrap().as_array_mut().unwrap()
+            };
+            slots.push(serde_json::Value::String(item_id));
+            world
+                .set_component(entity, "Inventory", inv)
+                .map_err(mlua::Error::external)
+        })?;
+    globals.set("add_item_to_inventory", add_item_to_inventory)?;
+
+    // remove_item_from_inventory(entity, index)
+    let world_remove_item = world.clone();
+    let remove_item_from_inventory =
+        lua.create_function_mut(move |_, (entity, index): (u32, usize)| {
+            let mut world = world_remove_item.borrow_mut();
+            let mut inv = if let Some(val) = world.get_component(entity, "Inventory") {
+                val.clone()
+            } else {
+                return Err(mlua::Error::external("No Inventory component found"));
+            };
+            if let Some(slots) = inv.get_mut("slots").and_then(|v| v.as_array_mut()) {
+                if index < slots.len() {
+                    slots.remove(index);
+                    world
+                        .set_component(entity, "Inventory", inv)
+                        .map_err(mlua::Error::external)
+                } else {
+                    Err(mlua::Error::external("Index out of bounds"))
+                }
+            } else {
+                Err(mlua::Error::external("No slots array in Inventory"))
+            }
+        })?;
+    globals.set("remove_item_from_inventory", remove_item_from_inventory)?;
+
+    // get_equipment(entity)
+    let world_get_equipment = world.clone();
+    let get_equipment = lua.create_function_mut(move |lua, entity: u32| {
+        let world = world_get_equipment.borrow();
+        if let Some(val) = world.get_component(entity, "Equipment") {
+            crate::scripting::helpers::json_to_lua_table(lua, val)
+        } else {
+            // Always return an empty table if not present
+            Ok(mlua::Value::Table(lua.create_table()?))
+        }
+    })?;
+    globals.set("get_equipment", get_equipment)?;
+
+    // equip_item(entity, item_id, slot)
+    let world_equip_item = world.clone();
+    let equip_item =
+        lua.create_function_mut(move |_, (entity, item_id, slot): (u32, String, String)| {
+            let mut world = world_equip_item.borrow_mut();
+
+            // 1. Check inventory
+            let inv = world
+                .get_component(entity, "Inventory")
+                .ok_or_else(|| mlua::Error::external("Entity has no inventory"))?;
+            let slots = inv
+                .get("slots")
+                .and_then(|v| v.as_array())
+                .ok_or_else(|| mlua::Error::external("No slots array in Inventory"))?;
+            if !slots
+                .iter()
+                .any(|v| v == &serde_json::Value::String(item_id.clone()))
+            {
+                return Err(mlua::Error::external("Item not in inventory"));
+            }
+
+            // 2. Check item metadata
+            let mut found = None;
+            for item_eid in world.get_entities_with_component("Item") {
+                if let Some(item_comp) = world.get_component(item_eid, "Item") {
+                    if item_comp.get("id") == Some(&serde_json::Value::String(item_id.clone())) {
+                        found = Some(item_comp);
+                        break;
+                    }
+                }
+            }
+            let item_meta = found.ok_or_else(|| mlua::Error::external("Item not found"))?;
+
+            // 3. Check slot compatibility
+            let valid_slot = item_meta
+                .get("slot")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| mlua::Error::external("Item missing slot info"))?;
+            if valid_slot != slot {
+                return Err(mlua::Error::external("invalid slot"));
+            }
+
+            // 4. Get or create Equipment component with correct structure
+            let mut equipment = if let Some(val) = world.get_component(entity, "Equipment") {
+                val.clone()
+            } else {
+                // Always create with correct structure
+                let mut map = serde_json::Map::new();
+                map.insert("slots".to_string(), serde_json::json!({}));
+                serde_json::Value::Object(map)
+            };
+
+            // 5. Ensure "slots" is an object
+            let slots_obj = equipment
+                .get_mut("slots")
+                .and_then(|v| v.as_object_mut())
+                .ok_or_else(|| mlua::Error::external("Equipment slots must be an object"))?;
+
+            // 6. Check if slot is already occupied
+            if let Some(existing) = slots_obj.get(&slot) {
+                if !existing.is_null() {
+                    return Err(mlua::Error::external("already equipped"));
+                }
+            }
+
+            // 7. Equip
+            slots_obj.insert(slot.clone(), serde_json::Value::String(item_id.clone()));
+            let result = world.set_component(entity, "Equipment", equipment);
+            println!("set_component result: {:?}", result);
+            result.map_err(mlua::Error::external)
+        })?;
+    globals.set("equip_item", equip_item)?;
+
+    // unequip_item(entity, slot)
+    let world_unequip_item = world.clone();
+    let unequip_item = lua.create_function_mut(move |_, (entity, slot): (u32, String)| {
+        let mut world = world_unequip_item.borrow_mut();
+        let mut equipment = world
+            .get_component(entity, "Equipment")
+            .ok_or_else(|| mlua::Error::external("No Equipment component"))?
+            .clone();
+        let slots_obj = equipment
+            .get_mut("slots")
+            .and_then(|v| v.as_object_mut())
+            .ok_or_else(|| mlua::Error::external("Equipment slots must be an object"))?;
+        slots_obj.insert(slot, serde_json::Value::Null);
+        world
+            .set_component(entity, "Equipment", equipment)
+            .map_err(mlua::Error::external)
+    })?;
+    globals.set("unequip_item", unequip_item)?;
+
     Ok(())
 }
 
