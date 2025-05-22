@@ -1,4 +1,6 @@
 use super::World;
+use crate::ecs::error::RegistryError;
+use crate::ecs::schema::ComponentSchema;
 use jsonschema::{Draft, JSONSchema};
 use serde_json::Value as JsonValue;
 
@@ -59,5 +61,10 @@ impl World {
     /// Unregister a dynamic system by name.
     pub fn unregister_dynamic_system(&mut self, name: &str) {
         self.dynamic_systems.unregister_system(name);
+    }
+
+    /// Hot-reload a component schema in the registry.
+    pub fn hotreload_schema(&mut self, schema: ComponentSchema) -> Result<(), RegistryError> {
+        self.registry.lock().unwrap().update_external_schema(schema)
     }
 }
