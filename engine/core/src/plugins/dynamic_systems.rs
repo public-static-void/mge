@@ -42,7 +42,11 @@ impl DynamicSystemRegistry {
         self.systems.keys().cloned().collect()
     }
 
-    pub fn unregister_system(&mut self, name: &str) {
-        self.systems.swap_remove(name);
+    pub fn unregister_system(&mut self, name: &str) -> Result<(), String> {
+        if self.systems.swap_remove(name).is_some() {
+            Ok(())
+        } else {
+            Err(format!("System '{}' not found", name))
+        }
     }
 }
