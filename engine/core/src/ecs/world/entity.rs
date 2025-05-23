@@ -113,4 +113,18 @@ impl World {
             })
             .collect()
     }
+
+    /// Returns all cells (as serde_json::Value) assigned to the given region_id.
+    pub fn cells_in_region(&self, region_id: &str) -> Vec<serde_json::Value> {
+        self.get_entities_with_component("RegionAssignment")
+            .into_iter()
+            .filter_map(|eid| {
+                self.get_component(eid, "RegionAssignment").and_then(|val| {
+                    let rid = val.get("region_id").and_then(|id| id.as_str());
+                    let cell = val.get("cell").cloned();
+                    if rid == Some(region_id) { cell } else { None }
+                })
+            })
+            .collect()
+    }
 }
