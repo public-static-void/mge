@@ -44,4 +44,59 @@ impl World {
             .into_iter()
             .collect()
     }
+
+    /// Returns all entity IDs in the given cell.
+    pub fn entities_in_cell(&self, cell: &crate::map::CellKey) -> Vec<u32> {
+        self.entities
+            .iter()
+            .copied()
+            .filter(|&eid| {
+                self.get_component(eid, "PositionComponent")
+                    .and_then(|val| {
+                        val.get("pos").and_then(|p| {
+                            if let Some(obj) = p.as_object() {
+                                if let Some(sq) = obj.get("Square") {
+                                    let x = sq.get("x")?.as_i64()? as i32;
+                                    let y = sq.get("y")?.as_i64()? as i32;
+                                    let z = sq.get("z")?.as_i64()? as i32;
+                                    if let crate::map::CellKey::Square {
+                                        x: cx,
+                                        y: cy,
+                                        z: cz,
+                                    } = cell
+                                    {
+                                        return Some(*cx == x && *cy == y && *cz == z);
+                                    }
+                                }
+                            }
+                            None
+                        })
+                    })
+                    .unwrap_or(false)
+            })
+            .collect()
+    }
+
+    /// Returns all entity IDs in the given z-level (for SquareGridMap).
+    pub fn entities_in_zlevel(&self, z: i32) -> Vec<u32> {
+        self.entities
+            .iter()
+            .copied()
+            .filter(|&eid| {
+                self.get_component(eid, "PositionComponent")
+                    .and_then(|val| {
+                        val.get("pos").and_then(|p| {
+                            if let Some(obj) = p.as_object() {
+                                if let Some(sq) = obj.get("Square") {
+                                    let zval = sq.get("z")?.as_i64()? as i32;
+                                    return Some(zval == z);
+                                }
+                            }
+                            None
+                        })
+                    })
+                    .unwrap_or(false)
+            })
+            .collect()
+    }
 }
