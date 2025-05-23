@@ -1,7 +1,7 @@
 {
   "title": "RegionAssignment",
   "type": "object",
-  "description": "Assigns a map cell to a region (e.g., room, biome, zone).",
+  "description": "Assigns a map cell to one or more regions (room, biome, zone, etc).",
   "properties": {
     "cell": {
       "type": "object",
@@ -38,7 +38,13 @@
         }
       }
     },
-    "region_id": { "type": "string", "description": "Region identifier" }
+    "region_id": {
+      "oneOf": [
+        { "type": "string" },
+        { "type": "array", "items": { "type": "string" } }
+      ],
+      "description": "One or more region identifiers"
+    }
   },
   "required": ["cell", "region_id"],
   "modes": ["colony", "roguelike", "editor"]
