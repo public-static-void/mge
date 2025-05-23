@@ -25,7 +25,8 @@ fn test_entities_in_multiple_regions() {
             eid1,
             "Region",
             serde_json::json!({
-                "id": ["room_1", "biome_A"]
+                "id": ["room_1", "biome_A"],
+                "kind": "room"
             }),
         )
         .unwrap();
@@ -37,7 +38,8 @@ fn test_entities_in_multiple_regions() {
             eid2,
             "Region",
             serde_json::json!({
-                "id": "room_1"
+                "id": "room_1",
+                "kind": "room"
             }),
         )
         .unwrap();
@@ -49,7 +51,8 @@ fn test_entities_in_multiple_regions() {
             eid3,
             "Region",
             serde_json::json!({
-                "id": "biome_A"
+                "id": "biome_A",
+                "kind": "biome"
             }),
         )
         .unwrap();
