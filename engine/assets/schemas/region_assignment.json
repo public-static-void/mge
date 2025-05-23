@@ -1,0 +1,45 @@
+{
+  "title": "RegionAssignment",
+  "type": "object",
+  "description": "Assigns a map cell to a region (e.g., room, biome, zone).",
+  "properties": {
+    "cell": {
+      "type": "object",
+      "oneOf": [
+        { "required": ["Square"] },
+        { "required": ["Hex"] },
+        { "required": ["Region"] }
+      ],
+      "properties": {
+        "Square": {
+          "type": "object",
+          "properties": {
+            "x": { "type": "integer" },
+            "y": { "type": "integer" },
+            "z": { "type": "integer" }
+          },
+          "required": ["x", "y", "z"]
+        },
+        "Hex": {
+          "type": "object",
+          "properties": {
+            "q": { "type": "integer" },
+            "r": { "type": "integer" },
+            "z": { "type": "integer" }
+          },
+          "required": ["q", "r", "z"]
+        },
+        "Region": {
+          "type": "object",
+          "properties": {
+            "id": { "type": "string" }
+          },
+          "required": ["id"]
+        }
+      }
+    },
+    "region_id": { "type": "string", "description": "Region identifier" }
+  },
+  "required": ["cell", "region_id"],
+  "modes": ["colony", "roguelike", "editor"]
+}
