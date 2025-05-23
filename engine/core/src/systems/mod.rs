@@ -1,3 +1,4 @@
+pub mod body_equipment_sync;
 pub mod equipment_effect_aggregation;
 pub mod equipment_logic;
 pub mod inventory;
