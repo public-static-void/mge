@@ -148,4 +148,18 @@ impl World {
             })
             .collect()
     }
+
+    /// Returns all entities assigned to regions of the given kind.
+    pub fn entities_in_region_kind(&self, kind: &str) -> Vec<u32> {
+        self.get_entities_with_component("Region")
+            .into_iter()
+            .filter(|&eid| {
+                self.get_component(eid, "Region")
+                    .and_then(|val| val.get("kind"))
+                    .and_then(|k| k.as_str())
+                    .map(|k| k == kind)
+                    .unwrap_or(false)
+            })
+            .collect()
+    }
 }
