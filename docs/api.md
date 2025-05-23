@@ -2,7 +2,7 @@
 
 > **Note:**
 > All functions below are available in both **Lua** (as global functions) and **Python** (as methods on the `PyWorld` class).
-> See [docs/examples.md](docs/examples.md) for usage in both languages.
+> See [docs/examples.md](examples.md) for usage in both languages.
 
 ---
 
@@ -69,6 +69,16 @@
 
 ---
 
+## Region and Zone Queries
+
+| Function                              | Description                                            |
+| -------------------------------------- | ------------------------------------------------------ |
+| `get_entities_in_region(region_id)`    | List entity IDs assigned to a given region/zone        |
+| `get_entities_in_region_kind(kind)`    | List entity IDs assigned to regions of the given kind  |
+| `get_cells_in_region(region_id)`       | List cells assigned to a given region/zone             |
+| `get_cells_in_region_kind(kind)`       | List cells assigned to regions of the given kind       |
+---
+
 ## Worldgen Plugins
 
 | Function                        | Description                              |
@@ -109,4 +119,4 @@
 - All Lua functions are available globally in scripts.
 - All Python functions are methods on the `PyWorld` class.
 - Component names are case-sensitive and must match the `"title"` in your schema files.
-- For practical code, see [docs/examples.md](docs/examples.md).
+- For practical code, see [docs/examples.md](examples.md).
