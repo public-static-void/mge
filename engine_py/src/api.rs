@@ -522,4 +522,30 @@ impl PyWorld {
             .set_component(entity_id, "Equipment", equipment)
             .map_err(|e| PyValueError::new_err(e.to_string()))
     }
+
+    /// Returns a list of entity IDs assigned to the given region ID.
+    fn get_entities_in_region(&self, region_id: String) -> Vec<u32> {
+        let world = self.inner.borrow();
+        world.entities_in_region(&region_id)
+    }
+
+    /// Returns a list of entity IDs assigned to regions of the given kind.
+    fn get_entities_in_region_kind(&self, kind: String) -> Vec<u32> {
+        let world = self.inner.borrow();
+        world.entities_in_region_kind(&kind)
+    }
+
+    /// Returns a list of cells (as Python objects) assigned to the given region ID.
+    fn get_cells_in_region(&self, py: Python, region_id: String) -> PyResult<PyObject> {
+        let world = self.inner.borrow();
+        let cells = world.cells_in_region(&region_id);
+        Ok(serde_pyobject::to_pyobject(py, &cells)?.into())
+    }
+
+    /// Returns a list of cells (as Python objects) assigned to regions of the given kind.
+    fn get_cells_in_region_kind(&self, py: Python, kind: String) -> PyResult<PyObject> {
+        let world = self.inner.borrow();
+        let cells = world.cells_in_region_kind(&kind);
+        Ok(serde_pyobject::to_pyobject(py, &cells)?.into())
+    }
 }
