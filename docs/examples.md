@@ -129,6 +129,42 @@ world.update_event_buses()
 
 ---
 
+## Region and Zone Queries
+
+### Lua
+
+```lua
+local eid1 = spawn_entity()
+set_component(eid1, "Region", { id = "room_1", kind = "room" })
+local eid2 = spawn_entity()
+set_component(eid2, "Region", { id = { "room_1", "biome_A" }, kind = "room" })
+local eid3 = spawn_entity()
+set_component(eid3, "Region", { id = "biome_A", kind = "biome" })
+
+local e_room = get_entities_in_region("room_1")
+print(#e_room) -- 2
+local e_kind_room = get_entities_in_region_kind("room")
+print(#e_kind_room) -- 2
+```
+
+### Python
+
+```python
+eid1 = world.spawn_entity()
+world.set_component(eid1, "Region", {"id": "room_1", "kind": "room"})
+eid2 = world.spawn_entity()
+world.set_component(eid2, "Region", {"id": ["room_1", "biome_A"], "kind": "room"})
+eid3 = world.spawn_entity()
+world.set_component(eid3, "Region", {"id": "biome_A", "kind": "biome"})
+
+e_room = world.get_entities_in_region("room_1")
+print(len(e_room)) # 2
+e_kind_room = world.get_entities_in_region_kind("room")
+print(len(e_kind_room)) # 2
+```
+
+---
+
 ## User Input
 
 ### Lua

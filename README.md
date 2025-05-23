@@ -14,6 +14,7 @@ MGE is a modular, cross-language game engine blueprint for rapid prototyping, ex
 - **Runtime mode switching:** Enables switching between game modes (e.g., "colony", "roguelike"), with schema-enforced component access.
 - **Flexible world generation:** World generators can be registered and invoked in Rust, Lua, Python, or C.
 - **Deterministic tick scheduler:** Provides a modular, event-driven simulation tick loop.
+- **Region/zone support:** Query entities and cells by region or zone, including multi-region and kind-based queries.
 
 ---
 
