@@ -1,11 +1,14 @@
 {
   "title": "Region",
   "type": "object",
-  "description": "Assigns an entity or cell to a named region or zone (e.g., room, biome, area).",
+  "description": "Assigns an entity to one or more regions/zones (e.g., room, biome, area).",
   "properties": {
     "id": {
-      "type": "string",
-      "description": "Region identifier (e.g., 'room_1', 'cavern_A')"
+      "oneOf": [
+        { "type": "string" },
+        { "type": "array", "items": { "type": "string" } }
+      ],
+      "description": "One or more region/zone identifiers"
     },
     "label": { "type": "string", "description": "Human-readable name" },
     "kind": {

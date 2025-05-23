@@ -100,20 +100,6 @@ impl World {
             .collect()
     }
 
-    /// Returns all entity IDs assigned to the given region ID.
-    pub fn entities_in_region(&self, region_id: &str) -> Vec<u32> {
-        self.get_entities_with_component("Region")
-            .into_iter()
-            .filter(|&eid| {
-                self.get_component(eid, "Region")
-                    .and_then(|val| val.get("id"))
-                    .and_then(|id| id.as_str())
-                    .map(|id| id == region_id)
-                    .unwrap_or(false)
-            })
-            .collect()
-    }
-
     /// Returns all cells (as serde_json::Value) assigned to the given region_id.
     pub fn cells_in_region(&self, region_id: &str) -> Vec<serde_json::Value> {
         self.get_entities_with_component("RegionAssignment")
@@ -140,6 +126,25 @@ impl World {
                         _ => None,
                     }
                 })
+            })
+            .collect()
+    }
+
+    /// Returns all entity IDs assigned to the given region ID (supports multi-region).
+    pub fn entities_in_region(&self, region_id: &str) -> Vec<u32> {
+        self.get_entities_with_component("Region")
+            .into_iter()
+            .filter(|&eid| {
+                self.get_component(eid, "Region")
+                    .and_then(|val| val.get("id"))
+                    .map(|id_val| match id_val {
+                        serde_json::Value::String(s) => s == region_id,
+                        serde_json::Value::Array(arr) => {
+                            arr.iter().any(|v| v.as_str() == Some(region_id))
+                        }
+                        _ => false,
+                    })
+                    .unwrap_or(false)
             })
             .collect()
     }
