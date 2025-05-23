@@ -120,9 +120,25 @@ impl World {
             .into_iter()
             .filter_map(|eid| {
                 self.get_component(eid, "RegionAssignment").and_then(|val| {
-                    let rid = val.get("region_id").and_then(|id| id.as_str());
-                    let cell = val.get("cell").cloned();
-                    if rid == Some(region_id) { cell } else { None }
+                    let cell = val.get("cell").cloned()?;
+                    let rid = val.get("region_id");
+                    match rid {
+                        Some(serde_json::Value::String(s)) => {
+                            if s == region_id {
+                                Some(cell)
+                            } else {
+                                None
+                            }
+                        }
+                        Some(serde_json::Value::Array(arr)) => {
+                            if arr.iter().any(|v| v.as_str() == Some(region_id)) {
+                                Some(cell)
+                            } else {
+                                None
+                            }
+                        }
+                        _ => None,
+                    }
                 })
             })
             .collect()
