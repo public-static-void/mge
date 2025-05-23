@@ -1,0 +1,18 @@
+{
+  "title": "Region",
+  "type": "object",
+  "description": "Assigns an entity or cell to a named region or zone (e.g., room, biome, area).",
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Region identifier (e.g., 'room_1', 'cavern_A')"
+    },
+    "label": { "type": "string", "description": "Human-readable name" },
+    "kind": {
+      "type": "string",
+      "description": "Region type (e.g., 'room', 'biome', 'zone')"
+    }
+  },
+  "required": ["id"],
+  "modes": ["colony", "roguelike", "editor"]
+}
