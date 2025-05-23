@@ -9,7 +9,7 @@ fn schema_dir() -> PathBuf {
 }
 
 #[test]
-fn test_entities_in_multiple_regions() {
+fn test_entities_by_region_kind() {
     let schemas = load_schemas_from_dir(schema_dir()).unwrap();
     let mut registry = ComponentRegistry::new();
     for (_name, schema) in schemas {
@@ -18,24 +18,10 @@ fn test_entities_in_multiple_regions() {
     let registry = Arc::new(Mutex::new(registry));
     let mut world = World::new(registry);
 
-    // eid1 in both "room_1" and "biome_A"
     let eid1 = world.spawn_entity();
     world
         .set_component(
             eid1,
-            "Region",
-            serde_json::json!({
-                "id": ["room_1", "biome_A"],
-                "kind": "room"
-            }),
-        )
-        .unwrap();
-
-    // eid2 only in "room_1"
-    let eid2 = world.spawn_entity();
-    world
-        .set_component(
-            eid2,
             "Region",
             serde_json::json!({
                 "id": "room_1",
@@ -44,28 +30,36 @@ fn test_entities_in_multiple_regions() {
         )
         .unwrap();
 
-    // eid3 only in "biome_A"
+    let eid2 = world.spawn_entity();
+    world
+        .set_component(
+            eid2,
+            "Region",
+            serde_json::json!({
+                "id": "stockpile_1",
+                "kind": "stockpile"
+            }),
+        )
+        .unwrap();
+
     let eid3 = world.spawn_entity();
     world
         .set_component(
             eid3,
             "Region",
             serde_json::json!({
-                "id": "biome_A",
-                "kind": "biome"
+                "id": "room_2",
+                "kind": "room"
             }),
         )
         .unwrap();
 
-    // Query all entities in "room_1"
-    let entities_room = world.entities_in_region("room_1");
-    assert!(entities_room.contains(&eid1));
-    assert!(entities_room.contains(&eid2));
-    assert!(!entities_room.contains(&eid3));
+    let room_entities = world.entities_in_region_kind("room");
+    assert!(room_entities.contains(&eid1));
+    assert!(room_entities.contains(&eid3));
+    assert!(!room_entities.contains(&eid2));
 
-    // Query all entities in "biome_A"
-    let entities_biome = world.entities_in_region("biome_A");
-    assert!(entities_biome.contains(&eid1));
-    assert!(!entities_biome.contains(&eid2));
-    assert!(entities_biome.contains(&eid3));
+    let stockpile_entities = world.entities_in_region_kind("stockpile");
+    assert!(stockpile_entities.contains(&eid2));
+    assert!(!stockpile_entities.contains(&eid1));
 }

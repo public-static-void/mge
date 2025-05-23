@@ -55,13 +55,25 @@ fn test_entities_in_region() {
 
     // Assign regions
     world
-        .set_component(eid1, "Region", serde_json::json!({"id": "room_1"}))
+        .set_component(
+            eid1,
+            "Region",
+            serde_json::json!({"id": "room_1", "kind": "room"}),
+        )
         .unwrap();
     world
-        .set_component(eid2, "Region", serde_json::json!({"id": "room_2"}))
+        .set_component(
+            eid2,
+            "Region",
+            serde_json::json!({"id": "room_2", "kind": "room"}),
+        )
         .unwrap();
     world
-        .set_component(eid3, "Region", serde_json::json!({"id": "room_1"}))
+        .set_component(
+            eid3,
+            "Region",
+            serde_json::json!({"id": "room_1", "kind": "room"}),
+        )
         .unwrap();
 
     // Query all entities in region "room_1"

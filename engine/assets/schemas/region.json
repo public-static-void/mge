@@ -1,7 +1,7 @@
 {
   "title": "Region",
   "type": "object",
-  "description": "Assigns an entity to one or more regions/zones (e.g., room, biome, area).",
+  "description": "Assigns an entity to one or more regions/zones with types.",
   "properties": {
     "id": {
       "oneOf": [
@@ -13,9 +13,9 @@
     "label": { "type": "string", "description": "Human-readable name" },
     "kind": {
       "type": "string",
-      "description": "Region type (e.g., 'room', 'biome', 'zone')"
+      "description": "Region type (e.g., 'room', 'biome', 'stockpile')"
     }
   },
-  "required": ["id"],
+  "required": ["id", "kind"],
   "modes": ["colony", "roguelike", "editor"]
 }
