@@ -13,7 +13,7 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 pub struct ScriptEngine {
-    lua: Rc<Lua>,
+    pub lua: Rc<Lua>,
     input_provider: Arc<Mutex<Box<dyn InputProvider + Send + Sync>>>,
     worldgen_registry: Rc<RefCell<WorldgenRegistry>>,
     lua_systems: Rc<RefCell<HashMap<String, RegistryKey>>>,
@@ -25,8 +25,33 @@ impl ScriptEngine {
     }
 
     pub fn new_with_input(input_provider: Box<dyn InputProvider + Send + Sync>) -> Self {
+        use mlua::{Lua, LuaOptions, StdLib};
+
+        // Lua-VM mit allen Standardbibliotheken (inkl. debug) erzeugen
+        let lua = unsafe { Lua::unsafe_new_with(StdLib::ALL, LuaOptions::default()) };
+
+        {
+            let globals = lua.globals();
+            let print = lua
+                .create_function(|_, args: mlua::Variadic<mlua::Value>| {
+                    let mut out = String::new();
+                    for (i, v) in args.iter().enumerate() {
+                        if i > 0 {
+                            out.push('\t');
+                        }
+                        out.push_str(&v.to_string()?);
+                    }
+                    println!("{}", out);
+                    Ok(())
+                })
+                .expect("Failed to create print function");
+            globals
+                .set("print", print)
+                .expect("Failed to set print function");
+        }
+
         Self {
-            lua: Rc::new(Lua::new()),
+            lua: Rc::new(lua),
             input_provider: Arc::new(Mutex::new(input_provider)),
             worldgen_registry: Rc::new(RefCell::new(WorldgenRegistry::new())),
             lua_systems: Rc::new(RefCell::new(HashMap::new())),
@@ -34,7 +59,7 @@ impl ScriptEngine {
     }
 
     pub fn run_script(&self, code: &str) -> LuaResult<()> {
-        self.lua.load(code).exec()
+        self.lua.load(code).call(())
     }
 
     pub fn register_world(&mut self, world: Rc<RefCell<World>>) -> mlua::Result<()> {
@@ -75,6 +100,22 @@ impl ScriptEngine {
         )?;
 
         Ok(())
+    }
+
+    pub fn set_lua_args(&self, args: Vec<String>) {
+        let globals = self.lua.globals();
+        let lua_args = self
+            .lua
+            .create_table()
+            .expect("Failed to create Lua table for args");
+        for (i, val) in args.iter().enumerate() {
+            lua_args
+                .set(i + 1, val.as_str())
+                .expect("Failed to set arg in Lua table");
+        }
+        globals
+            .set("arg", lua_args)
+            .expect("Failed to set global arg in Lua");
     }
 }
 

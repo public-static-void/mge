@@ -1,67 +1,52 @@
-local lu = require("luaunit")
+local assert = require("assert")
+local utils = require("utils")
 
-function test_equip_and_unequip()
-	print("START test_equip_and_unequip")
+local function test_equip_and_unequip()
 	local e = spawn_entity()
-	set_inventory(e, { slots = {}, weight = 0.0, volume = 0.0 })
+	set_inventory(e, { slots = utils.empty_array(), weight = 0.0, volume = 0.0 })
 	local sword = spawn_entity()
 	set_component(sword, "Item", { id = "sword", name = "Sword", slot = "right_hand" })
 	add_item_to_inventory(e, "sword")
 
-	-- Equip the sword
-	local ok, err = pcall(function()
-		equip_item(e, "sword", "right_hand")
-	end)
-	assert(ok, "equip_item failed: " .. tostring(err))
-
+	equip_item(e, "sword", "right_hand")
 	local eq = get_equipment(e)
-	lu.assertEquals(eq.slots.right_hand, "sword")
+	assert.equals(eq.slots.right_hand, "sword")
 
-	-- Unequip the sword
-	ok, err = pcall(function()
-		unequip_item(e, "right_hand")
-	end)
-	assert(ok, "unequip_item failed: " .. tostring(err))
-
+	unequip_item(e, "right_hand")
 	eq = get_equipment(e)
-	lu.assertNil(eq.slots.right_hand)
+	assert.is_nil(eq.slots.right_hand)
 end
 
-function test_equip_invalid_slot()
-	print("START test_equip_invalid_slot")
+local function test_equip_invalid_slot()
 	local e = spawn_entity()
-	set_inventory(e, { slots = {}, weight = 0.0, volume = 0.0 })
+	set_inventory(e, { slots = utils.empty_array(), weight = 0.0, volume = 0.0 })
 	local sword = spawn_entity()
 	set_component(sword, "Item", { id = "sword", name = "Sword", slot = "right_hand" })
 	add_item_to_inventory(e, "sword")
-
-	-- Try to equip to an invalid slot
 	local ok, err = pcall(function()
 		equip_item(e, "sword", "left_foot")
 	end)
-	assert(not ok, "Expected error, got success")
-	assert(tostring(err):find("invalid slot"), "Error message mismatch: " .. tostring(err))
+	assert.is_false(ok)
+	local msg = utils.error_to_table(err)
+	assert.is_true(msg.msg:find("Invalid slot"), "Error text not found!")
 end
 
-function test_equip_item_not_in_inventory()
-	print("START test_equip_item_not_in_inventory")
+local function test_equip_item_not_in_inventory()
 	local e = spawn_entity()
-	set_inventory(e, { slots = {}, weight = 0.0, volume = 0.0 })
+	set_inventory(e, { slots = utils.empty_array(), weight = 0.0, volume = 0.0 })
 	local sword = spawn_entity()
 	set_component(sword, "Item", { id = "sword", name = "Sword", slot = "right_hand" })
-
-	-- Try to equip an item not in inventory
 	local ok, err = pcall(function()
 		equip_item(e, "sword", "right_hand")
 	end)
-	assert(not ok, "Expected error, got success")
-	assert(tostring(err):find("not in inventory"), "Error message mismatch: " .. tostring(err))
+	assert.is_false(ok)
+	local msg = utils.error_to_table(err)
+	assert.is_true(msg.msg:find("not in Inventory"), "Error text not found!")
 end
 
-function test_double_equip_same_slot()
-	print("START test_double_equip_same_slot")
+local function test_double_equip_same_slot()
 	local e = spawn_entity()
-	set_inventory(e, { slots = {}, weight = 0.0, volume = 0.0 })
+	set_inventory(e, { slots = utils.empty_array(), weight = 0.0, volume = 0.0 })
 	local sword = spawn_entity()
 	set_component(sword, "Item", { id = "sword", name = "Sword", slot = "right_hand" })
 	local shield = spawn_entity()
@@ -69,16 +54,18 @@ function test_double_equip_same_slot()
 	add_item_to_inventory(e, "sword")
 	add_item_to_inventory(e, "shield")
 
+	equip_item(e, "sword", "right_hand")
 	local ok, err = pcall(function()
-		equip_item(e, "sword", "right_hand")
-	end)
-	assert(ok, "equip_item failed: " .. tostring(err))
-
-	ok, err = pcall(function()
 		equip_item(e, "shield", "right_hand")
 	end)
-	assert(not ok, "Expected error, got success")
-	assert(tostring(err):find("already equipped"), "Error message mismatch: " .. tostring(err))
+	assert.is_false(ok)
+	local msg = utils.error_to_table(err)
+	assert.is_true(msg.msg:find("already occupied"), "Error text not found!")
 end
 
-os.exit(lu.LuaUnit.run())
+return {
+	test_equip_and_unequip = test_equip_and_unequip,
+	test_equip_invalid_slot = test_equip_invalid_slot,
+	test_equip_item_not_in_inventory = test_equip_item_not_in_inventory,
+	test_double_equip_same_slot = test_double_equip_same_slot,
+}

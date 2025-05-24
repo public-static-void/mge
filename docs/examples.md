@@ -165,6 +165,102 @@ print(len(e_kind_room)) # 2
 
 ---
 
+## Inventory Example
+
+### Lua
+
+```lua
+local e = spawn_entity()
+set_inventory(e, { slots = {}, weight = 0.0, volume = 0.0 })
+add_item_to_inventory(e, "ring")
+local inv = get_inventory(e)
+print(inv.slots) -- "ring"
+remove_item_from_inventory(e, 0)
+```
+
+### Python
+
+```python
+eid = world.spawn_entity()
+world.set_inventory(eid, { "slots": [], "weight": 0.0, "volume": 0.0 })
+world.add_item_to_inventory(eid, "ring")
+inv = world.get_inventory(eid)
+print(inv["slots"]) # "ring"
+world.remove_item_from_inventory(eid, 0)
+```
+
+---
+
+## Equipment Example
+
+### Lua
+
+```lua
+set_component(e, "Item", { id = "sword", name = "Sword", slot = "right_hand" })
+add_item_to_inventory(e, "sword")
+equip_item(e, "sword", "right_hand")
+local eq = get_equipment(e)
+print(eq.slots.right_hand) -- "sword"
+unequip_item(e, "right_hand")
+```
+
+### Python
+
+```python
+world.set_component(eid, "Item", { "id": "sword", "name": "Sword", "slot": "right_hand" })
+world.add_item_to_inventory(eid, "sword")
+world.equip_item(eid, "sword", "right_hand")
+eq = world.get_equipment(eid)
+print(eq["slots"]["right_hand"]) # "sword"
+world.unequip_item(eid, "right_hand")
+```
+
+---
+
+## Body Example
+
+### Lua
+
+```lua
+set_body(e, { parts = {} })
+add_body_part(e, {
+    name = "torso",
+    status = "healthy",
+    kind = "flesh",
+    temperature = 37.0,
+    ideal_temperature = 37.0,
+    insulation = 1.0,
+    heat_loss = 0.1,
+    children = {},
+    equipped = {},
+})
+local body = get_body(e)
+print(body.parts.name) -- "torso"
+remove_body_part(e, "torso")
+```
+
+### Python
+
+```python
+world.set_body(eid, { "parts": [] })
+world.add_body_part(eid, {
+    "name": "torso",
+    "status": "healthy",
+    "kind": "flesh",
+    "temperature": 37.0,
+    "ideal_temperature": 37.0,
+    "insulation": 1.0,
+    "heat_loss": 0.1,
+    "children": [],
+    "equipped": [],
+})
+body = world.get_body(eid)
+print(body["parts"]["name"]) # "torso"
+world.remove_body_part(eid, "torso")
+```
+
+---
+
 ## User Input
 
 ### Lua

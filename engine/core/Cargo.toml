@@ -5,7 +5,7 @@ edition = "2024"
 
 [dependencies]
 hecs = "0.10"
-mlua = { version = "0.9", features = ["luajit", "serialize"] }
+mlua = { version = "0.10.3", features = ["luajit", "serialize"] }
 serde = { version = "1.0", features = ["derive"] }
 schemars = { version = "0.8", features = ["derive"] }
 schemars_derive = "0.8"
@@ -23,6 +23,8 @@ topo_sort = "0.4.0"
 serde_yaml = "0.9.34"
 toml = "0.8.22"
 rand = "0.9.1"
+strip-ansi-escapes = "0.2.1"
+gag = "1.0.0"
 
 [dev-dependencies]
 rstest = "0.18"

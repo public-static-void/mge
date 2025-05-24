@@ -71,12 +71,13 @@
 
 ## Region and Zone Queries
 
-| Function                              | Description                                            |
-| -------------------------------------- | ------------------------------------------------------ |
-| `get_entities_in_region(region_id)`    | List entity IDs assigned to a given region/zone        |
-| `get_entities_in_region_kind(kind)`    | List entity IDs assigned to regions of the given kind  |
-| `get_cells_in_region(region_id)`       | List cells assigned to a given region/zone             |
-| `get_cells_in_region_kind(kind)`       | List cells assigned to regions of the given kind       |
+| Function                            | Description                                           |
+| ----------------------------------- | ----------------------------------------------------- |
+| `get_entities_in_region(region_id)` | List entity IDs assigned to a given region/zone       |
+| `get_entities_in_region_kind(kind)` | List entity IDs assigned to regions of the given kind |
+| `get_cells_in_region(region_id)`    | List cells assigned to a given region/zone            |
+| `get_cells_in_region_kind(kind)`    | List cells assigned to regions of the given kind      |
+
 ---
 
 ## Worldgen Plugins
@@ -95,6 +96,25 @@
 | ---------------------- | -------------------------------------- |
 | `save_to_file(path)`   | Save the current world state to a file |
 | `load_from_file(path)` | Load world state from a file           |
+
+---
+
+## Inventory, Equipment, and Body Helpers
+
+| Function                                    | Description                                 |
+| ------------------------------------------- | ------------------------------------------- |
+| `get_inventory(entity)`                     | Get the inventory component as a table/dict |
+| `set_inventory(entity, data)`               | Set the inventory component                 |
+| `add_item_to_inventory(entity, item_id)`    | Add an item ID to the inventory             |
+| `remove_item_from_inventory(entity, index)` | Remove item at index from the inventory     |
+| `get_equipment(entity)`                     | Get the equipment component as a table/dict |
+| `equip_item(entity, item_id, slot)`         | Equip an item to a slot                     |
+| `unequip_item(entity, slot)`                | Unequip the item from the given slot        |
+| `get_body(entity)`                          | Get the body component as a table/dict      |
+| `set_body(entity, data)`                    | Set the body component                      |
+| `add_body_part(entity, part)`               | Add a part to the body (recursive)          |
+| `remove_body_part(entity, name)`            | Remove a part by name (recursive)           |
+| `get_body_part(entity, name)`               | Get a part by name (recursive)              |
 
 ---
 
