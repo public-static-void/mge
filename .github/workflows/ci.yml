@@ -3,26 +3,66 @@ name: CI
 on:
   pull_request:
     branches: [main]
+  push:
+    branches: [main]
 
 jobs:
   lint-and-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+
+      # Rust toolchain for Lint und Tests
       - uses: moonrepo/setup-rust@v1
         with:
           components: rustfmt, clippy
-      - name: Install LuaJIT
-        run: sudo apt-get update && sudo apt-get install -y libluajit-5.1-dev
-      - name: Lint
+
+      # Lua for Lua-Tests
+      - name: Install Lua
+        run: sudo apt-get update && sudo apt-get install -y lua5.1
+
+      # Python for Python-Tests
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # Python Dependencies
+      - name: Install maturin and pytest
+        run: |
+          pip install maturin pytest
+
+      # Rust Linting
+      - name: Lint (rustfmt)
         run: cargo fmt --all --check
+
       - name: Clippy
         run: cargo clippy --all-targets --all-features -- -D warnings
+
+      # Rust Tests
+      - name: Rust Tests
+        run: cargo test --all
+
+      # Lua-Tests (Custom Runner)
+      - name: Lua Tests
+        run: ./run_lua_tests.sh
+
+      # Build and Test Python-Bindings
+      - name: Build Python bindings
+        run: |
+          cd engine_py
+          maturin develop
+
+      - name: Python Tests
+        run: |
+          cd engine_py
+          pytest
+
+      # Build C-Plugins
       - name: Build all C plugins
         run: |
           for src in plugins/*.c; do
             base=$(basename "$src" .c)
             gcc -Iengine -shared -fPIC "$src" -o "plugins/lib${base}.so"
           done
-      - name: Test
-        run: cargo test --all
+        if: ${{ hashFiles('plugins/*.c') != '' }}
