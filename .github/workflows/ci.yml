@@ -17,6 +17,15 @@ jobs:
         with:
           components: rustfmt, clippy
 
+      # Build C-Plugins
+      - name: Build all C plugins
+        run: |
+          for src in plugins/*.c; do
+            base=$(basename "$src" .c)
+            gcc -Iengine -shared -fPIC "$src" -o "plugins/lib${base}.so"
+          done
+        if: ${{ hashFiles('plugins/*.c') != '' }}
+
       # Lua Dependencies
       - name: Install LuaJIT and pkg-config
         run: sudo apt-get update && sudo apt-get install -y libluajit-5.1-dev pkg-config
@@ -61,12 +70,3 @@ jobs:
         run: |
           cd engine_py
           pytest
-
-      # Build C-Plugins
-      - name: Build all C plugins
-        run: |
-          for src in plugins/*.c; do
-            base=$(basename "$src" .c)
-            gcc -Iengine -shared -fPIC "$src" -o "plugins/lib${base}.so"
-          done
-        if: ${{ hashFiles('plugins/*.c') != '' }}
