@@ -1,8 +1,6 @@
-local luaunit = require("luaunit")
+local assert = require("assert")
 
-TestJob = {}
-
-function TestJob:test_job_completion_event()
+local function test_job_completion_event()
 	local eid = spawn_entity()
 	assign_job(eid, "test_job", { should_fail = false })
 	local found = false
@@ -14,7 +12,6 @@ function TestJob:test_job_completion_event()
 			for _, event in ipairs(events) do
 				if event.entity == eid then
 					found = true
-					-- Optionally: print("Job completed event received for entity", eid)
 				end
 			end
 			if found then
@@ -22,7 +19,9 @@ function TestJob:test_job_completion_event()
 			end
 		end
 	end
-	luaunit.assertTrue(found, "No job_completed events for this entity")
+	assert.is_true(found, "No job_completed events for this entity")
 end
 
-os.exit(luaunit.LuaUnit.run())
+return {
+	test_job_completion_event = test_job_completion_event,
+}

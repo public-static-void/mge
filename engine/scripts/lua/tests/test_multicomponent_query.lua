@@ -1,8 +1,6 @@
-local luaunit = require("luaunit")
+local assert = require("assert")
 
-TestMultiComponentQuery = {}
-
-function TestMultiComponentQuery:test_query()
+local function test_query()
 	local e1 = spawn_entity()
 	set_component(e1, "Health", { current = 10, max = 10 })
 	set_component(e1, "PositionComponent", { pos = { Square = { x = 1, y = 2, z = 0 } } })
@@ -14,8 +12,10 @@ function TestMultiComponentQuery:test_query()
 	set_component(e3, "PositionComponent", { pos = { Square = { x = 3, y = 4, z = 0 } } })
 
 	local both = get_entities_with_components({ "Health", "PositionComponent" })
-	luaunit.assertEquals(#both, 1, "Multi-component query failed: wrong number of entities")
-	luaunit.assertEquals(both[1], e1, "Multi-component query failed: wrong entity returned")
+	assert.equals(#both, 1, "Multi-component query failed: wrong number of entities")
+	assert.equals(both[1], e1, "Multi-component query failed: wrong entity returned")
 end
 
-os.exit(luaunit.LuaUnit.run())
+return {
+	test_query = test_query,
+}

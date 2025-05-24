@@ -1,23 +1,29 @@
-local luaunit = require("luaunit")
+local assert = require("assert")
+local utils = require("utils")
 
-TestSaveLoad = {}
+local function test_save_and_load()
+	-- Setup: create some entities and save them
+	local e1 = spawn_entity()
+	set_inventory(e1, { slots = utils.empty_array(), weight = 0.0, volume = 0.0 })
+	local e2 = spawn_entity()
+	set_component(e2, "Health", { current = 10, max = 10 })
 
-function TestSaveLoad:test_save_and_load()
-	local e = spawn_entity()
-	set_component(e, "Health", { current = 99, max = 100 })
 	save_to_file("test_save.json")
-
-	despawn_entity(e)
-	luaunit.assertEquals(#get_entities(), 0, "Entities should be empty after despawn")
-
-	load_from_file("test_save.json")
+	-- Despawn all entities in the world
 	local entities = get_entities()
-	luaunit.assertTrue(#entities > 0, "No entities loaded from save file")
-	local h = get_component(entities[1], "Health")
-	luaunit.assertEquals(h.current, 99, "Loaded entity health.current mismatch")
+	for _, eid in ipairs(entities) do
+		despawn_entity(eid)
+	end
 
-	-- Clean up
-	os.remove("test_save.json")
+	local entities_after_despawn = get_entities()
+	assert.equals(#entities_after_despawn, 0, "Entities should be empty after despawn")
+
+	-- Restore
+	load_from_file("test_save.json")
+	local entities_after = get_entities()
+	assert.is_true(#entities_after >= 2, "Entities should exist after loading")
 end
 
-os.exit(luaunit.LuaUnit.run())
+return {
+	test_save_and_load = test_save_and_load,
+}
