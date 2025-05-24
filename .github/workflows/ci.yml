@@ -12,12 +12,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Rust toolchain for Lint und Tests
       - uses: moonrepo/setup-rust@v1
         with:
           components: rustfmt, clippy
 
-      # Build C-Plugins
       - name: Build all C plugins
         run: |
           for src in plugins/*.c; do
@@ -26,47 +24,35 @@ jobs:
           done
         if: ${{ hashFiles('plugins/*.c') != '' }}
 
-      # Lua Dependencies
       - name: Install LuaJIT and pkg-config
         run: sudo apt-get update && sudo apt-get install -y libluajit-5.1-dev pkg-config
 
-      # Lua for Lua-Tests
       - name: Install Lua
         run: sudo apt-get update && sudo apt-get install -y lua5.1
 
-      # Python for Python-Tests
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      # Python Dependencies
-      - name: Install maturin and pytest
-        run: |
-          pip install maturin pytest
-
-      # Rust Linting
       - name: Lint (rustfmt)
         run: cargo fmt --all --check
 
       - name: Clippy
         run: cargo clippy --all-targets --all-features -- -D warnings
 
-      # Rust Tests
       - name: Rust Tests
         run: cargo test --all
 
-      # Lua-Tests (Custom Runner)
       - name: Lua Tests
         run: ./run_lua_tests.sh
 
-      # Build and Test Python-Bindings
-      - name: Build Python bindings
+      - name: Build and test Python bindings
         run: |
+          python -m venv .venv
+          source .venv/bin/activate
+          pip install --upgrade pip
+          pip install maturin pytest
           cd engine_py
           maturin develop
-
-      - name: Python Tests
-        run: |
-          cd engine_py
           pytest
