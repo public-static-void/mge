@@ -1,6 +1,6 @@
 use crate::ecs::event::{EventBus, EventReader};
 use crate::ecs::world::World;
-use crate::scripting::helpers::json_to_lua_table;
+use crate::scripting::helpers::{json_to_lua_table, lua_error_from_any};
 use mlua::{Lua, Result as LuaResult, Table, UserData, UserDataMethods};
 use serde_json::Value as JsonValue;
 use std::cell::RefCell;
@@ -29,7 +29,7 @@ impl Default for LuaEventBus {
 }
 
 impl UserData for LuaEventBus {
-    fn add_methods<'lua, M: UserDataMethods<'lua, Self>>(methods: &mut M) {
+    fn add_methods<M: UserDataMethods<Self>>(methods: &mut M) {
         methods.add_method_mut("send", |_, this, value: u32| {
             this.inner.lock().unwrap().send(MyEvent(value));
             Ok(())
@@ -61,13 +61,13 @@ pub fn register_event_bus_and_globals(
     // send_event
     let world_send_event = world.clone();
     let send_event =
-        lua.create_function_mut(move |_, (event_type, payload): (String, String)| {
+        lua.create_function_mut(move |lua, (event_type, payload): (String, String)| {
             let mut world = world_send_event.borrow_mut();
             let json_payload: JsonValue =
-                serde_json::from_str(&payload).map_err(mlua::Error::external)?;
+                serde_json::from_str(&payload).map_err(|e| lua_error_from_any(lua, e))?;
             world
                 .send_event(&event_type, json_payload)
-                .map_err(mlua::Error::external)
+                .map_err(|e| lua_error_from_any(lua, e))
         })?;
     globals.set("send_event", send_event)?;
 

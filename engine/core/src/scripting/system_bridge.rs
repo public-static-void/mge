@@ -1,5 +1,7 @@
 use crate::ecs::world::World;
-use crate::scripting::helpers::{json_to_lua_table, lua_table_to_json};
+use crate::scripting::helpers::{
+    json_to_lua_table, lua_error_from_any, lua_error_msg, lua_table_to_json,
+};
 use mlua::{Function, Lua, RegistryKey, Result as LuaResult, Table};
 use serde_json::Value as JsonValue;
 use std::cell::RefCell;
@@ -23,7 +25,7 @@ pub fn register_system_functions(
 
             let mut dependencies = Vec::new();
             if let Some(opts) = opts {
-                if let Ok(dep_table) = opts.get::<_, Table>("dependencies") {
+                if let Ok(dep_table) = opts.get::<Table>("dependencies") {
                     for dep in dep_table.sequence_values::<String>() {
                         dependencies.push(dep?);
                     }
@@ -46,7 +48,7 @@ pub fn register_system_functions(
                     let func: Function = lua_inner
                         .registry_value(key)
                         .expect("Invalid Lua registry key");
-                    let _ = func.call::<_, ()>((dt,));
+                    let _ = func.call::<()>(dt);
                 },
             );
 
@@ -61,45 +63,50 @@ pub fn register_system_functions(
         let systems = lua_systems_ref.borrow();
         if let Some(key) = systems.get(&name) {
             let func: Function = lua.registry_value(key)?;
-            func.call::<_, ()>(())?;
+            func.call::<()>(())?;
             Ok(())
         } else {
-            Err(mlua::Error::external("system not found"))
+            Err(lua_error_msg(lua, "system not found"))
         }
     })?;
     globals.set("run_system", run_system)?;
 
     // run_native_system
     let world_native_run = world.clone();
+    let lua_for_native = lua.clone();
     let run_native_system = lua.create_function_mut(move |_, name: String| {
         let mut world = world_native_run.borrow_mut();
-        world.run_system(&name, None).map_err(mlua::Error::external)
+        world
+            .run_system(&name, None)
+            .map_err(|e| lua_error_from_any(&lua_for_native, e))
     })?;
     globals.set("run_native_system", run_native_system)?;
 
     // assign_job(entity, job_type, fields)
     let world_assign_job = world.clone();
-    let assign_job = lua.create_function_mut(
-        move |lua, (entity, job_type, fields): (u32, String, Option<Table>)| {
-            let mut world = world_assign_job.borrow_mut();
-            let mut job_val = serde_json::json!({
-                "job_type": job_type,
-                "status": "pending",
-                "progress": 0.0
-            });
-            if let Some(tbl) = fields {
-                let extra: JsonValue = lua_table_to_json(lua, &tbl)?;
-                if let Some(obj) = extra.as_object() {
-                    for (k, v) in obj {
-                        job_val[k] = v.clone();
+    let assign_job = {
+        lua.create_function_mut(
+            move |lua, (entity, job_type, fields): (u32, String, Option<Table>)| {
+                let mut world = world_assign_job.borrow_mut();
+                let mut job_val = serde_json::json!({
+                    "job_type": job_type,
+                    "status": "pending",
+                    "progress": 0.0
+                });
+                if let Some(tbl) = fields {
+                    let extra: JsonValue = lua_table_to_json(lua, &tbl, None)?;
+                    if let Some(obj) = extra.as_object() {
+                        for (k, v) in obj {
+                            job_val[k] = v.clone();
+                        }
                     }
                 }
-            }
-            world
-                .set_component(entity, "Job", job_val)
-                .map_err(mlua::Error::external)
-        },
-    )?;
+                world
+                    .set_component(entity, "Job", job_val)
+                    .map_err(|e| lua_error_from_any(lua, e))
+            },
+        )
+    }?;
     globals.set("assign_job", assign_job)?;
 
     // poll_ecs_event

@@ -12,7 +12,7 @@ pub enum WorldgenError {
 
 impl fmt::Display for WorldgenError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self) // or provide a more descriptive message
+        write!(f, "{:?}", self)
     }
 }
 
@@ -93,18 +93,14 @@ impl WorldgenRegistry {
             } = plugin
             {
                 if plugin_name == name {
-                    // 1. Retrieve the Lua function from the registry
                     let func: mlua::Function = lua
                         .registry_value(registry_key)
                         .map_err(WorldgenError::LuaError)?;
-                    // 2. Convert params from JSON to Lua table
                     let params_table =
                         json_to_lua_table(lua, params).map_err(WorldgenError::LuaError)?;
-                    // 3. Call the Lua function
                     let result: mlua::Value =
                         func.call(params_table).map_err(WorldgenError::LuaError)?;
-                    // 4. Convert the result from Lua value to JSON
-                    return lua_value_to_json(lua, result).map_err(WorldgenError::LuaError);
+                    return lua_value_to_json(lua, result, None).map_err(WorldgenError::LuaError);
                 }
             }
         }

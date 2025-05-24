@@ -59,7 +59,7 @@ fn test_lua_can_list_and_invoke_worldgen_plugins() {
         .eval()
         .expect("Should invoke worldgen");
 
-    assert_eq!(map.get::<_, String>("topology").unwrap(), "square");
+    assert_eq!(map.get::<String>("topology").unwrap(), "square");
     let cells: Table = map.get("cells").unwrap();
     assert_eq!(cells.len().unwrap(), 4);
 }

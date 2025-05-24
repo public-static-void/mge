@@ -1,4 +1,4 @@
-use crate::scripting::helpers::{json_to_lua_table, lua_table_to_json};
+use crate::scripting::helpers::{json_to_lua_table, lua_error_msg, lua_table_to_json};
 use crate::worldgen::{WorldgenError, WorldgenPlugin, WorldgenRegistry};
 use mlua::{Function, Lua, Result as LuaResult, Table};
 use std::cell::RefCell;
@@ -32,14 +32,14 @@ pub fn register_worldgen_functions(
     // invoke_worldgen(name, params)
     let worldgen_registry_invoke = worldgen_registry.clone();
     let invoke_worldgen = lua.create_function(move |lua, (name, params): (String, Table)| {
-        let params_json = lua_table_to_json(lua, &params)?;
+        let params_json = lua_table_to_json(lua, &params, None)?;
         let registry = worldgen_registry_invoke.borrow();
         match registry.invoke_lua(lua, &name, &params_json) {
             Ok(result_json) => json_to_lua_table(lua, &result_json),
-            Err(WorldgenError::NotFound) => Err(mlua::Error::external(format!(
-                "Worldgen plugin '{}' not found",
-                name
-            ))),
+            Err(WorldgenError::NotFound) => Err(lua_error_msg(
+                lua,
+                &format!("Worldgen plugin '{}' not found", name),
+            )),
             Err(WorldgenError::LuaError(e)) => Err(e),
         }
     })?;
