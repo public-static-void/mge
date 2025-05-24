@@ -3,26 +3,56 @@ name: CI
 on:
   pull_request:
     branches: [main]
+  push:
+    branches: [main]
 
 jobs:
   lint-and-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+
       - uses: moonrepo/setup-rust@v1
         with:
           components: rustfmt, clippy
-      - name: Install LuaJIT
-        run: sudo apt-get update && sudo apt-get install -y libluajit-5.1-dev
-      - name: Lint
-        run: cargo fmt --all --check
-      - name: Clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
+
       - name: Build all C plugins
         run: |
           for src in plugins/*.c; do
             base=$(basename "$src" .c)
             gcc -Iengine -shared -fPIC "$src" -o "plugins/lib${base}.so"
           done
-      - name: Test
+        if: ${{ hashFiles('plugins/*.c') != '' }}
+
+      - name: Install LuaJIT and pkg-config
+        run: sudo apt-get update && sudo apt-get install -y libluajit-5.1-dev pkg-config
+
+      - name: Install Lua
+        run: sudo apt-get update && sudo apt-get install -y lua5.1
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Lint (rustfmt)
+        run: cargo fmt --all --check
+
+      - name: Clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Rust Tests
         run: cargo test --all
+
+      - name: Lua Tests
+        run: ./run_lua_tests.sh
+
+      - name: Build and test Python bindings
+        run: |
+          python -m venv .venv
+          source .venv/bin/activate
+          pip install --upgrade pip
+          pip install maturin pytest
+          cd engine_py
+          maturin develop
+          pytest
