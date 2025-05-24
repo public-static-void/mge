@@ -8,7 +8,7 @@ This document contains practical code samples for Lua, Python, and Rust usage.
 
 ### Lua
 
-```
+```lua
 local id = spawn_entity()
 despawn_entity(id)
 local ids = get_entities()
@@ -16,7 +16,7 @@ local ids = get_entities()
 
 ### Python
 
-```
+```python
 eid = world.spawn_entity()
 world.despawn_entity(eid)
 ids = world.get_entities()
@@ -28,14 +28,14 @@ ids = world.get_entities()
 
 ### Lua
 
-```
+```lua
 set_component(id, "Health", { current = 10, max = 10 })
 local health = get_component(id, "Health")
 ```
 
 ### Python
 
-```
+```python
 world.set_component(eid, "Health", {"current": 10, "max": 10})
 health = world.get_component(eid, "Health")
 ```
@@ -46,13 +46,13 @@ health = world.get_component(eid, "Health")
 
 ### Lua
 
-```
+```lua
 local ids = get_entities_with_component("Health")
 ```
 
 ### Python
 
-```
+```python
 ids = world.get_entities_with_component("Health")
 ```
 
@@ -62,7 +62,7 @@ ids = world.get_entities_with_component("Health")
 
 ### Lua
 
-```
+```lua
 set_mode("colony")
 print(get_mode())
 print(get_available_modes())
@@ -70,7 +70,7 @@ print(get_available_modes())
 
 ### Python
 
-```
+```python
 world.set_mode("colony")
 print(world.get_mode())
 print(world.get_available_modes())
@@ -82,7 +82,7 @@ print(world.get_available_modes())
 
 ### Lua
 
-```
+```lua
 local ran = false
 register_system("test_lua_system", function(dt)
     ran = true
@@ -93,7 +93,7 @@ assert(ran == true, "System did not run!")
 
 ### Python
 
-```
+```python
 ran = {"flag": False}
 def sys(dt):
     ran["flag"] = True
@@ -108,7 +108,7 @@ assert ran["flag"] is True
 
 ### Lua
 
-```
+```lua
 send_event("my_event", {foo = 42})
 local events = poll_event("my_event")
 for i, evt in ipairs(events) do
@@ -119,7 +119,7 @@ update_event_buses()
 
 ### Python
 
-```
+```python
 world.send_event("my_event", '{"foo": 42}')
 events = world.poll_event("my_event")
 for evt in events:
@@ -265,14 +265,14 @@ world.remove_body_part(eid, "torso")
 
 ### Lua
 
-```
+```lua
 local name = get_user_input("Enter your name: ")
 print("Hello, " .. name)
 ```
 
 ### Python
 
-```
+```python
 name = world.get_user_input("Enter your name: ")
 print("Hello,", name)
 ```
