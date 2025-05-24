@@ -1,5 +1,5 @@
 use mlua::{Error as LuaError, Lua, Result as LuaResult, Table, Value as LuaValue};
-use serde_json::{json, Map, Value as JsonValue};
+use serde_json::{Map, Value as JsonValue, json};
 
 pub fn luaunit_style_error(_lua: &Lua, msg: &str) -> LuaError {
     let err_json = json!({
