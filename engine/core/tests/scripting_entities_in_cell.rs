@@ -1,4 +1,5 @@
 use engine_core::ecs::registry::ComponentRegistry;
+use engine_core::ecs::schema::load_schemas_from_dir;
 use engine_core::ecs::world::World;
 use engine_core::scripting::engine::ScriptEngine;
 use std::cell::RefCell;
@@ -7,7 +8,13 @@ use std::sync::{Arc, Mutex};
 
 #[test]
 fn test_lua_entities_in_cell_api() {
+    let schema_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap() + "/../assets/schemas";
+    let schemas = load_schemas_from_dir(&schema_dir).expect("Failed to load schemas");
     let registry = Arc::new(Mutex::new(ComponentRegistry::new()));
+    for (_name, schema) in schemas {
+        registry.lock().unwrap().register_external_schema(schema);
+    }
+
     let world = Rc::new(RefCell::new(World::new(registry.clone())));
     {
         let mut w = world.borrow_mut();
@@ -24,7 +31,7 @@ fn test_lua_entities_in_cell_api() {
 
     let lua_code = r#"
         local eid = spawn_entity()
-        set_component(eid, "Position", { x = 0, y = 0, z = 0 })
+        set_component(eid, "PositionComponent", { pos = { Square = { x = 0, y = 0, z = 0 } } })
         local cell = { Square = { x = 0, y = 0, z = 0 } }
         local entities = entities_in_cell(cell)
         assert(#entities == 1, "Should find one entity in cell")
