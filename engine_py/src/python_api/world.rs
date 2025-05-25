@@ -1,5 +1,6 @@
 use crate::system_bridge::SystemBridge;
 use engine_core::ecs::world::World;
+use pyo3::IntoPyObject;
 use pyo3::prelude::*;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -368,5 +369,12 @@ impl PyWorld {
                 square.add_neighbor(from, to);
             }
         }
+    }
+
+    fn entities_in_cell(&self, py: Python, cell: &Bound<'_, pyo3::types::PyAny>) -> PyObject {
+        let world = self.inner.borrow();
+        let cell_key: engine_core::map::CellKey = pythonize::depythonize(cell).unwrap();
+        let entities = world.entities_in_cell(&cell_key);
+        entities.into_pyobject(py).unwrap().into()
     }
 }
