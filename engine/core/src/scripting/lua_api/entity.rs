@@ -31,5 +31,18 @@ pub fn register_entity_api(lua: &Lua, globals: &Table, world: Rc<RefCell<World>>
     })?;
     globals.set("get_entities", get_entities)?;
 
+    // get_entities_with_components(names)
+    let world_query = world.clone();
+    let get_entities_with_components = lua.create_function_mut(move |_lua, names: Table| {
+        let world = world_query.borrow();
+        let mut rust_names = Vec::new();
+        for pair in names.sequence_values::<String>() {
+            rust_names.push(pair?);
+        }
+        let name_refs: Vec<&str> = rust_names.iter().map(|s| s.as_str()).collect();
+        Ok(world.get_entities_with_components(&name_refs))
+    })?;
+    globals.set("get_entities_with_components", get_entities_with_components)?;
+
     Ok(())
 }
