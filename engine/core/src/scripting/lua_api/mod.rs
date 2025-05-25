@@ -5,18 +5,19 @@ pub mod component;
 pub mod entity;
 pub mod equipment;
 pub mod inventory;
+pub mod map;
 pub mod misc;
 pub mod region;
 pub mod worldgen;
+
+use crate::ecs::world::World;
+use crate::scripting::input::InputProvider;
+use crate::worldgen::WorldgenRegistry;
 
 use mlua::{Lua, Result as LuaResult, Table};
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
-
-use crate::ecs::world::World;
-use crate::scripting::input::InputProvider;
-use crate::worldgen::WorldgenRegistry;
 
 /// Registers all Lua API functions into the given globals table.
 pub fn register_all_api_functions(
@@ -33,6 +34,7 @@ pub fn register_all_api_functions(
     body::register_body_api(lua, globals, world.clone())?;
     region::register_region_api(lua, globals, world.clone())?;
     worldgen::register_worldgen_api(lua, globals, worldgen_registry)?;
-    misc::register_misc_api(lua, globals, world, input_provider)?;
+    misc::register_misc_api(lua, globals, world.clone(), input_provider)?;
+    map::register_map_api(lua, globals, world.clone())?;
     Ok(())
 }

@@ -326,4 +326,47 @@ impl PyWorld {
             }),
         );
     }
+
+    fn get_map_topology_type(&self) -> String {
+        let world = self.inner.borrow();
+        world
+            .map
+            .as_ref()
+            .map(|m| m.topology_type().to_string())
+            .unwrap_or_else(|| "none".to_string())
+    }
+
+    fn get_all_cells(&self, py: Python) -> PyObject {
+        let world = self.inner.borrow();
+        let cells = world
+            .map
+            .as_ref()
+            .map(|m| m.all_cells())
+            .unwrap_or_default();
+        serde_pyobject::to_pyobject(py, &cells).unwrap().into()
+    }
+
+    fn get_neighbors(&self, py: Python, cell: &Bound<'_, pyo3::types::PyAny>) -> PyObject {
+        let world = self.inner.borrow();
+        let cell_key: engine_core::map::CellKey = pythonize::depythonize(cell).unwrap();
+        let neighbors = world
+            .map
+            .as_ref()
+            .map(|m| m.neighbors(&cell_key))
+            .unwrap_or_default();
+        serde_pyobject::to_pyobject(py, &neighbors).unwrap().into()
+    }
+
+    fn add_neighbor(&self, from: (i32, i32, i32), to: (i32, i32, i32)) {
+        let mut world = self.inner.borrow_mut();
+        if let Some(map) = &mut world.map {
+            if let Some(square) = map
+                .topology
+                .as_any_mut()
+                .downcast_mut::<engine_core::map::SquareGridMap>()
+            {
+                square.add_neighbor(from, to);
+            }
+        }
+    }
 }
