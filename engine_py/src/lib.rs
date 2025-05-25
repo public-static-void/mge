@@ -1,5 +1,6 @@
-mod api;
+pub mod api;
 mod event_bus;
+pub mod python_api;
 mod system_bridge;
 mod worldgen_bridge;
 
