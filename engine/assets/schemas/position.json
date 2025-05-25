@@ -1,4 +1,5 @@
 {
+  "name": "Position",
   "title": "PositionComponent",
   "type": "object",
   "properties": {
