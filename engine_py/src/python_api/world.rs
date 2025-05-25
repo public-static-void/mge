@@ -1,0 +1,329 @@
+use crate::system_bridge::SystemBridge;
+use engine_core::ecs::world::World;
+use pyo3::prelude::*;
+use std::cell::RefCell;
+use std::rc::Rc;
+
+// Bring all trait APIs into scope
+use crate::python_api::body::BodyApi;
+use crate::python_api::component::ComponentApi;
+use crate::python_api::entity::EntityApi;
+use crate::python_api::equipment::EquipmentApi;
+use crate::python_api::inventory::InventoryApi;
+use crate::python_api::misc::MiscApi;
+use crate::python_api::region::RegionApi;
+
+#[pyclass(unsendable)]
+pub struct PyWorld {
+    pub inner: Rc<RefCell<World>>,
+    pub systems: Rc<SystemBridge>,
+}
+
+#[pymethods]
+impl PyWorld {
+    #[new]
+    #[pyo3(signature = (schema_dir=None))]
+    fn new(schema_dir: Option<String>) -> PyResult<Self> {
+        use engine_core::ecs::registry::ComponentRegistry;
+        use engine_core::ecs::schema::load_schemas_from_dir;
+        use std::path::PathBuf;
+
+        let schema_path = match schema_dir {
+            Some(dir) => PathBuf::from(dir),
+            None => PathBuf::from("engine/assets/schemas"),
+        };
+
+        let schemas = load_schemas_from_dir(&schema_path).map_err(|e| {
+            pyo3::exceptions::PyValueError::new_err(format!(
+                "Failed to load schemas from {:?}: {e}",
+                schema_path
+            ))
+        })?;
+
+        let mut registry = ComponentRegistry::new();
+        for (_name, schema) in schemas {
+            registry.register_external_schema(schema);
+        }
+
+        let mut world = World::new(std::sync::Arc::new(std::sync::Mutex::new(registry)));
+
+        // Always initialize a map for the world (so add_cell and movement will work)
+        let grid = engine_core::map::SquareGridMap::new();
+        let map = engine_core::map::Map::new(Box::new(grid));
+        world.map = Some(map);
+
+        world.register_system(engine_core::systems::standard::MoveAll {
+            delta: engine_core::systems::standard::MoveDelta::Square {
+                dx: 1,
+                dy: 0,
+                dz: 0,
+            },
+        });
+        world.register_system(engine_core::systems::standard::DamageAll { amount: 1.0 });
+        world.register_system(engine_core::systems::standard::ProcessDeaths);
+        world.register_system(engine_core::systems::standard::ProcessDecay);
+        world.register_system(engine_core::systems::job::JobSystem::default());
+        Ok(PyWorld {
+            inner: Rc::new(RefCell::new(world)),
+            systems: Rc::new(SystemBridge {
+                systems: RefCell::new(std::collections::HashMap::new()),
+            }),
+        })
+    }
+
+    // ---- ENTITY ----
+    fn spawn_entity(&self) -> u32 {
+        EntityApi::spawn_entity(self)
+    }
+    fn despawn_entity(&self, entity_id: u32) {
+        EntityApi::despawn_entity(self, entity_id)
+    }
+    fn get_entities(&self) -> PyResult<Vec<u32>> {
+        EntityApi::get_entities(self)
+    }
+    fn is_entity_alive(&self, entity_id: u32) -> bool {
+        EntityApi::is_entity_alive(self, entity_id)
+    }
+
+    // ---- COMPONENT ----
+    fn set_component(
+        &self,
+        entity_id: u32,
+        name: String,
+        value: Bound<'_, pyo3::types::PyAny>,
+    ) -> PyResult<()> {
+        ComponentApi::set_component(self, entity_id, name, value)
+    }
+    fn get_component(
+        &self,
+        py: Python<'_>,
+        entity_id: u32,
+        name: String,
+    ) -> PyResult<Option<PyObject>> {
+        ComponentApi::get_component(self, py, entity_id, name)
+    }
+    fn remove_component(&self, entity_id: u32, name: String) {
+        ComponentApi::remove_component(self, entity_id, name)
+    }
+    fn get_entities_with_component(&self, name: String) -> PyResult<Vec<u32>> {
+        ComponentApi::get_entities_with_component(self, name)
+    }
+    fn get_entities_with_components(&self, names: Vec<String>) -> Vec<u32> {
+        ComponentApi::get_entities_with_components(self, names)
+    }
+    fn list_components(&self) -> Vec<String> {
+        ComponentApi::list_components(self)
+    }
+    fn get_component_schema(&self, name: String) -> PyResult<PyObject> {
+        ComponentApi::get_component_schema(self, name)
+    }
+
+    // ---- INVENTORY ----
+    fn get_inventory(&self, py: Python<'_>, entity_id: u32) -> PyResult<Option<PyObject>> {
+        InventoryApi::get_inventory(self, py, entity_id)
+    }
+    fn set_inventory(&self, entity_id: u32, value: Bound<'_, pyo3::types::PyAny>) -> PyResult<()> {
+        InventoryApi::set_inventory(self, entity_id, value)
+    }
+    fn add_item_to_inventory(&self, entity_id: u32, item_id: String) -> PyResult<()> {
+        InventoryApi::add_item_to_inventory(self, entity_id, item_id)
+    }
+    fn remove_item_from_inventory(
+        &self,
+        py: Python<'_>,
+        entity_id: u32,
+        index: usize,
+    ) -> PyResult<()> {
+        InventoryApi::remove_item_from_inventory(self, py, entity_id, index)
+    }
+
+    // ---- EQUIPMENT ----
+    fn get_equipment(&self, py: Python<'_>, entity_id: u32) -> PyResult<PyObject> {
+        EquipmentApi::get_equipment(self, py, entity_id)
+    }
+    fn equip_item(&self, entity_id: u32, item_id: String, slot: String) -> PyResult<()> {
+        EquipmentApi::equip_item(self, entity_id, item_id, slot)
+    }
+    fn unequip_item(&self, entity_id: u32, slot: String) -> PyResult<()> {
+        EquipmentApi::unequip_item(self, entity_id, slot)
+    }
+
+    // ---- BODY ----
+    fn get_body(&self, py: Python<'_>, entity_id: u32) -> PyResult<Option<PyObject>> {
+        BodyApi::get_body(self, py, entity_id)
+    }
+    fn set_body(&self, entity_id: u32, value: Bound<'_, pyo3::types::PyAny>) -> PyResult<()> {
+        BodyApi::set_body(self, entity_id, value)
+    }
+    fn add_body_part(&self, entity_id: u32, part: Bound<'_, pyo3::types::PyAny>) -> PyResult<()> {
+        BodyApi::add_body_part(self, entity_id, part)
+    }
+    fn remove_body_part(&self, entity_id: u32, part_name: String) -> PyResult<()> {
+        BodyApi::remove_body_part(self, entity_id, part_name)
+    }
+    fn get_body_part(
+        &self,
+        py: Python<'_>,
+        entity_id: u32,
+        part_name: String,
+    ) -> PyResult<Option<PyObject>> {
+        BodyApi::get_body_part(self, py, entity_id, part_name)
+    }
+
+    // ---- REGION ----
+    fn get_entities_in_region(&self, region_id: String) -> Vec<u32> {
+        RegionApi::get_entities_in_region(self, region_id)
+    }
+    fn get_entities_in_region_kind(&self, kind: String) -> Vec<u32> {
+        RegionApi::get_entities_in_region_kind(self, kind)
+    }
+    fn get_cells_in_region(&self, py: Python, region_id: String) -> PyResult<PyObject> {
+        RegionApi::get_cells_in_region(self, py, region_id)
+    }
+    fn get_cells_in_region_kind(&self, py: Python, kind: String) -> PyResult<PyObject> {
+        RegionApi::get_cells_in_region_kind(self, py, kind)
+    }
+
+    // ---- MISC ----
+    fn move_entity(&self, entity_id: u32, dx: f32, dy: f32) {
+        MiscApi::move_entity(self, entity_id, dx, dy)
+    }
+    fn move_all(&self, dx: i32, dy: i32) {
+        MiscApi::move_all(self, dx, dy)
+    }
+    fn tick(&self) {
+        MiscApi::tick(self)
+    }
+    fn get_turn(&self) -> u32 {
+        MiscApi::get_turn(self)
+    }
+    fn set_mode(&self, mode: String) {
+        MiscApi::set_mode(self, mode)
+    }
+    fn get_mode(&self) -> String {
+        MiscApi::get_mode(self)
+    }
+    fn get_available_modes(&self) -> Vec<String> {
+        MiscApi::get_available_modes(self)
+    }
+    fn damage_entity(&self, entity_id: u32, amount: f32) {
+        MiscApi::damage_entity(self, entity_id, amount)
+    }
+    fn damage_all(&self, amount: f32) {
+        MiscApi::damage_all(self, amount)
+    }
+    fn process_deaths(&self) {
+        MiscApi::process_deaths(self)
+    }
+    fn process_decay(&self) {
+        MiscApi::process_decay(self)
+    }
+    fn count_entities_with_type(&self, type_str: String) -> usize {
+        MiscApi::count_entities_with_type(self, type_str)
+    }
+    fn modify_stockpile_resource(&self, entity_id: u32, kind: String, delta: f64) -> PyResult<()> {
+        MiscApi::modify_stockpile_resource(self, entity_id, kind, delta)
+    }
+    fn save_to_file(&self, path: String) -> PyResult<()> {
+        MiscApi::save_to_file(self, path)
+    }
+    fn load_from_file(&mut self, path: String) -> PyResult<()> {
+        MiscApi::load_from_file(self, path)
+    }
+
+    // ---- ADDITIONAL METHODS (e.g. add_cell) ----
+    fn add_cell(&self, x: i32, y: i32, z: i32) {
+        let mut world = self.inner.borrow_mut();
+        if let Some(map) = &mut world.map {
+            if let Some(square) = map
+                .topology
+                .as_any_mut()
+                .downcast_mut::<engine_core::map::SquareGridMap>()
+            {
+                square.add_cell(x, y, z);
+            }
+        }
+    }
+
+    // ---- SYSTEM REGISTRATION/BRIDGE ----
+    fn register_system(&self, py: Python, name: String, callback: Py<PyAny>) -> PyResult<()> {
+        self.systems.register_system(py, name, callback)
+    }
+    fn run_system(&self, py: Python, name: String) -> PyResult<()> {
+        self.systems.run_system(py, name)
+    }
+    fn run_native_system(&self, name: String) -> PyResult<()> {
+        let mut world = self.inner.borrow_mut();
+        world
+            .run_system(&name, None)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
+    }
+
+    // ---- EVENT BUS ----
+    fn send_event(&self, event_type: String, payload: String) -> PyResult<()> {
+        crate::event_bus::send_event(event_type, payload)
+    }
+    fn poll_event(&self, py: Python, event_type: String) -> PyResult<Vec<PyObject>> {
+        crate::event_bus::poll_event(py, event_type)
+    }
+    fn poll_ecs_event(&self, py: Python, event_type: String) -> PyResult<Vec<PyObject>> {
+        let mut world = self.inner.borrow_mut();
+        let events = world.take_events(&event_type);
+        Ok(events
+            .into_iter()
+            .map(|e| serde_pyobject::to_pyobject(py, &e).unwrap().into())
+            .collect())
+    }
+    fn update_event_buses(&self) {
+        crate::event_bus::update_event_buses()
+    }
+
+    // ---- USER INPUT ----
+    fn get_user_input(&self, py: Python, prompt: String) -> PyResult<String> {
+        let builtins = py.import("builtins")?;
+        let input_func = builtins.getattr("input")?;
+        let result = input_func.call1((prompt,))?;
+        result.extract::<String>()
+    }
+
+    // ---- JOB SYSTEM ----
+    #[pyo3(signature = (entity_id, job_type, **kwargs))]
+    fn assign_job(
+        &self,
+        entity_id: u32,
+        job_type: String,
+        kwargs: Option<&Bound<'_, pyo3::types::PyDict>>,
+    ) -> PyResult<()> {
+        let mut world = self.inner.borrow_mut();
+        let mut job_val = serde_json::json!({
+            "job_type": job_type,
+            "status": "pending",
+            "progress": 0.0
+        });
+        if let Some(kwargs) = kwargs {
+            let extra: serde_json::Value = pythonize::depythonize(kwargs)?;
+            if let Some(obj) = extra.as_object() {
+                for (k, v) in obj {
+                    job_val[k] = v.clone();
+                }
+            }
+        }
+        world
+            .set_component(entity_id, "Job", job_val)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
+    }
+
+    fn register_job_type(&self, _py: Python, name: String, callback: Py<PyAny>) {
+        let mut world = self.inner.borrow_mut();
+        world.job_types.register_native(
+            &name,
+            Box::new(move |old_job, progress| {
+                Python::with_gil(|py| {
+                    let job_obj = serde_pyobject::to_pyobject(py, old_job).unwrap();
+                    let result = callback.call1(py, (job_obj, progress)).unwrap();
+                    serde_pyobject::from_pyobject(result.bind(py).clone()).unwrap()
+                })
+            }),
+        );
+    }
+}
