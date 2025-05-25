@@ -137,3 +137,4 @@ Example:
 - [docs/idea.md](docs/idea.md): Architecture and design
 - [docs/c_plugin_abi.md](docs/c_plugin_abi.md): C ABI plugin authoring
 - [docs/worldgen.md](docs/worldgen.md): Worldgen plugin system
+- [docs/ROADMAP.md](docs/ROADMAP.md): Project Roadmap
