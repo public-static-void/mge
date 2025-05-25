@@ -79,5 +79,58 @@ pub fn register_map_api(lua: &Lua, globals: &Table, world: Rc<RefCell<World>>) -
     })?;
     globals.set("get_neighbors", get_neighbors)?;
 
+    // add_neighbor(from, to)
+    let world_add_neighbor = world.clone();
+    let add_neighbor = lua.create_function_mut(move |lua, (from, to): (LuaValue, LuaValue)| {
+        let mut world = world_add_neighbor.borrow_mut();
+        // Helper to convert Lua table {0,0,0} or {x=0,y=0,z=0} to (i32, i32, i32)
+        fn table_to_xyz(_lua: &Lua, val: LuaValue) -> mlua::Result<(i32, i32, i32)> {
+            let t = match val {
+                LuaValue::Table(t) => t,
+                _ => {
+                    return Err(mlua::Error::FromLuaConversionError {
+                        from: val.type_name(),
+                        to: "table".to_string(),
+                        message: Some("Expected table".to_string()),
+                    });
+                }
+            };
+            // Accept {x=..,y=..,z=..} or {..,..,..}
+            let x = t.get("x").or_else(|_| t.get(1))?;
+            let y = t.get("y").or_else(|_| t.get(2))?;
+            let z = t.get("z").or_else(|_| t.get(3))?;
+            Ok((x, y, z))
+        }
+        let from_xyz = table_to_xyz(lua, from)?;
+        let to_xyz = table_to_xyz(lua, to)?;
+        if let Some(map) = &mut world.map {
+            if let Some(square) = map
+                .topology
+                .as_any_mut()
+                .downcast_mut::<crate::map::SquareGridMap>()
+            {
+                square.add_neighbor(from_xyz, to_xyz);
+            }
+        }
+        Ok(())
+    })?;
+    globals.set("add_neighbor", add_neighbor)?;
+
+    // entities_in_cell(cell)
+    let world_entities_in_cell = world.clone();
+    let entities_in_cell = lua.create_function_mut(move |lua, cell: LuaValue| {
+        let world = world_entities_in_cell.borrow();
+        let cell_json = crate::scripting::helpers::lua_value_to_json(lua, cell, None)?;
+        let cell_key: crate::map::CellKey =
+            serde_json::from_value(cell_json).map_err(mlua::Error::external)?;
+        let entities = world.entities_in_cell(&cell_key);
+        let arr = lua.create_table()?;
+        for (i, eid) in entities.iter().enumerate() {
+            arr.set(i + 1, *eid)?;
+        }
+        Ok(LuaValue::Table(arr))
+    })?;
+    globals.set("entities_in_cell", entities_in_cell)?;
+
     Ok(())
 }
