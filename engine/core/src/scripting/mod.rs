@@ -18,8 +18,8 @@ pub mod input;
 pub mod engine;
 pub use engine::ScriptEngine;
 
-pub mod api;
 pub mod event_bus;
 pub mod helpers;
+pub mod lua_api;
 pub mod system_bridge;
 pub mod worldgen_bridge;

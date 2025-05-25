@@ -1,0 +1,38 @@
+//! Scripting API bridge: orchestrates registration of all Lua API subsystems.
+
+pub mod body;
+pub mod component;
+pub mod entity;
+pub mod equipment;
+pub mod inventory;
+pub mod misc;
+pub mod region;
+pub mod worldgen;
+
+use mlua::{Lua, Result as LuaResult, Table};
+use std::cell::RefCell;
+use std::rc::Rc;
+use std::sync::{Arc, Mutex};
+
+use crate::ecs::world::World;
+use crate::scripting::input::InputProvider;
+use crate::worldgen::WorldgenRegistry;
+
+/// Registers all Lua API functions into the given globals table.
+pub fn register_all_api_functions(
+    lua: &Lua,
+    globals: &Table,
+    world: Rc<RefCell<World>>,
+    input_provider: Arc<Mutex<Box<dyn InputProvider + Send + Sync>>>,
+    worldgen_registry: Rc<RefCell<WorldgenRegistry>>,
+) -> LuaResult<()> {
+    entity::register_entity_api(lua, globals, world.clone())?;
+    component::register_component_api(lua, globals, world.clone())?;
+    inventory::register_inventory_api(lua, globals, world.clone())?;
+    equipment::register_equipment_api(lua, globals, world.clone())?;
+    body::register_body_api(lua, globals, world.clone())?;
+    region::register_region_api(lua, globals, world.clone())?;
+    worldgen::register_worldgen_api(lua, globals, worldgen_registry)?;
+    misc::register_misc_api(lua, globals, world, input_provider)?;
+    Ok(())
+}

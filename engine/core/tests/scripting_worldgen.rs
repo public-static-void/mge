@@ -1,5 +1,7 @@
 use engine_core::ecs::world::World;
-use engine_core::scripting::api::{register_api_functions, register_worldgen_api};
+use engine_core::scripting::lua_api::register_all_api_functions;
+use engine_core::scripting::lua_api::worldgen::register_worldgen_api;
+
 use engine_core::worldgen::{WorldgenRegistry, register_builtin_worldgen_plugins};
 use mlua::{Lua, Table};
 use std::cell::RefCell;
@@ -18,7 +20,7 @@ fn test_lua_can_list_and_invoke_worldgen_plugins() {
     // Set up worldgen registry and register builtins (single-threaded, so Rc is fine)
     let mut reg = WorldgenRegistry::new();
     register_builtin_worldgen_plugins(&mut reg);
-    let worldgen_registry = Rc::new(reg);
+    let worldgen_registry = Rc::new(RefCell::new(reg));
 
     // Set up ECS world and Lua (must use Arc<Mutex<...>> as required by World::new)
     let registry = Arc::new(Mutex::new(
@@ -32,7 +34,14 @@ fn test_lua_can_list_and_invoke_worldgen_plugins() {
     let input_provider = Arc::new(Mutex::new(Box::new(DummyInputProvider) as Box<_>));
 
     // Register core ECS API
-    register_api_functions(&lua, &globals, world.clone(), Arc::clone(&input_provider)).unwrap();
+    register_all_api_functions(
+        &lua,
+        &globals,
+        world.clone(),
+        Arc::clone(&input_provider),
+        Rc::clone(&worldgen_registry),
+    )
+    .unwrap();
 
     // Register worldgen API (Rc-based)
     register_worldgen_api(&lua, &globals, Rc::clone(&worldgen_registry)).unwrap();
