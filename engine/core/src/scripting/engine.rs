@@ -1,6 +1,6 @@
-use super::api::register_api_functions;
 use super::event_bus::register_event_bus_and_globals;
 use super::input::{InputProvider, StdinInput};
+use super::lua_api::register_all_api_functions;
 use super::system_bridge::register_system_functions;
 use super::worldgen_bridge::register_worldgen_functions;
 use crate::ecs::world::World;
@@ -92,11 +92,12 @@ impl ScriptEngine {
             self.lua_systems.clone(),
         )?;
 
-        register_api_functions(
+        register_all_api_functions(
             &self.lua,
             &globals,
             world.clone(),
             Arc::clone(&self.input_provider),
+            Rc::clone(&self.worldgen_registry),
         )?;
 
         Ok(())
