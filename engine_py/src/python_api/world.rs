@@ -398,4 +398,27 @@ impl PyWorld {
         let meta_json: serde_json::Value = pythonize::depythonize(metadata).unwrap();
         world.set_cell_metadata(&cell_key, meta_json);
     }
+
+    fn find_path(
+        &self,
+        py: Python,
+        start: &Bound<'_, pyo3::types::PyAny>,
+        goal: &Bound<'_, pyo3::types::PyAny>,
+    ) -> PyObject {
+        let world = self.inner.borrow();
+        let start_key: engine_core::map::CellKey = pythonize::depythonize(start).unwrap();
+        let goal_key: engine_core::map::CellKey = pythonize::depythonize(goal).unwrap();
+        if let Some(result) = world.find_path(&start_key, &goal_key) {
+            let dict = pyo3::types::PyDict::new(py);
+            dict.set_item(
+                "path",
+                serde_pyobject::to_pyobject(py, &result.path).unwrap(),
+            )
+            .unwrap();
+            dict.set_item("total_cost", result.total_cost).unwrap();
+            dict.into()
+        } else {
+            py.None()
+        }
+    }
 }

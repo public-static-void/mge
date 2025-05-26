@@ -9,6 +9,7 @@ use engine_core::systems::inventory::InventoryConstraintSystem;
 use engine_core::systems::job::{JobSystem, JobTypeRegistry, load_job_types_from_dir};
 use engine_core::systems::standard::{DamageAll, MoveAll, MoveDelta, ProcessDeaths, ProcessDecay};
 use gag::BufferRedirect;
+use regex::Regex;
 use std::cell::RefCell;
 use std::env;
 use std::fs;
@@ -38,6 +39,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let filter_module = args.first().map(|s| s.as_str());
     let filter_func = args.get(1).map(|s| s.as_str());
 
+    // Compile the regex ONCE, outside the loop (Clippy requirement)
+    let re = Regex::new(r#"test_[a-zA-Z0-9_]+\s*="#).unwrap();
+
     // Discover test functions, filtered by module and/or function if provided
     let test_dir = Path::new("engine/scripts/lua/tests");
     let mut test_functions = Vec::new();
@@ -50,43 +54,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let modname = &fname[..fname.len() - 4];
                 if filter_module.is_none_or(|f| modname == f) {
                     let content = fs::read_to_string(&path)?;
-                    let mut in_return_table = false;
-                    for line in content.lines() {
-                        let trimmed = line.trim();
-                        if trimmed == "return {" {
-                            in_return_table = true;
-                            continue;
-                        }
-                        if in_return_table {
-                            if trimmed.starts_with('}') {
-                                break;
+                    // Use the regex compiled above
+                    for cap in re.find_iter(&content) {
+                        let key = cap.as_str().split('=').next().unwrap().trim();
+                        // Apply filters as before
+                        if let (Some(fmod), Some(ffunc)) = (filter_module, filter_func) {
+                            if modname == fmod && key == ffunc {
+                                test_functions.push((modname.to_string(), key.to_string()));
                             }
-                            if let Some(eq_pos) = trimmed.find('=') {
-                                let key = trimmed[..eq_pos].trim();
-                                if key.starts_with("test_") {
-                                    // If both module and function are specified, only collect that one function
-                                    if let (Some(fmod), Some(ffunc)) = (filter_module, filter_func)
-                                    {
-                                        if modname == fmod && key == ffunc {
-                                            test_functions
-                                                .push((modname.to_string(), key.to_string()));
-                                        }
-                                    // If only function is specified (should not happen), ignore
-                                    } else if let (None, Some(_)) = (filter_module, filter_func) {
-                                        // Do nothing: function filter without module filter is not supported
-                                        // If only module is specified, collect all functions in that module
-                                    } else if let (Some(fmod), None) = (filter_module, filter_func)
-                                    {
-                                        if modname == fmod {
-                                            test_functions
-                                                .push((modname.to_string(), key.to_string()));
-                                        }
-                                    // If no filter, collect all
-                                    } else if filter_module.is_none() && filter_func.is_none() {
-                                        test_functions.push((modname.to_string(), key.to_string()));
-                                    }
-                                }
+                        } else if let (None, Some(_)) = (filter_module, filter_func) {
+                            // Do nothing: function filter without module filter is not supported
+                        } else if let (Some(fmod), None) = (filter_module, filter_func) {
+                            if modname == fmod {
+                                test_functions.push((modname.to_string(), key.to_string()));
                             }
+                        } else if filter_module.is_none() && filter_func.is_none() {
+                            test_functions.push((modname.to_string(), key.to_string()));
                         }
                     }
                 }

@@ -5,6 +5,25 @@ use mlua::{Lua, Result as LuaResult, Table, Value as LuaValue};
 use std::cell::RefCell;
 use std::rc::Rc;
 
+/// Helper: parse a CellKey from a serde_json::Value, supporting both enum and ergonomic square form.
+fn parse_cell_key(cell_json: serde_json::Value) -> Result<CellKey, mlua::Error> {
+    // Try standard enum deserialization first
+    if let Ok(cell_key) = serde_json::from_value::<CellKey>(cell_json.clone()) {
+        return Ok(cell_key);
+    }
+    // Fallback: treat as Square if x/y/z fields are present
+    if let serde_json::Value::Object(ref obj) = cell_json {
+        if obj.contains_key("x") && obj.contains_key("y") && obj.contains_key("z") {
+            return Ok(CellKey::Square {
+                x: obj["x"].as_i64().unwrap() as i32,
+                y: obj["y"].as_i64().unwrap() as i32,
+                z: obj["z"].as_i64().unwrap() as i32,
+            });
+        }
+    }
+    Err(mlua::Error::external("Invalid cell key format"))
+}
+
 /// Registers map/topology scripting API into Lua.
 pub fn register_map_api(lua: &Lua, globals: &Table, world: Rc<RefCell<World>>) -> LuaResult<()> {
     // get_map_topology_type()
@@ -61,8 +80,8 @@ pub fn register_map_api(lua: &Lua, globals: &Table, world: Rc<RefCell<World>>) -
     let world_neighbors = world.clone();
     let get_neighbors = lua.create_function_mut(move |lua, cell: LuaValue| {
         let world = world_neighbors.borrow();
-        let cell_json = crate::scripting::helpers::lua_value_to_json(lua, cell, None)?;
-        let cell_key: CellKey = serde_json::from_value(cell_json).map_err(mlua::Error::external)?;
+        let cell_json = lua_value_to_json(lua, cell, None)?;
+        let cell_key = parse_cell_key(cell_json)?;
         let neighbors = world
             .map
             .as_ref()
@@ -83,7 +102,6 @@ pub fn register_map_api(lua: &Lua, globals: &Table, world: Rc<RefCell<World>>) -
     let world_add_neighbor = world.clone();
     let add_neighbor = lua.create_function_mut(move |lua, (from, to): (LuaValue, LuaValue)| {
         let mut world = world_add_neighbor.borrow_mut();
-        // Helper to convert Lua table {0,0,0} or {x=0,y=0,z=0} to (i32, i32, i32)
         fn table_to_xyz(_lua: &Lua, val: LuaValue) -> mlua::Result<(i32, i32, i32)> {
             let t = match val {
                 LuaValue::Table(t) => t,
@@ -95,7 +113,6 @@ pub fn register_map_api(lua: &Lua, globals: &Table, world: Rc<RefCell<World>>) -
                     });
                 }
             };
-            // Accept {x=..,y=..,z=..} or {..,..,..}
             let x = t.get("x").or_else(|_| t.get(1))?;
             let y = t.get("y").or_else(|_| t.get(2))?;
             let z = t.get("z").or_else(|_| t.get(3))?;
@@ -120,9 +137,8 @@ pub fn register_map_api(lua: &Lua, globals: &Table, world: Rc<RefCell<World>>) -
     let world_entities_in_cell = world.clone();
     let entities_in_cell = lua.create_function_mut(move |lua, cell: LuaValue| {
         let world = world_entities_in_cell.borrow();
-        let cell_json = crate::scripting::helpers::lua_value_to_json(lua, cell, None)?;
-        let cell_key: crate::map::CellKey =
-            serde_json::from_value(cell_json).map_err(mlua::Error::external)?;
+        let cell_json = lua_value_to_json(lua, cell, None)?;
+        let cell_key = parse_cell_key(cell_json)?;
         let entities = world.entities_in_cell(&cell_key);
         let arr = lua.create_table()?;
         for (i, eid) in entities.iter().enumerate() {
@@ -137,7 +153,7 @@ pub fn register_map_api(lua: &Lua, globals: &Table, world: Rc<RefCell<World>>) -
     let get_cell_metadata = lua.create_function_mut(move |lua, cell: LuaValue| {
         let world = world_get_cell_meta.borrow();
         let cell_json = lua_value_to_json(lua, cell, None)?;
-        let cell_key: CellKey = serde_json::from_value(cell_json).map_err(mlua::Error::external)?;
+        let cell_key = parse_cell_key(cell_json)?;
         if let Some(meta) = world.get_cell_metadata(&cell_key) {
             Ok(json_to_lua_table(lua, meta)?)
         } else {
@@ -152,13 +168,38 @@ pub fn register_map_api(lua: &Lua, globals: &Table, world: Rc<RefCell<World>>) -
         lua.create_function_mut(move |lua, (cell, meta): (LuaValue, LuaValue)| {
             let mut world = world_set_cell_meta.borrow_mut();
             let cell_json = lua_value_to_json(lua, cell, None)?;
-            let cell_key: CellKey =
-                serde_json::from_value(cell_json).map_err(mlua::Error::external)?;
+            let cell_key = parse_cell_key(cell_json)?;
             let meta_json = lua_value_to_json(lua, meta, None)?;
             world.set_cell_metadata(&cell_key, meta_json);
             Ok(())
         })?;
     globals.set("set_cell_metadata", set_cell_metadata)?;
+
+    // find_path(start_cell, goal_cell)
+    let world_find_path = world.clone();
+    let find_path = lua.create_function_mut(move |lua, (start, goal): (LuaValue, LuaValue)| {
+        let world = world_find_path.borrow();
+        let start_json = lua_value_to_json(lua, start, None)?;
+        let goal_json = lua_value_to_json(lua, goal, None)?;
+        let start_key = parse_cell_key(start_json)?;
+        let goal_key = parse_cell_key(goal_json)?;
+        if let Some(result) = world.find_path(&start_key, &goal_key) {
+            let arr = lua.create_table()?;
+            for (i, cell) in result.path.iter().enumerate() {
+                arr.set(
+                    i + 1,
+                    json_to_lua_table(lua, &serde_json::to_value(cell).unwrap())?,
+                )?;
+            }
+            let out = lua.create_table()?;
+            out.set("path", arr)?;
+            out.set("total_cost", result.total_cost)?;
+            Ok(LuaValue::Table(out))
+        } else {
+            Ok(LuaValue::Nil)
+        }
+    })?;
+    globals.set("find_path", find_path)?;
 
     Ok(())
 }

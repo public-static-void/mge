@@ -19,3 +19,7 @@ local function test_map_api()
 	local neighbors = get_neighbors(cell)
 	assert.is_true(#neighbors > 0, "Cell should have neighbors")
 end
+
+return {
+	test_map_api = test_map_api,
+}
