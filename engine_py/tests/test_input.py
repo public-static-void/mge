@@ -1,6 +1,3 @@
-import pytest
-
-
 def test_get_user_input(monkeypatch, make_world):
     world = make_world()
     # Simulate user entering "foobar"

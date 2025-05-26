@@ -1,6 +1,3 @@
-import pytest
-
-
 def test_region_queries(make_world):
     world = make_world()
     eid1 = world.spawn_entity()
