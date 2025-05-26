@@ -146,7 +146,7 @@ pub fn register_misc_api(
     let world_tick = world.clone();
     let tick = lua.create_function_mut(move |_, ()| {
         let mut world = world_tick.borrow_mut();
-        world.simulation_tick();
+        world.tick();
         Ok(())
     })?;
     globals.set("tick", tick)?;
@@ -178,6 +178,18 @@ pub fn register_misc_api(
         Ok(())
     })?;
     globals.set("process_decay", process_decay)?;
+
+    // get_time_of_day()
+    let world_time = world.clone();
+    let get_time_of_day = lua.create_function_mut(move |lua, ()| {
+        let world = world_time.borrow();
+        let time = world.get_time_of_day();
+        let tbl = lua.create_table()?;
+        tbl.set("hour", time.hour)?;
+        tbl.set("minute", time.minute)?;
+        Ok(tbl)
+    })?;
+    globals.set("get_time_of_day", get_time_of_day)?;
 
     Ok(())
 }

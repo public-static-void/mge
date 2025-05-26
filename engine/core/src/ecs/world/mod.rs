@@ -16,6 +16,12 @@ mod resources;
 mod save_load;
 mod systems;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct TimeOfDay {
+    pub hour: u8,
+    pub minute: u8,
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct World {
     pub entities: Vec<u32>,
@@ -23,6 +29,7 @@ pub struct World {
     next_id: u32,
     pub current_mode: String,
     pub turn: u32,
+    pub time_of_day: TimeOfDay,
     #[serde(skip)]
     pub registry: Arc<Mutex<ComponentRegistry>>,
     #[serde(skip)]
@@ -48,6 +55,7 @@ impl World {
             next_id: 1,
             current_mode: "colony".to_string(),
             turn: 0,
+            time_of_day: TimeOfDay::default(),
             registry,
             systems: SystemRegistry::new(),
             event_buses: crate::ecs::event_bus_registry::EventBusRegistry::new(),
@@ -77,6 +85,26 @@ impl World {
         goal: &crate::map::CellKey,
     ) -> Option<crate::map::pathfinding::PathfindingResult> {
         self.map.as_ref()?.find_path(start, goal)
+    }
+
+    pub fn tick(&mut self) {
+        self.simulation_tick();
+        self.advance_time_of_day();
+    }
+
+    fn advance_time_of_day(&mut self) {
+        self.time_of_day.minute += 1;
+        if self.time_of_day.minute >= 60 {
+            self.time_of_day.minute = 0;
+            self.time_of_day.hour += 1;
+            if self.time_of_day.hour >= 24 {
+                self.time_of_day.hour = 0;
+            }
+        }
+    }
+
+    pub fn get_time_of_day(&self) -> TimeOfDay {
+        self.time_of_day
     }
 }
 
