@@ -2,6 +2,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::any::Any;
 use std::collections::{HashMap, HashSet};
+pub mod pathfinding;
+use crate::map::pathfinding::PathfindingResult;
 
 type CellSet = HashSet<CellKey>;
 
@@ -338,5 +340,18 @@ impl Map {
     }
     pub fn get_cell_metadata(&self, cell: &CellKey) -> Option<&Value> {
         self.topology.get_cell_metadata(cell)
+    }
+
+    /// Find path from start to goal using cell metadata for cost.
+    /// Uses A* (with Manhattan heuristic for squares, Dijkstra for others).
+    pub fn find_path(&self, start: &CellKey, goal: &CellKey) -> Option<PathfindingResult> {
+        crate::map::pathfinding::find_path(
+            self.topology.as_ref(),
+            start,
+            goal,
+            &crate::map::pathfinding::default_cost_fn,
+            &crate::map::pathfinding::default_heuristic,
+            &|cell| self.get_cell_metadata(cell),
+        )
     }
 }
