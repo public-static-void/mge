@@ -7,18 +7,17 @@ type CellSet = HashSet<CellKey>;
 
 /// Trait for any map topology (tile, hex, region, etc.)
 pub trait MapTopology: Send + Sync {
-    /// Returns all neighbor cell IDs for a given cell.
     fn neighbors(&self, cell: &CellKey) -> Vec<CellKey>;
-    /// Returns true if the cell exists.
     fn contains(&self, cell: &CellKey) -> bool;
-    /// Returns all cell IDs.
     fn all_cells(&self) -> Vec<CellKey>;
-    /// Returns the topology type as a string.
     fn topology_type(&self) -> &'static str;
     fn as_any_mut(&mut self) -> &mut dyn Any;
+
+    // Cell metadata API
+    fn set_cell_metadata(&mut self, cell: &CellKey, data: Value);
+    fn get_cell_metadata(&self, cell: &CellKey) -> Option<&Value>;
 }
 
-/// Uniquely identifies a cell in any map (2D/3D/region).
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum CellKey {
     Square { x: i32, y: i32, z: i32 },
@@ -29,14 +28,15 @@ pub enum CellKey {
 /// Square grid with z-levels (Dwarf Fortress style).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SquareGridMap {
-    /// CellKey::Square { x, y, z } -> set of neighbor CellKeys
     pub cells: HashMap<CellKey, CellSet>,
+    pub cell_metadata: HashMap<CellKey, Value>,
 }
 
 impl SquareGridMap {
     pub fn new() -> Self {
         Self {
             cells: HashMap::new(),
+            cell_metadata: HashMap::new(),
         }
     }
     pub fn add_cell(&mut self, x: i32, y: i32, z: i32) {
@@ -81,6 +81,12 @@ impl MapTopology for SquareGridMap {
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
     }
+    fn set_cell_metadata(&mut self, cell: &CellKey, data: Value) {
+        self.cell_metadata.insert(cell.clone(), data);
+    }
+    fn get_cell_metadata(&self, cell: &CellKey) -> Option<&Value> {
+        self.cell_metadata.get(cell)
+    }
 }
 
 impl Default for SquareGridMap {
@@ -92,14 +98,15 @@ impl Default for SquareGridMap {
 /// Hex grid with z-levels (Panzer General style).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HexGridMap {
-    /// CellKey::Hex { q, r, z } -> set of neighbor CellKeys
     pub cells: HashMap<CellKey, CellSet>,
+    pub cell_metadata: HashMap<CellKey, Value>,
 }
 
 impl HexGridMap {
     pub fn new() -> Self {
         Self {
             cells: HashMap::new(),
+            cell_metadata: HashMap::new(),
         }
     }
     pub fn add_cell(&mut self, q: i32, r: i32, z: i32) {
@@ -150,19 +157,26 @@ impl MapTopology for HexGridMap {
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
     }
+    fn set_cell_metadata(&mut self, cell: &CellKey, data: Value) {
+        self.cell_metadata.insert(cell.clone(), data);
+    }
+    fn get_cell_metadata(&self, cell: &CellKey) -> Option<&Value> {
+        self.cell_metadata.get(cell)
+    }
 }
 
 /// Arbitrary region/province map (Hearts of Iron style).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RegionMap {
-    /// id -> set of neighbor ids
     pub cells: HashMap<String, HashSet<String>>,
+    pub cell_metadata: HashMap<String, Value>,
 }
 
 impl RegionMap {
     pub fn new() -> Self {
         Self {
             cells: HashMap::new(),
+            cell_metadata: HashMap::new(),
         }
     }
     pub fn add_cell(&mut self, id: &str) {
@@ -212,6 +226,18 @@ impl MapTopology for RegionMap {
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
     }
+    fn set_cell_metadata(&mut self, cell: &CellKey, data: Value) {
+        if let CellKey::Region { id } = cell {
+            self.cell_metadata.insert(id.clone(), data);
+        }
+    }
+    fn get_cell_metadata(&self, cell: &CellKey) -> Option<&Value> {
+        if let CellKey::Region { id } = cell {
+            self.cell_metadata.get(id)
+        } else {
+            None
+        }
+    }
 }
 
 /// The main Map type (boxed trait object for dynamic dispatch).
@@ -242,6 +268,11 @@ impl Map {
                             map.add_neighbor((x, y, z), (nx, ny, nz));
                         }
                     }
+                    // Load cell metadata if present
+                    if let Some(meta) = cell.get("metadata") {
+                        let key = CellKey::Square { x, y, z };
+                        map.set_cell_metadata(&key, meta.clone());
+                    }
                 }
                 Some(Map::new(Box::new(map)))
             }
@@ -260,6 +291,10 @@ impl Map {
                             map.add_neighbor((q, r, z), (nq, nr, nz));
                         }
                     }
+                    if let Some(meta) = cell.get("metadata") {
+                        let key = CellKey::Hex { q, r, z };
+                        map.set_cell_metadata(&key, meta.clone());
+                    }
                 }
                 Some(Map::new(Box::new(map)))
             }
@@ -273,6 +308,10 @@ impl Map {
                             let nid = n.as_str()?.to_string();
                             map.add_neighbor(&id, &nid);
                         }
+                    }
+                    if let Some(meta) = cell.get("metadata") {
+                        let key = CellKey::Region { id: id.clone() };
+                        map.set_cell_metadata(&key, meta.clone());
                     }
                 }
                 Some(Map::new(Box::new(map)))
@@ -292,5 +331,12 @@ impl Map {
     }
     pub fn all_cells(&self) -> Vec<CellKey> {
         self.topology.all_cells()
+    }
+
+    pub fn set_cell_metadata(&mut self, cell: &CellKey, data: Value) {
+        self.topology.set_cell_metadata(cell, data);
+    }
+    pub fn get_cell_metadata(&self, cell: &CellKey) -> Option<&Value> {
+        self.topology.get_cell_metadata(cell)
     }
 }

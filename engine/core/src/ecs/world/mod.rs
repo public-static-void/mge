@@ -58,6 +58,17 @@ impl World {
             event_queues: HashMap::new(),
         }
     }
+
+    // --- Cell metadata API ---
+    pub fn set_cell_metadata(&mut self, cell: &crate::map::CellKey, data: serde_json::Value) {
+        if let Some(map) = &mut self.map {
+            map.set_cell_metadata(cell, data);
+        }
+    }
+
+    pub fn get_cell_metadata(&self, cell: &crate::map::CellKey) -> Option<&serde_json::Value> {
+        self.map.as_ref().and_then(|m| m.get_cell_metadata(cell))
+    }
 }
 
 impl Default for World {
