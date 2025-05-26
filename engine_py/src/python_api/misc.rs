@@ -35,11 +35,7 @@ impl MiscApi for PyWorld {
 
     fn tick(&self) {
         let mut world = self.inner.borrow_mut();
-        world.run_system("MoveAll", None).unwrap();
-        world.run_system("DamageAll", None).unwrap();
-        world.run_system("ProcessDeaths", None).unwrap();
-        world.run_system("ProcessDecay", None).unwrap();
-        world.turn += 1;
+        world.tick();
     }
 
     fn get_turn(&self) -> u32 {

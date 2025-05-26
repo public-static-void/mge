@@ -2,6 +2,7 @@ use crate::system_bridge::SystemBridge;
 use engine_core::ecs::world::World;
 use pyo3::IntoPyObject;
 use pyo3::prelude::*;
+use pyo3::types::PyDict;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -420,5 +421,14 @@ impl PyWorld {
         } else {
             py.None()
         }
+    }
+
+    fn get_time_of_day(&self, py: Python) -> PyObject {
+        let world = self.inner.borrow();
+        let tod = world.get_time_of_day();
+        let dict = PyDict::new(py);
+        dict.set_item("hour", tod.hour).unwrap();
+        dict.set_item("minute", tod.minute).unwrap();
+        dict.into_pyobject(py).unwrap().unbind().into()
     }
 }
