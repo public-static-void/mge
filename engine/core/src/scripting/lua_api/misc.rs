@@ -146,11 +146,7 @@ pub fn register_misc_api(
     let world_tick = world.clone();
     let tick = lua.create_function_mut(move |_, ()| {
         let mut world = world_tick.borrow_mut();
-        world.run_system("MoveAll", None).unwrap();
-        world.run_system("DamageAll", None).unwrap();
-        world.run_system("ProcessDeaths", None).unwrap();
-        world.run_system("ProcessDecay", None).unwrap();
-        world.turn += 1;
+        world.simulation_tick();
         Ok(())
     })?;
     globals.set("tick", tick)?;
