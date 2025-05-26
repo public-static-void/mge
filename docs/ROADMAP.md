@@ -30,8 +30,8 @@
 
 - [x] Map/cell/region management (add/remove/query)
 - [x] Entity queries by cell, region, type, and multi-cell
-- [ ] Pathfinding API (exposed to scripting)
-- [ ] Cell/region metadata (terrain, tags, properties)
+- [x] Pathfinding API (exposed to scripting)
+- [x] Cell/region metadata (terrain, tags, properties)
 - [x] Region/zone support (multi-region, region kinds)
 - [ ] Deterministic tick & event loop (WIP)
 - [x] Modular world generation system (plugin/scriptable, documented)
