@@ -1,8 +1,8 @@
 local assert = require("assert")
 
-function test_map_metadata()
+local function test_map_metadata()
 	add_cell(1, 2, 0)
-	set_cell_metadata({ x = 1, y = 2, z = 0 }, { biome = "Forest", terrain = "Grass" })
+	set_cell_metadata({ type = "square", x = 1, y = 2, z = 0 }, { biome = "Forest", terrain = "Grass" })
 	local meta = get_cell_metadata({ x = 1, y = 2, z = 0 })
 	assert.equals(meta.biome, "Forest")
 	assert.equals(meta.terrain, "Grass")
