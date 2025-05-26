@@ -1,6 +1,3 @@
-import pytest
-
-
 def test_dynamic_system_registration(make_world):
     world = make_world()
     ran = {"flag": False}

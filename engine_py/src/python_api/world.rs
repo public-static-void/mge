@@ -377,4 +377,25 @@ impl PyWorld {
         let entities = world.entities_in_cell(&cell_key);
         entities.into_pyobject(py).unwrap().into()
     }
+
+    fn get_cell_metadata(&self, py: Python, cell: &Bound<'_, pyo3::types::PyAny>) -> PyObject {
+        let world = self.inner.borrow();
+        let cell_key: engine_core::map::CellKey = pythonize::depythonize(cell).unwrap();
+        if let Some(meta) = world.get_cell_metadata(&cell_key) {
+            serde_pyobject::to_pyobject(py, meta).unwrap().into()
+        } else {
+            py.None()
+        }
+    }
+
+    fn set_cell_metadata(
+        &self,
+        cell: &Bound<'_, pyo3::types::PyAny>,
+        metadata: &Bound<'_, pyo3::types::PyAny>,
+    ) {
+        let mut world = self.inner.borrow_mut();
+        let cell_key: engine_core::map::CellKey = pythonize::depythonize(cell).unwrap();
+        let meta_json: serde_json::Value = pythonize::depythonize(metadata).unwrap();
+        world.set_cell_metadata(&cell_key, meta_json);
+    }
 }

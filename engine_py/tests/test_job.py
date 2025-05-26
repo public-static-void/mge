@@ -1,6 +1,3 @@
-import pytest
-
-
 def test_job_completion(make_world):
     world = make_world()
     eid = world.spawn_entity()

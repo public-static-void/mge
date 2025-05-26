@@ -1,6 +1,3 @@
-import pytest
-
-
 def test_entities_in_cell(make_world):
     world = make_world()
     world.add_cell(0, 0, 0)

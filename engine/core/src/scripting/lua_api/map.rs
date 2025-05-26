@@ -1,6 +1,6 @@
 use crate::ecs::world::World;
 use crate::map::CellKey;
-use crate::scripting::helpers::json_to_lua_table;
+use crate::scripting::helpers::{json_to_lua_table, lua_value_to_json};
 use mlua::{Lua, Result as LuaResult, Table, Value as LuaValue};
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -131,6 +131,34 @@ pub fn register_map_api(lua: &Lua, globals: &Table, world: Rc<RefCell<World>>) -
         Ok(LuaValue::Table(arr))
     })?;
     globals.set("entities_in_cell", entities_in_cell)?;
+
+    // --- get_cell_metadata(cell) ---
+    let world_get_cell_meta = world.clone();
+    let get_cell_metadata = lua.create_function_mut(move |lua, cell: LuaValue| {
+        let world = world_get_cell_meta.borrow();
+        let cell_json = lua_value_to_json(lua, cell, None)?;
+        let cell_key: CellKey = serde_json::from_value(cell_json).map_err(mlua::Error::external)?;
+        if let Some(meta) = world.get_cell_metadata(&cell_key) {
+            Ok(json_to_lua_table(lua, meta)?)
+        } else {
+            Ok(LuaValue::Nil)
+        }
+    })?;
+    globals.set("get_cell_metadata", get_cell_metadata)?;
+
+    // --- set_cell_metadata(cell, metadata) ---
+    let world_set_cell_meta = world.clone();
+    let set_cell_metadata =
+        lua.create_function_mut(move |lua, (cell, meta): (LuaValue, LuaValue)| {
+            let mut world = world_set_cell_meta.borrow_mut();
+            let cell_json = lua_value_to_json(lua, cell, None)?;
+            let cell_key: CellKey =
+                serde_json::from_value(cell_json).map_err(mlua::Error::external)?;
+            let meta_json = lua_value_to_json(lua, meta, None)?;
+            world.set_cell_metadata(&cell_key, meta_json);
+            Ok(())
+        })?;
+    globals.set("set_cell_metadata", set_cell_metadata)?;
 
     Ok(())
 }

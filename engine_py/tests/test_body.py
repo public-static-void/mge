@@ -1,6 +1,3 @@
-import pytest
-
-
 def empty_part(name):
     return {
         "name": name,

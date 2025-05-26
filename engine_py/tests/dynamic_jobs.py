@@ -1,6 +1,3 @@
-import pytest
-
-
 def test_dynamic_job_registration(make_world):
     world = make_world()
     eid = world.spawn_entity()
