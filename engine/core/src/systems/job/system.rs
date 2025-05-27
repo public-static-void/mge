@@ -1,77 +1,8 @@
-use crate::{World, ecs::system::System};
-use serde::Deserialize;
-use serde_json::Value as JsonValue;
-use serde_json::json;
-use std::collections::HashMap;
-use std::fs;
-use std::path::Path;
+use crate::World;
+use crate::ecs::system::System;
+use serde_json::{Value as JsonValue, json};
 
-type JobFn = dyn Fn(&JsonValue, f64) -> JsonValue + Send + Sync + 'static;
-
-#[derive(Debug, Deserialize)]
-pub struct JobTypeData {
-    pub name: String,
-    pub requirements: Option<Vec<String>>,
-    pub duration: Option<f64>,
-    pub effects: Option<Vec<serde_json::Value>>,
-}
-
-pub enum JobLogic {
-    Native(Box<JobFn>),
-    Lua(mlua::RegistryKey),
-}
-
-#[derive(Default)]
-pub struct JobTypeRegistry {
-    logic: HashMap<String, JobLogic>,
-}
-
-impl JobTypeRegistry {
-    pub fn register_native(&mut self, job_type: &str, logic: Box<JobFn>) {
-        self.logic
-            .insert(job_type.to_string(), JobLogic::Native(logic));
-    }
-
-    pub fn register_lua(&mut self, job_type: &str, key: mlua::RegistryKey) {
-        self.logic.insert(job_type.to_string(), JobLogic::Lua(key));
-    }
-
-    pub fn register_data_job(&mut self, job: JobTypeData) {
-        let logic = move |old_job: &JsonValue, progress: f64| {
-            let mut job = old_job.clone();
-            let status = job.get("status").and_then(|v| v.as_str()).unwrap_or("");
-            if status == "failed" || status == "complete" || status == "cancelled" {
-            } else if status == "pending" {
-                job["status"] = json!("in_progress");
-            } else if status == "in_progress" {
-                let progress = progress + 1.0;
-                job["progress"] = json!(progress);
-                if let Some(duration) = job.get("duration").and_then(|v| v.as_f64()).or(job
-                    .get("duration")
-                    .and_then(|v| v.as_i64())
-                    .map(|i| i as f64))
-                {
-                    if progress >= duration {
-                        job["status"] = json!("complete");
-                    }
-                } else if progress >= 3.0 {
-                    job["status"] = json!("complete");
-                }
-            }
-            job
-        };
-        self.logic
-            .insert(job.name.clone(), JobLogic::Native(Box::new(logic)));
-    }
-
-    pub fn get(&self, job_type: &str) -> Option<&JobLogic> {
-        self.logic.get(job_type)
-    }
-
-    pub fn job_type_names(&self) -> Vec<String> {
-        self.logic.keys().cloned().collect()
-    }
-}
+use super::registry::{JobLogic, JobTypeRegistry};
 
 #[derive(Default)]
 pub struct JobSystem {
@@ -83,7 +14,7 @@ impl JobSystem {
         JobSystem { job_types }
     }
 
-    fn dependencies_complete(&self, world: &World, job: &serde_json::Value) -> bool {
+    fn dependencies_complete(&self, world: &World, job: &JsonValue) -> bool {
         if let Some(deps) = job.get("dependencies").and_then(|v| v.as_array()) {
             for dep in deps {
                 if let Some(dep_id) = dep.as_str() {
@@ -138,7 +69,6 @@ impl JobSystem {
                 .as_array_mut()
                 .map(std::mem::take)
                 .unwrap_or_default();
-
             let mut all_children_complete = true;
             for child in &mut children {
                 let processed = self.process_job(world, lua, _eid, child.take());
@@ -246,33 +176,4 @@ impl System for JobSystem {
             world.set_component(eid, "Job", job).unwrap();
         }
     }
-}
-
-pub fn load_job_types_from_dir<P: AsRef<Path>>(dir: P) -> Vec<JobTypeData> {
-    let mut jobs = Vec::new();
-    let entries = match fs::read_dir(dir) {
-        Ok(entries) => entries,
-        Err(_) => return jobs,
-    };
-    for entry in entries {
-        let entry = entry.expect("Failed to read entry");
-        let path = entry.path();
-        if path.extension().is_some_and(|e| e == "json") {
-            let data = fs::read_to_string(&path).expect("Failed to read job file");
-            let job: JobTypeData = serde_json::from_str(&data).expect("Failed to parse job file");
-            jobs.push(job);
-        }
-        if path.extension().is_some_and(|e| e == "yaml" || e == "yml") {
-            let data = fs::read_to_string(&path).expect("Failed to read job file");
-            let job: JobTypeData =
-                serde_yaml::from_str(&data).expect("Failed to parse YAML job file");
-            jobs.push(job);
-        }
-        if path.extension().is_some_and(|e| e == "toml") {
-            let data = fs::read_to_string(&path).expect("Failed to read job file");
-            let job: JobTypeData = toml::from_str(&data).expect("Failed to parse TOML job file");
-            jobs.push(job);
-        }
-    }
-    jobs
 }
