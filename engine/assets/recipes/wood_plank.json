@@ -1,0 +1,6 @@
+{
+  "name": "wood_plank",
+  "inputs": [{ "kind": "wood", "amount": 1 }],
+  "outputs": [{ "kind": "plank", "amount": 4 }],
+  "duration": 1
+}
