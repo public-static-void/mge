@@ -3,6 +3,7 @@ use engine_core::ecs::world::World;
 use engine_core::map::{Map, SquareGridMap};
 use engine_core::scripting::ScriptEngine;
 use engine_core::systems::body_equipment_sync::BodyEquipmentSyncSystem;
+use engine_core::systems::economic::{EconomicSystem, load_recipes_from_dir};
 use engine_core::systems::equipment_logic::EquipmentLogicSystem;
 use engine_core::systems::inventory::InventoryConstraintSystem;
 use engine_core::systems::job::{JobSystem, JobTypeRegistry, load_job_types_from_dir};
@@ -47,8 +48,6 @@ fn main() {
     grid.add_cell(0, 2, 0); // starting cell for your test entity
     grid.add_cell(1, 2, 0); // cell you want to move to
 
-    // Optionally, you can set neighbors if needed for other logic, but MoveAll only checks contains()
-
     // Wrap in Map and assign to world
     let map = Map::new(Box::new(grid));
     world.borrow_mut().map = Some(map);
@@ -66,6 +65,12 @@ fn main() {
     world.borrow_mut().register_system(ProcessDeaths);
     world.borrow_mut().register_system(ProcessDecay);
 
+    // --- Economic System registration (NEW) ---
+    let recipes = load_recipes_from_dir("engine/assets/recipes");
+    let economic_system = EconomicSystem::with_recipes(recipes);
+    world.borrow_mut().register_system(economic_system);
+
+    // --- Job System registration ---
     let job_types = load_job_types_from_dir("assets/jobs");
     let mut job_registry = JobTypeRegistry::default();
     for job in job_types {
@@ -85,7 +90,7 @@ fn main() {
         .register_world(world.clone())
         .expect("Failed to register ECS API");
 
-    // --- Argumente an Lua übergeben ---
+    // --- Pass arguments to Lua ---
     engine.set_lua_args(lua_args);
 
     // --- Run script ---
