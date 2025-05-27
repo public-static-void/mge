@@ -118,6 +118,15 @@
 
 ---
 
+## Economic System Helpers
+
+| Function                          | Description                                                |
+| --------------------------------- | ---------------------------------------------------------- |
+| `get_stockpile_resources(entity)` | Get the resources subtable/dict from a Stockpile component |
+| `get_production_job(entity)`      | Get the full ProductionJob component as a table/dict       |
+
+---
+
 ## Other Functions
 
 | Function                  | Description                                 |

@@ -261,6 +261,60 @@ world.remove_body_part(eid, "torso")
 
 ---
 
+## Economic System Example
+
+### Lua
+
+```lua
+local eid = spawn_entity()
+set_component(eid, "Stockpile", { resources = { wood = 5 } })
+set_component(eid, "ProductionJob", {
+    recipe = "wood_plank",
+    progress = 0,
+    status = "pending"
+})
+
+local resources = get_stockpile_resources(eid)
+print(resources.wood) -- 5
+
+local job = get_production_job(eid)
+print(job.recipe) -- "wood_plank"
+print(job.status) -- "pending"
+
+remove_component(eid, "Stockpile")
+assert.is_nil(get_stockpile_resources(eid))
+
+remove_component(eid, "ProductionJob")
+assert.is_nil(get_production_job(eid))
+```
+
+### Python
+
+```python
+eid = world.spawn_entity()
+world.set_component(eid, "Stockpile", {"resources": {"wood": 5}})
+world.set_component(eid, "ProductionJob", {
+    "recipe": "wood_plank",
+    "progress": 0,
+    "status": "pending"
+})
+
+resources = world.get_stockpile_resources(eid)
+print(resources["wood"]) # 5
+
+job = world.get_production_job(eid)
+print(job["recipe"]) # "wood_plank"
+print(job["status"]) # "pending"
+
+world.remove_component(eid, "Stockpile")
+assert world.get_stockpile_resources(eid) is None
+
+world.remove_component(eid, "ProductionJob")
+assert world.get_production_job(eid) is None
+```
+
+---
+
 ## User Input
 
 ### Lua
