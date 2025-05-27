@@ -33,7 +33,7 @@
 - [x] Pathfinding API (exposed to scripting)
 - [x] Cell/region metadata (terrain, tags, properties)
 - [x] Region/zone support (multi-region, region kinds)
-- [ ] Deterministic tick & event loop (WIP)
+- [x] Deterministic tick & event loop
 - [x] Modular world generation system (plugin/scriptable, documented)
 
 ## Systems & Simulation Layer
@@ -44,7 +44,7 @@
 - [x] Event bus (inter-system comms)
 - [x] World generator (data-driven, pluggable)
 - [ ] Economic engine (planned, not yet implemented)
-- [ ] Temporal system (turns, ticks, time-of-day) (WIP)
+- [x] Temporal system (turns, ticks, time-of-day)
 
 ## Plugin/Extensibility
 
