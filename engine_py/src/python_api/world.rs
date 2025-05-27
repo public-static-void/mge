@@ -3,6 +3,7 @@ use engine_core::ecs::world::World;
 use pyo3::IntoPyObject;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
+use serde_pyobject::to_pyobject;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -430,5 +431,27 @@ impl PyWorld {
         dict.set_item("hour", tod.hour).unwrap();
         dict.set_item("minute", tod.minute).unwrap();
         dict.into_pyobject(py).unwrap().unbind().into()
+    }
+
+    pub fn get_stockpile_resources(&self, entity_id: u32) -> PyResult<Option<PyObject>> {
+        let world = self.inner.borrow();
+        if let Some(stockpile) = world.get_component(entity_id, "Stockpile") {
+            if let Some(resources) = stockpile.get("resources") {
+                Python::with_gil(|py| Ok(Some(to_pyobject(py, resources)?.into())))
+            } else {
+                Ok(None)
+            }
+        } else {
+            Ok(None)
+        }
+    }
+
+    pub fn get_production_job(&self, entity_id: u32) -> PyResult<Option<PyObject>> {
+        let world = self.inner.borrow();
+        if let Some(job) = world.get_component(entity_id, "ProductionJob") {
+            Python::with_gil(|py| Ok(Some(to_pyobject(py, job)?.into())))
+        } else {
+            Ok(None)
+        }
     }
 }

@@ -1,0 +1,11 @@
+{
+  "title": "ProductionJob",
+  "type": "object",
+  "properties": {
+    "recipe": { "type": "string" },
+    "progress": { "type": "integer" },
+    "status": { "type": "string" }
+  },
+  "required": ["recipe", "progress", "status"],
+  "modes": ["colony"]
+}

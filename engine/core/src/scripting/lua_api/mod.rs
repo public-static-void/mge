@@ -2,6 +2,7 @@
 
 pub mod body;
 pub mod component;
+pub mod economic;
 pub mod entity;
 pub mod equipment;
 pub mod inventory;
@@ -36,5 +37,6 @@ pub fn register_all_api_functions(
     worldgen::register_worldgen_api(lua, globals, worldgen_registry)?;
     misc::register_misc_api(lua, globals, world.clone(), input_provider)?;
     map::register_map_api(lua, globals, world.clone())?;
+    economic::register_economic_api(lua, globals, world.clone())?;
     Ok(())
 }
