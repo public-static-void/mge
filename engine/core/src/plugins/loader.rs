@@ -135,7 +135,10 @@ pub unsafe fn load_plugin_and_register_systems<P: AsRef<Path>>(
                 });
                 world_ref.register_dynamic_system(&name, run_closure);
             }
-            // TODO: free systems_ptr if allocated dynamically by plugin
+            // Free systems_ptr if plugin allocated it dynamically
+            if let Some(free_systems_fn) = vtable_ref.free_systems {
+                unsafe { free_systems_fn(systems_ptr, count) };
+            }
         }
     }
 

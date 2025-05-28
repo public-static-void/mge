@@ -29,6 +29,9 @@ pub struct PluginVTable {
             *mut c_int,
         ) -> i32,
     >,
+    /// Frees memory allocated for the SystemPlugin array, if it was allocated dynamically.
+    /// If the array is static/global, this may be NULL.
+    pub free_systems: Option<unsafe extern "C" fn(*mut SystemPlugin, c_int)>,
 }
 
 pub struct LoadedPlugin {
