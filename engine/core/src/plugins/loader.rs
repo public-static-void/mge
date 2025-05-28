@@ -5,10 +5,12 @@ use crate::plugins::types::{
 use crate::worldgen::{WorldgenPlugin, WorldgenRegistry};
 use libloading::{Library, Symbol};
 use serde_json::Value;
+use std::collections::HashMap;
 use std::ffi::{CStr, CString};
 use std::fs;
 use std::os::raw::{c_char, c_int, c_void};
 use std::path::Path;
+use topo_sort::TopoSort;
 
 /// # Safety
 ///
@@ -257,4 +259,57 @@ pub unsafe fn load_plugin_with_manifest<P: AsRef<Path>>(
     };
 
     Ok(LoadedPlugin::new(lib, plugin_vtable, metadata))
+}
+
+/// Resolves the order in which plugins should be loaded based on their dependencies.
+/// Returns a Vec of manifest paths in load order, or an error if there are cycles or missing deps.
+pub fn resolve_plugin_load_order(
+    manifests: &[(String, PluginManifest)],
+) -> Result<Vec<String>, String> {
+    // Map plugin name to manifest path
+    let name_to_path: HashMap<&str, &String> = manifests
+        .iter()
+        .map(|(p, m)| (m.name.as_str(), p))
+        .collect();
+
+    // 1. Check for missing dependencies
+    let mut missing = Vec::new();
+    for (_, manifest) in manifests {
+        for dep in &manifest.dependencies {
+            if !name_to_path.contains_key(dep.as_str()) {
+                missing.push(dep.clone());
+            }
+        }
+    }
+    if !missing.is_empty() {
+        return Err(format!("Missing dependencies: {:?}", missing));
+    }
+
+    // 2. Build topo_sort graph
+    let mut ts = TopoSort::with_capacity(manifests.len());
+    for (_, manifest) in manifests {
+        ts.insert(
+            manifest.name.as_str(),
+            manifest
+                .dependencies
+                .iter()
+                .map(|s| s.as_str())
+                .collect::<Vec<_>>(),
+        );
+    }
+
+    // 3. Try to get a full order, or error if there's a cycle
+    let sorted_names = ts
+        .try_vec_nodes()
+        .map_err(|_| "Cycle detected in plugin dependency graph".to_string())?;
+
+    // 4. Map sorted names back to manifest paths
+    let mut order = Vec::new();
+    for name in sorted_names {
+        if let Some(path) = name_to_path.get(name) {
+            order.push((*path).clone());
+        }
+    }
+
+    Ok(order)
 }
