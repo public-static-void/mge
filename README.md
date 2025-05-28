@@ -135,6 +135,6 @@ Example:
 - [docs/api.md](docs/api.md): Unified scripting API (Lua & Python)
 - [docs/examples.md](docs/examples.md): Usage examples (Lua, Python, Rust, C)
 - [docs/idea.md](docs/idea.md): Architecture and design
-- [docs/c_plugin_abi.md](docs/c_plugin_abi.md): C ABI plugin authoring
+- [docs/plugin_abi.md](docs/plugin_abi.md): C ABI plugin authoring
 - [docs/worldgen.md](docs/worldgen.md): Worldgen plugin system
 - [docs/ROADMAP.md](docs/ROADMAP.md): Project Roadmap

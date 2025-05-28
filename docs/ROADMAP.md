@@ -49,8 +49,8 @@
 ## Plugin/Extensibility
 
 - [x] Plugin/mod loader (Rust and C ABI, hot-reloadable, manifest support)
-- [ ] C ABI plugin loader (with example) (WIP)
-- [ ] Rust dynamic plugin loader (WIP)
+- [x] C ABI plugin loader (with example)
+- [x] Rust dynamic plugin loader
 - [ ] Hot-reloadable plugins, systems, and components (WIP)
 
 ## Tooling & Testing
