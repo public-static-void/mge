@@ -1,4 +1,8 @@
+use std::fs::{self, File};
+use std::io::Write;
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
+use tempfile::tempdir;
 
 #[test]
 fn test_ffi_spawn_entity_and_set_component() {
@@ -235,4 +239,99 @@ fn test_plugin_registers_and_frees_dynamic_systems() {
     };
 
     // No assertion needed: test passes if no segfault/leak and systems are registered.
+}
+
+#[test]
+fn test_load_plugin_manifest() {
+    use engine_core::plugins::loader::load_plugin_manifest;
+
+    let dir = tempdir().unwrap();
+    let manifest_path = dir.path().join("plugin.json");
+    let manifest_content = r#"
+    {
+        "name": "Test Plugin",
+        "version": "1.2.3",
+        "description": "A test plugin.",
+        "authors": ["Alice", "Bob"],
+        "dependencies": ["foo", "bar"],
+        "dynamic_library": "libtest_plugin.so"
+    }
+    "#;
+    let mut file = File::create(&manifest_path).unwrap();
+    file.write_all(manifest_content.as_bytes()).unwrap();
+
+    let manifest = load_plugin_manifest(&manifest_path).unwrap();
+    assert_eq!(manifest.name, "Test Plugin");
+    assert_eq!(manifest.version, "1.2.3");
+    assert_eq!(manifest.description, "A test plugin.");
+    assert_eq!(manifest.authors, vec!["Alice", "Bob"]);
+    assert_eq!(manifest.dependencies, vec!["foo", "bar"]);
+    assert_eq!(manifest.dynamic_library, "libtest_plugin.so");
+}
+
+#[test]
+fn test_load_plugin_with_manifest_and_metadata() {
+    use engine_core::plugins::loader::load_plugin_with_manifest;
+    use std::ffi::c_void;
+
+    let mut registry = engine_core::ecs::registry::ComponentRegistry::new();
+    let schema_json = r#"
+    {
+        "title": "Position",
+        "type": "object",
+        "properties": {
+            "x": { "type": "number" },
+            "y": { "type": "number" }
+        },
+        "required": ["x", "y"],
+        "modes": ["colony", "roguelike"]
+    }
+    "#;
+    registry
+        .register_external_schema_from_json(schema_json)
+        .unwrap();
+    let registry = Arc::new(Mutex::new(registry));
+    let mut world = engine_core::ecs::World::new(registry.clone());
+    let world_ptr = &mut world as *mut _ as *mut c_void;
+
+    let plugin_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(|p| p.parent())
+        .expect("Failed to find project root")
+        .join("plugins");
+    let manifest_path = plugin_dir.join("plugin.json");
+
+    // Write a test manifest file pointing to the test plugin
+    let manifest_content = r#"
+    {
+        "name": "Test Plugin",
+        "version": "1.0.0",
+        "description": "A test plugin for the Modular Game Engine.",
+        "authors": ["Test Author"],
+        "dependencies": [],
+        "dynamic_library": "libtest_plugin.so"
+    }
+    "#;
+    fs::write(&manifest_path, manifest_content).unwrap();
+
+    let mut engine_api = engine_core::plugins::EngineApi {
+        spawn_entity: engine_core::plugins::ffi_spawn_entity,
+        set_component: engine_core::plugins::ffi_set_component,
+    };
+
+    let loaded = unsafe {
+        load_plugin_with_manifest(&manifest_path, &mut engine_api, world_ptr)
+            .expect("Failed to load plugin with manifest")
+    };
+
+    assert_eq!(loaded.metadata.manifest.name, "Test Plugin");
+    assert_eq!(loaded.metadata.manifest.version, "1.0.0");
+    assert_eq!(
+        loaded.metadata.manifest.dynamic_library,
+        "libtest_plugin.so"
+    );
+    assert_eq!(
+        loaded.metadata.path.file_name().unwrap(),
+        "libtest_plugin.so"
+    );
 }

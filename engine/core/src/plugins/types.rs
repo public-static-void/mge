@@ -1,6 +1,25 @@
 use libloading::Library;
 use std::os::raw::{c_char, c_int, c_void};
 
+#[derive(Debug, Clone, serde::Deserialize, PartialEq, Eq)]
+pub struct PluginManifest {
+    pub name: String,
+    pub version: String,
+    #[serde(default)]
+    pub description: String,
+    #[serde(default)]
+    pub authors: Vec<String>,
+    #[serde(default)]
+    pub dependencies: Vec<String>,
+    pub dynamic_library: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct PluginMetadata {
+    pub manifest: PluginManifest,
+    pub path: std::path::PathBuf,
+}
+
 #[repr(C)]
 pub struct EngineApi {
     pub spawn_entity: unsafe extern "C" fn(*mut c_void) -> u32,
@@ -29,19 +48,22 @@ pub struct PluginVTable {
             *mut c_int,
         ) -> i32,
     >,
-    /// Frees memory allocated for the SystemPlugin array, if it was allocated dynamically.
-    /// If the array is static/global, this may be NULL.
     pub free_systems: Option<unsafe extern "C" fn(*mut SystemPlugin, c_int)>,
 }
 
 pub struct LoadedPlugin {
     _lib: Library, // Must keep alive!
     pub vtable: *const PluginVTable,
+    pub metadata: PluginMetadata,
 }
 
 impl LoadedPlugin {
-    pub fn new(lib: Library, vtable: *const PluginVTable) -> Self {
-        Self { _lib: lib, vtable }
+    pub fn new(lib: Library, vtable: *const PluginVTable, metadata: PluginMetadata) -> Self {
+        Self {
+            _lib: lib,
+            vtable,
+            metadata,
+        }
     }
 }
 
