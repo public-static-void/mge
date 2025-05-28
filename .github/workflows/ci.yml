@@ -83,6 +83,11 @@ jobs:
           export PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig
           cargo build --all
 
+      - name: Build and deploy Rust plugins
+        run: |
+          export PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig
+          cargo run -p xtask -- build-plugins
+
       - name: Test (with C plugins)
         run: |
           export PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig
