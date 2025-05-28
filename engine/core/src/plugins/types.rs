@@ -51,6 +51,7 @@ pub struct PluginVTable {
     pub free_systems: Option<unsafe extern "C" fn(*mut SystemPlugin, c_int)>,
 }
 
+#[derive(Debug)]
 pub struct LoadedPlugin {
     _lib: Library, // Must keep alive!
     pub vtable: *const PluginVTable,
