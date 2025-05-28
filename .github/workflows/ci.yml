@@ -40,17 +40,16 @@ jobs:
 
       - name: Build all C plugins
         run: |
-          mkdir -p plugins/build
           for src in plugins/*.c; do
             base=$(basename "$src" .c)
-            gcc -Iengine -shared -fPIC "$src" -o "plugins/build/lib${base}.so"
+            gcc -Iengine -shared -fPIC "$src" -o "plugins/lib${base}.so"
           done
 
       - name: Upload C plugins
         uses: actions/upload-artifact@v4
         with:
           name: c-plugins
-          path: plugins/build/*.so
+          path: plugins/*.so
 
   test-rust:
     runs-on: ubuntu-latest
@@ -62,7 +61,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: c-plugins
-          path: plugins/build
+          path: plugins
 
       - name: Install LuaJIT and pkg-config
         run: sudo apt-get update && sudo apt-get install -y libluajit-5.1-dev pkg-config && sudo apt-get clean
@@ -87,7 +86,7 @@ jobs:
       - name: Test (with C plugins)
         run: |
           export PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig
-          export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(pwd)/plugins/build
+          export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(pwd)/plugins
           cargo test --all
 
       - name: Clean up Rust build artifacts
@@ -103,7 +102,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: c-plugins
-          path: plugins/build
+          path: plugins
 
       - name: Install LuaJIT and pkg-config
         run: sudo apt-get update && sudo apt-get install -y libluajit-5.1-dev pkg-config && sudo apt-get clean
@@ -113,7 +112,7 @@ jobs:
 
       - name: Lua Tests
         run: |
-          export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(pwd)/plugins/build
+          export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(pwd)/plugins
           ./run_lua_tests.sh
 
   test-python:
@@ -126,7 +125,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: c-plugins
-          path: plugins/build
+          path: plugins
 
       - name: Install LuaJIT and pkg-config
         run: sudo apt-get update && sudo apt-get install -y libluajit-5.1-dev pkg-config && sudo apt-get clean
@@ -136,7 +135,7 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install Python dependencies
+      - name: Create and activate virtualenv, install Python deps
         run: |
           python -m venv .venv
           source .venv/bin/activate
@@ -147,7 +146,7 @@ jobs:
         run: |
           source .venv/bin/activate
           cd engine_py
-          export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(pwd)/../plugins/build
+          export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(pwd)/../plugins
           export PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}
           maturin develop
           pytest
