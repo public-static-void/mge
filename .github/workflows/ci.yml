@@ -7,14 +7,35 @@ on:
     branches: [main]
 
 jobs:
-  lint-and-test:
+  lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - uses: moonrepo/setup-rust@v1
+      - name: Set up Rust toolchain
+        uses: moonrepo/setup-rust@v1
         with:
           components: rustfmt, clippy
+
+      - name: Lint (rustfmt)
+        run: cargo fmt --all --check
+
+      - name: Clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Clean up Rust build artifacts
+        run: cargo clean
+
+      - name: Show disk usage after cleanup
+        run: df -h
+
+  build-c-plugins:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build-essential
+        run: sudo apt-get update && sudo apt-get install -y build-essential && sudo apt-get clean
 
       - name: Build all C plugins
         run: |
@@ -24,35 +45,111 @@ jobs:
           done
         if: ${{ hashFiles('plugins/*.c') != '' }}
 
+      - name: Clean up build artifacts
+        run: rm -rf plugins/*.o plugins/*.so
+
+      - name: Show disk usage after cleanup
+        run: df -h
+
+  test-rust:
+    runs-on: ubuntu-latest
+    needs: [lint]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache cargo registry and git
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-registry-
+
+      - name: Cache cargo target
+        uses: actions/cache@v4
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-target-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-target-
+
+      - name: Set up Rust toolchain
+        uses: moonrepo/setup-rust@v1
+
+      - name: Build
+        run: cargo build --all
+
+      - name: Test
+        run: cargo test --all
+
+      - name: Clean up Rust build artifacts
+        run: cargo clean
+
+      - name: Remove Cargo registry source checkouts
+        run: rm -rf ~/.cargo/registry/src/*
+
+      - name: Show disk usage after cleanup
+        run: df -h
+
+  test-lua:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
       - name: Install LuaJIT and pkg-config
-        run: sudo apt-get update && sudo apt-get install -y libluajit-5.1-dev pkg-config
+        run: sudo apt-get update && sudo apt-get install -y libluajit-5.1-dev pkg-config && sudo apt-get clean
 
       - name: Install Lua
-        run: sudo apt-get update && sudo apt-get install -y lua5.1
+        run: sudo apt-get update && sudo apt-get install -y lua5.1 && sudo apt-get clean
+
+      - name: Lua Tests
+        run: ./run_lua_tests.sh
+
+      - name: Show disk usage after tests
+        run: df -h
+
+  test-python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: Lint (rustfmt)
-        run: cargo fmt --all --check
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('engine_py/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
 
-      - name: Clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
-
-      - name: Rust Tests
-        run: cargo test --all
-
-      - name: Lua Tests
-        run: ./run_lua_tests.sh
-
-      - name: Build and test Python bindings
+      - name: Install Python dependencies
         run: |
           python -m venv .venv
           source .venv/bin/activate
           pip install --upgrade pip
           pip install maturin pytest
+
+      - name: Build and test Python bindings
+        run: |
+          source .venv/bin/activate
           cd engine_py
           maturin develop
           pytest
+
+      - name: Clean up Python venv
+        run: rm -rf .venv
+
+      - name: Show disk usage after cleanup
+        run: df -h
+
+  check-disk-space:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Show disk usage
+        run: df -h
