@@ -128,6 +128,9 @@ jobs:
           name: c-plugins
           path: plugins/build
 
+      - name: Install LuaJIT and pkg-config
+        run: sudo apt-get update && sudo apt-get install -y libluajit-5.1-dev pkg-config && sudo apt-get clean
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -145,14 +148,9 @@ jobs:
           source .venv/bin/activate
           cd engine_py
           export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(pwd)/../plugins/build
+          export PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}
           maturin develop
           pytest
 
       - name: Clean up Python venv
         run: rm -rf .venv
-
-  check-disk-space:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Show disk usage
-        run: df -h
