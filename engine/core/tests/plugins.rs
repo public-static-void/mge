@@ -432,3 +432,93 @@ fn test_plugin_dependency_resolution_missing_dep() {
         "Expected missing dependency error, got: {err}"
     );
 }
+
+#[test]
+fn test_plugin_registry_register_and_list() {
+    use engine_core::plugins::{LoadedPlugin, PluginManifest, PluginMetadata, PluginRegistry};
+    use libloading::Library;
+    use std::path::PathBuf;
+
+    // Use the real test plugin library
+    let lib_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(|p| p.parent())
+        .expect("Failed to find project root")
+        .join("plugins")
+        .join("libtest_plugin.so");
+
+    let manifest = PluginManifest {
+        name: "dummy".to_string(),
+        version: "1.0.0".to_string(),
+        description: "Dummy plugin".to_string(),
+        authors: vec!["Test".to_string()],
+        dependencies: vec![],
+        dynamic_library: "libtest_plugin.so".to_string(),
+    };
+    let metadata = PluginMetadata {
+        manifest: manifest.clone(),
+        path: lib_path.clone(),
+    };
+    let plugin = LoadedPlugin::new(
+        unsafe { Library::new(&lib_path).expect("Failed to load test plugin library") },
+        std::ptr::null(),
+        metadata,
+    );
+
+    let registry = PluginRegistry::new();
+    registry.register(plugin);
+
+    let names = registry.list();
+    assert_eq!(names, vec!["dummy".to_string()]);
+    assert_eq!(registry.len(), 1);
+
+    let meta = registry.get_metadata("dummy").unwrap();
+    assert_eq!(meta.manifest.name, "dummy");
+    assert_eq!(meta.manifest.version, "1.0.0");
+
+    let plugin_ref = registry.get_plugin("dummy");
+    assert!(plugin_ref.is_some());
+}
+
+#[test]
+fn test_plugin_registry_all_metadata_and_empty() {
+    use engine_core::plugins::{LoadedPlugin, PluginManifest, PluginMetadata, PluginRegistry};
+    use libloading::Library;
+    use std::path::PathBuf;
+
+    let registry = PluginRegistry::new();
+    assert!(registry.is_empty());
+    assert_eq!(registry.all_metadata().len(), 0);
+
+    // Use the real test plugin library
+    let lib_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(|p| p.parent())
+        .expect("Failed to find project root")
+        .join("plugins")
+        .join("libtest_plugin.so");
+
+    let manifest = PluginManifest {
+        name: "dummy2".to_string(),
+        version: "1.2.3".to_string(),
+        description: "Another plugin".to_string(),
+        authors: vec![],
+        dependencies: vec![],
+        dynamic_library: "libtest_plugin.so".to_string(),
+    };
+    let metadata = PluginMetadata {
+        manifest: manifest.clone(),
+        path: lib_path.clone(),
+    };
+    let plugin = LoadedPlugin::new(
+        unsafe { Library::new(&lib_path).expect("Failed to load test plugin library") },
+        std::ptr::null(),
+        metadata,
+    );
+    registry.register(plugin);
+
+    assert!(!registry.is_empty());
+    let all = registry.all_metadata();
+    assert_eq!(all.len(), 1);
+    assert_eq!(all[0].manifest.name, "dummy2");
+}
