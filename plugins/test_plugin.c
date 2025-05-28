@@ -37,6 +37,7 @@ __attribute__((constructor)) void init_vtable() {
   vtable.generate_world = NULL;
   vtable.free_result_json = NULL;
   vtable.register_systems = register_systems;
+  vtable.free_systems = NULL;
 }
 
 // Export vtable pointer with default visibility

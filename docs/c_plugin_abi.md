@@ -26,6 +26,7 @@ typedef struct PluginVTable {
   void (*free_result_json)(char *result_json);
   int (*register_systems)(struct EngineApi *api, void *world,
                           SystemPlugin **systems, int *count);
+  void (*free_systems)(SystemPlugin *systems, int count);
 } PluginVTable;
 ```
 
@@ -36,6 +37,9 @@ typedef struct PluginVTable {
 - **generate_world:** Generate a world based on JSON parameters. Returns a JSON string (see below).
 - **free_result_json:** Free memory allocated for result JSON (if needed).
 - **register_systems:** Register one or more ECS systems with the engine.
+- **free_systems:**
+  If you dynamically allocate the `SystemPlugin` array (e.g., with `malloc`), provide a function here to free it.
+  If you use a static/global array, set this to `NULL`.
 
 ---
 
@@ -89,6 +93,10 @@ int register_systems(struct EngineApi *api, void *world, SystemPlugin **systems,
 - The array of `SystemPlugin` must be static/global (not stack-allocated).
 - The `name` field must point to a static string for the plugin's lifetime.
 - Return 0 on success.
+
+- **Memory Management:**
+  If you allocate the `SystemPlugin` array dynamically, you must provide a `free_systems` function in your vtable that will be called by the engine after registration.
+  For static/global arrays, set `free_systems` to `NULL`.
 
 ---
 

@@ -43,7 +43,7 @@
 - [x] Dynamic system registration (from scripting/plugins)
 - [x] Event bus (inter-system comms)
 - [x] World generator (data-driven, pluggable)
-- [x] Economic engine (planned, not yet implemented)
+- [x] Economic engine
 - [x] Temporal system (turns, ticks, time-of-day)
 
 ## Plugin/Extensibility

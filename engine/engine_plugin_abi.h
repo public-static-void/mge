@@ -30,6 +30,7 @@ typedef struct PluginVTable {
   void (*free_result_json)(char *result_json);
   int (*register_systems)(struct EngineApi *api, void *world,
                           SystemPlugin **systems, int *count);
+  void (*free_systems)(SystemPlugin *systems, int count);
 } PluginVTable;
 
 extern PluginVTable *PLUGIN_VTABLE;
