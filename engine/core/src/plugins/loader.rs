@@ -1,9 +1,12 @@
 use crate::ecs::World;
-use crate::plugins::types::{EngineApi, LoadedPlugin, PluginVTable, SystemPlugin};
+use crate::plugins::types::{
+    EngineApi, LoadedPlugin, PluginManifest, PluginMetadata, PluginVTable, SystemPlugin,
+};
 use crate::worldgen::{WorldgenPlugin, WorldgenRegistry};
 use libloading::{Library, Symbol};
 use serde_json::Value;
 use std::ffi::{CStr, CString};
+use std::fs;
 use std::os::raw::{c_char, c_int, c_void};
 use std::path::Path;
 
@@ -30,7 +33,25 @@ pub unsafe fn load_plugin<P: AsRef<Path>>(
     if init_result != 0 {
         return Err(format!("Plugin init failed with code {}", init_result));
     }
-    Ok(LoadedPlugin::new(lib, plugin_vtable))
+
+    let metadata = PluginMetadata {
+        manifest: PluginManifest {
+            name: "<unknown>".to_string(),
+            version: "0.0.0".to_string(),
+            description: String::new(),
+            authors: vec![],
+            dependencies: vec![],
+            dynamic_library: path
+                .as_ref()
+                .file_name()
+                .unwrap()
+                .to_string_lossy()
+                .into_owned(),
+        },
+        path: path.as_ref().to_path_buf(),
+    };
+
+    Ok(LoadedPlugin::new(lib, plugin_vtable, metadata))
 }
 
 /// # Safety
@@ -89,7 +110,24 @@ pub unsafe fn load_plugin_and_register_worldgen<P: AsRef<Path>>(
         });
     }
 
-    Ok(LoadedPlugin::new(lib, plugin_vtable))
+    let metadata = PluginMetadata {
+        manifest: PluginManifest {
+            name: "<unknown>".to_string(),
+            version: "0.0.0".to_string(),
+            description: String::new(),
+            authors: vec![],
+            dependencies: vec![],
+            dynamic_library: path
+                .as_ref()
+                .file_name()
+                .unwrap()
+                .to_string_lossy()
+                .into_owned(),
+        },
+        path: path.as_ref().to_path_buf(),
+    };
+
+    Ok(LoadedPlugin::new(lib, plugin_vtable, metadata))
 }
 
 /// # Safety
@@ -142,5 +180,81 @@ pub unsafe fn load_plugin_and_register_systems<P: AsRef<Path>>(
         }
     }
 
-    Ok(LoadedPlugin::new(lib, plugin_vtable))
+    let metadata = PluginMetadata {
+        manifest: PluginManifest {
+            name: "<unknown>".to_string(),
+            version: "0.0.0".to_string(),
+            description: String::new(),
+            authors: vec![],
+            dependencies: vec![],
+            dynamic_library: path
+                .as_ref()
+                .file_name()
+                .unwrap()
+                .to_string_lossy()
+                .into_owned(),
+        },
+        path: path.as_ref().to_path_buf(),
+    };
+
+    Ok(LoadedPlugin::new(lib, plugin_vtable, metadata))
+}
+
+/// Loads the plugin manifest from a given manifest path.
+pub fn load_plugin_manifest<P: AsRef<Path>>(manifest_path: P) -> Result<PluginManifest, String> {
+    let manifest_str = fs::read_to_string(&manifest_path)
+        .map_err(|e| format!("Failed to read plugin manifest: {e}"))?;
+    let manifest: PluginManifest = serde_json::from_str(&manifest_str)
+        .map_err(|e| format!("Failed to parse plugin manifest: {e}"))?;
+    // Validate required fields
+    if manifest.name.trim().is_empty() {
+        return Err("Plugin manifest missing 'name'".to_string());
+    }
+    if manifest.version.trim().is_empty() {
+        return Err("Plugin manifest missing 'version'".to_string());
+    }
+    if manifest.dynamic_library.trim().is_empty() {
+        return Err("Plugin manifest missing 'dynamic_library'".to_string());
+    }
+    Ok(manifest)
+}
+
+/// # Safety
+///
+/// - `manifest_path` must point to a valid plugin manifest (plugin.json).
+/// - The referenced dynamic library must exist and be a valid plugin.
+/// - `engine_api` and `world` must be valid for the duration of the plugin.
+/// - The caller must ensure all pointer arguments are valid and not aliased elsewhere.
+pub unsafe fn load_plugin_with_manifest<P: AsRef<Path>>(
+    manifest_path: P,
+    engine_api: &mut EngineApi,
+    world: *mut c_void,
+) -> Result<LoadedPlugin, String> {
+    let manifest = load_plugin_manifest(&manifest_path)?;
+    let manifest_dir = manifest_path
+        .as_ref()
+        .parent()
+        .unwrap_or_else(|| Path::new("."));
+    let dylib_path = manifest_dir.join(&manifest.dynamic_library);
+
+    let lib = unsafe { Library::new(&dylib_path) }.map_err(|e| e.to_string())?;
+    let vtable: Symbol<*mut *mut PluginVTable> =
+        unsafe { lib.get(b"PLUGIN_VTABLE\0") }.map_err(|e| e.to_string())?;
+    let plugin_vtable: *mut PluginVTable = unsafe { **vtable };
+    if plugin_vtable.is_null() {
+        return Err("PLUGIN_VTABLE symbol is null".to_string());
+    }
+    let vtable_ref: &PluginVTable = unsafe { &*plugin_vtable };
+
+    let init_result = unsafe { (vtable_ref.init)(engine_api as *mut _, world) };
+    if init_result != 0 {
+        return Err(format!("Plugin init failed with code {}", init_result));
+    }
+
+    let metadata = PluginMetadata {
+        manifest,
+        path: dylib_path,
+    };
+
+    Ok(LoadedPlugin::new(lib, plugin_vtable, metadata))
 }
