@@ -4,5 +4,7 @@ members = [
   "engine_macros",
   "engine_py",
   "engine/tools/schema_validator",
+  "plugins/rust_test_plugin",
+  "xtask",
 ]
 resolver = "3"

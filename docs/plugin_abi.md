@@ -1,7 +1,11 @@
-# MGE C Plugin ABI Reference
+# MGE Plugin ABI Reference
 
-This document describes the **C ABI** for writing hot-reloadable plugins for the Modular Game Engine (MGE).
+This document describes the **ABI** for writing hot-reloadable plugins for the Modular Game Engine (MGE).
 Plugins can register systems, participate in world generation, and interact with the engine at runtime.
+
+> **Note:**
+> This ABI is supported for both C and Rust plugins.
+> Rust plugins must use `#[repr(C)]` and `extern "C"` for all exported types and functions.
 
 ---
 
@@ -11,6 +15,40 @@ Plugins can register systems, participate in world generation, and interact with
 - The vtable exposes function pointers for initialization, update, shutdown, world generation, and system registration.
 - The ABI is defined in [`engine/engine_plugin_abi.h`](../engine/engine_plugin_abi.h).
 - Plugins are hot-reloaded and run in the same process as the engine.
+
+---
+
+## Rust Plugins
+
+- Place your Rust plugin crate in `plugins/<plugin_name>/`.
+- Ensure `[lib] crate-type = ["cdylib"]` in `Cargo.toml`.
+- Export a `PLUGIN_VTABLE` symbol with the C ABI.
+- Use `cargo run -p xtask -- build-plugins` to build and deploy all plugins.
+
+## C Plugins
+
+- Place your C plugin source in `plugins/<plugin_name>/`.
+- Build as a shared library and ensure the `.so`/`.dll`/`.dylib` is referenced in the plugin's `plugin.json`.
+
+## Automation
+
+- The `xtask` tool automates building and deploying all plugins to the correct locations.
+
+### Usage
+
+```bash
+cargo run -p xtask -- build-plugins
+```
+
+- Builds all plugin crates in `plugins/`
+- Copies the resulting `.so`/`.dll`/`.dylib` to each plugin's directory for loader discovery
+- Handles both C and Rust plugins
+
+You can also build a single plugin:
+
+```bash
+cargo run -p xtask -- build-plugins rust_test_plugin
+```
 
 ---
 
@@ -134,7 +172,7 @@ void free_result_json(char *result_json);
   All struct layouts must match exactly between C and Rust (`#[repr(C)]` in Rust).
 
 - **Other Languages:**
-  The C ABI is the foundation for all plugin types. Integrations for Lua, Python, etc., should use this ABI for maximum compatibility.
+  The ABI is the foundation for all plugin types. Integrations for Lua, Python, etc., should use this ABI for maximum compatibility.
 
 - **Unused VTable Fields:**
   Set unused function pointers in the vtable to `NULL`.

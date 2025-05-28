@@ -1,0 +1,13 @@
+[package]
+name = "rust_test_plugin"
+version = "0.1.0"
+edition = "2021"
+authors = ["Test Author <test@example.com>"]
+description = "A Rust plugin for the Modular Game Engine"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+libc = "0.2"
+ctor = "0.2"

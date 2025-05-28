@@ -522,3 +522,72 @@ fn test_plugin_registry_all_metadata_and_empty() {
     assert_eq!(all.len(), 1);
     assert_eq!(all[0].manifest.name, "dummy2");
 }
+
+#[test]
+fn test_load_rust_dynamic_plugin_via_manifest() {
+    use engine_core::plugins::PluginRegistry;
+    use engine_core::plugins::loader::load_plugin_with_manifest;
+    use std::ffi::c_void;
+    use std::path::PathBuf;
+    use std::sync::{Arc, Mutex};
+
+    // Setup registry and world as usual
+    let mut registry = engine_core::ecs::registry::ComponentRegistry::new();
+    let schema_json = r#"
+    {
+        "title": "Position",
+        "type": "object",
+        "properties": {
+            "x": { "type": "number" },
+            "y": { "type": "number" }
+        },
+        "required": ["x", "y"],
+        "modes": ["colony", "roguelike"]
+    }
+    "#;
+    registry
+        .register_external_schema_from_json(schema_json)
+        .unwrap();
+    let registry = Arc::new(Mutex::new(registry));
+    let mut world = engine_core::ecs::World::new(registry.clone());
+    let world_ptr = &mut world as *mut _ as *mut c_void;
+
+    let mut engine_api = engine_core::plugins::EngineApi {
+        spawn_entity: engine_core::plugins::ffi_spawn_entity,
+        set_component: engine_core::plugins::ffi_set_component,
+    };
+
+    // Path to the Rust plugin manifest
+    let plugin_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(|p| p.parent())
+        .expect("Failed to find project root")
+        .join("plugins")
+        .join("rust_test_plugin");
+    let manifest_path = plugin_dir.join("plugin.json");
+
+    // Load the Rust dynamic plugin via manifest
+    let loaded = unsafe {
+        load_plugin_with_manifest(&manifest_path, &mut engine_api, world_ptr)
+            .expect("Failed to load Rust dynamic plugin with manifest")
+    };
+
+    // Register in the plugin registry
+    let registry = PluginRegistry::new();
+    registry.register(loaded);
+
+    // Check registry contents
+    let names = registry.list();
+    assert_eq!(names, vec!["Rust Test Plugin".to_string()]);
+    let meta = registry.get_metadata("Rust Test Plugin").unwrap();
+    assert_eq!(meta.manifest.name, "Rust Test Plugin");
+    assert_eq!(meta.manifest.dynamic_library, "librust_test_plugin.so");
+
+    // The plugin should have spawned an entity with Position
+    let entities = world.get_entities();
+    assert!(!entities.is_empty());
+    let eid = entities[0];
+    let pos = world.get_component(eid, "Position").unwrap();
+    assert_eq!(pos["x"], 10.0);
+    assert_eq!(pos["y"], 42.0);
+}
