@@ -2,16 +2,16 @@ local assert = require("assert")
 
 local function test_tick_advances_turn_and_state()
 	local id = spawn_entity()
-	set_component(id, "PositionComponent", { pos = { Square = { x = 0.0, y = 0.0, z = 0.0 } } })
+	set_component(id, "Position", { pos = { Square = { x = 0.0, y = 0.0, z = 0.0 } } })
 	set_component(id, "Health", { current = 10.0, max = 10.0 })
 
-	local pos_before = get_component(id, "PositionComponent")
+	local pos_before = get_component(id, "Position")
 	local health_before = get_component(id, "Health")
 	local turn_before = get_turn()
 
 	tick()
 
-	local pos_after = get_component(id, "PositionComponent")
+	local pos_after = get_component(id, "Position")
 	local health_after = get_component(id, "Health")
 	local turn_after = get_turn()
 

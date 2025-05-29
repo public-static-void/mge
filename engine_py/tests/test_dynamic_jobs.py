@@ -6,6 +6,7 @@ def test_dynamic_job_registration(make_world):
     def test_job_logic(job, progress):
         if job["status"] == "pending":
             job["status"] = "in_progress"
+            job["progress"] = 0
         elif job["status"] == "in_progress":
             job["progress"] = job.get("progress", 0) + 1
             if job["progress"] >= 2:
@@ -16,7 +17,7 @@ def test_dynamic_job_registration(make_world):
     world.assign_job(eid, "TestJob")
 
     # Run the job system a few times
-    for _ in range(3):
+    for _ in range(4):
         world.run_native_system("JobSystem")
 
     # Check that the job is marked complete

@@ -1,0 +1,10 @@
+{
+  "title": "Player",
+  "type": "object",
+  "description": "Player marker component.",
+  "properties": {
+    "name": { "type": "string", "default": "Player" }
+  },
+  "required": ["name"],
+  "modes": ["roguelike"]
+}

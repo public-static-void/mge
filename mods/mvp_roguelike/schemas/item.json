@@ -1,0 +1,12 @@
+{
+  "title": "Item",
+  "type": "object",
+  "description": "Collectible item.",
+  "properties": {
+    "id": { "type": "string" },
+    "name": { "type": "string" },
+    "effect": { "type": "string" }
+  },
+  "required": ["id", "name"],
+  "modes": ["roguelike"]
+}

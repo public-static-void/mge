@@ -466,14 +466,18 @@ impl PyWorld {
             .unwrap_or_else(|| {
                 let id = world.spawn_entity();
                 world
-                    .set_component(id, "Camera", serde_json::json!({}))
+                    .set_component(id, "Camera", serde_json::json!({ "x": x, "y": y }))
                     .unwrap();
                 id
             });
+        // Always update Camera component with x and y
+        world
+            .set_component(camera_id, "Camera", serde_json::json!({ "x": x, "y": y }))
+            .unwrap();
         world
             .set_component(
                 camera_id,
-                "PositionComponent",
+                "Position",
                 serde_json::json!({ "pos": { "Square": { "x": x, "y": y, "z": 0 } } }),
             )
             .unwrap();
@@ -483,7 +487,7 @@ impl PyWorld {
     fn get_camera(&self, py: pyo3::Python) -> pyo3::PyObject {
         let world = self.inner.borrow();
         if let Some(camera_id) = world.get_entities_with_component("Camera").first() {
-            if let Some(pos) = world.get_component(*camera_id, "PositionComponent") {
+            if let Some(pos) = world.get_component(*camera_id, "Position") {
                 let x = pos["pos"]["Square"]["x"].as_i64().unwrap_or(0);
                 let y = pos["pos"]["Square"]["y"].as_i64().unwrap_or(0);
                 let dict = pyo3::types::PyDict::new(py);

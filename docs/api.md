@@ -136,6 +136,13 @@
 
 ---
 
+## Camera & Viewport
+
+| Function           | Description                               |
+| ------------------ | ----------------------------------------- |
+| `set_camera(x, y)` | Set the camera position (center viewport) |
+| `get_camera()`     | Get the camera position as {x, y}         |
+
 ## Other Functions
 
 | Function                  | Description                                 |

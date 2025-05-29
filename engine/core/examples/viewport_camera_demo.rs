@@ -78,7 +78,7 @@ fn main() {
     world
         .set_component(
             entity,
-            "PositionComponent",
+            "Position",
             json!({ "pos": { "Square": { "x": 4, "y": 2, "z": 0 } } }),
         )
         .unwrap();
@@ -95,7 +95,7 @@ fn main() {
     world
         .set_component(
             camera,
-            "PositionComponent",
+            "Position",
             json!({ "pos": { "Square": { "x": 2, "y": 2, "z": 0 } } }),
         )
         .unwrap();
@@ -108,7 +108,7 @@ fn main() {
 
     loop {
         // Get camera position
-        let cam_pos = world.get_component(camera, "PositionComponent").unwrap();
+        let cam_pos = world.get_component(camera, "Position").unwrap();
         let x = cam_pos["pos"]["Square"]["x"].as_i64().unwrap();
         let y = cam_pos["pos"]["Square"]["y"].as_i64().unwrap();
 
@@ -144,9 +144,7 @@ fn main() {
             let mut pos = cam_pos.clone();
             pos["pos"]["Square"]["x"] = json!(new_x);
             pos["pos"]["Square"]["y"] = json!(new_y);
-            world
-                .set_component(camera, "PositionComponent", pos)
-                .unwrap();
+            world.set_component(camera, "Position", pos).unwrap();
         }
     }
 }

@@ -1,13 +1,7 @@
 use engine_core::ecs::registry::ComponentRegistry;
 use engine_core::ecs::world::World;
-use engine_core::map::{Map, SquareGridMap};
+use engine_core::mods::loader::load_mod;
 use engine_core::scripting::ScriptEngine;
-use engine_core::systems::body_equipment_sync::BodyEquipmentSyncSystem;
-use engine_core::systems::economic::{EconomicSystem, load_recipes_from_dir};
-use engine_core::systems::equipment_logic::EquipmentLogicSystem;
-use engine_core::systems::inventory::InventoryConstraintSystem;
-use engine_core::systems::job::{JobSystem, JobTypeRegistry, load_job_types_from_dir};
-use engine_core::systems::standard::{DamageAll, MoveAll, MoveDelta, ProcessDeaths, ProcessDecay};
 use std::cell::RefCell;
 use std::env;
 use std::fs;
@@ -17,85 +11,113 @@ use std::sync::{Arc, Mutex};
 fn main() {
     let args: Vec<String> = env::args().collect();
 
-    if args.len() < 2 {
-        eprintln!("Usage: mge-cli <script.lua> [args...]");
-        std::process::exit(1);
+    let mut mode_arg: Option<String> = None;
+    let mut mod_name: Option<String> = None;
+    let mut script_path: Option<String> = None;
+    let mut script_args: Vec<String> = Vec::new();
+
+    let mut i = 1;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--mod" if i + 1 < args.len() => {
+                mod_name = Some(args[i + 1].clone());
+                i += 2;
+            }
+            "--mode" if i + 1 < args.len() => {
+                mode_arg = Some(args[i + 1].clone());
+                i += 2;
+            }
+            _ if script_path.is_none() => {
+                script_path = Some(args[i].clone());
+                i += 1;
+            }
+            _ => {
+                script_args.push(args[i].clone());
+                i += 1;
+            }
+        }
     }
 
-    let script_path = &args[1];
-    let script = fs::read_to_string(script_path).unwrap_or_else(|_| {
-        eprintln!("Failed to read Lua script file: {}", script_path);
-        std::process::exit(1);
-    });
+    // --- Mod loading mode ---
+    if let Some(mod_name) = mod_name {
+        let mod_dir = format!("mods/{}", mod_name);
 
-    let lua_args = args[2..].to_vec();
+        // Load engine schemas first
+        let engine_schema_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap() + "/../assets/schemas";
+        let engine_schemas = engine_core::ecs::schema::load_schemas_from_dir(&engine_schema_dir)
+            .expect("Failed to load engine schemas");
 
-    // --- ECS + Lua context ---
+        let registry = Arc::new(Mutex::new(ComponentRegistry::new()));
+        for (_name, schema) in engine_schemas {
+            registry.lock().unwrap().register_external_schema(schema);
+        }
 
-    // Load all schemas!
-    let schema_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap() + "/../assets/schemas";
-    let schemas = engine_core::ecs::schema::load_schemas_from_dir(&schema_dir)
-        .expect("Failed to load schemas");
-    let registry = Arc::new(Mutex::new(ComponentRegistry::new()));
-    for (_name, schema) in schemas {
-        registry.lock().unwrap().register_external_schema(schema);
+        // Read mod manifest and parse mode if present
+        let manifest_path = format!("{}/mod.json", mod_dir);
+        let manifest: Option<serde_json::Value> = fs::read_to_string(&manifest_path)
+            .ok()
+            .and_then(|data| serde_json::from_str(&data).ok());
+
+        let manifest_mode = manifest
+            .as_ref()
+            .and_then(|m| m.get("mode"))
+            .and_then(|m| m.as_str())
+            .map(|s| s.to_string());
+
+        let mode = mode_arg
+            .or(manifest_mode)
+            .unwrap_or_else(|| "colony".to_string());
+
+        let mut world = World::new(registry.clone());
+        world.current_mode = mode.clone();
+
+        let world_rc = Rc::new(RefCell::new(world));
+        let mut engine = ScriptEngine::new();
+        engine
+            .register_world(world_rc.clone())
+            .expect("Failed to register ECS API");
+
+        if let Err(e) = load_mod(&mod_dir, world_rc.clone(), &mut engine) {
+            eprintln!("Failed to load mod: {}", e);
+            std::process::exit(1);
+        }
+        return;
     }
 
-    let world = Rc::new(RefCell::new(World::new(registry.clone())));
+    // --- Script/demo/test mode ---
+    if let Some(script_path) = script_path {
+        let script = fs::read_to_string(&script_path).unwrap_or_else(|_| {
+            eprintln!("Failed to read Lua script file: {}", script_path);
+            std::process::exit(1);
+        });
 
-    // Create the square grid map and add the required cells
-    let mut grid = SquareGridMap::new();
-    grid.add_cell(0, 2, 0); // starting cell for your test entity
-    grid.add_cell(1, 2, 0); // cell you want to move to
+        let schema_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap() + "/../assets/schemas";
+        let schemas = engine_core::ecs::schema::load_schemas_from_dir(&schema_dir)
+            .expect("Failed to load schemas");
+        let registry = Arc::new(Mutex::new(ComponentRegistry::new()));
+        for (_name, schema) in schemas {
+            registry.lock().unwrap().register_external_schema(schema);
+        }
 
-    // Wrap in Map and assign to world
-    let map = Map::new(Box::new(grid));
-    world.borrow_mut().map = Some(map);
+        let mut world = World::new(registry.clone());
+        if let Some(mode) = mode_arg {
+            world.current_mode = mode;
+        }
 
-    world.borrow_mut().register_system(MoveAll {
-        delta: MoveDelta::Square {
-            dx: 1,
-            dy: 0,
-            dz: 0,
-        },
-    });
-    world
-        .borrow_mut()
-        .register_system(DamageAll { amount: 1.0 });
-    world.borrow_mut().register_system(ProcessDeaths);
-    world.borrow_mut().register_system(ProcessDecay);
+        let world_rc = Rc::new(RefCell::new(world));
+        let mut engine = ScriptEngine::new();
+        engine
+            .register_world(world_rc.clone())
+            .expect("Failed to register ECS API");
+        engine.set_lua_args(script_args);
 
-    // --- Economic System registration (NEW) ---
-    let recipes = load_recipes_from_dir("engine/assets/recipes");
-    let economic_system = EconomicSystem::with_recipes(recipes);
-    world.borrow_mut().register_system(economic_system);
-
-    // --- Job System registration ---
-    let job_types = load_job_types_from_dir("assets/jobs");
-    let mut job_registry = JobTypeRegistry::default();
-    for job in job_types {
-        job_registry.register_data_job(job);
+        if let Err(e) = engine.run_script(&script) {
+            eprintln!("Lua error: {:?}", e);
+            std::process::exit(1);
+        }
+        return;
     }
-    let job_system = JobSystem::with_registry(job_registry);
-    world.borrow_mut().register_system(job_system);
 
-    world
-        .borrow_mut()
-        .register_system(InventoryConstraintSystem);
-    world.borrow_mut().register_system(EquipmentLogicSystem);
-    world.borrow_mut().register_system(BodyEquipmentSyncSystem);
-
-    let mut engine = ScriptEngine::new();
-    engine
-        .register_world(world.clone())
-        .expect("Failed to register ECS API");
-
-    // --- Pass arguments to Lua ---
-    engine.set_lua_args(lua_args);
-
-    // --- Run script ---
-    if let Err(e) = engine.run_script(&script) {
-        eprintln!("Lua error: {:?}", e);
-        std::process::exit(1);
-    }
+    eprintln!("Usage: mge-cli --mod <mod_name> [--mode <mode>] | <script.lua> [args...]");
+    std::process::exit(1);
 }

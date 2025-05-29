@@ -52,7 +52,7 @@ fn main() {
     world
         .set_component(
             entity,
-            "PositionComponent",
+            "Position",
             json!({ "pos": { "Square": { "x": 4, "y": 2, "z": 0 } } }),
         )
         .unwrap();

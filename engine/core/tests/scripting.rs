@@ -84,12 +84,12 @@ fn lua_can_spawn_and_move_entity() {
 
     let script = r#"
         local id = spawn_entity()
-        set_component(id, "PositionComponent", { pos = { Square = { x = 1, y = 2, z = 0 } } })
-        local pos = get_component(id, "PositionComponent")
+        set_component(id, "Position", { pos = { Square = { x = 1, y = 2, z = 0 } } })
+        local pos = get_component(id, "Position")
         assert(pos.pos.Square.x == 1)
         assert(pos.pos.Square.y == 2)
         move_entity(id, 3, 4)
-        local pos2 = get_component(id, "PositionComponent")
+        local pos2 = get_component(id, "Position")
         assert(pos2.pos.Square.x == 4)
         assert(pos2.pos.Square.y == 6)
     "#;
@@ -126,8 +126,8 @@ fn lua_can_run_script_from_file() {
         file,
         r#"
         local id = spawn_entity()
-        set_component(id, "PositionComponent", {{ pos = {{ Square = {{ x = 9, y = 10, z = 0 }} }} }})
-        local pos = get_component(id, "PositionComponent")
+        set_component(id, "Position", {{ pos = {{ Square = {{ x = 9, y = 10, z = 0 }} }} }})
+        local pos = get_component(id, "Position")
         assert(pos.pos.Square.x == 9)
         assert(pos.pos.Square.y == 10)
         "#
@@ -163,8 +163,8 @@ fn lua_can_set_and_get_arbitrary_component() {
 
     let script = r#"
         local id = spawn_entity()
-        set_component(id, "PositionComponent", { pos = { Square = { x = 7, y = 8, z = 0 } } })
-        local pos = get_component(id, "PositionComponent")
+        set_component(id, "Position", { pos = { Square = { x = 7, y = 8, z = 0 } } })
+        local pos = get_component(id, "Position")
         assert(pos.pos.Square.x == 7)
         assert(pos.pos.Square.y == 8)
     "#;
@@ -269,14 +269,14 @@ fn test_move_entity() {
     world
         .set_component(
             id,
-            "PositionComponent",
+            "Position",
             serde_json::json!({ "pos": { "Square": { "x": 1, "y": 2, "z": 0 } } }),
         )
         .unwrap();
 
     world.move_entity(id, 2.0, 3.0);
 
-    let pos = world.get_component(id, "PositionComponent").unwrap();
+    let pos = world.get_component(id, "Position").unwrap();
     assert_eq!(pos["pos"]["Square"]["x"].as_i64().unwrap(), 3);
     assert_eq!(pos["pos"]["Square"]["y"].as_i64().unwrap(), 5);
 }

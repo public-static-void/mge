@@ -1,6 +1,6 @@
 {
-  "name": "PositionComponent",
-  "title": "PositionComponent",
+  "name": "Position",
+  "title": "Position",
   "type": "object",
   "properties": {
     "pos": {

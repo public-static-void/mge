@@ -31,7 +31,7 @@ fn test_presentation_system_renders_entities() {
     world
         .set_component(
             entity,
-            "PositionComponent",
+            "Position",
             json!({
                 "pos": { "Square": { "x": 1, "y": 2, "z": 0 } }
             }),

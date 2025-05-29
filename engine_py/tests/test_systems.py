@@ -10,28 +10,28 @@ def test_move_and_damage(make_world):
 
     eid = world.spawn_entity()
     world.set_component(
-        eid, "PositionComponent", {"pos": {"Square": {"x": 0, "y": 0, "z": 0}}}
+        eid, "Position", {"pos": {"Square": {"x": 0, "y": 0, "z": 0}}}
     )
     world.move_entity(eid, 2, 3)
-    print("After move_entity:", world.get_component(eid, "PositionComponent"))
+    print("After move_entity:", world.get_component(eid, "Position"))
 
     eid2 = world.spawn_entity()
     world.set_component(
         eid2,
-        "PositionComponent",
+        "Position",
         {"pos": {"Square": {"x": 1, "y": 1, "z": 0}}},
     )
     world.move_all(1, 1)
     print(
-        "After move_all (eid):", world.get_component(eid, "PositionComponent")
+        "After move_all (eid):", world.get_component(eid, "Position")
     )
     print(
         "After move_all (eid2):",
-        world.get_component(eid2, "PositionComponent"),
+        world.get_component(eid2, "Position"),
     )
 
-    pos1 = world.get_component(eid, "PositionComponent")
-    pos2 = world.get_component(eid2, "PositionComponent")
+    pos1 = world.get_component(eid, "Position")
+    pos2 = world.get_component(eid2, "Position")
     assert pos1["pos"]["Square"]["x"] == 3 and pos1["pos"]["Square"]["y"] == 4
     assert pos2["pos"]["Square"]["x"] == 2 and pos2["pos"]["Square"]["y"] == 2
 

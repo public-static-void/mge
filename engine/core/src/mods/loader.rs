@@ -1,59 +1,47 @@
+use crate::ecs::schema::load_schemas_from_dir;
 use crate::ecs::world::World;
-use crate::mods::manifest::ModManifest;
-use crate::scripting::engine::ScriptEngine;
+use crate::scripting::ScriptEngine;
 use std::cell::RefCell;
-use std::fs;
-use std::path::Path;
 use std::rc::Rc;
 
-pub fn load_mod<P: AsRef<Path>>(
-    mod_dir: P,
+pub fn load_mod(
+    mod_dir: &str,
     world: Rc<RefCell<World>>,
-    script_engine: &mut ScriptEngine,
-) -> Result<(), String> {
-    let mod_dir = mod_dir.as_ref();
-    let manifest_path = mod_dir.join("mod.json");
-    let manifest_str =
-        fs::read_to_string(&manifest_path).map_err(|e| format!("Failed to read manifest: {e}"))?;
-    let manifest: ModManifest = serde_json::from_str(&manifest_str)
-        .map_err(|e| format!("Failed to parse manifest: {e}"))?;
+    engine: &mut ScriptEngine,
+) -> anyhow::Result<()> {
+    // Load the mod manifest (mod.json)
+    let manifest_path = format!("{}/mod.json", mod_dir);
+    let manifest_data = std::fs::read_to_string(&manifest_path)
+        .map_err(|e| anyhow::anyhow!("Failed to read mod manifest: {}", e))?;
+    let manifest: serde_json::Value = serde_json::from_str(&manifest_data)
+        .map_err(|e| anyhow::anyhow!("Failed to parse mod manifest: {}", e))?;
 
-    // Register schemas
-    for schema_rel in &manifest.schemas {
-        let schema_path = mod_dir.join(schema_rel);
-        let schema_str = fs::read_to_string(&schema_path)
-            .map_err(|e| format!("Failed to read schema {schema_rel}: {e}"))?;
-        let schema: crate::ecs::schema::ComponentSchema = serde_json::from_str(&schema_str)
-            .map_err(|e| format!("Failed to parse schema {schema_rel}: {e}"))?;
-        world
-            .borrow()
-            .registry
-            .lock()
-            .unwrap()
-            .register_external_schema(schema);
+    // Load schemas using the unified loader
+    let schema_dir = format!("{}/schemas", mod_dir);
+    let schemas = load_schemas_from_dir(&schema_dir)
+        .map_err(|e| anyhow::anyhow!("Failed to load schemas: {}", e))?;
+
+    // Register schemas with the world's registry
+    let registry = world.borrow().registry.clone();
+    for (_name, schema) in schemas {
+        registry.lock().unwrap().register_external_schema(schema);
     }
 
-    // Register systems (Lua/Python only for now; extend for plugins as needed)
-    for sys in &manifest.systems {
-        let system_path = mod_dir.join(&sys.file);
-        let ext = system_path
-            .extension()
-            .and_then(|s| s.to_str())
-            .unwrap_or("");
-        if ext == "lua" {
-            let script_code = std::fs::read_to_string(&system_path)
-                .map_err(|e| format!("Failed to read Lua system {}: {e}", sys.name))?;
-            script_engine
-                .run_script(&script_code)
-                .map_err(|e| format!("Failed to load Lua system {}: {e}", sys.name))?;
-        } else if ext == "py" {
-            // Similar for Python
-        } else {
-            // For now, skip unknown system types
+    // Optionally: Load assets, jobs, recipes, etc. as needed here
+
+    // Load and run the main system script (assume manifest has "main_script" field)
+    if let Some(main_script) = manifest.get("main_script").and_then(|v| v.as_str()) {
+        let script_path = format!("{}/{}", mod_dir, main_script);
+        let script = std::fs::read_to_string(&script_path)
+            .map_err(|e| anyhow::anyhow!("Failed to read main script: {}", e))?;
+        if let Err(e) = engine.run_script(&script) {
+            return Err(anyhow::anyhow!("Error running main script: {:?}", e));
         }
+    } else {
+        return Err(anyhow::anyhow!(
+            "No main_script field found in mod manifest"
+        ));
     }
-
-    // (Optionally) Load scripts similarly
 
     Ok(())
 }

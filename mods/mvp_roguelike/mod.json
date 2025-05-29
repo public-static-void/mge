@@ -1,0 +1,15 @@
+{
+  "name": "mvp_roguelike",
+  "version": "1.0.0",
+  "mode": "roguelike",
+  "schemas": [
+    "schemas/player.json",
+    "schemas/monster.json",
+    "schemas/item.json",
+    "schemas/renderable.json",
+    "schemas/position.json",
+    "schemas/health.json"
+  ],
+  "systems": [{ "file": "systems/main.lua", "name": "RoguelikeMain" }],
+  "main_script": "systems/main.lua"
+}

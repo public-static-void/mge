@@ -1,11 +1,11 @@
 {
-  "name": "Camera",
   "title": "Camera",
   "type": "object",
+  "description": "Camera component for roguelike viewport control.",
   "properties": {
     "x": { "type": "integer" },
     "y": { "type": "integer" }
   },
   "required": ["x", "y"],
-  "modes": ["roguelike", "colony", "editor"]
+  "modes": ["roguelike"]
 }

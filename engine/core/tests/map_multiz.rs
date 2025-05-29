@@ -47,21 +47,21 @@ fn test_entities_in_cell_and_zlevel() {
     world
         .set_component(
             eid1,
-            "PositionComponent",
+            "Position",
             serde_json::json!({"pos": {"Square": {"x": 1, "y": 2, "z": 0}}}),
         )
         .unwrap();
     world
         .set_component(
             eid2,
-            "PositionComponent",
+            "Position",
             serde_json::json!({"pos": {"Square": {"x": 1, "y": 2, "z": 1}}}),
         )
         .unwrap();
     world
         .set_component(
             eid3,
-            "PositionComponent",
+            "Position",
             serde_json::json!({"pos": {"Square": {"x": 1, "y": 2, "z": 0}}}),
         )
         .unwrap();

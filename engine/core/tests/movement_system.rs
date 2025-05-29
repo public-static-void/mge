@@ -38,18 +38,10 @@ fn test_move_all_moves_positions() {
         pos: Position::Square { x: 5, y: 7, z: 0 },
     };
     world
-        .set_component(
-            id1,
-            "PositionComponent",
-            serde_json::to_value(&pos1).unwrap(),
-        )
+        .set_component(id1, "Position", serde_json::to_value(&pos1).unwrap())
         .unwrap();
     world
-        .set_component(
-            id2,
-            "PositionComponent",
-            serde_json::to_value(&pos2).unwrap(),
-        )
+        .set_component(id2, "Position", serde_json::to_value(&pos2).unwrap())
         .unwrap();
 
     world.register_system(MoveAll {
@@ -61,14 +53,8 @@ fn test_move_all_moves_positions() {
     });
     world.run_system("MoveAll", None).unwrap();
 
-    let pos1_val = world
-        .get_component(id1, "PositionComponent")
-        .unwrap()
-        .clone();
-    let pos2_val = world
-        .get_component(id2, "PositionComponent")
-        .unwrap()
-        .clone();
+    let pos1_val = world.get_component(id1, "Position").unwrap().clone();
+    let pos2_val = world.get_component(id2, "Position").unwrap().clone();
 
     let pos1: PositionComponent = serde_json::from_value(pos1_val).unwrap();
     let pos2: PositionComponent = serde_json::from_value(pos2_val).unwrap();
@@ -101,9 +87,9 @@ fn test_lua_move_all() {
 
     let script = r#"
         local id = spawn_entity()
-        set_component(id, "PositionComponent", { pos = { Square = { x = 0, y = 0, z = 0 } } })
+        set_component(id, "Position", { pos = { Square = { x = 0, y = 0, z = 0 } } })
         move_all(2, 3)
-        local pos = get_component(id, "PositionComponent")
+        local pos = get_component(id, "Position")
         assert(math.abs(pos.pos.Square.x - 2) < 1e-6)
         assert(math.abs(pos.pos.Square.y - 3) < 1e-6)
     "#;
@@ -137,11 +123,7 @@ fn test_move_all_square() {
         pos: Position::Square { x: 0, y: 0, z: 0 },
     };
     world
-        .set_component(
-            entity,
-            "PositionComponent",
-            serde_json::to_value(&pos).unwrap(),
-        )
+        .set_component(entity, "Position", serde_json::to_value(&pos).unwrap())
         .unwrap();
 
     let mut sys = MoveAll {
@@ -153,13 +135,9 @@ fn test_move_all_square() {
     };
     sys.run(&mut world, None);
 
-    let new_pos: PositionComponent = serde_json::from_value(
-        world
-            .get_component(entity, "PositionComponent")
-            .unwrap()
-            .clone(),
-    )
-    .expect("valid PositionComponent");
+    let new_pos: PositionComponent =
+        serde_json::from_value(world.get_component(entity, "Position").unwrap().clone())
+            .expect("valid Position");
     assert_eq!(new_pos.pos, Position::Square { x: 1, y: 0, z: 0 });
 }
 
@@ -176,11 +154,7 @@ fn test_move_all_hex() {
         pos: Position::Hex { q: 0, r: 0, z: 0 },
     };
     world
-        .set_component(
-            entity,
-            "PositionComponent",
-            serde_json::to_value(&pos).unwrap(),
-        )
+        .set_component(entity, "Position", serde_json::to_value(&pos).unwrap())
         .unwrap();
 
     let mut sys = MoveAll {
@@ -192,13 +166,9 @@ fn test_move_all_hex() {
     };
     sys.run(&mut world, None);
 
-    let new_pos: PositionComponent = serde_json::from_value(
-        world
-            .get_component(entity, "PositionComponent")
-            .unwrap()
-            .clone(),
-    )
-    .expect("valid PositionComponent");
+    let new_pos: PositionComponent =
+        serde_json::from_value(world.get_component(entity, "Position").unwrap().clone())
+            .expect("valid Position");
     assert_eq!(new_pos.pos, Position::Hex { q: 1, r: 0, z: 0 });
 }
 
@@ -215,11 +185,7 @@ fn test_move_all_region() {
         pos: Position::Region { id: "A".into() },
     };
     world
-        .set_component(
-            entity,
-            "PositionComponent",
-            serde_json::to_value(&pos).unwrap(),
-        )
+        .set_component(entity, "Position", serde_json::to_value(&pos).unwrap())
         .unwrap();
 
     let mut sys = MoveAll {
@@ -227,12 +193,8 @@ fn test_move_all_region() {
     };
     sys.run(&mut world, None);
 
-    let new_pos: PositionComponent = serde_json::from_value(
-        world
-            .get_component(entity, "PositionComponent")
-            .unwrap()
-            .clone(),
-    )
-    .expect("valid PositionComponent");
+    let new_pos: PositionComponent =
+        serde_json::from_value(world.get_component(entity, "Position").unwrap().clone())
+            .expect("valid Position");
     assert_eq!(new_pos.pos, Position::Region { id: "B".into() });
 }

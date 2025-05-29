@@ -38,7 +38,8 @@ fn setup_test_mod_dir() -> (tempfile::TempDir, std::path::PathBuf) {
         "schemas": ["schemas/test_component.json"],
         "systems": [
             { "file": "systems/test_system.lua", "name": "TestSystem" }
-        ]
+        ],
+        "main_script": "systems/test_system.lua"
     }"#;
     std::fs::write(mod_dir.join("mod.json"), manifest).unwrap();
 
@@ -54,7 +55,12 @@ fn test_load_mod_registers_schema_and_system() {
     let world_rc = Rc::new(RefCell::new(world));
     script_engine.register_world(world_rc.clone()).unwrap();
 
-    load_mod(&mod_dir, world_rc.clone(), &mut script_engine).expect("Mod should load");
+    load_mod(
+        mod_dir.to_str().unwrap(),
+        world_rc.clone(),
+        &mut script_engine,
+    )
+    .expect("Mod should load");
 
     // Assert schema is registered
     assert!(
