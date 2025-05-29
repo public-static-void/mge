@@ -26,11 +26,17 @@ pub fn load_schemas_from_dir<P: AsRef<Path>>(
             let data = fs::read_to_string(entry.path())?;
             let json_val: serde_json::Value = serde_json::from_str(&data)?;
 
-            // Get name from "title"
+            // Priority: name > title > filename
             let name = json_val
-                .get("title")
+                .get("name")
                 .and_then(|v| v.as_str())
                 .map(|s| s.to_string())
+                .or_else(|| {
+                    json_val
+                        .get("title")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string())
+                })
                 .unwrap_or_else(|| entry.path().file_stem().unwrap().to_string_lossy().into());
 
             // Get modes from root-level "modes"
