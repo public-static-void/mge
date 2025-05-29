@@ -26,7 +26,7 @@ fn test_get_entities_with_components() {
     world
         .set_component(
             e1,
-            "PositionComponent",
+            "Position",
             json!({"pos": { "Square": { "x": 1, "y": 2, "z": 0 } } }),
         )
         .unwrap();
@@ -38,11 +38,11 @@ fn test_get_entities_with_components() {
     world
         .set_component(
             e3,
-            "PositionComponent",
+            "Position",
             json!({"pos": { "Square": { "x": 3, "y": 4, "z": 0 } } }),
         )
         .unwrap();
 
-    let both = world.get_entities_with_components(&["Health", "PositionComponent"]);
+    let both = world.get_entities_with_components(&["Health", "Position"]);
     assert_eq!(both, vec![e1]);
 }

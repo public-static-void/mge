@@ -58,7 +58,7 @@ fn test_map_rendering_renders_terrain_and_entities_in_viewport() {
     world
         .set_component(
             entity,
-            "PositionComponent",
+            "Position",
             json!({ "pos": { "Square": { "x": 1, "y": 1, "z": 0 } } }),
         )
         .unwrap();

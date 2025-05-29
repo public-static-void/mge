@@ -34,21 +34,21 @@ fn test_entities_in_region() {
     world
         .set_component(
             eid1,
-            "PositionComponent",
+            "Position",
             serde_json::json!({"pos": {"Square": {"x": 0, "y": 0, "z": 0}}}),
         )
         .unwrap();
     world
         .set_component(
             eid2,
-            "PositionComponent",
+            "Position",
             serde_json::json!({"pos": {"Square": {"x": 1, "y": 0, "z": 0}}}),
         )
         .unwrap();
     world
         .set_component(
             eid3,
-            "PositionComponent",
+            "Position",
             serde_json::json!({"pos": {"Square": {"x": 0, "y": 0, "z": 0}}}),
         )
         .unwrap();

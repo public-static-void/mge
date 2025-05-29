@@ -34,7 +34,7 @@ fn test_tick_advances_turn_and_runs_systems() {
     world
         .set_component(
             id,
-            "PositionComponent",
+            "Position",
             serde_json::json!({ "pos": { "Square": { "x": 1, "y": 2, "z": 0 } } }),
         )
         .unwrap();
@@ -64,7 +64,7 @@ fn test_tick_advances_turn_and_runs_systems() {
     world.turn += 1;
 
     // Position should be x+1, Health should be -1
-    let pos = world.get_component(id, "PositionComponent").unwrap();
+    let pos = world.get_component(id, "Position").unwrap();
     let health = world.get_component(id, "Health").unwrap();
 
     assert!((pos["pos"]["Square"]["x"].as_f64().unwrap() - 2.0).abs() < 1e-6);
@@ -102,10 +102,10 @@ fn test_lua_tick() {
 
     let script = r#"
         local id = spawn_entity()
-        set_component(id, "PositionComponent", { pos = { Square = { x = 0, y = 0, z = 0 } } })
+        set_component(id, "Position", { pos = { Square = { x = 0, y = 0, z = 0 } } })
         set_component(id, "Health", { current = 10.0, max = 10.0 })
         tick()
-        local pos = get_component(id, "PositionComponent")
+        local pos = get_component(id, "Position")
         local health = get_component(id, "Health")
         assert(math.abs(pos.pos.Square.x - 1.0) < 1e-6)
         assert(math.abs(health.current - 9.0) < 1e-6)
