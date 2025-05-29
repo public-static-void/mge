@@ -1,0 +1,6 @@
+{
+  "name": "Camera",
+  "title": "Camera",
+  "fields": {},
+  "modes": ["colony", "roguelike"]
+}
