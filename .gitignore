@@ -55,3 +55,42 @@ dist/
 /scripts/**/*.pyc
 /scripts/**/__pycache__
 test_save.json
+
+# Ignore all build output folders in plugins/
+plugins/**/target/
+plugins/**/build/
+plugins/**/CMakeFiles/
+plugins/**/cmake-build-*/
+plugins/**/Makefile
+plugins/**/CMakeCache.txt
+
+# Ignore common binary/library outputs in plugins/ (all names, all plugins)
+plugins/**/*.so
+plugins/**/*.dll
+plugins/**/*.dylib
+plugins/**/*.exe
+plugins/**/*.out
+
+# Ignore extensionless binaries (common for Rust/C/C++ builds)
+plugins/*/bin/*
+plugins/*/build/*
+plugins/*/target/release/*
+plugins/*/target/debug/*
+plugins/*/target/*
+
+# Ignore any extensionless file directly in plugin root (likely a binary)
+plugins/*/[^/]*
+
+# Allow source and config files
+!plugins/**/*.rs
+!plugins/**/*.c
+!plugins/**/*.cpp
+!plugins/**/*.h
+!plugins/**/*.hpp
+!plugins/**/*.json
+!plugins/**/*.toml
+!plugins/**/*.md
+!plugins/**/*.txt
+!plugins/**/Cargo.toml
+!plugins/**/plugin.json
+!plugins/**/src/
