@@ -1,0 +1,24 @@
+{
+  "title": "Renderable",
+  "type": "object",
+  "description": "A component for displayable entities (glyph and color).",
+  "properties": {
+    "glyph": {
+      "type": "string",
+      "description": "The character or symbol to render for this entity."
+    },
+    "color": {
+      "type": "array",
+      "description": "RGB color as [r, g, b] (0-255 each).",
+      "items": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 255
+      },
+      "minItems": 3,
+      "maxItems": 3
+    }
+  },
+  "required": ["glyph", "color"],
+  "modes": ["colony", "roguelike"]
+}
