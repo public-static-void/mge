@@ -89,7 +89,7 @@ Run all Lua scripting tests:
 To validate all component schemas:
 
 ```sh
-cargo run --bin schema_validator
+cargo run --bin schema_validator -- engine/assets/schemas/
 ```
 
 ---
