@@ -6,15 +6,16 @@ MGE is a modular, cross-language game engine blueprint for rapid prototyping, ex
 
 ## Capabilities
 
-- **Macro-driven ECS in Rust:** Provides an Entity-Component-System core with schema-based, runtime-extensible components.
-- **Unified scripting API:** Supplies identical ECS and world APIs in Lua and Python, supporting entity, component, system, mode, and event management.
-- **Schema-driven component model:** Components can be added or modified by editing JSON schemas; no Rust code changes are required for scripting or data-driven systems.
-- **Hot-reloadable plugins:** Supports runtime extension using C ABI or dynamic Rust plugins.
-- **Dependency-ordered system scheduler:** Systems can declare dependencies on other systems; the engine topologically sorts and executes them in correct order, with automatic cycle detection.
-- **Runtime mode switching:** Enables switching between game modes (e.g., "colony", "roguelike"), with schema-enforced component access.
-- **Flexible world generation:** World generators can be registered and invoked in Rust, Lua, Python, or C.
-- **Deterministic tick scheduler:** Provides a modular, event-driven simulation tick loop.
-- **Region/zone support:** Query entities and cells by region or zone, including multi-region and kind-based queries.
+## Capabilities
+
+- **Schema-driven ECS:** JSON-based, hot-reloadable components and systems.
+- **Unified scripting API:** Identical ECS/world APIs in Lua and Python.
+- **Hot-reloadable plugins:** Extend at runtime with Rust, Lua, Python, or C.
+- **Flexible world generation:** Register/invoke worldgen plugins in any supported language.
+- **Dependency-aware system scheduler:** Automatic ordering and cycle detection.
+- **Runtime mode switching:** Switch between game modes on the fly.
+- **Deterministic simulation:** Modular, event-driven tick loop.
+- **Region/zone queries:** Query entities/cells by region or kind.
 
 ---
 
@@ -132,6 +133,7 @@ Example:
 
 ## Documentation
 
+- [docs/dev.md](docs/dev.md): Quick reference how to set up this project for development and run tests and such
 - [docs/api.md](docs/api.md): Unified scripting API (Lua & Python)
 - [docs/examples.md](docs/examples.md): Usage examples (Lua, Python, Rust, C)
 - [docs/idea.md](docs/idea.md): Architecture and design

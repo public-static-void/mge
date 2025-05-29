@@ -56,8 +56,17 @@
 | --------------------------- | ------------------------------------------ |
 | `register_system(name, fn)` | Register a function as a named system      |
 | `run_system(name)`          | Run a previously registered system by name |
+| `run_native_system(name)`   | Run a built-in system by name              |
+| `poll_ecs_event(type)`      | Poll ECS events of a type                  |
 
 ---
+
+## Job System
+
+| Function                                        | Description                                                          |
+| ----------------------------------------------- | -------------------------------------------------------------------- |
+| `assign_job(entity, job_type, [fields/kwargs])` | Assign a job to an entity. Extra fields/kwargs become job properties |
+| `register_job_type(name, fn)`                   | Register a custom job type                                           |
 
 ## Event Bus
 
@@ -82,11 +91,11 @@
 
 ## Worldgen Plugins
 
-| Function                        | Description                              |
-| ------------------------------- | ---------------------------------------- |
-| `register_worldgen(name, fn)`   | Register a worldgen plugin               |
-| `list_worldgen()`               | List all registered worldgen plugins     |
-| `invoke_worldgen(name, params)` | Invoke a worldgen plugin with parameters |
+| Function                               | Description                              |
+| -------------------------------------- | ---------------------------------------- |
+| `register_worldgen_plugin(name, fn)`   | Register a worldgen plugin               |
+| `list_worldgen_plugins()`              | List all registered worldgen plugins     |
+| `invoke_worldgen_plugin(name, params)` | Invoke a worldgen plugin with parameters |
 
 ---
 
