@@ -40,6 +40,14 @@ done
 
 ---
 
+## Build Rust Plugins
+
+```sh
+cargo run -p xtask -- build-plugins
+```
+
+---
+
 ## Running Tests
 
 ### Rust Unit/Integration Tests
