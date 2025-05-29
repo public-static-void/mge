@@ -21,7 +21,7 @@ local directions = { w = { 0, -1 }, a = { -1, 0 }, s = { 0, 1 }, d = { 1, 0 } }
 local turn = 1
 
 function get_xy(entity)
-	ocal pos = get_component(entity, "Position")
+	local pos = get_component(entity, "Position")
 	return pos.pos.Square.x, pos.pos.Square.y
 end
 
