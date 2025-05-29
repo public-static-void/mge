@@ -1,6 +1,7 @@
 //! Scripting API bridge: orchestrates registration of all Lua API subsystems.
 
 pub mod body;
+pub mod camera;
 pub mod component;
 pub mod economic;
 pub mod entity;
@@ -34,6 +35,7 @@ pub fn register_all_api_functions(
     equipment::register_equipment_api(lua, globals, world.clone())?;
     body::register_body_api(lua, globals, world.clone())?;
     region::register_region_api(lua, globals, world.clone())?;
+    camera::register_camera_api(lua, globals, world.clone())?;
     worldgen::register_worldgen_api(lua, globals, worldgen_registry)?;
     misc::register_misc_api(lua, globals, world.clone(), input_provider)?;
     map::register_map_api(lua, globals, world.clone())?;
