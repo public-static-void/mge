@@ -4,7 +4,7 @@
 -- Setup player
 local player = spawn_entity()
 set_component(player, "Type", { kind = "player" })
-set_component(player, "PositionComponent", { pos = { Square = { x = 0, y = 0, z = 0 } } })
+set_component(player, "Position", { pos = { Square = { x = 0, y = 0, z = 0 } } })
 set_component(player, "Health", { current = 10, max = 10 })
 
 -- Setup enemies
@@ -12,7 +12,7 @@ local enemies = {}
 for i = 1, 3 do
 	local enemy = spawn_entity()
 	set_component(enemy, "Type", { kind = "enemy" })
-	set_component(enemy, "PositionComponent", { pos = { Square = { x = i * 2, y = 1, z = 0 } } })
+	set_component(enemy, "Position", { pos = { Square = { x = i * 2, y = 1, z = 0 } } })
 	set_component(enemy, "Health", { current = 3, max = 3 })
 	table.insert(enemies, enemy)
 end
@@ -21,7 +21,7 @@ local directions = { w = { 0, -1 }, a = { -1, 0 }, s = { 0, 1 }, d = { 1, 0 } }
 local turn = 1
 
 function get_xy(entity)
-	local pos = get_component(entity, "PositionComponent")
+	ocal pos = get_component(entity, "Position")
 	return pos.pos.Square.x, pos.pos.Square.y
 end
 
