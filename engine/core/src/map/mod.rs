@@ -41,6 +41,13 @@ impl Map {
         self.topology.all_cells()
     }
 
+    pub fn as_any(&self) -> &dyn std::any::Any {
+        self.topology.as_any()
+    }
+    pub fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self.topology.as_any_mut()
+    }
+
     pub fn set_cell_metadata(&mut self, cell: &CellKey, data: Value) {
         self.topology.set_cell_metadata(cell, data);
     }
