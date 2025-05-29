@@ -17,15 +17,25 @@ pub fn register_camera_api(lua: &Lua, globals: &Table, world: Rc<RefCell<World>>
             .unwrap_or_else(|| {
                 let id = world.spawn_entity();
                 world
-                    .set_component(id, "Camera", serde_json::json!({}))
+                    .set_component(id, "Camera", serde_json::json!({ "x": x, "y": y }))
+                    .unwrap();
+                world
+                    .set_component(
+                        id,
+                        "Position",
+                        serde_json::json!({ "pos": { "Square": { "x": x, "y": y, "z": 0 } } }),
+                    )
                     .unwrap();
                 id
             });
-        // Set its PositionComponent
+        // Always update Camera component with x and y
+        world
+            .set_component(camera_id, "Camera", serde_json::json!({ "x": x, "y": y }))
+            .unwrap();
         world
             .set_component(
                 camera_id,
-                "PositionComponent",
+                "Position",
                 serde_json::json!({ "pos": { "Square": { "x": x, "y": y, "z": 0 } } }),
             )
             .unwrap();
@@ -38,9 +48,21 @@ pub fn register_camera_api(lua: &Lua, globals: &Table, world: Rc<RefCell<World>>
     let get_camera = lua.create_function_mut(move |lua, ()| {
         let world = world_get.borrow();
         if let Some(camera_id) = world.get_entities_with_component("Camera").first() {
-            if let Some(pos) = world.get_component(*camera_id, "PositionComponent") {
-                let x = pos["pos"]["Square"]["x"].as_i64().unwrap_or(0);
-                let y = pos["pos"]["Square"]["y"].as_i64().unwrap_or(0);
+            // Prefer Position component's pos.Square if present
+            if let Some(pos) = world.get_component(*camera_id, "Position") {
+                if let Some(square) = pos.get("pos").and_then(|p| p.get("Square")) {
+                    let x = square.get("x").and_then(|v| v.as_i64()).unwrap_or(0);
+                    let y = square.get("y").and_then(|v| v.as_i64()).unwrap_or(0);
+                    let tbl = lua.create_table()?;
+                    tbl.set("x", x)?;
+                    tbl.set("y", y)?;
+                    return Ok(LuaValue::Table(tbl));
+                }
+            }
+            // Fallback: try Camera component's x/y (for legacy support)
+            if let Some(cam) = world.get_component(*camera_id, "Camera") {
+                let x = cam.get("x").and_then(|v| v.as_i64()).unwrap_or(0);
+                let y = cam.get("y").and_then(|v| v.as_i64()).unwrap_or(0);
                 let tbl = lua.create_table()?;
                 tbl.set("x", x)?;
                 tbl.set("y", y)?;

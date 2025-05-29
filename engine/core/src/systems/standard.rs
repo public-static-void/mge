@@ -24,7 +24,7 @@ impl System for MoveAll {
             None => return,
         };
 
-        if let Some(positions) = world.components.get_mut("PositionComponent") {
+        if let Some(positions) = world.components.get_mut("Position") {
             for (_entity, value) in positions.iter_mut() {
                 if let Ok(mut pos_comp) = serde_json::from_value::<PositionComponent>(value.clone())
                 {
