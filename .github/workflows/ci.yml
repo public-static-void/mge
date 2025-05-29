@@ -88,7 +88,7 @@ jobs:
           export PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig
           cargo run -p xtask -- build-plugins
 
-      - name: Test (with C plugins)
+      - name: Test (with plugins)
         run: |
           export PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig
           export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(pwd)/plugins
