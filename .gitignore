@@ -1,87 +1,73 @@
-# Rust
-**/*.rs.bk
-/target
-engine_macros/target/
-engine_py/target/
-engine/target/
+# System/Editor files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
 
 # Python
 *.pyc
-__pycache__/
-**/__pycache__/
 *.pyo
 *.pyd
 *.pdb
+__pycache__/
 *.egg-info/
 .eggs/
 *.egg
-*.env
-*.venv
+.env
 .venv/
-env/
 venv/
 ENV/
+env/
 pip-wheel-metadata/
-build/
-dist/
-
-# Editor/OS
-*.swp
-*.swo
-.DS_Store
-*.bak
-*.tmp
 
 # Node
-/node_modules
+node_modules/
 
-# Maturin build artifacts
+# Build artifacts
+build/
+dist/
+target/
+
+# Compiled/binary artifacts
+*.o
+*.obj
 *.so
 *.dll
 *.dylib
+*.exe
+*.out
+*.class
 *.whl
 
-# Editor/IDE project settings
-.ropeproject/
+# Rust backup files
+**/*.rs.bk
+
+# Logs and temp files
+*.log
+*.tmp
+*.bak
+
+# IDE/Project settings
 .vscode/
 .idea/
+.ropeproject/
 .spyderproject
 .spyproject
 
-# Misc
-*.log
-
 # Project-specific
-/scripts/**/*.pyc
-/scripts/**/__pycache__
 test_save.json
 
-# Ignore all build output folders in plugins/
-plugins/**/target/
+# Plugins
 plugins/**/build/
 plugins/**/CMakeFiles/
 plugins/**/cmake-build-*/
 plugins/**/Makefile
 plugins/**/CMakeCache.txt
 
-# Ignore common binary/library outputs in plugins/ (all names, all plugins)
-plugins/**/*.so
-plugins/**/*.dll
-plugins/**/*.dylib
-plugins/**/*.exe
-plugins/**/*.out
+# Ignore extensionless files in plugin roots (likely binaries)
+plugins/*/[^./]*
 
-# Ignore extensionless binaries (common for Rust/C/C++ builds)
-plugins/*/bin/*
-plugins/*/build/*
-plugins/*/target/release/*
-plugins/*/target/debug/*
-plugins/*/target/*
-
-# Ignore any extensionless file directly in plugin root (likely a binary)
-plugins/*/[^/]*
-
-# Allow source and config files
+# Whitelist source and config files in plugins
 !plugins/**/*.rs
 !plugins/**/*.c
 !plugins/**/*.cpp
