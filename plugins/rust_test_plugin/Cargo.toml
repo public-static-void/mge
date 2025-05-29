@@ -9,5 +9,16 @@ description = "A Rust plugin for the Modular Game Engine"
 crate-type = ["cdylib"]
 
 [dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0.140"
 libc = "0.2"
 ctor = "0.2"
+
+[features]
+default = []
+variant_v1 = []
+variant_v2 = []
+
+[[bin]]
+name = "rust_test_plugin"
+path = "src/main.rs"

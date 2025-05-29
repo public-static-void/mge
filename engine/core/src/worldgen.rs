@@ -1,4 +1,5 @@
 use crate::scripting::helpers::{json_to_lua_table, lua_value_to_json};
+use libloading::Library;
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use serde_json::Value as JsonValue;
@@ -21,11 +22,12 @@ impl std::error::Error for WorldgenError {}
 pub enum WorldgenPlugin {
     CAbi {
         name: String,
-        generate: Box<dyn Fn(&JsonValue) -> JsonValue>,
+        generate: Box<dyn Fn(&JsonValue) -> JsonValue + Send + Sync>,
+        _lib: Option<Library>, // Keeps the dynamic library alive!
     },
     Python {
         name: String,
-        generate: Box<dyn Fn(&JsonValue) -> JsonValue>,
+        generate: Box<dyn Fn(&JsonValue) -> JsonValue + Send + Sync>,
     },
     Lua {
         name: String,
@@ -193,5 +195,6 @@ pub fn register_builtin_worldgen_plugins(registry: &mut WorldgenRegistry) {
                 "cells": cells
             })
         }),
+        _lib: None, // Built-in: no dynamic library
     });
 }

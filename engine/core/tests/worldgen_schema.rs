@@ -38,6 +38,7 @@ fn test_register_and_invoke_rust_worldgen_plugin() {
                 "cells": cells
             })
         }),
+        _lib: None,
     };
 
     // 3. Register the plugin

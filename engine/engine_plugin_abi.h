@@ -31,6 +31,7 @@ typedef struct PluginVTable {
   int (*register_systems)(struct EngineApi *api, void *world,
                           SystemPlugin **systems, int *count);
   void (*free_systems)(SystemPlugin *systems, int count);
+  void *(*hot_reload)(void *old_state);
 } PluginVTable;
 
 extern PluginVTable *PLUGIN_VTABLE;

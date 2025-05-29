@@ -1,7 +1,5 @@
 use crate::ecs::World;
-use crate::plugins::types::{
-    EngineApi, LoadedPlugin, PluginManifest, PluginMetadata, PluginVTable, SystemPlugin,
-};
+use crate::plugins::types::{EngineApi, PluginManifest, PluginVTable, SystemPlugin};
 use crate::worldgen::{WorldgenPlugin, WorldgenRegistry};
 use libloading::{Library, Symbol};
 use serde_json::Value;
@@ -21,7 +19,7 @@ pub unsafe fn load_plugin<P: AsRef<Path>>(
     path: P,
     engine_api: &mut EngineApi,
     world: *mut c_void,
-) -> Result<LoadedPlugin, String> {
+) -> Result<(), String> {
     let lib = unsafe { Library::new(path.as_ref()) }.map_err(|e| e.to_string())?;
     let vtable: Symbol<*mut *mut PluginVTable> =
         unsafe { lib.get(b"PLUGIN_VTABLE\0") }.map_err(|e| e.to_string())?;
@@ -36,24 +34,7 @@ pub unsafe fn load_plugin<P: AsRef<Path>>(
         return Err(format!("Plugin init failed with code {}", init_result));
     }
 
-    let metadata = PluginMetadata {
-        manifest: PluginManifest {
-            name: "<unknown>".to_string(),
-            version: "0.0.0".to_string(),
-            description: String::new(),
-            authors: vec![],
-            dependencies: vec![],
-            dynamic_library: path
-                .as_ref()
-                .file_name()
-                .unwrap()
-                .to_string_lossy()
-                .into_owned(),
-        },
-        path: path.as_ref().to_path_buf(),
-    };
-
-    Ok(LoadedPlugin::new(lib, plugin_vtable, metadata))
+    Ok(())
 }
 
 /// # Safety
@@ -66,7 +47,7 @@ pub unsafe fn load_plugin_and_register_worldgen<P: AsRef<Path>>(
     engine_api: &mut EngineApi,
     world: *mut c_void,
     worldgen_registry: &mut WorldgenRegistry,
-) -> Result<LoadedPlugin, String> {
+) -> Result<(), String> {
     let lib = unsafe { Library::new(path.as_ref()) }.map_err(|e| e.to_string())?;
     let vtable: Symbol<*mut *mut PluginVTable> =
         unsafe { lib.get(b"PLUGIN_VTABLE\0") }.map_err(|e| e.to_string())?;
@@ -87,9 +68,11 @@ pub unsafe fn load_plugin_and_register_worldgen<P: AsRef<Path>>(
         let generate_world_fn = vtable_ref.generate_world;
         let free_result_json_fn = vtable_ref.free_result_json;
 
-        let name = {
+        let name = if let Some(worldgen_name_fn) = worldgen_name_fn {
             let cstr = unsafe { CStr::from_ptr(worldgen_name_fn()) };
             cstr.to_str().unwrap().to_owned()
+        } else {
+            return Err("Plugin does not provide worldgen_name".to_string());
         };
 
         let generate = move |params: &Value| -> Value {
@@ -97,39 +80,29 @@ pub unsafe fn load_plugin_and_register_worldgen<P: AsRef<Path>>(
             let c_params = CString::new(params_json).unwrap();
             let mut out_ptr: *mut c_char = std::ptr::null_mut();
 
-            let res = unsafe { generate_world_fn(c_params.as_ptr(), &mut out_ptr) };
-            if res != 0 || out_ptr.is_null() {
-                return Value::Null;
+            if let Some(generate_world_fn) = generate_world_fn {
+                let res = unsafe { generate_world_fn(c_params.as_ptr(), &mut out_ptr) };
+                if res != 0 || out_ptr.is_null() {
+                    return Value::Null;
+                }
+                let result = unsafe { CStr::from_ptr(out_ptr).to_string_lossy().into_owned() };
+                if let Some(free_result_json_fn) = free_result_json_fn {
+                    unsafe { free_result_json_fn(out_ptr) };
+                }
+                serde_json::from_str(&result).unwrap_or(Value::Null)
+            } else {
+                Value::Null
             }
-            let result = unsafe { CStr::from_ptr(out_ptr).to_string_lossy().into_owned() };
-            unsafe { free_result_json_fn(out_ptr) };
-            serde_json::from_str(&result).unwrap_or(Value::Null)
         };
 
         worldgen_registry.register(WorldgenPlugin::CAbi {
             name,
             generate: Box::new(generate),
+            _lib: Some(lib), // Dynamic plugin: keep the library alive
         });
     }
 
-    let metadata = PluginMetadata {
-        manifest: PluginManifest {
-            name: "<unknown>".to_string(),
-            version: "0.0.0".to_string(),
-            description: String::new(),
-            authors: vec![],
-            dependencies: vec![],
-            dynamic_library: path
-                .as_ref()
-                .file_name()
-                .unwrap()
-                .to_string_lossy()
-                .into_owned(),
-        },
-        path: path.as_ref().to_path_buf(),
-    };
-
-    Ok(LoadedPlugin::new(lib, plugin_vtable, metadata))
+    Ok(())
 }
 
 /// # Safety
@@ -142,7 +115,7 @@ pub unsafe fn load_plugin_and_register_systems<P: AsRef<Path>>(
     engine_api: &mut EngineApi,
     world: *mut c_void,
     world_ref: &mut World,
-) -> Result<LoadedPlugin, String> {
+) -> Result<(), String> {
     let lib = unsafe { Library::new(path.as_ref()) }.map_err(|e| e.to_string())?;
     let vtable: Symbol<*mut *mut PluginVTable> =
         unsafe { lib.get(b"PLUGIN_VTABLE\0") }.map_err(|e| e.to_string())?;
@@ -182,24 +155,7 @@ pub unsafe fn load_plugin_and_register_systems<P: AsRef<Path>>(
         }
     }
 
-    let metadata = PluginMetadata {
-        manifest: PluginManifest {
-            name: "<unknown>".to_string(),
-            version: "0.0.0".to_string(),
-            description: String::new(),
-            authors: vec![],
-            dependencies: vec![],
-            dynamic_library: path
-                .as_ref()
-                .file_name()
-                .unwrap()
-                .to_string_lossy()
-                .into_owned(),
-        },
-        path: path.as_ref().to_path_buf(),
-    };
-
-    Ok(LoadedPlugin::new(lib, plugin_vtable, metadata))
+    Ok(())
 }
 
 /// Loads the plugin manifest from a given manifest path.
@@ -231,7 +187,7 @@ pub unsafe fn load_plugin_with_manifest<P: AsRef<Path>>(
     manifest_path: P,
     engine_api: &mut EngineApi,
     world: *mut c_void,
-) -> Result<LoadedPlugin, String> {
+) -> Result<(), String> {
     let manifest = load_plugin_manifest(&manifest_path)?;
     let manifest_dir = manifest_path
         .as_ref()
@@ -253,12 +209,7 @@ pub unsafe fn load_plugin_with_manifest<P: AsRef<Path>>(
         return Err(format!("Plugin init failed with code {}", init_result));
     }
 
-    let metadata = PluginMetadata {
-        manifest,
-        path: dylib_path,
-    };
-
-    Ok(LoadedPlugin::new(lib, plugin_vtable, metadata))
+    Ok(())
 }
 
 /// Resolves the order in which plugins should be loaded based on their dependencies.

@@ -1,10 +1,9 @@
-use crate::plugins::types::{LoadedPlugin, PluginMetadata};
+use crate::plugins::types::PluginMetadata;
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::rc::Rc;
 
 pub struct PluginRegistry {
-    plugins: RefCell<HashMap<String, Rc<LoadedPlugin>>>,
+    plugins: RefCell<HashMap<String, PluginMetadata>>,
 }
 
 impl PluginRegistry {
@@ -14,9 +13,9 @@ impl PluginRegistry {
         }
     }
 
-    pub fn register(&self, plugin: LoadedPlugin) {
-        let name = plugin.metadata.manifest.name.clone();
-        self.plugins.borrow_mut().insert(name, Rc::new(plugin));
+    pub fn register(&self, metadata: PluginMetadata) {
+        let name = metadata.manifest.name.clone();
+        self.plugins.borrow_mut().insert(name, metadata);
     }
 
     pub fn list(&self) -> Vec<String> {
@@ -24,19 +23,11 @@ impl PluginRegistry {
     }
 
     pub fn get_metadata(&self, name: &str) -> Option<PluginMetadata> {
-        self.plugins.borrow().get(name).map(|p| p.metadata.clone())
-    }
-
-    pub fn get_plugin(&self, name: &str) -> Option<Rc<LoadedPlugin>> {
         self.plugins.borrow().get(name).cloned()
     }
 
     pub fn all_metadata(&self) -> Vec<PluginMetadata> {
-        self.plugins
-            .borrow()
-            .values()
-            .map(|p| p.metadata.clone())
-            .collect()
+        self.plugins.borrow().values().cloned().collect()
     }
 
     pub fn len(&self) -> usize {

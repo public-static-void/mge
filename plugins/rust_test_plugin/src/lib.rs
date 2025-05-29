@@ -36,6 +36,7 @@ pub struct PluginVTable {
         ) -> c_int,
     >,
     pub free_systems: Option<unsafe extern "C" fn(*mut SystemPlugin, c_int)>,
+    pub hot_reload: Option<unsafe extern "C" fn(old_state: *mut c_void) -> *mut c_void>,
 }
 
 // --- System implementation ---
@@ -81,6 +82,10 @@ unsafe extern "C" fn update(dt: c_float) {
     println!("[RUST PLUGIN] Update called with dt={}", dt);
 }
 
+unsafe extern "C" fn hot_reload(old_state: *mut c_void) -> *mut c_void {
+    old_state
+}
+
 // --- VTable setup ---
 #[no_mangle]
 pub static mut PLUGIN_VTABLE: *mut PluginVTable = ptr::null_mut();
@@ -96,8 +101,9 @@ fn init_vtable() {
         free_result_json: None,
         register_systems: Some(register_systems),
         free_systems: None,
+        hot_reload: Some(hot_reload),
     };
     unsafe {
-        PLUGIN_VTABLE = &raw mut VTABLE;
+        PLUGIN_VTABLE = std::ptr::addr_of_mut!(VTABLE);
     }
 }

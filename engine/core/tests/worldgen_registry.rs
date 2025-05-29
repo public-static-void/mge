@@ -15,6 +15,7 @@ fn test_register_and_list_worldgen_plugins() {
     registry.register(WorldgenPlugin::CAbi {
         name: "simple_square".to_string(),
         generate: Box::new(|_| json!({ "cells": [] })),
+        _lib: None,
     });
     registry.register(WorldgenPlugin::Python {
         name: "cave_gen".to_string(),
@@ -37,6 +38,7 @@ fn test_invoke_worldgen_plugin_returns_map() {
             assert_eq!(params["width"], 10);
             json!({ "cells": [ { "id": "0,0", "x": 0, "y": 0 } ] })
         }),
+        _lib: None,
     });
 
     let params = json!({ "width": 10, "height": 10, "seed": 42 });

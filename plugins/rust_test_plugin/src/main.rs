@@ -51,12 +51,21 @@ fn main() -> std::io::Result<()> {
             }
         };
         let resp = match req {
-            PluginRequest::Initialize => PluginResponse::Initialized,
-            PluginRequest::Reload => PluginResponse::Reloaded,
+            PluginRequest::Initialize => {
+                // Initialize plugin state here
+                PluginResponse::Initialized
+            }
+            PluginRequest::Reload => {
+                // Reload plugin state here
+                PluginResponse::Reloaded
+            }
             PluginRequest::Shutdown => PluginResponse::Shutdown,
-            PluginRequest::RunCommand { data, .. } => PluginResponse::CommandResult {
-                result: serde_json::json!({"echo": data}),
-            },
+            PluginRequest::RunCommand { data, .. } => {
+                // Handle custom commands here
+                PluginResponse::CommandResult {
+                    result: serde_json::json!({"echo": data}),
+                }
+            }
         };
         let msg = serde_json::to_string(&resp)? + "\n";
         writer.write_all(msg.as_bytes())?;
