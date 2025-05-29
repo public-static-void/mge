@@ -1,0 +1,11 @@
+{
+  "title": "Monster",
+  "type": "object",
+  "description": "Monster marker component.",
+  "properties": {
+    "name": { "type": "string" },
+    "ai": { "type": "string", "default": "basic" }
+  },
+  "required": ["name", "ai"],
+  "modes": ["roguelike"]
+}

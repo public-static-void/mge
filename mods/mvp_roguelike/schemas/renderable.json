@@ -1,0 +1,11 @@
+{
+  "title": "Renderable",
+  "type": "object",
+  "description": "Display properties for map rendering.",
+  "properties": {
+    "glyph": { "type": "string" },
+    "color": { "type": "string", "default": "white" }
+  },
+  "required": ["glyph"],
+  "modes": ["roguelike"]
+}
