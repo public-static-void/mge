@@ -16,7 +16,7 @@ impl<R: PresentationRenderer> PresentationSystem<R> {
 
     pub fn render_world(&mut self, world: &crate::ecs::world::World) {
         for entity in &world.entities {
-            let pos_json = world.get_component(*entity, "PositionComponent");
+            let pos_json = world.get_component(*entity, "Position");
             let renderable_json = world.get_component(*entity, "Renderable");
             if let (Some(pos_json), Some(renderable_json)) = (pos_json, renderable_json) {
                 // Extract position (supports Square, Hex, Region)
@@ -112,7 +112,7 @@ impl<R: PresentationRenderer> PresentationSystem<R> {
 
         // Draw entities
         for entity in &world.entities {
-            let pos_json = world.get_component(*entity, "PositionComponent");
+            let pos_json = world.get_component(*entity, "Position");
             let renderable_json = world.get_component(*entity, "Renderable");
             if let (Some(pos_json), Some(renderable_json)) = (pos_json, renderable_json) {
                 let (x, y) = if let Some(pos_obj) = pos_json.get("pos") {

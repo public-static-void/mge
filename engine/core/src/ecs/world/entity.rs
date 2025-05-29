@@ -51,7 +51,7 @@ impl World {
             .iter()
             .copied()
             .filter(|&eid| {
-                self.get_component(eid, "PositionComponent")
+                self.get_component(eid, "Position")
                     .and_then(|val| {
                         val.get("pos").and_then(|p| {
                             if let Some(obj) = p.as_object() {
@@ -83,7 +83,7 @@ impl World {
             .iter()
             .copied()
             .filter(|&eid| {
-                self.get_component(eid, "PositionComponent")
+                self.get_component(eid, "Position")
                     .and_then(|val| {
                         val.get("pos").and_then(|p| {
                             if let Some(obj) = p.as_object() {

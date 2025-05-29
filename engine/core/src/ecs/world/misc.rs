@@ -3,7 +3,7 @@ use crate::ecs::components::position::{Position, PositionComponent};
 
 impl World {
     pub fn move_entity(&mut self, entity: u32, dx: f32, dy: f32) {
-        if let Some(value) = self.get_component(entity, "PositionComponent").cloned() {
+        if let Some(value) = self.get_component(entity, "Position").cloned() {
             if let Ok(mut pos_comp) = serde_json::from_value::<PositionComponent>(value) {
                 if let Position::Square { x, y, .. } = &mut pos_comp.pos {
                     *x += dx as i32;
@@ -11,7 +11,7 @@ impl World {
                 }
                 let _ = self.set_component(
                     entity,
-                    "PositionComponent",
+                    "Position",
                     serde_json::to_value(&pos_comp).unwrap(),
                 );
             }

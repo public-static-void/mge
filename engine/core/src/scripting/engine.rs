@@ -3,6 +3,7 @@ use super::input::{InputProvider, StdinInput};
 use super::lua_api::register_all_api_functions;
 use super::system_bridge::register_system_functions;
 use crate::ecs::world::World;
+use crate::scripting::helpers::json_to_lua_table;
 use crate::scripting::lua_api::worldgen::register_worldgen_api;
 use crate::worldgen::WorldgenRegistry;
 use mlua::RegistryKey;
@@ -48,6 +49,24 @@ impl ScriptEngine {
             globals
                 .set("print", print)
                 .expect("Failed to set print function");
+
+            // --- BEGIN: Register require_json ---
+            let require_json = lua
+                .create_function(|lua, path: String| {
+                    let json_str = std::fs::read_to_string(&path).map_err(|e| {
+                        mlua::Error::external(format!("Failed to read file: {}", e))
+                    })?;
+                    let json_val: serde_json::Value =
+                        serde_json::from_str(&json_str).map_err(|e| {
+                            mlua::Error::external(format!("Failed to parse JSON: {}", e))
+                        })?;
+                    json_to_lua_table(lua, &json_val)
+                })
+                .expect("Failed to create require_json function");
+            globals
+                .set("require_json", require_json)
+                .expect("Failed to set require_json function");
+            // --- END: Register require_json ---
         }
 
         Self {
