@@ -22,4 +22,3 @@ pub mod event_bus;
 pub mod helpers;
 pub mod lua_api;
 pub mod system_bridge;
-pub mod worldgen_bridge;

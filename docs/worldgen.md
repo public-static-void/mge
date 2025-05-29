@@ -18,7 +18,7 @@ registry.register(WorldgenPlugin::CAbi {
 ### Lua
 
 ```lua
-register_worldgen("luagen", function(params)
+register_worldgen_plugin("luagen", function(params)
     -- params is a Lua table representing JSON
     return { cells = { { id = "luacell", x = 1, y = 2 } } }
 end)
@@ -30,7 +30,7 @@ end)
 def pygen(params):
     return {"cells": [{"id": "pycell", "x": 0, "y": 0}]}
 
-world.register_worldgen("pygen", pygen)
+world.register_worldgen_plugin("pygen", pygen)
 ```
 
 ### C ABI
@@ -41,8 +41,8 @@ See [`engine/engine_plugin_abi.h`](../engine/engine_plugin_abi.h) for details on
 
 ## Listing Plugins
 
-- Lua: `list_worldgen()`
-- Python: `world.list_worldgen()`
+- Lua: `list_worldgen_plugins()`
+- Python: `world.list_worldgen_plugins()`
 - Rust: `registry.list_names()`
 
 ---
@@ -52,13 +52,13 @@ See [`engine/engine_plugin_abi.h`](../engine/engine_plugin_abi.h) for details on
 - Lua:
 
 ```lua
-local result = invoke_worldgen("luagen", { width = 7 })
+local result = invoke_worldgen_plugin("luagen", { width = 7 })
 ```
 
 - Python:
 
 ```python
-result = world.invoke_worldgen("pygen", {"width": 7})
+result = world.invoke_worldgen_plugin("pygen", {"width": 7})
 ```
 
 - Rust:

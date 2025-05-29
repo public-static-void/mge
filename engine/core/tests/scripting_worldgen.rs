@@ -62,7 +62,7 @@ fn test_lua_can_list_and_invoke_worldgen_plugins() {
         .load(
             r#"
             local params = { topology = "square", width = 2, height = 2, z_levels = 1, seed = 42 }
-            return invoke_worldgen("basic_square_worldgen", params)
+            return invoke_worldgen_plugin("basic_square_worldgen", params)
         "#,
         )
         .eval()
