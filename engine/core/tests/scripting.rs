@@ -385,3 +385,41 @@ fn test_lua_get_user_input_with_mock() {
 
     assert!(engine.run_script(script).is_ok());
 }
+
+#[test]
+fn lua_can_set_and_get_camera_position() {
+    use engine_core::scripting::ScriptEngine;
+    use std::sync::{Arc, Mutex};
+
+    let mut registry = ComponentRegistry::new();
+    let schema_dir = std::path::Path::new("../assets/schemas");
+    for entry in std::fs::read_dir(schema_dir).unwrap() {
+        let path = entry.unwrap().path();
+        if path.extension().map(|e| e == "json").unwrap_or(false) {
+            let json = std::fs::read_to_string(&path).unwrap();
+            registry.register_external_schema_from_json(&json).unwrap();
+        }
+    }
+    let registry = Arc::new(Mutex::new(registry));
+    let mut engine = ScriptEngine::new();
+    let world = std::rc::Rc::new(std::cell::RefCell::new(engine_core::ecs::World::new(
+        registry.clone(),
+    )));
+    world.borrow_mut().current_mode = "roguelike".to_string();
+    engine.register_world(world.clone()).unwrap();
+
+    let script = r#"
+        -- Spawn camera entity (should be handled by set_camera)
+        set_camera(5, 7)
+        local cam = get_camera()
+        assert(cam.x == 5, "Camera x should be 5")
+        assert(cam.y == 7, "Camera y should be 7")
+
+        -- Move camera again
+        set_camera(10, 2)
+        local cam2 = get_camera()
+        assert(cam2.x == 10, "Camera x should be 10")
+        assert(cam2.y == 2, "Camera y should be 2")
+    "#;
+    engine.run_script(script).unwrap();
+}
