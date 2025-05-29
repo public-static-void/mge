@@ -1,45 +1,31 @@
-use std::env;
 use std::fs;
 use std::path::Path;
 use std::process::{Command, exit};
 
 fn main() {
-    let args: Vec<String> = env::args().collect();
+    let args: Vec<String> = std::env::args().collect();
     if args.len() < 2 {
-        eprintln!("Usage: xtask <cmd>");
-        eprintln!("Commands: build-plugins [plugin_name]");
+        eprintln!("Usage: xtask <command>");
         exit(1);
     }
+    let command = &args[1];
 
-    match args[1].as_str() {
+    match command.as_str() {
         "build-plugins" => {
-            let plugin_name = args.get(2).map(String::as_str);
-            if let Err(e) = build_and_deploy_plugins(plugin_name) {
-                eprintln!("xtask error: {e}");
+            if let Err(e) = build_and_deploy_plugins() {
+                eprintln!("Error: {e}");
                 exit(1);
             }
         }
-        cmd => {
-            eprintln!("Unknown command: {cmd}");
+        _ => {
+            eprintln!("Unknown command: {command}");
             exit(1);
         }
     }
 }
 
-fn build_and_deploy_plugins(plugin_name: Option<&str>) -> Result<(), Box<dyn std::error::Error>> {
+fn build_and_deploy_plugins() -> Result<(), Box<dyn std::error::Error>> {
     let plugins_dir = Path::new("plugins");
-    let plugin_crates = fs::read_dir(plugins_dir)?
-        .filter_map(|entry| {
-            let entry = entry.ok()?;
-            let path = entry.path();
-            if path.is_dir() && path.join("Cargo.toml").exists() {
-                Some(path)
-            } else {
-                None
-            }
-        })
-        .filter(|path| plugin_name.is_none_or(|name| path.ends_with(name)));
-
     let target_os = std::env::consts::OS;
     let dylib_ext = match target_os {
         "linux" => "so",
@@ -47,17 +33,25 @@ fn build_and_deploy_plugins(plugin_name: Option<&str>) -> Result<(), Box<dyn std
         "windows" => "dll",
         _ => panic!("Unsupported OS"),
     };
+    let lib_prefix = if target_os == "windows" { "" } else { "lib" };
 
-    // Workspace-wide target directory
     let workspace_target_dir = Path::new("target/release");
 
-    for crate_path in plugin_crates {
-        let crate_name = crate_path.file_name().unwrap().to_str().unwrap();
+    for entry in fs::read_dir(plugins_dir)? {
+        let entry = entry?;
+        let crate_path = entry.path();
+        if !crate_path.is_dir() {
+            continue;
+        }
         let cargo_toml = crate_path.join("Cargo.toml");
+        if !cargo_toml.exists() {
+            continue;
+        }
+        let crate_name = crate_path.file_name().unwrap().to_str().unwrap();
         let crate_package_name = get_package_name(&cargo_toml)?;
         println!("Building plugin crate: {crate_name}");
 
-        // Build plugin
+        // Build plugin (all targets, including binaries)
         let status = Command::new("cargo")
             .arg("build")
             .arg("--release")
@@ -67,61 +61,87 @@ fn build_and_deploy_plugins(plugin_name: Option<&str>) -> Result<(), Box<dyn std
             return Err(format!("Build failed for {crate_name}").into());
         }
 
-        let lib_prefix = if target_os == "windows" { "" } else { "lib" };
+        // === Deploy dynamic library ===
         let dylib_name = format!("{lib_prefix}{crate_package_name}.{dylib_ext}");
-        let dest = crate_path.join(&dylib_name);
+        let dest_dylib = crate_path.join(&dylib_name);
 
         // 1. Try workspace target/release
-        let built_lib = workspace_target_dir.join(&dylib_name);
-        if built_lib.exists() {
-            fs::copy(&built_lib, &dest)?;
+        let built_dylib = workspace_target_dir.join(&dylib_name);
+        if built_dylib.exists() {
+            fs::copy(&built_dylib, &dest_dylib)?;
             println!(
                 "Deployed {} to {}",
-                built_lib.display(),
-                crate_path.display()
+                built_dylib.display(),
+                dest_dylib.display()
             );
-            continue;
-        }
-
-        // 2. Try workspace target/release/deps with hash
-        let deps_dir = workspace_target_dir.join("deps");
-        let found = std::fs::read_dir(&deps_dir)?
-            .filter_map(|e| e.ok())
-            .find(|e| {
-                let binding = e.file_name();
-                let fname = binding.to_string_lossy();
+        } else {
+            // 2. Try workspace target/release/deps with hash
+            let deps_dir = workspace_target_dir.join("deps");
+            let found = fs::read_dir(&deps_dir)?.filter_map(|e| e.ok()).find(|e| {
+                let fname = e.file_name().to_string_lossy().to_string();
                 fname.starts_with(&format!("{}{}", lib_prefix, crate_package_name))
                     && fname.ends_with(dylib_ext)
             });
-        if let Some(entry) = found {
-            let built_lib = entry.path();
-            fs::copy(&built_lib, &dest)?;
-            println!(
-                "Deployed {} to {}",
-                built_lib.display(),
-                crate_path.display()
-            );
-            continue;
+            if let Some(entry) = found {
+                let built_dylib = entry.path();
+                fs::copy(&built_dylib, &dest_dylib)?;
+                println!(
+                    "Deployed {} to {}",
+                    built_dylib.display(),
+                    dest_dylib.display()
+                );
+            } else {
+                return Err(format!(
+                    "Built library not found in {} or {}",
+                    workspace_target_dir.display(),
+                    deps_dir.display()
+                )
+                .into());
+            }
         }
 
-        return Err(format!(
-            "Built library not found in {} or {}",
-            workspace_target_dir.display(),
-            deps_dir.display()
-        )
-        .into());
+        // === Deploy binary executable (if it exists) ===
+        let bin_name = if target_os == "windows" {
+            format!("{}.exe", crate_package_name)
+        } else {
+            crate_package_name.clone()
+        };
+        let built_bin = workspace_target_dir.join(&bin_name);
+        let dest_bin = crate_path.join(&bin_name);
+        if built_bin.exists() {
+            fs::copy(&built_bin, &dest_bin)?;
+            println!("Deployed {} to {}", built_bin.display(), dest_bin.display());
+        } else {
+            // 2. Try workspace target/release/deps (rare, but possible for some setups)
+            let deps_dir = workspace_target_dir.join("deps");
+            let found = fs::read_dir(&deps_dir)?.filter_map(|e| e.ok()).find(|e| {
+                let fname = e.file_name().to_string_lossy().to_string();
+                fname.starts_with(&bin_name)
+                    && (fname == bin_name || fname.starts_with(&format!("{}-", bin_name)))
+            });
+            if let Some(entry) = found {
+                let built_bin = entry.path();
+                fs::copy(&built_bin, &dest_bin)?;
+                println!("Deployed {} to {}", built_bin.display(), dest_bin.display());
+            } else {
+                println!(
+                    "Warning: Built binary {} not found in {} or {} (skipping binary deploy)",
+                    bin_name,
+                    workspace_target_dir.display(),
+                    deps_dir.display()
+                );
+            }
+        }
     }
     Ok(())
 }
 
 fn get_package_name(cargo_toml: &Path) -> Result<String, Box<dyn std::error::Error>> {
-    let content = std::fs::read_to_string(cargo_toml)?;
+    let content = fs::read_to_string(cargo_toml)?;
     for line in content.lines() {
-        let trimmed = line.trim();
-        if trimmed.starts_with("name") && trimmed.contains('=') {
-            // e.g. name = "rust_test_plugin"
-            let name = trimmed.split('=').nth(1).unwrap().trim().trim_matches('"');
-            return Ok(name.to_string());
+        if let Some(rest) = line.strip_prefix("name = ") {
+            let name = rest.trim().trim_matches('"').to_string();
+            return Ok(name);
         }
     }
     Err("No package name found in Cargo.toml".into())
