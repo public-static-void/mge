@@ -47,6 +47,14 @@ Example output:
 ..........
 ```
 
+### Roguelike MVP Viewport Demo Mod
+
+```bash
+cargo run --bin mge-cli -- --mod mvp_roguelike
+```
+
+Controls: `w/a/s/d` = move, `e` = attack, `q` = quit
+
 ---
 
 ## Documentation
