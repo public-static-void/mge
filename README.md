@@ -19,13 +19,33 @@ MGE is a modular, cross-language game engine blueprint for rapid prototyping, ex
 
 ## Usage
 
-Example:
+### Lua Scripting Example:
 
 ```sh
 cargo run --bin mge-cli -- engine/scripts/lua/roguelike_mvp.lua
 ```
 
 Controls: `w/a/s/d` = move, `e` = attack, `q` = quit
+
+### Terminal Viewport Rendering Example:
+
+MGE supports modular rendering backends. You can render a map and entities directly to your terminal for rapid prototyping and roguelike-style games.
+
+Run the demo:
+
+```bash
+cargo run --example viewport_demo -p engine_core
+```
+
+Example output:
+
+```bash
+..........
+..........
+....@.....
+..........
+..........
+```
 
 ---
 

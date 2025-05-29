@@ -61,3 +61,49 @@ impl Default for TestRenderer {
         Self::new()
     }
 }
+
+pub struct TerminalRenderer {
+    pub width: i32,
+    pub height: i32,
+    pub buffer: Vec<Vec<Option<RenderCommand>>>,
+}
+
+impl TerminalRenderer {
+    pub fn new(width: i32, height: i32) -> Self {
+        Self {
+            width,
+            height,
+            buffer: vec![vec![None; width as usize]; height as usize],
+        }
+    }
+}
+
+impl PresentationRenderer for TerminalRenderer {
+    fn queue_draw(&mut self, cmd: RenderCommand) {
+        let (x, y) = cmd.pos;
+        if x >= 0 && y >= 0 && x < self.width && y < self.height {
+            self.buffer[y as usize][x as usize] = Some(cmd);
+        }
+    }
+    fn queue_draw_cell(&mut self, _pos: (i32, i32), _cell: &CellKey) {
+        // Not needed for terminal output
+    }
+    fn present(&mut self) {
+        for row in &self.buffer {
+            for cell in row {
+                if let Some(cmd) = cell {
+                    print!("{}", cmd.glyph);
+                } else {
+                    print!(" ");
+                }
+            }
+            println!();
+        }
+        // Clear buffer for next frame
+        for row in &mut self.buffer {
+            for cell in row.iter_mut() {
+                *cell = None;
+            }
+        }
+    }
+}
