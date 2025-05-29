@@ -1,5 +1,4 @@
-use libloading::Library;
-use std::os::raw::{c_char, c_int, c_void};
+use std::os::raw::{c_char, c_float, c_int, c_void};
 
 #[derive(Debug, Clone, serde::Deserialize, PartialEq, Eq)]
 pub struct PluginManifest {
@@ -34,38 +33,22 @@ pub struct SystemPlugin {
 
 #[repr(C)]
 pub struct PluginVTable {
-    pub init: unsafe extern "C" fn(*mut EngineApi, *mut c_void) -> i32,
+    pub init: unsafe extern "C" fn(*mut EngineApi, *mut c_void) -> c_int,
     pub shutdown: unsafe extern "C" fn(),
-    pub update: unsafe extern "C" fn(f32),
-    pub worldgen_name: unsafe extern "C" fn() -> *const c_char,
-    pub generate_world: unsafe extern "C" fn(*const c_char, *mut *mut c_char) -> i32,
-    pub free_result_json: unsafe extern "C" fn(*mut c_char),
+    pub update: unsafe extern "C" fn(c_float),
+    pub worldgen_name: Option<unsafe extern "C" fn() -> *const c_char>,
+    pub generate_world: Option<unsafe extern "C" fn(*const c_char, *mut *mut c_char) -> c_int>,
+    pub free_result_json: Option<unsafe extern "C" fn(*mut c_char)>,
     pub register_systems: Option<
         unsafe extern "C" fn(
             *mut EngineApi,
             *mut c_void,
             *mut *mut SystemPlugin,
             *mut c_int,
-        ) -> i32,
+        ) -> c_int,
     >,
     pub free_systems: Option<unsafe extern "C" fn(*mut SystemPlugin, c_int)>,
-}
-
-#[derive(Debug)]
-pub struct LoadedPlugin {
-    _lib: Library, // Must keep alive!
-    pub vtable: *const PluginVTable,
-    pub metadata: PluginMetadata,
-}
-
-impl LoadedPlugin {
-    pub fn new(lib: Library, vtable: *const PluginVTable, metadata: PluginMetadata) -> Self {
-        Self {
-            _lib: lib,
-            vtable,
-            metadata,
-        }
-    }
+    pub hot_reload: Option<unsafe extern "C" fn(old_state: *mut c_void) -> *mut c_void>,
 }
 
 impl SystemPlugin {

@@ -1585,6 +1585,8 @@ version = "0.1.0"
 dependencies = [
  "ctor",
  "libc",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -2612,6 +2614,10 @@ dependencies = [
 [[package]]
 name = "xtask"
 version = "0.1.0"
+dependencies = [
+ "serde",
+ "toml",
+]
 
 [[package]]
 name = "yoke"
