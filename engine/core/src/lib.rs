@@ -7,6 +7,7 @@ pub mod map;
 pub mod modes;
 pub mod mods;
 pub mod plugins;
+pub mod presentation;
 pub mod scripting;
 pub mod systems;
 pub mod worldgen;

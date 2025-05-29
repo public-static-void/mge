@@ -65,6 +65,9 @@ impl MapTopology for SquareGridMap {
     fn topology_type(&self) -> &'static str {
         "square"
     }
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
         self
     }

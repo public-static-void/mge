@@ -24,17 +24,17 @@ pub fn load_schemas_from_dir<P: AsRef<Path>>(
             .unwrap_or(false)
         {
             let data = fs::read_to_string(entry.path())?;
-            let schema: RootSchema = serde_json::from_str(&data)?;
-            // Extract component name and modes from schema or file name
-            let name = schema
-                .schema
-                .metadata
-                .as_ref()
-                .and_then(|m| m.title.clone())
+            let json_val: serde_json::Value = serde_json::from_str(&data)?;
+
+            // Get name from "title"
+            let name = json_val
+                .get("title")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())
                 .unwrap_or_else(|| entry.path().file_stem().unwrap().to_string_lossy().into());
-            let modes = schema
-                .schema
-                .extensions
+
+            // Get modes from root-level "modes"
+            let modes = json_val
                 .get("modes")
                 .and_then(|v| v.as_array())
                 .map(|arr| {
@@ -43,6 +43,9 @@ pub fn load_schemas_from_dir<P: AsRef<Path>>(
                         .collect()
                 })
                 .unwrap_or_default();
+
+            // Parse the whole file as a RootSchema
+            let schema: RootSchema = serde_json::from_str(&data)?;
 
             map.insert(
                 name.clone(),
