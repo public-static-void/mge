@@ -454,4 +454,44 @@ impl PyWorld {
             Ok(None)
         }
     }
+
+    /// Set the camera position (creates camera entity if not present)
+    fn set_camera(&self, x: i64, y: i64) {
+        let mut world = self.inner.borrow_mut();
+        // Find or create the camera entity
+        let camera_id = world
+            .get_entities_with_component("Camera")
+            .first()
+            .cloned()
+            .unwrap_or_else(|| {
+                let id = world.spawn_entity();
+                world
+                    .set_component(id, "Camera", serde_json::json!({}))
+                    .unwrap();
+                id
+            });
+        world
+            .set_component(
+                camera_id,
+                "PositionComponent",
+                serde_json::json!({ "pos": { "Square": { "x": x, "y": y, "z": 0 } } }),
+            )
+            .unwrap();
+    }
+
+    /// Get the camera position as a dict {x, y}
+    fn get_camera(&self, py: pyo3::Python) -> pyo3::PyObject {
+        let world = self.inner.borrow();
+        if let Some(camera_id) = world.get_entities_with_component("Camera").first() {
+            if let Some(pos) = world.get_component(*camera_id, "PositionComponent") {
+                let x = pos["pos"]["Square"]["x"].as_i64().unwrap_or(0);
+                let y = pos["pos"]["Square"]["y"].as_i64().unwrap_or(0);
+                let dict = pyo3::types::PyDict::new(py);
+                dict.set_item("x", x).unwrap();
+                dict.set_item("y", y).unwrap();
+                return dict.into();
+            }
+        }
+        py.None()
+    }
 }
