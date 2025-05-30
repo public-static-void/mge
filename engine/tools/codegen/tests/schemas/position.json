@@ -1,0 +1,56 @@
+{
+  "name": "Position",
+  "title": "Position",
+  "type": "object",
+  "properties": {
+    "pos": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "Square": {
+              "type": "object",
+              "properties": {
+                "x": { "type": "integer" },
+                "y": { "type": "integer" },
+                "z": { "type": "integer" }
+              },
+              "required": ["x", "y", "z"]
+            }
+          },
+          "required": ["Square"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "Hex": {
+              "type": "object",
+              "properties": {
+                "q": { "type": "integer" },
+                "r": { "type": "integer" },
+                "z": { "type": "integer" }
+              },
+              "required": ["q", "r", "z"]
+            }
+          },
+          "required": ["Hex"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "Region": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string" }
+              },
+              "required": ["id"]
+            }
+          },
+          "required": ["Region"]
+        }
+      ]
+    }
+  },
+  "required": ["pos"],
+  "modes": ["colony", "roguelike", "editor"]
+}
