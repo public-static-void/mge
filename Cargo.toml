@@ -6,5 +6,6 @@ members = [
   "engine/tools/schema_validator",
   "plugins/rust_test_plugin",
   "xtask",
+  "engine/tools/codegen",
 ]
 resolver = "3"
