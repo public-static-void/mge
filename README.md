@@ -65,4 +65,5 @@ Controls: `w/a/s/d` = move, `e` = attack, `q` = quit
 - [docs/plugin_abi.md](docs/plugin_abi.md): C ABI plugin authoring
 - [docs/examples.md](docs/examples.md): Usage examples (Lua, Python, Rust, C)
 - [docs/worldgen.md](docs/worldgen.md): Worldgen plugin system
+- [docs/codegen.md](docs/codegen.md): Code generation for schema-driven ECS
 - [docs/ROADMAP.md](docs/ROADMAP.md): Project Roadmap
