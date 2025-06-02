@@ -5,6 +5,8 @@ pub mod equipment;
 pub mod inventory;
 pub mod misc;
 pub mod region;
+pub mod ui;
 pub mod world;
 
+pub use ui::UiApi;
 pub use world::PyWorld;
