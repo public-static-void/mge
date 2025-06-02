@@ -1,6 +1,7 @@
 pub mod input;
 pub mod layout;
 pub mod renderer;
+pub mod ui;
 
 use crate::presentation::renderer::{PresentationRenderer, RenderColor, RenderCommand};
 

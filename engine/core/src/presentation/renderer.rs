@@ -1,11 +1,12 @@
 //! Renderer abstraction for the presentation layer.
 
 use crate::map::cell_key::CellKey;
+use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RenderColor(pub u8, pub u8, pub u8);
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RenderCommand {
     pub glyph: char,
     pub color: RenderColor,
