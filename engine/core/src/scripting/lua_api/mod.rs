@@ -10,6 +10,7 @@ pub mod inventory;
 pub mod map;
 pub mod misc;
 pub mod region;
+pub mod ui;
 pub mod worldgen;
 
 use crate::ecs::world::World;
@@ -36,6 +37,7 @@ pub fn register_all_api_functions(
     body::register_body_api(lua, globals, world.clone())?;
     region::register_region_api(lua, globals, world.clone())?;
     camera::register_camera_api(lua, globals, world.clone())?;
+    ui::register_ui_api(lua, globals)?;
     worldgen::register_worldgen_api(lua, globals, worldgen_registry)?;
     misc::register_misc_api(lua, globals, world.clone(), input_provider)?;
     map::register_map_api(lua, globals, world.clone())?;

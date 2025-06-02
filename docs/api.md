@@ -143,6 +143,52 @@
 | `set_camera(x, y)` | Set the camera position (center viewport) |
 | `get_camera()`     | Get the camera position as {x, y}         |
 
+---
+
+## UI API
+
+| Function                               | Description                                                      |
+| -------------------------------------- | ---------------------------------------------------------------- |
+| `ui.create_widget(type, props)`        | Create a new UI widget of given type and properties              |
+| `ui.load_json(json_str)`               | Load a UI widget tree from JSON                                  |
+| `ui.remove_widget(id)`                 | Remove a widget by ID                                            |
+| `ui.set_widget_props(id, props)`       | Set properties on a widget                                       |
+| `ui.get_widget_props(id)`              | Get properties of a widget                                       |
+| `ui.add_child(parent_id, child_id)`    | Add a widget as a child to another                               |
+| `ui.get_children(parent_id)`           | Get the children IDs of a widget                                 |
+| `ui.remove_child(parent_id, child_id)` | Remove a child widget from a parent                              |
+| `ui.set_callback(id, event, fn)`       | Register a callback for a widget event (e.g., "click")           |
+| `ui.remove_callback(id, event)`        | Remove a callback for a widget event                             |
+| `ui.focus_widget(id)`                  | Set focus to a widget                                            |
+| `ui.trigger_event(id, event, args)`    | Trigger an event on a widget                                     |
+| `ui.send_ui_event(...)`                | Alias for `ui.trigger_event`                                     |
+| `ui.get_widget_type(id)`               | Get the type name of a widget (including dynamically registered) |
+| `ui.get_parent(id)`                    | Get the parent ID of a widget                                    |
+| `ui.set_z_order(id, z)`                | Set the z-order of a widget                                      |
+| `ui.get_z_order(id)`                   | Get the z-order of a widget                                      |
+| `ui.register_widget(type, ctor)`       | Register a new widget type dynamically from scripting            |
+
+### Supported Widget Types
+
+| Widget Type     | Properties (main)                                                   |
+| --------------- | ------------------------------------------------------------------- |
+| `"Button"`      | `label: string`, `pos: [x, y]`, `color: [r, g, b]`, `group?: int`   |
+| `"Label"`       | `text: string`, `pos: [x, y]`, `color: [r, g, b]`                   |
+| `"Checkbox"`    | `label: string`, `pos: [x, y]`, `checked: bool`, `color: [r, g, b]` |
+| `"Dropdown"`    | `items: [string]`, `pos: [x, y]`, `selected: int`, `color: [r,g,b]` |
+| `"TextInput"`   | `text: string`, `pos: [x, y]`, `color: [r, g, b]`                   |
+| `"Panel"`       | `pos: [x, y]`, `size: [w, h]`, `color: [r, g, b]`                   |
+| `"GridLayout"`  | `pos: [x, y]`, `rows: int`, `cols: int`, `spacing: int`             |
+| `"ContextMenu"` | `items: [string]`, `pos: [x, y]`, `color: [r, g, b]`                |
+
+#### Notes:
+
+- All functions are available as `ui.<function>` in Lua, and as methods on `UiApi` in Python.
+- Widget property tables/dicts use the scripting language’s native data structures.
+- Dynamic widget registration allows to add new types at runtime from scripts.
+
+---
+
 ## Other Functions
 
 | Function                  | Description                                 |
