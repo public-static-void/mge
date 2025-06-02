@@ -315,6 +315,131 @@ assert world.get_production_job(eid) is None
 
 ---
 
+## UI API
+
+### Lua
+
+```lua
+-- Create a Button widget
+local id = ui.create_widget("Button", { label = "OK", pos = {1, 2}, color = {255, 255, 255} })
+assert(id > 0)
+
+-- Set and get widget properties
+ui.set_widget_props(id, { label = "Confirm", color = {0, 255, 0} })
+local props = ui.get_widget_props(id)
+print(props.label) -- "Confirm"
+
+-- Add a child widget (e.g., add a Label to a Panel)
+local panel_id = ui.create_widget("Panel", { pos = {0, 0}, size = {100, 50}, color = {200, 200, 200} })
+local label_id = ui.create_widget("Label", { text = "Info", pos = {2, 2}, color = {0, 0, 0} })
+ui.add_child(panel_id, label_id)
+
+-- Get children
+local children = ui.get_children(panel_id)
+for i, child_id in ipairs(children) do
+    print("Child ID:", child_id)
+end
+
+-- Remove a child
+ui.remove_child(panel_id, label_id)
+
+-- Register and trigger a callback
+ui.set_callback(id, "click", function(widget_id)
+    print("Button clicked! Widget ID:", widget_id)
+end)
+ui.trigger_event(id, "click", { x = 10, y = 5 })
+
+-- Remove a callback
+ui.remove_callback(id, "click")
+
+-- Focus a widget
+ui.focus_widget(id)
+
+-- Set/get z-order
+ui.set_z_order(id, 10)
+print(ui.get_z_order(id))
+
+-- Query widget type and parent
+print(ui.get_widget_type(id))
+print(ui.get_parent(label_id))
+
+-- Dynamic widget registration (advanced)
+ui.register_widget("CustomWidget", function(props)
+    return ui.create_widget("Button", props)
+end)
+local custom_id = ui.create_widget("CustomWidget", { label = "Dynamic!" })
+print(ui.get_widget_type(custom_id)) -- "CustomWidget"
+
+-- Load UI from JSON
+local ids = ui.load_json([[{"type":"Panel","props":{"pos":[0,0],"size":[100,50]}}]])
+print(ids[1])
+```
+
+### Python
+
+```python
+import mge
+
+ui = mge.UiApi()
+
+# Create a Button widget
+widget_id = ui.create_widget("Button", {"label": "OK", "pos": [1, 2], "color": [255, 255, 255]})
+assert widget_id > 0
+
+# Set and get widget properties
+ui.set_widget_props(widget_id, {"label": "Confirm", "color": [0, 255, 0]})
+props = ui.get_widget_props(widget_id)
+print(props["label"])  # "Confirm"
+
+# Add a child widget (e.g., add a Label to a Panel)
+panel_id = ui.create_widget("Panel", {"pos": [0, 0], "size": [100, 50], "color": [200, 200, 200]})
+label_id = ui.create_widget("Label", {"text": "Info", "pos": [2, 2], "color": [0, 0, 0]})
+ui.add_child(panel_id, label_id)
+
+# Get children
+children = ui.get_children(panel_id)
+for child_id in children:
+    print("Child ID:", child_id)
+
+# Remove a child
+ui.remove_child(panel_id, label_id)
+
+# Register and trigger a callback
+def on_click(widget_id):
+    print("Button clicked! Widget ID:", widget_id)
+
+ui.set_callback(widget_id, "click", on_click)
+ui.trigger_event(widget_id, "click", {"x": 10, "y": 5})
+
+# Remove a callback
+ui.remove_callback(widget_id, "click")
+
+# Focus a widget
+ui.focus_widget(widget_id)
+
+# Set/get z-order
+ui.set_z_order(widget_id, 10)
+print(ui.get_z_order(widget_id))
+
+# Query widget type and parent
+print(ui.get_widget_type(widget_id))
+print(ui.get_parent(label_id))
+
+# Dynamic widget registration (advanced)
+def custom_widget_ctor(props):
+    return ui.create_widget("Button", props)
+
+ui.register_widget("CustomWidget", custom_widget_ctor)
+custom_id = ui.create_widget("CustomWidget", {"label": "Dynamic!"})
+print(ui.get_widget_type(custom_id))  # "CustomWidget"
+
+# Load UI from JSON
+ids = ui.load_json('{"type":"Panel","props":{"pos":[0,0],"size":[100,50]}}')
+print(ids[0])
+```
+
+---
+
 ## User Input
 
 ### Lua

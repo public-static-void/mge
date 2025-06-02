@@ -24,7 +24,7 @@
 - [x] Component versioning & migration (data evolution)
 - [x] Data-driven field constraints (min/max, enums, etc.)
 - [x] Component macro system (Rust derive macros, migration, schema parsing)
-- [ ] Code generation tools (for components, schemas, bindings)
+- [x] Code generation tools (for components, schemas, bindings)
 
 ## Map, World, and Simulation
 
