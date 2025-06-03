@@ -87,10 +87,10 @@ impl UiApi {
                     }
                 };
             }
+            try_downcast!(engine_core::presentation::ui::layout::grid::GridLayout);
             try_downcast!(engine_core::presentation::ui::widget::button::Button);
             try_downcast!(engine_core::presentation::ui::widget::label::Label);
             try_downcast!(engine_core::presentation::ui::widget::panel::Panel);
-            try_downcast!(engine_core::presentation::ui::widget::grid_layout::GridLayout);
             try_downcast!(engine_core::presentation::ui::widget::checkbox::Checkbox);
             try_downcast!(engine_core::presentation::ui::widget::dropdown::Dropdown);
             try_downcast!(engine_core::presentation::ui::widget::text_input::TextInput);
@@ -155,7 +155,7 @@ impl UiApi {
             if removed_child.is_none() {
                 if let Some(grid) = parent
                     .as_any_mut()
-                    .downcast_mut::<engine_core::presentation::ui::widget::grid_layout::GridLayout>(
+                    .downcast_mut::<engine_core::presentation::ui::layout::grid::GridLayout>(
                 ) {
                     if let Some(pos) = grid.children.iter().position(|c| c.id() == child_id) {
                         let mut child = grid.children.remove(pos);

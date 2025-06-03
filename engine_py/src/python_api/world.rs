@@ -1,9 +1,7 @@
 use crate::system_bridge::SystemBridge;
 use engine_core::ecs::world::World;
-use pyo3::IntoPyObject;
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
-use serde_pyobject::to_pyobject;
+use pyo3::types::{PyAny, PyDict};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -55,14 +53,6 @@ impl PyWorld {
         let map = engine_core::map::Map::new(Box::new(grid));
         world.map = Some(map);
 
-        world.register_system(engine_core::systems::standard::MoveAll {
-            delta: engine_core::systems::standard::MoveDelta::Square {
-                dx: 1,
-                dy: 0,
-                dz: 0,
-            },
-        });
-        world.register_system(engine_core::systems::standard::DamageAll { amount: 1.0 });
         world.register_system(engine_core::systems::standard::ProcessDeaths);
         world.register_system(engine_core::systems::standard::ProcessDecay);
         world.register_system(engine_core::systems::job::JobSystem::default());
@@ -89,12 +79,7 @@ impl PyWorld {
     }
 
     // ---- COMPONENT ----
-    fn set_component(
-        &self,
-        entity_id: u32,
-        name: String,
-        value: Bound<'_, pyo3::types::PyAny>,
-    ) -> PyResult<()> {
+    fn set_component(&self, entity_id: u32, name: String, value: Bound<'_, PyAny>) -> PyResult<()> {
         ComponentApi::set_component(self, entity_id, name, value)
     }
     fn get_component(
@@ -125,7 +110,7 @@ impl PyWorld {
     fn get_inventory(&self, py: Python<'_>, entity_id: u32) -> PyResult<Option<PyObject>> {
         InventoryApi::get_inventory(self, py, entity_id)
     }
-    fn set_inventory(&self, entity_id: u32, value: Bound<'_, pyo3::types::PyAny>) -> PyResult<()> {
+    fn set_inventory(&self, entity_id: u32, value: Bound<'_, PyAny>) -> PyResult<()> {
         InventoryApi::set_inventory(self, entity_id, value)
     }
     fn add_item_to_inventory(&self, entity_id: u32, item_id: String) -> PyResult<()> {
@@ -155,10 +140,10 @@ impl PyWorld {
     fn get_body(&self, py: Python<'_>, entity_id: u32) -> PyResult<Option<PyObject>> {
         BodyApi::get_body(self, py, entity_id)
     }
-    fn set_body(&self, entity_id: u32, value: Bound<'_, pyo3::types::PyAny>) -> PyResult<()> {
+    fn set_body(&self, entity_id: u32, value: Bound<'_, PyAny>) -> PyResult<()> {
         BodyApi::set_body(self, entity_id, value)
     }
-    fn add_body_part(&self, entity_id: u32, part: Bound<'_, pyo3::types::PyAny>) -> PyResult<()> {
+    fn add_body_part(&self, entity_id: u32, part: Bound<'_, PyAny>) -> PyResult<()> {
         BodyApi::add_body_part(self, entity_id, part)
     }
     fn remove_body_part(&self, entity_id: u32, part_name: String) -> PyResult<()> {
@@ -191,9 +176,6 @@ impl PyWorld {
     fn move_entity(&self, entity_id: u32, dx: f32, dy: f32) {
         MiscApi::move_entity(self, entity_id, dx, dy)
     }
-    fn move_all(&self, dx: i32, dy: i32) {
-        MiscApi::move_all(self, dx, dy)
-    }
     fn tick(&self) {
         MiscApi::tick(self)
     }
@@ -211,9 +193,6 @@ impl PyWorld {
     }
     fn damage_entity(&self, entity_id: u32, amount: f32) {
         MiscApi::damage_entity(self, entity_id, amount)
-    }
-    fn damage_all(&self, amount: f32) {
-        MiscApi::damage_all(self, amount)
     }
     fn process_deaths(&self) {
         MiscApi::process_deaths(self)
@@ -234,7 +213,9 @@ impl PyWorld {
         MiscApi::load_from_file(self, path)
     }
 
-    // ---- ADDITIONAL METHODS (e.g. add_cell) ----
+    // ---- ADDITIONAL METHODS ----
+
+    /// Add a cell to the map (utility for tests/scripts)
     fn add_cell(&self, x: i32, y: i32, z: i32) {
         let mut world = self.inner.borrow_mut();
         if let Some(map) = &mut world.map {
@@ -295,7 +276,7 @@ impl PyWorld {
         &self,
         entity_id: u32,
         job_type: String,
-        kwargs: Option<&Bound<'_, pyo3::types::PyDict>>,
+        kwargs: Option<&Bound<'_, PyDict>>,
     ) -> PyResult<()> {
         let mut world = self.inner.borrow_mut();
         let mut job_val = serde_json::json!({
@@ -330,6 +311,29 @@ impl PyWorld {
         );
     }
 
+    fn get_stockpile_resources(&self, entity_id: u32) -> PyResult<Option<PyObject>> {
+        let world = self.inner.borrow();
+        if let Some(stockpile) = world.get_component(entity_id, "Stockpile") {
+            if let Some(resources) = stockpile.get("resources") {
+                Python::with_gil(|py| Ok(Some(serde_pyobject::to_pyobject(py, resources)?.into())))
+            } else {
+                Ok(None)
+            }
+        } else {
+            Ok(None)
+        }
+    }
+
+    fn get_production_job(&self, entity_id: u32) -> PyResult<Option<PyObject>> {
+        let world = self.inner.borrow();
+        if let Some(job) = world.get_component(entity_id, "ProductionJob") {
+            Python::with_gil(|py| Ok(Some(serde_pyobject::to_pyobject(py, job)?.into())))
+        } else {
+            Ok(None)
+        }
+    }
+
+    // ---- MAP/CAMERA/TOPOLOGY ----
     fn get_map_topology_type(&self) -> String {
         let world = self.inner.borrow();
         world
@@ -349,7 +353,7 @@ impl PyWorld {
         serde_pyobject::to_pyobject(py, &cells).unwrap().into()
     }
 
-    fn get_neighbors(&self, py: Python, cell: &Bound<'_, pyo3::types::PyAny>) -> PyObject {
+    fn get_neighbors(&self, py: Python, cell: &Bound<'_, PyAny>) -> PyObject {
         let world = self.inner.borrow();
         let cell_key: engine_core::map::CellKey = pythonize::depythonize(cell).unwrap();
         let neighbors = world
@@ -373,14 +377,14 @@ impl PyWorld {
         }
     }
 
-    fn entities_in_cell(&self, py: Python, cell: &Bound<'_, pyo3::types::PyAny>) -> PyObject {
+    fn entities_in_cell(&self, py: Python, cell: &Bound<'_, PyAny>) -> PyObject {
         let world = self.inner.borrow();
         let cell_key: engine_core::map::CellKey = pythonize::depythonize(cell).unwrap();
         let entities = world.entities_in_cell(&cell_key);
         entities.into_pyobject(py).unwrap().into()
     }
 
-    fn get_cell_metadata(&self, py: Python, cell: &Bound<'_, pyo3::types::PyAny>) -> PyObject {
+    fn get_cell_metadata(&self, py: Python, cell: &Bound<'_, PyAny>) -> PyObject {
         let world = self.inner.borrow();
         let cell_key: engine_core::map::CellKey = pythonize::depythonize(cell).unwrap();
         if let Some(meta) = world.get_cell_metadata(&cell_key) {
@@ -390,28 +394,19 @@ impl PyWorld {
         }
     }
 
-    fn set_cell_metadata(
-        &self,
-        cell: &Bound<'_, pyo3::types::PyAny>,
-        metadata: &Bound<'_, pyo3::types::PyAny>,
-    ) {
+    fn set_cell_metadata(&self, cell: &Bound<'_, PyAny>, metadata: &Bound<'_, PyAny>) {
         let mut world = self.inner.borrow_mut();
         let cell_key: engine_core::map::CellKey = pythonize::depythonize(cell).unwrap();
         let meta_json: serde_json::Value = pythonize::depythonize(metadata).unwrap();
         world.set_cell_metadata(&cell_key, meta_json);
     }
 
-    fn find_path(
-        &self,
-        py: Python,
-        start: &Bound<'_, pyo3::types::PyAny>,
-        goal: &Bound<'_, pyo3::types::PyAny>,
-    ) -> PyObject {
+    fn find_path(&self, py: Python, start: &Bound<'_, PyAny>, goal: &Bound<'_, PyAny>) -> PyObject {
         let world = self.inner.borrow();
         let start_key: engine_core::map::CellKey = pythonize::depythonize(start).unwrap();
         let goal_key: engine_core::map::CellKey = pythonize::depythonize(goal).unwrap();
         if let Some(result) = world.find_path(&start_key, &goal_key) {
-            let dict = pyo3::types::PyDict::new(py);
+            let dict = PyDict::new(py);
             dict.set_item(
                 "path",
                 serde_pyobject::to_pyobject(py, &result.path).unwrap(),
@@ -431,28 +426,6 @@ impl PyWorld {
         dict.set_item("hour", tod.hour).unwrap();
         dict.set_item("minute", tod.minute).unwrap();
         dict.into_pyobject(py).unwrap().unbind().into()
-    }
-
-    pub fn get_stockpile_resources(&self, entity_id: u32) -> PyResult<Option<PyObject>> {
-        let world = self.inner.borrow();
-        if let Some(stockpile) = world.get_component(entity_id, "Stockpile") {
-            if let Some(resources) = stockpile.get("resources") {
-                Python::with_gil(|py| Ok(Some(to_pyobject(py, resources)?.into())))
-            } else {
-                Ok(None)
-            }
-        } else {
-            Ok(None)
-        }
-    }
-
-    pub fn get_production_job(&self, entity_id: u32) -> PyResult<Option<PyObject>> {
-        let world = self.inner.borrow();
-        if let Some(job) = world.get_component(entity_id, "ProductionJob") {
-            Python::with_gil(|py| Ok(Some(to_pyobject(py, job)?.into())))
-        } else {
-            Ok(None)
-        }
     }
 
     /// Set the camera position (creates camera entity if not present)
@@ -484,13 +457,13 @@ impl PyWorld {
     }
 
     /// Get the camera position as a dict {x, y}
-    fn get_camera(&self, py: pyo3::Python) -> pyo3::PyObject {
+    fn get_camera(&self, py: Python) -> PyObject {
         let world = self.inner.borrow();
         if let Some(camera_id) = world.get_entities_with_component("Camera").first() {
             if let Some(pos) = world.get_component(*camera_id, "Position") {
                 let x = pos["pos"]["Square"]["x"].as_i64().unwrap_or(0);
                 let y = pos["pos"]["Square"]["y"].as_i64().unwrap_or(0);
-                let dict = pyo3::types::PyDict::new(py);
+                let dict = PyDict::new(py);
                 dict.set_item("x", x).unwrap();
                 dict.set_item("y", y).unwrap();
                 return dict.into();
