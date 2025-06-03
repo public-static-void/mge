@@ -3,11 +3,13 @@ use crate::plugins::types::{EngineApi, PluginManifest, PluginVTable, SystemPlugi
 use crate::worldgen::{WorldgenPlugin, WorldgenRegistry};
 use libloading::{Library, Symbol};
 use serde_json::Value;
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::ffi::{CStr, CString};
 use std::fs;
 use std::os::raw::{c_char, c_int, c_void};
 use std::path::Path;
+use std::rc::Rc;
 use topo_sort::TopoSort;
 
 /// # Safety
@@ -146,7 +148,13 @@ pub unsafe fn load_plugin_and_register_systems<P: AsRef<Path>>(
                 let run_closure = Box::new(move |world: &mut World, delta_time: f32| unsafe {
                     run_fn(world as *mut _ as *mut std::ffi::c_void, delta_time)
                 });
-                world_ref.register_dynamic_system(&name, run_closure);
+                world_ref.register_dynamic_system(
+                    &name,
+                    move |world_rc: Rc<RefCell<World>>, delta_time: f32| {
+                        let mut world = world_rc.borrow_mut();
+                        run_closure(&mut world, delta_time);
+                    },
+                );
             }
             // Free systems_ptr if plugin allocated it dynamically
             if let Some(free_systems_fn) = vtable_ref.free_systems {
