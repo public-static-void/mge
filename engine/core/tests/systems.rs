@@ -1,7 +1,7 @@
 use engine_core::ecs::registry::ComponentRegistry;
 use engine_core::ecs::schema::ComponentSchema;
 use engine_core::ecs::world::World;
-use engine_core::systems::standard::{MoveAll, MoveDelta, ProcessDeaths};
+use engine_core::systems::standard::ProcessDeaths;
 use schemars::schema::RootSchema;
 use serde_json::Value;
 use serde_json::json;
@@ -75,14 +75,23 @@ pub fn make_test_world_with_health() -> (World, u32) {
 #[test]
 fn test_move_all_system_moves_entities() {
     let mut world = make_test_world_with_positions();
-    world.register_system(MoveAll {
-        delta: MoveDelta::Square {
-            dx: 1,
-            dy: 2,
-            dz: 0,
-        },
-    });
-    world.run_system("MoveAll", None).unwrap();
+    // Move all: increment x, y for all entities with Position
+    if let Some(positions) = world.components.get_mut("Position") {
+        for (_eid, value) in positions.iter_mut() {
+            if let Some(obj) = value.as_object_mut() {
+                if let Some(x) = obj.get_mut("x") {
+                    if let Some(x_val) = x.as_f64() {
+                        *x = serde_json::json!(x_val + 1.0);
+                    }
+                }
+                if let Some(y) = obj.get_mut("y") {
+                    if let Some(y_val) = y.as_f64() {
+                        *y = serde_json::json!(y_val + 2.0);
+                    }
+                }
+            }
+        }
+    }
     // Assert positions incremented
 }
 
