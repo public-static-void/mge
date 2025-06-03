@@ -1,17 +1,16 @@
 use engine_core::ecs::system::{System, SystemRegistry};
 use engine_core::ecs::world::World;
 use serde_json::json;
+use std::cell::RefCell;
+use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 #[test]
 fn systems_execute_in_registered_order() {
-    use engine_core::ecs::system::System;
-    use engine_core::ecs::world::World;
-
     let registry = Arc::new(Mutex::new(
         engine_core::ecs::registry::ComponentRegistry::new(),
     ));
-    let mut world = World::new(registry);
+    let world_rc = Rc::new(RefCell::new(World::new(registry)));
 
     let log = Arc::new(Mutex::new(Vec::new()));
 
@@ -34,10 +33,10 @@ fn systems_execute_in_registered_order() {
         }
     }
 
-    world.register_system(SysA(log.clone()));
-    world.register_system(SysB(log.clone()));
+    world_rc.borrow_mut().register_system(SysA(log.clone()));
+    world_rc.borrow_mut().register_system(SysB(log.clone()));
 
-    world.simulation_tick();
+    World::simulation_tick(Rc::clone(&world_rc));
 
     let log = log.lock().unwrap();
     assert!(
@@ -49,21 +48,19 @@ fn systems_execute_in_registered_order() {
 
 #[test]
 fn dynamic_systems_are_executed_in_tick() {
-    use engine_core::ecs::world::World;
-
     let registry = Arc::new(Mutex::new(
         engine_core::ecs::registry::ComponentRegistry::new(),
     ));
-    let mut world = World::new(registry);
+    let world_rc = Rc::new(RefCell::new(World::new(registry)));
 
     let log = Arc::new(Mutex::new(Vec::new()));
 
-    world.register_dynamic_system("dyn", {
+    world_rc.borrow_mut().register_dynamic_system("dyn", {
         let log = log.clone();
         move |_, _| log.lock().unwrap().push("dyn")
     });
 
-    world.simulation_tick();
+    World::simulation_tick(Rc::clone(&world_rc));
 
     let log = log.lock().unwrap();
     assert!(log.contains(&"dyn"));
@@ -71,14 +68,10 @@ fn dynamic_systems_are_executed_in_tick() {
 
 #[test]
 fn systems_can_emit_and_receive_events_in_tick() {
-    use engine_core::ecs::system::System;
-    use engine_core::ecs::world::World;
-    use serde_json::json;
-
     let registry = Arc::new(Mutex::new(
         engine_core::ecs::registry::ComponentRegistry::new(),
     ));
-    let mut world = World::new(registry);
+    let world_rc = Rc::new(RefCell::new(World::new(registry)));
 
     let events = Arc::new(Mutex::new(Vec::new()));
 
@@ -112,11 +105,13 @@ fn systems_can_emit_and_receive_events_in_tick() {
         }
     }
 
-    world.register_system(Emitter);
-    world.register_system(Receiver(events.clone()));
+    world_rc.borrow_mut().register_system(Emitter);
+    world_rc
+        .borrow_mut()
+        .register_system(Receiver(events.clone()));
 
-    world.simulation_tick(); // Emitter sends, Receiver does NOT see it yet
-    world.simulation_tick(); // Receiver sees the event
+    World::simulation_tick(Rc::clone(&world_rc)); // Emitter sends, Receiver does NOT see it yet
+    World::simulation_tick(Rc::clone(&world_rc)); // Receiver sees the event
 
     let events = events.lock().unwrap();
     assert_eq!(&events[..], &[1]);
@@ -124,14 +119,13 @@ fn systems_can_emit_and_receive_events_in_tick() {
 
 #[test]
 fn simulation_tick_increments_turn() {
-    use engine_core::ecs::world::World;
     let registry = Arc::new(Mutex::new(
         engine_core::ecs::registry::ComponentRegistry::new(),
     ));
-    let mut world = World::new(registry);
-    let turn = world.turn;
-    world.simulation_tick();
-    assert_eq!(world.turn, turn + 1);
+    let world_rc = Rc::new(RefCell::new(World::new(registry)));
+    let turn = world_rc.borrow().turn;
+    World::simulation_tick(Rc::clone(&world_rc));
+    assert_eq!(world_rc.borrow().turn, turn + 1);
 }
 
 #[test]
@@ -140,7 +134,7 @@ fn event_driven_tick_system_runs_in_order_and_processes_events() {
     let registry = Arc::new(Mutex::new(
         engine_core::ecs::registry::ComponentRegistry::new(),
     ));
-    let mut world = World::new(registry.clone());
+    let world_rc = Rc::new(RefCell::new(World::new(registry.clone())));
 
     // Shared vector to record actions for assertion
     let actions = Arc::new(Mutex::new(Vec::new()));
@@ -195,13 +189,30 @@ fn event_driven_tick_system_runs_in_order_and_processes_events() {
         actions: actions.clone(),
     });
 
+    // Assign registry to world
+    world_rc.borrow_mut().systems = sys_registry;
+
     // Run the new tick loop
-    let sorted = sys_registry.sorted_system_names();
+    let sorted = world_rc.borrow().systems.sorted_system_names();
     for sys_name in sorted {
-        let mut sys = sys_registry.get_system_mut(&sys_name).unwrap();
-        sys.run(&mut world, None);
-        // After each system, process all events for all event types
-        world.update_event_queues();
+        // Take the system out of the registry
+        let sys_cell = {
+            let mut world_borrow = world_rc.borrow_mut();
+            world_borrow.systems.take_system(&sys_name)
+        };
+        if let Some(cell) = sys_cell {
+            {
+                let mut world_borrow = world_rc.borrow_mut();
+                let mut sys = cell.borrow_mut();
+                sys.run(&mut world_borrow, None);
+                world_borrow.update_event_queues();
+            }
+            // Put the system back in the registry
+            world_rc
+                .borrow_mut()
+                .systems
+                .register_system_boxed(sys_name, cell);
+        }
     }
 
     // Assert both systems ran and the event was delivered in order

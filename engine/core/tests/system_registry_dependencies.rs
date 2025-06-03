@@ -1,12 +1,16 @@
 use engine_core::ecs::World;
 use engine_core::ecs::registry::ComponentRegistry;
 use engine_core::plugins::dynamic_systems::DynamicSystemRegistry;
+use std::cell::RefCell;
+use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 #[test]
 fn test_system_dependency_ordering() {
     let mut registry = DynamicSystemRegistry::new();
-    let mut world = World::new(Arc::new(Mutex::new(ComponentRegistry::new())));
+    let world_rc = Rc::new(RefCell::new(World::new(Arc::new(Mutex::new(
+        ComponentRegistry::new(),
+    )))));
 
     let order = Arc::new(Mutex::new(Vec::new()));
 
@@ -47,7 +51,7 @@ fn test_system_dependency_ordering() {
     }
 
     // Run all systems
-    registry.run_all_systems(&mut world, 0.0).unwrap();
+    registry.run_all_systems(Rc::clone(&world_rc), 0.0).unwrap();
 
     let result = order.lock().unwrap().clone();
     assert_eq!(result, vec!["A", "B", "C"]);
@@ -59,6 +63,6 @@ fn test_system_dependency_ordering() {
         .update_system_dependencies("C", vec!["B".to_string(), "D".to_string()])
         .unwrap();
 
-    let run_result = registry.run_all_systems(&mut world, 0.0);
+    let run_result = registry.run_all_systems(Rc::clone(&world_rc), 0.0);
     assert!(run_result.is_err());
 }
