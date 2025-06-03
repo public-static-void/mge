@@ -1,7 +1,7 @@
 use engine_core::ecs::World;
 use engine_core::ecs::registry::ComponentRegistry;
 use engine_core::ecs::schema::load_schemas_from_dir;
-use engine_core::systems::standard::{DamageAll, ProcessDeaths, ProcessDecay};
+use engine_core::systems::standard::{ProcessDeaths, ProcessDecay};
 use serde_json::json;
 use std::sync::{Arc, Mutex};
 
@@ -24,8 +24,19 @@ fn test_death_replaces_health_with_corpse_and_decay() {
         .unwrap();
 
     // Simulate damage that kills the entity
-    world.register_system(DamageAll { amount: 2.0 });
-    world.run_system("DamageAll", None).unwrap();
+    if let Some(healths) = world.components.get_mut("Health") {
+        for (_eid, value) in healths.iter_mut() {
+            if let Some(obj) = value.as_object_mut() {
+                if let Some(current) = obj.get_mut("current") {
+                    if let Some(cur_val) = current.as_f64() {
+                        // Subtract 2.0 damage
+                        let new_val = (cur_val - 2.0).max(0.0);
+                        *current = serde_json::json!(new_val);
+                    }
+                }
+            }
+        }
+    }
 
     // Process deaths (to be implemented)
     world.register_system(ProcessDeaths);

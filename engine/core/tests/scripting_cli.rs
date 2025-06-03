@@ -27,7 +27,7 @@ fn test_lua_cli_runs_script_successfully() {
         "Initial health not found"
     );
     assert!(
-        stdout.contains("\"current\": Number(7.0)"),
+        stdout.contains("\"current\": Number(7.0)") || stdout.contains("\"current\": Number(7)"),
         "Damaged health not found"
     );
 }
