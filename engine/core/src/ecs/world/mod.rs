@@ -6,7 +6,9 @@ use crate::scripting::ScriptEngine;
 use crate::systems::job::JobTypeRegistry;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
+use std::cell::RefCell;
 use std::collections::{HashMap, VecDeque};
+use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 mod component;
 mod entity;
@@ -87,9 +89,9 @@ impl World {
         self.map.as_ref()?.find_path(start, goal)
     }
 
-    pub fn tick(&mut self) {
-        self.simulation_tick();
-        self.advance_time_of_day();
+    pub fn tick(world_rc: Rc<RefCell<World>>) {
+        World::simulation_tick(Rc::clone(&world_rc));
+        world_rc.borrow_mut().advance_time_of_day();
     }
 
     fn advance_time_of_day(&mut self) {

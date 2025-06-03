@@ -1,4 +1,6 @@
 use super::World;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 impl World {
     pub fn register_system<S: crate::ecs::system::System + 'static>(&mut self, system: S) {
@@ -19,7 +21,7 @@ impl World {
 
     pub fn register_dynamic_system<F>(&mut self, name: &str, run: F)
     where
-        F: Fn(&mut World, f32) + 'static,
+        F: Fn(Rc<RefCell<World>>, f32) + 'static,
     {
         self.dynamic_systems
             .register_system(name.to_string(), Box::new(run));
@@ -31,7 +33,7 @@ impl World {
         dependencies: Vec<String>,
         run: F,
     ) where
-        F: Fn(&mut World, f32) + 'static,
+        F: Fn(Rc<RefCell<World>>, f32) + 'static,
     {
         self.dynamic_systems.register_system_with_deps(
             name.to_string(),
@@ -40,12 +42,12 @@ impl World {
         );
     }
 
-    pub fn run_dynamic_system(&mut self, name: &str) -> Result<(), String> {
-        let name = name.to_string();
-        let dynamic_systems = std::mem::take(&mut self.dynamic_systems);
-        let result = dynamic_systems.run_system(self, &name, 0.0);
-        self.dynamic_systems = dynamic_systems;
-        result
+    pub fn run_dynamic_system(
+        &self,
+        world_rc: Rc<RefCell<World>>,
+        name: &str,
+    ) -> Result<(), String> {
+        self.dynamic_systems.run_system(world_rc, name, 0.0)
     }
 
     pub fn run_system(&mut self, name: &str, lua: Option<&mlua::Lua>) -> Result<(), String> {
@@ -54,31 +56,46 @@ impl World {
             self.systems.register_system_boxed(name.to_string(), system);
             Ok(())
         } else {
-            let dynamic_systems = std::mem::take(&mut self.dynamic_systems);
-            let result = dynamic_systems.run_system(self, name, 0.0);
-            self.dynamic_systems = dynamic_systems;
-            result
+            Err(format!("System '{}' not found", name))
         }
     }
 
-    pub fn simulation_tick(&mut self) {
-        let system_names: Vec<String> = self.systems.sorted_system_names();
+    /// Borrow-safe, idiomatic ECS tick.
+    pub fn simulation_tick(world_rc: Rc<RefCell<World>>) {
+        // Get the system names up front
+        let system_names: Vec<String> = world_rc.borrow().systems.sorted_system_names();
+
         for name in &system_names {
-            if let Some(cell) = self.systems.take_system(name) {
+            // Take the system out of the registry, drop the borrow immediately
+            let cell = {
+                let mut world = world_rc.borrow_mut();
+                world.systems.take_system(name)
+            };
+            if let Some(cell) = cell {
+                // Run the system, borrow the world only for this scope
                 {
+                    let mut world = world_rc.borrow_mut();
                     let mut system = cell.borrow_mut();
-                    system.run(self, None);
+                    system.run(&mut world, None);
                 }
-                self.systems.register_system_boxed(name.clone(), cell);
+                // Put the system back into the registry
+                let mut world = world_rc.borrow_mut();
+                world.systems.register_system_boxed(name.clone(), cell);
             }
         }
 
-        let dynamic_names = self.dynamic_systems.list_systems();
+        // Dynamic systems
+        let dynamic_names = world_rc.borrow().dynamic_systems.list_systems();
         for name in dynamic_names {
-            let _ = self.run_dynamic_system(&name);
+            let _ = world_rc
+                .borrow()
+                .run_dynamic_system(Rc::clone(&world_rc), &name);
         }
 
-        self.update_event_buses::<serde_json::Value>();
-        self.turn += 1;
+        {
+            let mut world = world_rc.borrow_mut();
+            world.update_event_buses::<serde_json::Value>();
+            world.turn += 1;
+        }
     }
 }
