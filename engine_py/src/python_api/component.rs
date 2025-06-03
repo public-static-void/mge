@@ -36,7 +36,8 @@ impl ComponentApi for PyWorld {
     ) -> PyResult<Option<PyObject>> {
         let world = self.inner.borrow_mut();
         if let Some(val) = world.get_component(entity_id, &name) {
-            let py_obj = to_pyobject(py, val)?;
+            let cloned = val.clone();
+            let py_obj = to_pyobject(py, &cloned)?;
             Ok(Some(py_obj.into()))
         } else {
             Ok(None)
