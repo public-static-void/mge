@@ -108,10 +108,10 @@ pub fn register_ui_api(lua: &Lua, globals: &Table) -> LuaResult<()> {
                         }
                     };
                 }
+                try_downcast!(crate::presentation::ui::layout::grid::GridLayout);
                 try_downcast!(crate::presentation::ui::widget::button::Button);
                 try_downcast!(crate::presentation::ui::widget::label::Label);
                 try_downcast!(crate::presentation::ui::widget::panel::Panel);
-                try_downcast!(crate::presentation::ui::widget::grid_layout::GridLayout);
                 try_downcast!(crate::presentation::ui::widget::checkbox::Checkbox);
                 try_downcast!(crate::presentation::ui::widget::dropdown::Dropdown);
                 try_downcast!(crate::presentation::ui::widget::text_input::TextInput);
@@ -170,7 +170,7 @@ pub fn register_ui_api(lua: &Lua, globals: &Table) -> LuaResult<()> {
                 if removed_child.is_none() {
                     if let Some(grid) = parent
                         .as_any_mut()
-                        .downcast_mut::<crate::presentation::ui::widget::grid_layout::GridLayout>(
+                        .downcast_mut::<crate::presentation::ui::layout::grid::GridLayout>(
                     ) {
                         if let Some(pos) = grid.children.iter().position(|c| c.id() == child_id) {
                             removed_child = Some(grid.children.remove(pos));

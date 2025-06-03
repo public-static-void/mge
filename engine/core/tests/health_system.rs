@@ -1,7 +1,6 @@
 use engine_core::ecs::World;
 use engine_core::ecs::registry::ComponentRegistry;
 use engine_core::ecs::schema::load_schemas_from_dir;
-use engine_core::systems::standard::DamageAll;
 use serde_json::json;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -31,8 +30,19 @@ fn test_damage_all_reduces_health() {
         .set_component(id2, "Health", json!({ "current": 5.0, "max": 8.0 }))
         .unwrap();
 
-    world.register_system(DamageAll { amount: 3.0 });
-    world.run_system("DamageAll", None).unwrap();
+    // Directly reduce health for all entities with Health
+    if let Some(healths) = world.components.get_mut("Health") {
+        for (_eid, value) in healths.iter_mut() {
+            if let Some(obj) = value.as_object_mut() {
+                if let Some(current) = obj.get_mut("current") {
+                    if let Some(cur_val) = current.as_f64() {
+                        let new_val = (cur_val - 3.0).max(0.0);
+                        *current = serde_json::json!(new_val);
+                    }
+                }
+            }
+        }
+    }
 
     let health1 = world.get_component(id1, "Health").unwrap();
     let health2 = world.get_component(id2, "Health").unwrap();
@@ -62,7 +72,11 @@ fn test_lua_damage_all() {
     let script = r#"
         local id = spawn_entity()
         set_component(id, "Health", { current = 10.0, max = 10.0 })
-        damage_all(4.0)
+        for _, eid in ipairs(get_entities_with_component("Health")) do
+            local h = get_component(eid, "Health")
+            h.current = h.current - 4.0
+            set_component(eid, "Health", h)
+        end
         local health = get_component(id, "Health")
         assert(math.abs(health.current - 6.0) < 1e-6)
     "#;

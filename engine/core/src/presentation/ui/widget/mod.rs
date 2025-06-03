@@ -22,9 +22,6 @@ pub use context_menu::ContextMenu;
 pub mod panel;
 pub use panel::Panel;
 
-pub mod grid_layout;
-pub use grid_layout::GridLayout;
-
 pub mod focus_grid;
 pub use focus_grid::FocusGrid;
 

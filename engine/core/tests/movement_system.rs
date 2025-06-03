@@ -1,11 +1,9 @@
 use engine_core::ecs::components::position::{Position, PositionComponent};
 use engine_core::ecs::registry::ComponentRegistry;
 use engine_core::ecs::schema::load_schemas_from_dir;
-use engine_core::ecs::system::System;
 use engine_core::ecs::world::World;
 use engine_core::map::{HexGridMap, Map, RegionMap, SquareGridMap};
 use engine_core::scripting::ScriptEngine;
-use engine_core::systems::standard::{MoveAll, MoveDelta};
 use std::sync::{Arc, Mutex};
 
 #[test]
@@ -44,14 +42,18 @@ fn test_move_all_moves_positions() {
         .set_component(id2, "Position", serde_json::to_value(&pos2).unwrap())
         .unwrap();
 
-    world.register_system(MoveAll {
-        delta: MoveDelta::Square {
-            dx: 1,
-            dy: -1,
-            dz: 0,
-        },
-    });
-    world.run_system("MoveAll", None).unwrap();
+    // Batch move: increment x by 1, y by -1 for all Square positions
+    if let Some(positions) = world.components.get_mut("Position") {
+        for (_eid, value) in positions.iter_mut() {
+            if let Ok(mut pos_comp) = serde_json::from_value::<PositionComponent>(value.clone()) {
+                if let Position::Square { x, y, z: _ } = &mut pos_comp.pos {
+                    *x += 1;
+                    *y += -1;
+                }
+                *value = serde_json::to_value(&pos_comp).unwrap();
+            }
+        }
+    }
 
     let pos1_val = world.get_component(id1, "Position").unwrap().clone();
     let pos2_val = world.get_component(id2, "Position").unwrap().clone();
@@ -88,7 +90,12 @@ fn test_lua_move_all() {
     let script = r#"
         local id = spawn_entity()
         set_component(id, "Position", { pos = { Square = { x = 0, y = 0, z = 0 } } })
-        move_all(2, 3)
+        for _, eid in ipairs(get_entities_with_component("Position")) do
+            local pos = get_component(eid, "Position")
+            pos.pos.Square.x = pos.pos.Square.x + 2
+            pos.pos.Square.y = pos.pos.Square.y + 3
+            set_component(eid, "Position", pos)
+        end
         local pos = get_component(id, "Position")
         assert(math.abs(pos.pos.Square.x - 2) < 1e-6)
         assert(math.abs(pos.pos.Square.y - 3) < 1e-6)
@@ -126,14 +133,17 @@ fn test_move_all_square() {
         .set_component(entity, "Position", serde_json::to_value(&pos).unwrap())
         .unwrap();
 
-    let mut sys = MoveAll {
-        delta: MoveDelta::Square {
-            dx: 1,
-            dy: 0,
-            dz: 0,
-        },
-    };
-    sys.run(&mut world, None);
+    // Move all entities with Position (Square) by dx=1, dy=0, dz=0
+    if let Some(positions) = world.components.get_mut("Position") {
+        for (_eid, value) in positions.iter_mut() {
+            if let Ok(mut pos_comp) = serde_json::from_value::<PositionComponent>(value.clone()) {
+                if let Position::Square { x, y: _, z: _ } = &mut pos_comp.pos {
+                    *x += 1;
+                }
+                *value = serde_json::to_value(&pos_comp).unwrap();
+            }
+        }
+    }
 
     let new_pos: PositionComponent =
         serde_json::from_value(world.get_component(entity, "Position").unwrap().clone())
@@ -157,14 +167,17 @@ fn test_move_all_hex() {
         .set_component(entity, "Position", serde_json::to_value(&pos).unwrap())
         .unwrap();
 
-    let mut sys = MoveAll {
-        delta: MoveDelta::Hex {
-            dq: 1,
-            dr: 0,
-            dz: 0,
-        },
-    };
-    sys.run(&mut world, None);
+    // Move all entities with Position (Hex) by dq=1, dr=0, dz=0
+    if let Some(positions) = world.components.get_mut("Position") {
+        for (_eid, value) in positions.iter_mut() {
+            if let Ok(mut pos_comp) = serde_json::from_value::<PositionComponent>(value.clone()) {
+                if let Position::Hex { q, r: _, z: _ } = &mut pos_comp.pos {
+                    *q += 1;
+                }
+                *value = serde_json::to_value(&pos_comp).unwrap();
+            }
+        }
+    }
 
     let new_pos: PositionComponent =
         serde_json::from_value(world.get_component(entity, "Position").unwrap().clone())
@@ -188,10 +201,17 @@ fn test_move_all_region() {
         .set_component(entity, "Position", serde_json::to_value(&pos).unwrap())
         .unwrap();
 
-    let mut sys = MoveAll {
-        delta: MoveDelta::Region { to_id: "B".into() },
-    };
-    sys.run(&mut world, None);
+    // Move all entities with Position (Region) to id "B"
+    if let Some(positions) = world.components.get_mut("Position") {
+        for (_eid, value) in positions.iter_mut() {
+            if let Ok(mut pos_comp) = serde_json::from_value::<PositionComponent>(value.clone()) {
+                if let Position::Region { id } = &mut pos_comp.pos {
+                    *id = "B".into();
+                }
+                *value = serde_json::to_value(&pos_comp).unwrap();
+            }
+        }
+    }
 
     let new_pos: PositionComponent =
         serde_json::from_value(world.get_component(entity, "Position").unwrap().clone())

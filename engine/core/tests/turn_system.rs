@@ -2,7 +2,7 @@ use engine_core::ecs::registry::ComponentRegistry;
 use engine_core::ecs::schema::load_schemas_from_dir;
 use engine_core::ecs::world::World;
 use engine_core::scripting::ScriptEngine;
-use engine_core::systems::standard::{DamageAll, MoveAll, MoveDelta, ProcessDeaths, ProcessDecay};
+use engine_core::systems::standard::{ProcessDeaths, ProcessDecay};
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
@@ -46,17 +46,35 @@ fn test_tick_advances_turn_and_runs_systems() {
         )
         .unwrap();
 
-    // Set up a tick: move all + damage all
-    world.register_system(MoveAll {
-        delta: MoveDelta::Square {
-            dx: 1,
-            dy: 0,
-            dz: 0,
-        },
-    });
-    world.run_system("MoveAll", None).unwrap();
-    world.register_system(DamageAll { amount: 1.0 });
-    world.run_system("DamageAll", None).unwrap();
+    // Move all: increment x for all entities with Position (Square)
+    if let Some(positions) = world.components.get_mut("Position") {
+        for (_eid, value) in positions.iter_mut() {
+            if let Some(obj) = value.as_object_mut() {
+                if let Some(pos) = obj.get_mut("pos") {
+                    if let Some(square) = pos.get_mut("Square") {
+                        if let Some(x) = square.get_mut("x") {
+                            if let Some(x_val) = x.as_i64() {
+                                *x = serde_json::json!(x_val + 1);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    // Damage all: decrement health for all entities with Health
+    if let Some(healths) = world.components.get_mut("Health") {
+        for (_eid, value) in healths.iter_mut() {
+            if let Some(obj) = value.as_object_mut() {
+                if let Some(current) = obj.get_mut("current") {
+                    if let Some(cur_val) = current.as_f64() {
+                        let new_val = (cur_val - 1.0).max(0.0);
+                        *current = serde_json::json!(new_val);
+                    }
+                }
+            }
+        }
+    }
     world.register_system(ProcessDeaths);
     world.run_system("ProcessDeaths", None).unwrap();
     world.register_system(ProcessDecay);
@@ -86,24 +104,26 @@ fn test_lua_tick() {
     grid.add_cell(1, 0, 0); // after move
     world.borrow_mut().map = Some(Map::new(Box::new(grid)));
 
-    world.borrow_mut().register_system(MoveAll {
-        delta: MoveDelta::Square {
-            dx: 1,
-            dy: 0,
-            dz: 0,
-        },
-    });
-    world
-        .borrow_mut()
-        .register_system(DamageAll { amount: 1.0 });
-    world.borrow_mut().register_system(ProcessDeaths);
-    world.borrow_mut().register_system(ProcessDecay);
     engine.register_world(world.clone()).unwrap();
 
     let script = r#"
         local id = spawn_entity()
         set_component(id, "Position", { pos = { Square = { x = 0, y = 0, z = 0 } } })
         set_component(id, "Health", { current = 10.0, max = 10.0 })
+        -- Move all: increment x for all entities with Position (Square)
+        for _, eid in ipairs(get_entities_with_component("Position")) do
+            local pos = get_component(eid, "Position")
+            if pos.pos and pos.pos.Square then
+                pos.pos.Square.x = pos.pos.Square.x + 1
+                set_component(eid, "Position", pos)
+            end
+        end
+        -- Damage all: decrement health for all entities with Health
+        for _, eid in ipairs(get_entities_with_component("Health")) do
+            local h = get_component(eid, "Health")
+            h.current = h.current - 1.0
+            set_component(eid, "Health", h)
+        end
         tick()
         local pos = get_component(id, "Position")
         local health = get_component(id, "Health")

@@ -1,9 +1,11 @@
 use crate::ecs::World;
 use indexmap::IndexMap;
+use std::cell::RefCell;
 use std::collections::HashMap;
+use std::rc::Rc;
 use topo_sort::{SortResults, TopoSort};
 
-pub type DynSystemFn = Box<dyn Fn(&mut World, f32) + 'static>;
+pub type DynSystemFn = Box<dyn Fn(Rc<RefCell<World>>, f32) + 'static>;
 
 #[derive(Default)]
 pub struct DynamicSystemRegistry {
@@ -46,11 +48,15 @@ impl DynamicSystemRegistry {
         Ok(())
     }
 
-    pub fn run_all_systems(&self, world: &mut World, delta_time: f32) -> Result<(), String> {
+    pub fn run_all_systems(
+        &self,
+        world: Rc<RefCell<World>>,
+        delta_time: f32,
+    ) -> Result<(), String> {
         let order = self.topological_sort()?;
         for name in order {
             if let Some(system) = self.systems.get(&name) {
-                (system)(world, delta_time);
+                (system)(Rc::clone(&world), delta_time);
             }
         }
         Ok(())
@@ -60,7 +66,6 @@ impl DynamicSystemRegistry {
         let mut sorter = TopoSort::new();
 
         for (name, deps) in &self.dependencies {
-            // Only add dependencies that are registered systems
             let filtered_deps = deps
                 .iter()
                 .filter(|dep| self.systems.contains_key(*dep))
@@ -84,9 +89,14 @@ impl DynamicSystemRegistry {
         Ok(())
     }
 
-    pub fn run_system(&self, world: &mut World, name: &str, delta_time: f32) -> Result<(), String> {
+    pub fn run_system(
+        &self,
+        world: Rc<RefCell<World>>,
+        name: &str,
+        delta_time: f32,
+    ) -> Result<(), String> {
         if let Some(system) = self.systems.get(name) {
-            (system)(world, delta_time);
+            (system)(Rc::clone(&world), delta_time);
             Ok(())
         } else {
             Err(format!("System '{}' not found", name))

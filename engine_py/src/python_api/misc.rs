@@ -1,16 +1,16 @@
 use super::PyWorld;
+use engine_core::World;
 use pyo3::prelude::*;
+use std::rc::Rc;
 
 pub trait MiscApi {
     fn move_entity(&self, entity_id: u32, dx: f32, dy: f32);
-    fn move_all(&self, dx: i32, dy: i32);
     fn tick(&self);
     fn get_turn(&self) -> u32;
     fn set_mode(&self, mode: String);
     fn get_mode(&self) -> String;
     fn get_available_modes(&self) -> Vec<String>;
     fn damage_entity(&self, entity_id: u32, amount: f32);
-    fn damage_all(&self, amount: f32);
     fn process_deaths(&self);
     fn process_decay(&self);
     fn count_entities_with_type(&self, type_str: String) -> usize;
@@ -25,17 +25,8 @@ impl MiscApi for PyWorld {
         world.move_entity(entity_id, dx, dy);
     }
 
-    fn move_all(&self, dx: i32, dy: i32) {
-        let mut world = self.inner.borrow_mut();
-        world.register_system(engine_core::systems::standard::MoveAll {
-            delta: engine_core::systems::standard::MoveDelta::Square { dx, dy, dz: 0 },
-        });
-        world.run_system("MoveAll", None).unwrap();
-    }
-
     fn tick(&self) {
-        let mut world = self.inner.borrow_mut();
-        world.tick();
+        World::tick(Rc::clone(&self.inner));
     }
 
     fn get_turn(&self) -> u32 {
@@ -67,12 +58,6 @@ impl MiscApi for PyWorld {
     fn damage_entity(&self, entity_id: u32, amount: f32) {
         let mut world = self.inner.borrow_mut();
         world.damage_entity(entity_id, amount);
-    }
-
-    fn damage_all(&self, amount: f32) {
-        let mut world = self.inner.borrow_mut();
-        world.register_system(engine_core::systems::standard::DamageAll { amount });
-        world.run_system("DamageAll", None).unwrap();
     }
 
     fn process_deaths(&self) {

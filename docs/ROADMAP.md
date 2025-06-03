@@ -74,7 +74,7 @@
 - [x] Release automation (semantic-release, changelog)
 - [ ] Code coverage reporting (Rust, Lua, Python)
 
-## Presentation Layer (Planned)
+## Presentation Layer
 
-- [ ] Render adapter (graphics API abstraction)
-- [ ] UI framework (for in-game and editor UI)
+- [x] Render adapter (graphics API abstraction)
+- [x] UI framework (for in-game and editor UI)

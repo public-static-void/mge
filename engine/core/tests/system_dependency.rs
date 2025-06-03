@@ -1,6 +1,8 @@
 use engine_core::ecs::registry::ComponentRegistry;
 use engine_core::ecs::system::{System, SystemRegistry};
 use engine_core::ecs::world::World;
+use std::cell::RefCell;
+use std::rc::Rc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
@@ -51,10 +53,11 @@ fn test_systems_run_in_dependency_order() {
     });
 
     let component_registry = Arc::new(Mutex::new(ComponentRegistry::new()));
-    let mut world = World::new(component_registry.clone());
-    world.systems = registry;
+    let world_rc = Rc::new(RefCell::new(World::new(component_registry.clone())));
+    world_rc.borrow_mut().systems = registry;
 
-    world.simulation_tick();
+    // Call as associated function with Rc<RefCell<World>>
+    engine_core::ecs::world::World::simulation_tick(Rc::clone(&world_rc));
 
     let run_order = order.lock().unwrap().clone();
     assert_eq!(run_order, vec!["A", "B", "C"]);
@@ -80,12 +83,11 @@ fn test_cycle_detection_errors() {
     });
 
     let component_registry = Arc::new(Mutex::new(ComponentRegistry::new()));
-    let mut world = World::new(component_registry.clone());
-    world.systems = registry;
+    let world_rc = Rc::new(RefCell::new(World::new(component_registry.clone())));
+    world_rc.borrow_mut().systems = registry;
 
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(move || {
-        let mut world = world;
-        world.simulation_tick();
+        engine_core::ecs::world::World::simulation_tick(Rc::clone(&world_rc));
     }));
     assert!(result.is_err(), "Cycle was not detected!");
 }
@@ -110,10 +112,10 @@ fn test_independent_systems_run_in_registration_order() {
     });
 
     let component_registry = Arc::new(Mutex::new(ComponentRegistry::new()));
-    let mut world = World::new(component_registry.clone());
-    world.systems = registry;
+    let world_rc = Rc::new(RefCell::new(World::new(component_registry.clone())));
+    world_rc.borrow_mut().systems = registry;
 
-    world.simulation_tick();
+    engine_core::ecs::world::World::simulation_tick(Rc::clone(&world_rc));
 
     let run_order = order.lock().unwrap().clone();
     assert!(

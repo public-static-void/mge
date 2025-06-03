@@ -3,7 +3,7 @@
 use crate::ecs::world::World;
 use crate::scripting::helpers::{lua_error_from_any, lua_error_msg};
 use crate::scripting::input::InputProvider;
-use crate::systems::standard::{DamageAll, MoveAll, MoveDelta, ProcessDeaths, ProcessDecay};
+use crate::systems::standard::{ProcessDeaths, ProcessDecay};
 use mlua::{Lua, Result as LuaResult, Table};
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -111,18 +111,6 @@ pub fn register_misc_api(
     })?;
     globals.set("move_entity", move_entity)?;
 
-    // move_all(dx, dy)
-    let world_move = world.clone();
-    let move_all = lua.create_function_mut(move |_, (dx, dy): (i32, i32)| {
-        let mut world = world_move.borrow_mut();
-        world.register_system(MoveAll {
-            delta: MoveDelta::Square { dx, dy, dz: 0 },
-        });
-        world.run_system("MoveAll", None).unwrap();
-        Ok(())
-    })?;
-    globals.set("move_all", move_all)?;
-
     // damage_entity(entity, amount)
     let world_damage_entity = world.clone();
     let damage_entity = lua.create_function_mut(move |_, (entity, amount): (u32, f32)| {
@@ -132,21 +120,10 @@ pub fn register_misc_api(
     })?;
     globals.set("damage_entity", damage_entity)?;
 
-    // damage_all(amount)
-    let world_damage = world.clone();
-    let damage_all = lua.create_function_mut(move |_, amount: f32| {
-        let mut world = world_damage.borrow_mut();
-        world.register_system(DamageAll { amount });
-        world.run_system("DamageAll", None).unwrap();
-        Ok(())
-    })?;
-    globals.set("damage_all", damage_all)?;
-
     // tick()
     let world_tick = world.clone();
     let tick = lua.create_function_mut(move |_, ()| {
-        let mut world = world_tick.borrow_mut();
-        world.tick();
+        World::tick(Rc::clone(&world_tick));
         Ok(())
     })?;
     globals.set("tick", tick)?;

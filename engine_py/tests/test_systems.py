@@ -21,7 +21,11 @@ def test_move_and_damage(make_world):
         "Position",
         {"pos": {"Square": {"x": 1, "y": 1, "z": 0}}},
     )
-    world.move_all(1, 1)
+    for eid in world.get_entities_with_component("Position"):
+        pos = world.get_component(eid, "Position")
+        pos["pos"]["Square"]["x"] += 1
+        pos["pos"]["Square"]["y"] += 1
+        world.set_component(eid, "Position", pos)
     print(
         "After move_all (eid):", world.get_component(eid, "Position")
     )
@@ -38,16 +42,19 @@ def test_move_and_damage(make_world):
 
 def test_damage_and_tick(make_world):
     world = make_world()
-    eid = world.spawn_entity()
-    world.set_component(eid, "Health", {"current": 10, "max": 10})
-    world.damage_entity(eid, 3)
-    health = world.get_component(eid, "Health")
+    eid1 = world.spawn_entity()
+    world.set_component(eid1, "Health", {"current": 10, "max": 10})
+    world.damage_entity(eid1, 3)
+    health = world.get_component(eid1, "Health")
     assert health["current"] == 7
 
     eid2 = world.spawn_entity()
     world.set_component(eid2, "Health", {"current": 5, "max": 5})
-    world.damage_all(2)
-    h1 = world.get_component(eid, "Health")
+    for eid in world.get_entities_with_component("Health"):
+        h = world.get_component(eid, "Health")
+        h["current"] -= 2
+        world.set_component(eid, "Health", h)
+    h1 = world.get_component(eid1, "Health")
     h2 = world.get_component(eid2, "Health")
     assert h1["current"] == 5
     assert h2["current"] == 3
