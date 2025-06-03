@@ -1,5 +1,7 @@
 use super::PyWorld;
+use engine_core::World;
 use pyo3::prelude::*;
+use std::rc::Rc;
 
 pub trait MiscApi {
     fn move_entity(&self, entity_id: u32, dx: f32, dy: f32);
@@ -24,8 +26,7 @@ impl MiscApi for PyWorld {
     }
 
     fn tick(&self) {
-        let mut world = self.inner.borrow_mut();
-        world.tick();
+        World::tick(Rc::clone(&self.inner));
     }
 
     fn get_turn(&self) -> u32 {

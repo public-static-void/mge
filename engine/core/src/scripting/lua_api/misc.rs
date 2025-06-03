@@ -123,8 +123,7 @@ pub fn register_misc_api(
     // tick()
     let world_tick = world.clone();
     let tick = lua.create_function_mut(move |_, ()| {
-        let mut world = world_tick.borrow_mut();
-        world.tick();
+        World::tick(Rc::clone(&world_tick));
         Ok(())
     })?;
     globals.set("tick", tick)?;
