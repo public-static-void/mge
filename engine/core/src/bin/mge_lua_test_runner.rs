@@ -8,7 +8,7 @@ use engine_core::systems::economic::{EconomicSystem, load_recipes_from_dir};
 use engine_core::systems::equipment_logic::EquipmentLogicSystem;
 use engine_core::systems::inventory::InventoryConstraintSystem;
 use engine_core::systems::job::{JobSystem, JobTypeRegistry, load_job_types_from_dir};
-use engine_core::systems::standard::{DamageAll, MoveAll, MoveDelta, ProcessDeaths, ProcessDecay};
+use engine_core::systems::standard::{ProcessDeaths, ProcessDecay};
 use gag::BufferRedirect;
 use regex::Regex;
 use std::cell::RefCell;
@@ -121,16 +121,31 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let map = Map::new(Box::new(grid));
         world.borrow_mut().map = Some(map);
 
-        world.borrow_mut().register_system(MoveAll {
-            delta: MoveDelta::Square {
-                dx: 1,
-                dy: 0,
-                dz: 0,
-            },
-        });
-        world
-            .borrow_mut()
-            .register_system(DamageAll { amount: 1.0 });
+        // Move all: increment x for all entities with Position
+        if let Some(positions) = world.borrow_mut().components.get_mut("Position") {
+            for (_eid, value) in positions.iter_mut() {
+                if let Some(obj) = value.as_object_mut() {
+                    if let Some(x) = obj.get_mut("x") {
+                        if let Some(x_val) = x.as_f64() {
+                            *x = serde_json::json!(x_val + 1.0);
+                        }
+                    }
+                }
+            }
+        }
+        // Damage all: decrement health for all entities with Health
+        if let Some(healths) = world.borrow_mut().components.get_mut("Health") {
+            for (_eid, value) in healths.iter_mut() {
+                if let Some(obj) = value.as_object_mut() {
+                    if let Some(current) = obj.get_mut("current") {
+                        if let Some(cur_val) = current.as_f64() {
+                            let new_val = (cur_val - 1.0).max(0.0);
+                            *current = serde_json::json!(new_val);
+                        }
+                    }
+                }
+            }
+        }
         world.borrow_mut().register_system(ProcessDeaths);
         world.borrow_mut().register_system(ProcessDecay);
 
