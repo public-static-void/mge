@@ -3,7 +3,7 @@
 use crate::ecs::world::World;
 use crate::scripting::helpers::{lua_error_from_any, lua_error_msg};
 use crate::scripting::input::InputProvider;
-use crate::systems::standard::{ProcessDeaths, ProcessDecay};
+use crate::systems::death_decay::{ProcessDeaths, ProcessDecay};
 use mlua::{Lua, Result as LuaResult, Table};
 use std::cell::RefCell;
 use std::rc::Rc;

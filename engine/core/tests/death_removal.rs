@@ -1,7 +1,7 @@
 use engine_core::ecs::World;
 use engine_core::ecs::registry::ComponentRegistry;
 use engine_core::ecs::schema::load_schemas_from_dir;
-use engine_core::systems::standard::{ProcessDeaths, ProcessDecay};
+use engine_core::systems::death_decay::{ProcessDeaths, ProcessDecay};
 use serde_json::json;
 use std::sync::{Arc, Mutex};
 
