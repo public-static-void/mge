@@ -5,6 +5,7 @@ pub trait EntityApi {
     fn spawn_entity(&self) -> u32;
     fn despawn_entity(&self, entity_id: u32);
     fn get_entities(&self) -> PyResult<Vec<u32>>;
+    fn count_entities_with_type(&self, type_str: String) -> usize;
     fn is_entity_alive(&self, entity_id: u32) -> bool;
     fn move_entity(&self, entity_id: u32, dx: f32, dy: f32);
     fn damage_entity(&self, entity_id: u32, amount: f32);
@@ -25,6 +26,11 @@ impl EntityApi for PyWorld {
     fn get_entities(&self) -> PyResult<Vec<u32>> {
         let world = self.inner.borrow_mut();
         Ok(world.get_entities())
+    }
+
+    fn count_entities_with_type(&self, type_str: String) -> usize {
+        let world = self.inner.borrow_mut();
+        world.count_entities_with_type(&type_str)
     }
 
     fn is_entity_alive(&self, entity_id: u32) -> bool {

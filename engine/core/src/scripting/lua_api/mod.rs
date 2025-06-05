@@ -7,6 +7,7 @@ pub mod death_decay;
 pub mod economic;
 pub mod entity;
 pub mod equipment;
+pub mod input;
 pub mod inventory;
 pub mod map;
 pub mod mode;
@@ -36,6 +37,7 @@ pub fn register_all_api_functions(
 ) -> LuaResult<()> {
     entity::register_entity_api(lua, globals, world.clone())?;
     component::register_component_api(lua, globals, world.clone())?;
+    input::register_input_api(lua, globals, input_provider)?;
     inventory::register_inventory_api(lua, globals, world.clone())?;
     equipment::register_equipment_api(lua, globals, world.clone())?;
     body::register_body_api(lua, globals, world.clone())?;

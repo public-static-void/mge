@@ -1,6 +1,12 @@
+use crate::python_api::body::BodyApi;
+use crate::python_api::component::ComponentApi;
 use crate::python_api::death_decay::DeathDecayApi;
 use crate::python_api::economic::EconomicApi;
+use crate::python_api::entity::EntityApi;
+use crate::python_api::equipment::EquipmentApi;
+use crate::python_api::inventory::InventoryApi;
 use crate::python_api::mode::ModeApi;
+use crate::python_api::region::RegionApi;
 use crate::python_api::save_load::SaveLoadApi;
 use crate::python_api::time_of_day::TimeOfDayApi;
 use crate::python_api::turn::TurnApi;
@@ -10,15 +16,6 @@ use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict};
 use std::cell::RefCell;
 use std::rc::Rc;
-
-// Bring all trait APIs into scope
-use crate::python_api::body::BodyApi;
-use crate::python_api::component::ComponentApi;
-use crate::python_api::entity::EntityApi;
-use crate::python_api::equipment::EquipmentApi;
-use crate::python_api::inventory::InventoryApi;
-use crate::python_api::misc::MiscApi;
-use crate::python_api::region::RegionApi;
 
 #[pyclass(unsendable)]
 pub struct PyWorld {
@@ -79,6 +76,9 @@ impl PyWorld {
     }
     fn get_entities(&self) -> PyResult<Vec<u32>> {
         EntityApi::get_entities(self)
+    }
+    fn count_entities_with_type(&self, type_str: String) -> usize {
+        EntityApi::count_entities_with_type(self, type_str)
     }
     fn is_entity_alive(&self, entity_id: u32) -> bool {
         EntityApi::is_entity_alive(self, entity_id)
@@ -205,9 +205,6 @@ impl PyWorld {
     }
     fn process_decay(&self) {
         DeathDecayApi::process_decay(self)
-    }
-    fn count_entities_with_type(&self, type_str: String) -> usize {
-        MiscApi::count_entities_with_type(self, type_str)
     }
     fn modify_stockpile_resource(&self, entity_id: u32, kind: String, delta: f64) -> PyResult<()> {
         EconomicApi::modify_stockpile_resource(self, entity_id, kind, delta)

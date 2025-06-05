@@ -52,6 +52,14 @@ pub fn register_entity_api(lua: &Lua, globals: &Table, world: Rc<RefCell<World>>
     })?;
     globals.set("get_entities_with_components", get_entities_with_components)?;
 
+    // count_entities_with_type(type_str)
+    let world_count_type = world.clone();
+    let count_entities_with_type = lua.create_function_mut(move |_, type_str: String| {
+        let world = world_count_type.borrow();
+        Ok(world.count_entities_with_type(&type_str))
+    })?;
+    globals.set("count_entities_with_type", count_entities_with_type)?;
+
     // is_entity_alive(entity)
     let world_is_alive = world.clone();
     let is_entity_alive = lua.create_function_mut(move |_, entity: u32| {
