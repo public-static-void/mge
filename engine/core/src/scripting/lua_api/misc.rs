@@ -35,26 +35,6 @@ pub fn register_misc_api(
     })?;
     globals.set("count_entities_with_type", count_entities_with_type)?;
 
-    // process_deaths()
-    let world_deaths = world.clone();
-    let process_deaths = lua.create_function_mut(move |_, ()| {
-        let mut world = world_deaths.borrow_mut();
-        world.register_system(ProcessDeaths);
-        world.run_system("ProcessDeaths", None).unwrap();
-        Ok(())
-    })?;
-    globals.set("process_deaths", process_deaths)?;
-
-    // process_decay()
-    let world_decay = world.clone();
-    let process_decay = lua.create_function_mut(move |_, ()| {
-        let mut world = world_decay.borrow_mut();
-        world.register_system(ProcessDecay);
-        world.run_system("ProcessDecay", None).unwrap();
-        Ok(())
-    })?;
-    globals.set("process_decay", process_decay)?;
-
     // get_time_of_day()
     let world_time = world.clone();
     let get_time_of_day = lua.create_function_mut(move |lua, ()| {

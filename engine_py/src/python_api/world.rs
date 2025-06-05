@@ -1,3 +1,4 @@
+use crate::python_api::death_decay::DeathDecayApi;
 use crate::python_api::economic::EconomicApi;
 use crate::python_api::mode::ModeApi;
 use crate::python_api::save_load::SaveLoadApi;
@@ -199,10 +200,10 @@ impl PyWorld {
         ModeApi::get_available_modes(self)
     }
     fn process_deaths(&self) {
-        MiscApi::process_deaths(self)
+        DeathDecayApi::process_deaths(self)
     }
     fn process_decay(&self) {
-        MiscApi::process_decay(self)
+        DeathDecayApi::process_decay(self)
     }
     fn count_entities_with_type(&self, type_str: String) -> usize {
         MiscApi::count_entities_with_type(self, type_str)
