@@ -333,6 +333,12 @@ impl PyWorld {
         }
     }
 
+    /// Returns a list of all registered job type names.
+    fn get_job_types(&self) -> PyResult<Vec<String>> {
+        let world = self.inner.borrow();
+        Ok(world.job_types.job_type_names())
+    }
+
     // ---- MAP/CAMERA/TOPOLOGY ----
     fn get_map_topology_type(&self) -> String {
         let world = self.inner.borrow();
