@@ -4,6 +4,7 @@ pub mod entity;
 pub mod equipment;
 pub mod inventory;
 pub mod misc;
+pub mod mode;
 pub mod region;
 pub mod ui;
 pub mod world;

@@ -1,3 +1,4 @@
+use crate::python_api::mode::ModeApi;
 use crate::system_bridge::SystemBridge;
 use engine_core::ecs::world::World;
 use pyo3::prelude::*;
@@ -183,13 +184,13 @@ impl PyWorld {
         MiscApi::get_turn(self)
     }
     fn set_mode(&self, mode: String) {
-        MiscApi::set_mode(self, mode)
+        ModeApi::set_mode(self, mode)
     }
     fn get_mode(&self) -> String {
-        MiscApi::get_mode(self)
+        ModeApi::get_mode(self)
     }
     fn get_available_modes(&self) -> Vec<String> {
-        MiscApi::get_available_modes(self)
+        ModeApi::get_available_modes(self)
     }
     fn damage_entity(&self, entity_id: u32, amount: f32) {
         MiscApi::damage_entity(self, entity_id, amount)

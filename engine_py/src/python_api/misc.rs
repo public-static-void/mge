@@ -7,9 +7,6 @@ pub trait MiscApi {
     fn move_entity(&self, entity_id: u32, dx: f32, dy: f32);
     fn tick(&self);
     fn get_turn(&self) -> u32;
-    fn set_mode(&self, mode: String);
-    fn get_mode(&self) -> String;
-    fn get_available_modes(&self) -> Vec<String>;
     fn damage_entity(&self, entity_id: u32, amount: f32);
     fn process_deaths(&self);
     fn process_decay(&self);
@@ -32,27 +29,6 @@ impl MiscApi for PyWorld {
     fn get_turn(&self) -> u32 {
         let world = self.inner.borrow_mut();
         world.turn
-    }
-
-    fn set_mode(&self, mode: String) {
-        let mut world = self.inner.borrow_mut();
-        world.current_mode = mode;
-    }
-
-    fn get_mode(&self) -> String {
-        let world = self.inner.borrow_mut();
-        world.current_mode.clone()
-    }
-
-    fn get_available_modes(&self) -> Vec<String> {
-        let world = self.inner.borrow_mut();
-        world
-            .registry
-            .lock()
-            .unwrap()
-            .all_modes()
-            .into_iter()
-            .collect()
     }
 
     fn damage_entity(&self, entity_id: u32, amount: f32) {
