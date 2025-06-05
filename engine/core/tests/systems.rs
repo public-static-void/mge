@@ -1,7 +1,7 @@
 use engine_core::ecs::registry::ComponentRegistry;
 use engine_core::ecs::schema::ComponentSchema;
 use engine_core::ecs::world::World;
-use engine_core::systems::standard::ProcessDeaths;
+use engine_core::systems::death_decay::ProcessDeaths;
 use schemars::schema::RootSchema;
 use serde_json::Value;
 use serde_json::json;

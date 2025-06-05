@@ -53,8 +53,8 @@ impl PyWorld {
         let map = engine_core::map::Map::new(Box::new(grid));
         world.map = Some(map);
 
-        world.register_system(engine_core::systems::standard::ProcessDeaths);
-        world.register_system(engine_core::systems::standard::ProcessDecay);
+        world.register_system(engine_core::systems::death_decay::ProcessDeaths);
+        world.register_system(engine_core::systems::death_decay::ProcessDecay);
         world.register_system(engine_core::systems::job::JobSystem::default());
         Ok(PyWorld {
             inner: Rc::new(RefCell::new(world)),
