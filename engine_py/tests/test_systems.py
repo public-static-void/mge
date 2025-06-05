@@ -1,3 +1,6 @@
+import copy
+
+
 def test_move_and_damage(make_world):
     world = make_world()
 
@@ -21,14 +24,13 @@ def test_move_and_damage(make_world):
         "Position",
         {"pos": {"Square": {"x": 1, "y": 1, "z": 0}}},
     )
+
     for eid in world.get_entities_with_component("Position"):
-        pos = world.get_component(eid, "Position")
+        pos = copy.deepcopy(world.get_component(eid, "Position"))
         pos["pos"]["Square"]["x"] += 1
         pos["pos"]["Square"]["y"] += 1
         world.set_component(eid, "Position", pos)
-    print(
-        "After move_all (eid):", world.get_component(eid, "Position")
-    )
+    print("After move_all (eid):", world.get_component(eid, "Position"))
     print(
         "After move_all (eid2):",
         world.get_component(eid2, "Position"),
