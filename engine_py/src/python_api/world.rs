@@ -2,6 +2,7 @@ use crate::python_api::death_decay::DeathDecayApi;
 use crate::python_api::economic::EconomicApi;
 use crate::python_api::mode::ModeApi;
 use crate::python_api::save_load::SaveLoadApi;
+use crate::python_api::time_of_day::TimeOfDayApi;
 use crate::python_api::turn::TurnApi;
 use crate::system_bridge::SystemBridge;
 use engine_core::ecs::world::World;
@@ -431,12 +432,7 @@ impl PyWorld {
     }
 
     fn get_time_of_day(&self, py: Python) -> PyObject {
-        let world = self.inner.borrow();
-        let tod = world.get_time_of_day();
-        let dict = PyDict::new(py);
-        dict.set_item("hour", tod.hour).unwrap();
-        dict.set_item("minute", tod.minute).unwrap();
-        dict.into_pyobject(py).unwrap().unbind().into()
+        TimeOfDayApi::get_time_of_day(self, py)
     }
 
     /// Set the camera position (creates camera entity if not present)

@@ -8,6 +8,7 @@ pub mod inventory;
 pub mod mode;
 pub mod region;
 pub mod save_load;
+pub mod time_of_day;
 pub mod turn;
 pub mod ui;
 pub mod world;

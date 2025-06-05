@@ -12,6 +12,7 @@ pub mod map;
 pub mod mode;
 pub mod region;
 pub mod save_load;
+pub mod time_of_day;
 pub mod turn;
 pub mod ui;
 pub mod worldgen;
@@ -46,6 +47,7 @@ pub fn register_all_api_functions(
     turn::register_turn_api(lua, globals, world.clone())?;
     save_load::register_save_load_api(lua, globals, world.clone())?;
     death_decay::register_death_decay_api(lua, globals, world.clone())?;
+    time_of_day::register_time_of_day_api(lua, globals, world.clone())?;
     map::register_map_api(lua, globals, world.clone())?;
     economic::register_economic_api(lua, globals, world.clone())?;
     Ok(())
