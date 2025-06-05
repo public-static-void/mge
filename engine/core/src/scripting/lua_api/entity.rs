@@ -1,4 +1,4 @@
-//! Entity management API: spawn, despawn, basic queries.
+//! Entity management API: spawn, despawn, queries, state, movement, damage.
 
 use crate::ecs::world::World;
 use mlua::{Lua, Result as LuaResult, Table};
@@ -51,6 +51,32 @@ pub fn register_entity_api(lua: &Lua, globals: &Table, world: Rc<RefCell<World>>
         Ok(world.get_entities_with_components(&name_refs))
     })?;
     globals.set("get_entities_with_components", get_entities_with_components)?;
+
+    // is_entity_alive(entity)
+    let world_is_alive = world.clone();
+    let is_entity_alive = lua.create_function_mut(move |_, entity: u32| {
+        let world = world_is_alive.borrow();
+        Ok(world.is_entity_alive(entity))
+    })?;
+    globals.set("is_entity_alive", is_entity_alive)?;
+
+    // move_entity(entity, dx, dy)
+    let world_move_entity = world.clone();
+    let move_entity = lua.create_function_mut(move |_, (entity, dx, dy): (u32, f32, f32)| {
+        let mut world = world_move_entity.borrow_mut();
+        world.move_entity(entity, dx, dy);
+        Ok(())
+    })?;
+    globals.set("move_entity", move_entity)?;
+
+    // damage_entity(entity, amount)
+    let world_damage_entity = world.clone();
+    let damage_entity = lua.create_function_mut(move |_, (entity, amount): (u32, f32)| {
+        let mut world = world_damage_entity.borrow_mut();
+        world.damage_entity(entity, amount);
+        Ok(())
+    })?;
+    globals.set("damage_entity", damage_entity)?;
 
     Ok(())
 }
