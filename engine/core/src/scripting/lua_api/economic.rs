@@ -1,6 +1,7 @@
-//! Economic system Lua helpers: stockpile, production job, etc.
+//! Economic system Lua helpers: stockpile, production job, resource modification.
 
 use crate::ecs::world::World;
+use crate::scripting::helpers::lua_error_from_any;
 use mlua::{Lua, Result as LuaResult, Table};
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -37,6 +38,17 @@ pub fn register_economic_api(
         }
     })?;
     globals.set("get_production_job", get_production_job)?;
+
+    // modify_stockpile_resource(entity, kind, delta)
+    let world_modify_stockpile = world.clone();
+    let modify_stockpile_resource =
+        lua.create_function_mut(move |lua, (entity, kind, delta): (u32, String, f64)| {
+            let mut world = world_modify_stockpile.borrow_mut();
+            world
+                .modify_stockpile_resource(entity, &kind, delta)
+                .map_err(|e| lua_error_from_any(lua, e))
+        })?;
+    globals.set("modify_stockpile_resource", modify_stockpile_resource)?;
 
     Ok(())
 }

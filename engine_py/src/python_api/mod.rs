@@ -1,10 +1,15 @@
 pub mod body;
 pub mod component;
+pub mod death_decay;
+pub mod economic;
 pub mod entity;
 pub mod equipment;
 pub mod inventory;
-pub mod misc;
+pub mod mode;
 pub mod region;
+pub mod save_load;
+pub mod time_of_day;
+pub mod turn;
 pub mod ui;
 pub mod world;
 

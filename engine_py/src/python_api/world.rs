@@ -1,18 +1,21 @@
+use crate::python_api::body::BodyApi;
+use crate::python_api::component::ComponentApi;
+use crate::python_api::death_decay::DeathDecayApi;
+use crate::python_api::economic::EconomicApi;
+use crate::python_api::entity::EntityApi;
+use crate::python_api::equipment::EquipmentApi;
+use crate::python_api::inventory::InventoryApi;
+use crate::python_api::mode::ModeApi;
+use crate::python_api::region::RegionApi;
+use crate::python_api::save_load::SaveLoadApi;
+use crate::python_api::time_of_day::TimeOfDayApi;
+use crate::python_api::turn::TurnApi;
 use crate::system_bridge::SystemBridge;
 use engine_core::ecs::world::World;
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict};
 use std::cell::RefCell;
 use std::rc::Rc;
-
-// Bring all trait APIs into scope
-use crate::python_api::body::BodyApi;
-use crate::python_api::component::ComponentApi;
-use crate::python_api::entity::EntityApi;
-use crate::python_api::equipment::EquipmentApi;
-use crate::python_api::inventory::InventoryApi;
-use crate::python_api::misc::MiscApi;
-use crate::python_api::region::RegionApi;
 
 #[pyclass(unsendable)]
 pub struct PyWorld {
@@ -74,8 +77,17 @@ impl PyWorld {
     fn get_entities(&self) -> PyResult<Vec<u32>> {
         EntityApi::get_entities(self)
     }
+    fn count_entities_with_type(&self, type_str: String) -> usize {
+        EntityApi::count_entities_with_type(self, type_str)
+    }
     fn is_entity_alive(&self, entity_id: u32) -> bool {
         EntityApi::is_entity_alive(self, entity_id)
+    }
+    fn move_entity(&self, entity_id: u32, dx: f32, dy: f32) {
+        EntityApi::move_entity(self, entity_id, dx, dy)
+    }
+    fn damage_entity(&self, entity_id: u32, amount: f32) {
+        EntityApi::damage_entity(self, entity_id, amount)
     }
 
     // ---- COMPONENT ----
@@ -173,44 +185,35 @@ impl PyWorld {
     }
 
     // ---- MISC ----
-    fn move_entity(&self, entity_id: u32, dx: f32, dy: f32) {
-        MiscApi::move_entity(self, entity_id, dx, dy)
-    }
     fn tick(&self) {
-        MiscApi::tick(self)
+        TurnApi::tick(self)
     }
     fn get_turn(&self) -> u32 {
-        MiscApi::get_turn(self)
+        TurnApi::get_turn(self)
     }
     fn set_mode(&self, mode: String) {
-        MiscApi::set_mode(self, mode)
+        ModeApi::set_mode(self, mode)
     }
     fn get_mode(&self) -> String {
-        MiscApi::get_mode(self)
+        ModeApi::get_mode(self)
     }
     fn get_available_modes(&self) -> Vec<String> {
-        MiscApi::get_available_modes(self)
-    }
-    fn damage_entity(&self, entity_id: u32, amount: f32) {
-        MiscApi::damage_entity(self, entity_id, amount)
+        ModeApi::get_available_modes(self)
     }
     fn process_deaths(&self) {
-        MiscApi::process_deaths(self)
+        DeathDecayApi::process_deaths(self)
     }
     fn process_decay(&self) {
-        MiscApi::process_decay(self)
-    }
-    fn count_entities_with_type(&self, type_str: String) -> usize {
-        MiscApi::count_entities_with_type(self, type_str)
+        DeathDecayApi::process_decay(self)
     }
     fn modify_stockpile_resource(&self, entity_id: u32, kind: String, delta: f64) -> PyResult<()> {
-        MiscApi::modify_stockpile_resource(self, entity_id, kind, delta)
+        EconomicApi::modify_stockpile_resource(self, entity_id, kind, delta)
     }
     fn save_to_file(&self, path: String) -> PyResult<()> {
-        MiscApi::save_to_file(self, path)
+        SaveLoadApi::save_to_file(self, path)
     }
     fn load_from_file(&mut self, path: String) -> PyResult<()> {
-        MiscApi::load_from_file(self, path)
+        SaveLoadApi::load_from_file(self, path)
     }
 
     // ---- ADDITIONAL METHODS ----
@@ -426,12 +429,7 @@ impl PyWorld {
     }
 
     fn get_time_of_day(&self, py: Python) -> PyObject {
-        let world = self.inner.borrow();
-        let tod = world.get_time_of_day();
-        let dict = PyDict::new(py);
-        dict.set_item("hour", tod.hour).unwrap();
-        dict.set_item("minute", tod.minute).unwrap();
-        dict.into_pyobject(py).unwrap().unbind().into()
+        TimeOfDayApi::get_time_of_day(self, py)
     }
 
     /// Set the camera position (creates camera entity if not present)
