@@ -15,14 +15,6 @@ pub fn register_misc_api(
     world: Rc<RefCell<World>>,
     input_provider: Arc<Mutex<Box<dyn InputProvider + Send + Sync>>>,
 ) -> LuaResult<()> {
-    // is_entity_alive(entity)
-    let world_is_alive = world.clone();
-    let is_entity_alive = lua.create_function_mut(move |_, entity: u32| {
-        let world = world_is_alive.borrow();
-        Ok(world.is_entity_alive(entity))
-    })?;
-    globals.set("is_entity_alive", is_entity_alive)?;
-
     // get_user_input(prompt)
     let input_provider_clone = input_provider.clone();
     let get_user_input = lua.create_function(move |lua, prompt: String| {
@@ -42,17 +34,6 @@ pub fn register_misc_api(
         Ok(world.count_entities_with_type(&type_str))
     })?;
     globals.set("count_entities_with_type", count_entities_with_type)?;
-
-    // modify_stockpile_resource(entity, kind, delta)
-    let world_modify_stockpile = world.clone();
-    let modify_stockpile_resource =
-        lua.create_function_mut(move |lua, (entity, kind, delta): (u32, String, f64)| {
-            let mut world = world_modify_stockpile.borrow_mut();
-            world
-                .modify_stockpile_resource(entity, &kind, delta)
-                .map_err(|e| lua_error_from_any(lua, e))
-        })?;
-    globals.set("modify_stockpile_resource", modify_stockpile_resource)?;
 
     // save_to_file(filename)
     let world_save = world.clone();
@@ -75,24 +56,6 @@ pub fn register_misc_api(
         Ok(())
     })?;
     globals.set("load_from_file", load_from_file)?;
-
-    // move_entity(entity, dx, dy)
-    let world_move_entity = world.clone();
-    let move_entity = lua.create_function_mut(move |_, (entity, dx, dy): (u32, f32, f32)| {
-        let mut world = world_move_entity.borrow_mut();
-        world.move_entity(entity, dx, dy);
-        Ok(())
-    })?;
-    globals.set("move_entity", move_entity)?;
-
-    // damage_entity(entity, amount)
-    let world_damage_entity = world.clone();
-    let damage_entity = lua.create_function_mut(move |_, (entity, amount): (u32, f32)| {
-        let mut world = world_damage_entity.borrow_mut();
-        world.damage_entity(entity, amount);
-        Ok(())
-    })?;
-    globals.set("damage_entity", damage_entity)?;
 
     // process_deaths()
     let world_deaths = world.clone();

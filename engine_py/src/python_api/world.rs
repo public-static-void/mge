@@ -1,3 +1,4 @@
+use crate::python_api::economic::EconomicApi;
 use crate::python_api::mode::ModeApi;
 use crate::python_api::turn::TurnApi;
 use crate::system_bridge::SystemBridge;
@@ -78,6 +79,12 @@ impl PyWorld {
     }
     fn is_entity_alive(&self, entity_id: u32) -> bool {
         EntityApi::is_entity_alive(self, entity_id)
+    }
+    fn move_entity(&self, entity_id: u32, dx: f32, dy: f32) {
+        EntityApi::move_entity(self, entity_id, dx, dy)
+    }
+    fn damage_entity(&self, entity_id: u32, amount: f32) {
+        EntityApi::damage_entity(self, entity_id, amount)
     }
 
     // ---- COMPONENT ----
@@ -175,9 +182,6 @@ impl PyWorld {
     }
 
     // ---- MISC ----
-    fn move_entity(&self, entity_id: u32, dx: f32, dy: f32) {
-        MiscApi::move_entity(self, entity_id, dx, dy)
-    }
     fn tick(&self) {
         TurnApi::tick(self)
     }
@@ -193,9 +197,6 @@ impl PyWorld {
     fn get_available_modes(&self) -> Vec<String> {
         ModeApi::get_available_modes(self)
     }
-    fn damage_entity(&self, entity_id: u32, amount: f32) {
-        MiscApi::damage_entity(self, entity_id, amount)
-    }
     fn process_deaths(&self) {
         MiscApi::process_deaths(self)
     }
@@ -206,7 +207,7 @@ impl PyWorld {
         MiscApi::count_entities_with_type(self, type_str)
     }
     fn modify_stockpile_resource(&self, entity_id: u32, kind: String, delta: f64) -> PyResult<()> {
-        MiscApi::modify_stockpile_resource(self, entity_id, kind, delta)
+        EconomicApi::modify_stockpile_resource(self, entity_id, kind, delta)
     }
     fn save_to_file(&self, path: String) -> PyResult<()> {
         MiscApi::save_to_file(self, path)
