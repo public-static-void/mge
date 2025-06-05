@@ -1,12 +1,8 @@
 use super::PyWorld;
-use engine_core::World;
 use pyo3::prelude::*;
-use std::rc::Rc;
 
 pub trait MiscApi {
     fn move_entity(&self, entity_id: u32, dx: f32, dy: f32);
-    fn tick(&self);
-    fn get_turn(&self) -> u32;
     fn damage_entity(&self, entity_id: u32, amount: f32);
     fn process_deaths(&self);
     fn process_decay(&self);
@@ -20,15 +16,6 @@ impl MiscApi for PyWorld {
     fn move_entity(&self, entity_id: u32, dx: f32, dy: f32) {
         let mut world = self.inner.borrow_mut();
         world.move_entity(entity_id, dx, dy);
-    }
-
-    fn tick(&self) {
-        World::tick(Rc::clone(&self.inner));
-    }
-
-    fn get_turn(&self) -> u32 {
-        let world = self.inner.borrow_mut();
-        world.turn
     }
 
     fn damage_entity(&self, entity_id: u32, amount: f32) {
