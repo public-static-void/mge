@@ -1,5 +1,6 @@
 use crate::python_api::economic::EconomicApi;
 use crate::python_api::mode::ModeApi;
+use crate::python_api::save_load::SaveLoadApi;
 use crate::python_api::turn::TurnApi;
 use crate::system_bridge::SystemBridge;
 use engine_core::ecs::world::World;
@@ -210,10 +211,10 @@ impl PyWorld {
         EconomicApi::modify_stockpile_resource(self, entity_id, kind, delta)
     }
     fn save_to_file(&self, path: String) -> PyResult<()> {
-        MiscApi::save_to_file(self, path)
+        SaveLoadApi::save_to_file(self, path)
     }
     fn load_from_file(&mut self, path: String) -> PyResult<()> {
-        MiscApi::load_from_file(self, path)
+        SaveLoadApi::load_from_file(self, path)
     }
 
     // ---- ADDITIONAL METHODS ----
