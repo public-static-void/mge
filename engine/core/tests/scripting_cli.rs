@@ -23,11 +23,8 @@ fn test_lua_cli_runs_script_successfully() {
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(
-        stdout.contains("\"current\": Number(10)"),
+        stdout.contains("current = 10.0"),
         "Initial health not found"
     );
-    assert!(
-        stdout.contains("\"current\": Number(7.0)") || stdout.contains("\"current\": Number(7)"),
-        "Damaged health not found"
-    );
+    assert!(stdout.contains("current = 7.0"), "Damaged health not found");
 }
