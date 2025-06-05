@@ -11,6 +11,7 @@ pub mod map;
 pub mod misc;
 pub mod mode;
 pub mod region;
+pub mod turn;
 pub mod ui;
 pub mod worldgen;
 
@@ -41,6 +42,7 @@ pub fn register_all_api_functions(
     ui::register_ui_api(lua, globals)?;
     worldgen::register_worldgen_api(lua, globals, worldgen_registry)?;
     mode::register_mode_api(lua, globals, world.clone())?;
+    turn::register_turn_api(lua, globals, world.clone())?;
     misc::register_misc_api(lua, globals, world.clone(), input_provider)?;
     map::register_map_api(lua, globals, world.clone())?;
     economic::register_economic_api(lua, globals, world.clone())?;

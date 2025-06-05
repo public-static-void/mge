@@ -94,22 +94,6 @@ pub fn register_misc_api(
     })?;
     globals.set("damage_entity", damage_entity)?;
 
-    // tick()
-    let world_tick = world.clone();
-    let tick = lua.create_function_mut(move |_, ()| {
-        World::tick(Rc::clone(&world_tick));
-        Ok(())
-    })?;
-    globals.set("tick", tick)?;
-
-    // get_turn()
-    let world_get_turn = world.clone();
-    let get_turn = lua.create_function_mut(move |_, ()| {
-        let world = world_get_turn.borrow();
-        Ok(world.turn)
-    })?;
-    globals.set("get_turn", get_turn)?;
-
     // process_deaths()
     let world_deaths = world.clone();
     let process_deaths = lua.create_function_mut(move |_, ()| {

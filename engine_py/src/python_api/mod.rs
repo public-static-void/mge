@@ -6,6 +6,7 @@ pub mod inventory;
 pub mod misc;
 pub mod mode;
 pub mod region;
+pub mod turn;
 pub mod ui;
 pub mod world;
 

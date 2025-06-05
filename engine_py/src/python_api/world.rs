@@ -1,4 +1,5 @@
 use crate::python_api::mode::ModeApi;
+use crate::python_api::turn::TurnApi;
 use crate::system_bridge::SystemBridge;
 use engine_core::ecs::world::World;
 use pyo3::prelude::*;
@@ -178,10 +179,10 @@ impl PyWorld {
         MiscApi::move_entity(self, entity_id, dx, dy)
     }
     fn tick(&self) {
-        MiscApi::tick(self)
+        TurnApi::tick(self)
     }
     fn get_turn(&self) -> u32 {
-        MiscApi::get_turn(self)
+        TurnApi::get_turn(self)
     }
     fn set_mode(&self, mode: String) {
         ModeApi::set_mode(self, mode)
