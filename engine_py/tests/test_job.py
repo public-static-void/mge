@@ -12,3 +12,17 @@ def test_job_completion(make_world):
             found = True
             break
     assert found
+
+
+def test_get_job_types(make_world):
+    world = make_world()
+
+    # Register a custom job type if needed for the test
+    def dummy_job_logic(job, progress):
+        job["status"] = "complete"
+        return job
+
+    world.register_job_type("DummyJob", dummy_job_logic)
+    types = world.get_job_types()
+    assert isinstance(types, list)
+    assert "DummyJob" in types

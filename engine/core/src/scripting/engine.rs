@@ -28,7 +28,7 @@ impl ScriptEngine {
     pub fn new_with_input(input_provider: Box<dyn InputProvider + Send + Sync>) -> Self {
         use mlua::{Lua, LuaOptions, StdLib};
 
-        // Lua-VM mit allen Standardbibliotheken (inkl. debug) erzeugen
+        // Create Lua-VM with all standard libs (incl. debug)
         let lua = unsafe { Lua::unsafe_new_with(StdLib::ALL, LuaOptions::default()) };
 
         {
@@ -50,7 +50,6 @@ impl ScriptEngine {
                 .set("print", print)
                 .expect("Failed to set print function");
 
-            // --- BEGIN: Register require_json ---
             let require_json = lua
                 .create_function(|lua, path: String| {
                     let json_str = std::fs::read_to_string(&path).map_err(|e| {
@@ -66,7 +65,6 @@ impl ScriptEngine {
             globals
                 .set("require_json", require_json)
                 .expect("Failed to set require_json function");
-            // --- END: Register require_json ---
         }
 
         Self {
@@ -85,22 +83,6 @@ impl ScriptEngine {
         let globals = self.lua.globals();
 
         register_worldgen_api(&self.lua, &globals, self.worldgen_registry.clone())?;
-
-        let world_for_print = world.clone();
-        let print_positions_fn = self.lua.create_function_mut(move |_, ()| {
-            let world = world_for_print.borrow();
-            print_positions(&world);
-            Ok(())
-        })?;
-        globals.set("print_positions", print_positions_fn)?;
-
-        let world_for_print = world.clone();
-        let print_healths_fn = self.lua.create_function_mut(move |_, ()| {
-            let world = world_for_print.borrow();
-            print_healths(&world);
-            Ok(())
-        })?;
-        globals.set("print_healths", print_healths_fn)?;
 
         register_event_bus_and_globals(&self.lua, &globals, world.clone())?;
 
@@ -136,26 +118,6 @@ impl ScriptEngine {
         globals
             .set("arg", lua_args)
             .expect("Failed to set global arg in Lua");
-    }
-}
-
-pub fn print_positions(world: &World) {
-    if let Some(positions) = world.components.get("Position") {
-        for (entity, value) in positions {
-            println!("Entity {}: {:?}", entity, value);
-        }
-    } else {
-        println!("No Position components found.");
-    }
-}
-
-pub fn print_healths(world: &World) {
-    if let Some(healths) = world.components.get("Health") {
-        for (entity, value) in healths {
-            println!("Entity {}: {:?}", entity, value);
-        }
-    } else {
-        println!("No Health components found.");
     }
 }
 
