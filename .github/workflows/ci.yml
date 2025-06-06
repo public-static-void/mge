@@ -30,38 +30,11 @@ jobs:
       - name: Clean up Rust build artifacts
         run: cargo clean
 
-  build-c-plugins:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install build-essential
-        run: sudo apt-get update && sudo apt-get install -y build-essential && sudo apt-get clean
-
-      - name: Build all C plugins
-        run: |
-          for src in plugins/*.c; do
-            base=$(basename "$src" .c)
-            gcc -Iengine -shared -fPIC "$src" -o "plugins/lib${base}.so"
-          done
-
-      - name: Upload C plugins
-        uses: actions/upload-artifact@v4
-        with:
-          name: c-plugins
-          path: plugins/*.so
-
   test-rust:
     runs-on: ubuntu-latest
-    needs: [lint, build-c-plugins]
+    needs: [lint]
     steps:
       - uses: actions/checkout@v4
-
-      - name: Download C plugins
-        uses: actions/download-artifact@v4
-        with:
-          name: c-plugins
-          path: plugins
 
       - name: Install LuaJIT and pkg-config
         run: sudo apt-get update && sudo apt-get install -y libluajit-5.1-dev pkg-config && sudo apt-get clean
@@ -78,15 +51,13 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-registry-
 
+      - name: Build all plugins and WASM test modules (Rust, C, WASM)
+        run: cargo run -p xtask -- build-all
+
       - name: Build
         run: |
           export PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig
           cargo build --all
-
-      - name: Build and deploy Rust plugins
-        run: |
-          export PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig
-          cargo run -p xtask -- build-plugins
 
       - name: Test (with plugins)
         run: |
@@ -99,15 +70,9 @@ jobs:
 
   test-lua:
     runs-on: ubuntu-latest
-    needs: build-c-plugins
+    needs: test-rust
     steps:
       - uses: actions/checkout@v4
-
-      - name: Download C plugins
-        uses: actions/download-artifact@v4
-        with:
-          name: c-plugins
-          path: plugins
 
       - name: Install LuaJIT and pkg-config
         run: sudo apt-get update && sudo apt-get install -y libluajit-5.1-dev pkg-config && sudo apt-get clean
@@ -122,15 +87,9 @@ jobs:
 
   test-python:
     runs-on: ubuntu-latest
-    needs: build-c-plugins
+    needs: test-rust
     steps:
       - uses: actions/checkout@v4
-
-      - name: Download C plugins
-        uses: actions/download-artifact@v4
-        with:
-          name: c-plugins
-          path: plugins
 
       - name: Install LuaJIT and pkg-config
         run: sudo apt-get update && sudo apt-get install -y libluajit-5.1-dev pkg-config && sudo apt-get clean
