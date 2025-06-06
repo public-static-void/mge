@@ -51,6 +51,9 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-registry-
 
+      - name: Add wasm32-unknown-unknown target
+        run: rustup target add wasm32-unknown-unknown
+
       - name: Build all plugins and WASM test modules (Rust, C, WASM)
         run: cargo run -p xtask -- build-all
 
