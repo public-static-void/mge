@@ -19,13 +19,14 @@ jobs:
       - name: Install LuaJIT and pkg-config
         run: sudo apt-get update && sudo apt-get install -y libluajit-5.1-dev pkg-config && sudo apt-get clean
 
+      - name: Set PKG_CONFIG_PATH
+        run: echo "PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig" >> $GITHUB_ENV
+
       - name: Lint (rustfmt)
         run: cargo fmt --all --check
 
       - name: Clippy
-        run: |
-          export PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig
-          cargo clippy --all-targets --all-features -- -D warnings
+        run: cargo clippy --all-targets --all-features -- -D warnings
 
       - name: Clean up Rust build artifacts
         run: cargo clean
@@ -69,6 +70,9 @@ jobs:
       - name: Build WASM test modules (xtask via Makefile)
         run: cargo run -p xtask -- build-wasm-tests
 
+      - name: List WASM files
+        run: find engine_wasm/wasm_tests
+
       - name: Upload WASM test artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -83,8 +87,14 @@ jobs:
 
       - uses: moonrepo/setup-rust@v1
 
+      - name: Install wasm32-unknown-unknown target
+        run: rustup target add wasm32-unknown-unknown
+
       - name: Install LuaJIT and pkg-config
         run: sudo apt-get update && sudo apt-get install -y libluajit-5.1-dev pkg-config && sudo apt-get clean
+
+      - name: Set PKG_CONFIG_PATH
+        run: echo "PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig" >> $GITHUB_ENV
 
       - name: Download C plugins
         uses: actions/download-artifact@v4
@@ -96,7 +106,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: wasm-tests
-          path: engine/wasm_tests
+          path: engine_wasm/wasm_tests
 
       - name: Build all (xtask via Makefile)
         run: cargo run -p xtask -- build-all
@@ -112,8 +122,14 @@ jobs:
 
       - uses: moonrepo/setup-rust@v1
 
+      - name: Install wasm32-unknown-unknown target
+        run: rustup target add wasm32-unknown-unknown
+
       - name: Install LuaJIT and pkg-config
         run: sudo apt-get update && sudo apt-get install -y libluajit-5.1-dev pkg-config && sudo apt-get clean
+
+      - name: Set PKG_CONFIG_PATH
+        run: echo "PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig" >> $GITHUB_ENV
 
       - name: Download C plugins
         uses: actions/download-artifact@v4
@@ -125,11 +141,10 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: wasm-tests
-          path: engine/wasm_tests
+          path: engine_wasm/wasm_tests
 
       - name: Test Rust (xtask via Makefile)
         run: |
-          export PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig
           export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(pwd)/plugins
           cargo run -p xtask -- build-all
           cargo test --all
