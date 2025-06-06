@@ -12,23 +12,34 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install LuaJIT and pkg-config
-        run: sudo apt-get update && sudo apt-get install -y libluajit-5.1-dev pkg-config && sudo apt-get clean
-
       - uses: moonrepo/setup-rust@v1
         with:
           components: rustfmt, clippy
+
+      - name: Install LuaJIT and pkg-config
+        run: sudo apt-get update && sudo apt-get install -y libluajit-5.1-dev pkg-config && sudo apt-get clean
+
+      - name: Set PKG_CONFIG_PATH
+        run: echo "PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig" >> $GITHUB_ENV
 
       - name: Lint (rustfmt)
         run: cargo fmt --all --check
 
       - name: Clippy
-        run: |
-          export PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig
-          cargo clippy --all-targets --all-features -- -D warnings
+        run: cargo clippy --all-targets --all-features -- -D warnings
 
       - name: Clean up Rust build artifacts
         run: cargo clean
+
+  validate-schema:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: moonrepo/setup-rust@v1
+
+      - name: Validate schemas (xtask via Makefile)
+        run: cargo run --bin schema_validator --release -- engine/assets/schemas
 
   build-c-plugins:
     runs-on: ubuntu-latest
@@ -38,12 +49,8 @@ jobs:
       - name: Install build-essential
         run: sudo apt-get update && sudo apt-get install -y build-essential && sudo apt-get clean
 
-      - name: Build all C plugins
-        run: |
-          for src in plugins/*.c; do
-            base=$(basename "$src" .c)
-            gcc -Iengine -shared -fPIC "$src" -o "plugins/lib${base}.so"
-          done
+      - name: Build all C plugins (xtask via Makefile)
+        run: cargo run -p xtask -- build-c-plugins
 
       - name: Upload C plugins
         uses: actions/upload-artifact@v4
@@ -51,11 +58,43 @@ jobs:
           name: c-plugins
           path: plugins/*.so
 
-  test-rust:
+  build-wasm-tests:
     runs-on: ubuntu-latest
-    needs: [lint, build-c-plugins]
     steps:
       - uses: actions/checkout@v4
+
+      - uses: moonrepo/setup-rust@v1
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Build WASM test modules (xtask via Makefile)
+        run: cargo run -p xtask -- build-wasm-tests
+
+      - name: List WASM files
+        run: find engine_wasm/wasm_tests
+
+      - name: Upload WASM test artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: wasm-tests
+          path: engine_wasm/wasm_tests/**/*.wasm
+
+  build-all:
+    runs-on: ubuntu-latest
+    needs: [validate-schema, build-c-plugins, build-wasm-tests]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: moonrepo/setup-rust@v1
+
+      - name: Install wasm32-unknown-unknown target
+        run: rustup target add wasm32-unknown-unknown
+
+      - name: Install LuaJIT and pkg-config
+        run: sudo apt-get update && sudo apt-get install -y libluajit-5.1-dev pkg-config && sudo apt-get clean
+
+      - name: Set PKG_CONFIG_PATH
+        run: echo "PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig" >> $GITHUB_ENV
 
       - name: Download C plugins
         uses: actions/download-artifact@v4
@@ -63,35 +102,51 @@ jobs:
           name: c-plugins
           path: plugins
 
-      - name: Install LuaJIT and pkg-config
-        run: sudo apt-get update && sudo apt-get install -y libluajit-5.1-dev pkg-config && sudo apt-get clean
+      - name: Download WASM test artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: wasm-tests
+          path: engine_wasm/wasm_tests
+
+      - name: Build all (xtask via Makefile)
+        run: cargo run -p xtask -- build-all
+
+      - name: Clean up Rust build artifacts
+        run: cargo clean
+
+  test-rust:
+    runs-on: ubuntu-latest
+    needs: build-all
+    steps:
+      - uses: actions/checkout@v4
 
       - uses: moonrepo/setup-rust@v1
 
-      - name: Cache cargo registry and git
-        uses: actions/cache@v4
+      - name: Install wasm32-unknown-unknown target
+        run: rustup target add wasm32-unknown-unknown
+
+      - name: Install LuaJIT and pkg-config
+        run: sudo apt-get update && sudo apt-get install -y libluajit-5.1-dev pkg-config && sudo apt-get clean
+
+      - name: Set PKG_CONFIG_PATH
+        run: echo "PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig" >> $GITHUB_ENV
+
+      - name: Download C plugins
+        uses: actions/download-artifact@v4
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-registry-
+          name: c-plugins
+          path: plugins
 
-      - name: Build
-        run: |
-          export PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig
-          cargo build --all
+      - name: Download WASM test artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: wasm-tests
+          path: engine_wasm/wasm_tests
 
-      - name: Build and deploy Rust plugins
+      - name: Test Rust (xtask via Makefile)
         run: |
-          export PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig
-          cargo run -p xtask -- build-plugins
-
-      - name: Test (with plugins)
-        run: |
-          export PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig
           export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(pwd)/plugins
+          cargo run -p xtask -- build-all
           cargo test --all
 
       - name: Clean up Rust build artifacts
@@ -115,10 +170,8 @@ jobs:
       - name: Install Lua
         run: sudo apt-get update && sudo apt-get install -y lua5.1 && sudo apt-get clean
 
-      - name: Lua Tests
-        run: |
-          export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(pwd)/plugins
-          ./run_lua_tests.sh
+      - name: Lua tests (xtask via Makefile)
+        run: ./run_lua_tests.sh
 
   test-python:
     runs-on: ubuntu-latest

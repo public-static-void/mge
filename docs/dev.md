@@ -1,18 +1,46 @@
 # Developer Guide
 
-This document explains how to set up your environment and run tests.
-It mirrors the CI pipeline so all checks can be reproduced locally.
+This document explains how to set up your environment, build the project, run tests, and validate data.
+**All major workflows are automated via the project Makefile.**
+This mirrors the CI pipeline so all checks can be reproduced locally.
 
 ---
 
 ## Prerequisites
 
 - **Rust** (latest stable, with `cargo`)
-- **Python 3.8+** (for Python bridge/tests)
+- **Python 3.8+** (for Python scripting/tests)
 - **Lua 5.1 or LuaJIT** (for Lua scripting/tests)
 - **GCC/Clang** (for C ABI plugins)
 - **Maturin** (`pip install maturin`) for Python bindings
 - **pytest** (`pip install pytest`) for Python tests
+- **WebAssembly** (`rustup target add wasm32-unknown-unknown`) for WASM
+
+---
+
+## Using the Makefile
+
+All major build, test, and validation tasks are automated via the project `Makefile`.
+**This is the recommended way to work with the project, as it mirrors the CI pipeline and guarantees a reproducible developer experience.**
+
+### Common Makefile Targets
+
+| Target                 | Description                                            |
+| ---------------------- | ------------------------------------------------------ |
+| `make all`             | Build everything (validates schemas first)             |
+| `make test`            | Run all tests (Rust, Python, Lua) and validate schemas |
+| `make validate-schema` | Validate all component/data schemas                    |
+| `make test-python`     | Set up venv, build Rust extension, run Python tests    |
+| `make test-rust`       | Build and run all Rust tests                           |
+| `make test-lua`        | Run all Lua scripting tests                            |
+| `make clean`           | Clean Rust build artifacts                             |
+| `make help`            | Show a summary of available targets                    |
+
+### Notes
+
+- The Makefile will automatically set up Python virtual environments, install dependencies, and build Rust and C Plugins as needed.
+- All Makefile targets are idempotent and can be safely re-run.
+- The Makefile is the **single source of truth** for build and test orchestration; all CI steps use these targets.
 
 ---
 
@@ -23,81 +51,6 @@ It mirrors the CI pipeline so all checks can be reproduced locally.
 ```sh
 cargo fmt --all --check
 cargo clippy --all-targets --all-features -- -D warnings
-```
-
----
-
-## Building C Plugins
-
-Build all C plugins:
-
-```sh
-for src in plugins/*.c; do
-  base=$(basename "$src" .c)
-  gcc -Iengine -shared -fPIC "$src" -o "plugins/lib${base}.so"
-done
-```
-
----
-
-## Build Rust Plugins
-
-```sh
-cargo run -p xtask -- build-plugins
-```
-
----
-
-## Running Tests
-
-### Rust Unit/Integration Tests
-
-Build and run all Rust tests:
-
-```sh
-cargo test --all
-```
-
----
-
-### Lua Scripting Tests
-
-Run all Lua scripting tests:
-
-```sh
-./run_lua_tests.sh
-```
-
----
-
-### Python Scripting Tests
-
-1. Create and activate a virtual environment:
-
-   ```sh
-   cd engine_py
-   python3 -m venv .venv
-   source .venv/bin/activate
-   pip install --upgrade pip
-   pip install maturin pytest
-   ```
-
-2. Build and test the Python bindings:
-
-   ```sh
-   maturin develop
-   pytest
-   cd ..
-   ```
-
----
-
-## Schema Validation
-
-To validate all component schemas:
-
-```sh
-cargo run --bin schema_validator -- engine/assets/schemas/
 ```
 
 ---
@@ -118,4 +71,4 @@ cargo run --bin schema_validator -- engine/assets/schemas/
 - Add or edit schemas in `engine/assets/schemas/`.
 - Add Rust systems in `engine_core/systems/`.
 - Expose new APIs in scripting bridges as needed.
-- Build C plugins in `plugins/` as shown above.
+- Build C plugins in `plugins/` (see Makefile).

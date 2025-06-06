@@ -17,6 +17,32 @@ fn main() {
                 exit(1);
             }
         }
+        "build-c-plugins" => {
+            if let Err(e) = build_c_plugins() {
+                eprintln!("Error: {e}");
+                exit(1);
+            }
+        }
+        "build-wasm-tests" => {
+            if let Err(e) = build_wasm_tests() {
+                eprintln!("Error: {e}");
+                exit(1);
+            }
+        }
+        "build-all" => {
+            if let Err(e) = build_and_deploy_plugins() {
+                eprintln!("Error: {e}");
+                exit(1);
+            }
+            if let Err(e) = build_c_plugins() {
+                eprintln!("Error: {e}");
+                exit(1);
+            }
+            if let Err(e) = build_wasm_tests() {
+                eprintln!("Error: {e}");
+                exit(1);
+            }
+        }
         _ => {
             eprintln!("Unknown command: {command}");
             exit(1);
@@ -130,6 +156,67 @@ fn build_and_deploy_plugins() -> Result<(), Box<dyn std::error::Error>> {
                     workspace_target_dir.display(),
                     deps_dir.display()
                 );
+            }
+        }
+    }
+    Ok(())
+}
+
+fn build_c_plugins() -> Result<(), Box<dyn std::error::Error>> {
+    let plugins_dir = Path::new("plugins");
+    let engine_dir = Path::new("engine");
+    for entry in fs::read_dir(plugins_dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        if path.extension().and_then(|e| e.to_str()) == Some("c") {
+            let base = path.file_stem().unwrap().to_str().unwrap();
+            let out_lib = plugins_dir.join(format!("lib{}.so", base));
+            println!("Compiling {} -> {}", path.display(), out_lib.display());
+            let status = Command::new("gcc")
+                .args([
+                    "-I",
+                    engine_dir.to_str().unwrap(),
+                    "-shared",
+                    "-fPIC",
+                    path.to_str().unwrap(),
+                    "-o",
+                    out_lib.to_str().unwrap(),
+                ])
+                .status()?;
+            if !status.success() {
+                return Err(format!("Failed to compile {}", path.display()).into());
+            }
+        }
+    }
+    Ok(())
+}
+
+fn build_wasm_tests() -> Result<(), Box<dyn std::error::Error>> {
+    let test_dir = Path::new("engine_wasm/wasm_tests");
+    for entry in fs::read_dir(test_dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        if path.extension().and_then(|e| e.to_str()) == Some("rs") {
+            let stem = path.file_stem().unwrap().to_str().unwrap();
+            // Only compile files starting with "test_"
+            if !stem.starts_with("test_") {
+                continue;
+            }
+            let wasm_out = test_dir.join(format!("{stem}.wasm"));
+            println!("Compiling {} to {}", path.display(), wasm_out.display());
+            let status = Command::new("rustc")
+                .args([
+                    "--target",
+                    "wasm32-unknown-unknown",
+                    "-O",
+                    "--crate-type=cdylib",
+                    path.to_str().unwrap(),
+                    "-o",
+                    wasm_out.to_str().unwrap(),
+                ])
+                .status()?;
+            if !status.success() {
+                return Err(format!("Failed to compile {} to WASM", path.display()).into());
             }
         }
     }
