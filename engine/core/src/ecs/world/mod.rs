@@ -17,6 +17,7 @@ mod misc;
 mod resources;
 mod save_load;
 mod systems;
+pub mod wasm;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct TimeOfDay {
