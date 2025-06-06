@@ -16,11 +16,16 @@ jobs:
         with:
           components: rustfmt, clippy
 
+      - name: Install LuaJIT and pkg-config
+        run: sudo apt-get update && sudo apt-get install -y libluajit-5.1-dev pkg-config && sudo apt-get clean
+
       - name: Lint (rustfmt)
         run: cargo fmt --all --check
 
       - name: Clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
+        run: |
+          export PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig
+          cargo clippy --all-targets --all-features -- -D warnings
 
       - name: Clean up Rust build artifacts
         run: cargo clean
