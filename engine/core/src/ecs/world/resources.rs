@@ -1,6 +1,7 @@
 use super::World;
 
 impl World {
+    /// Modify the amount of a resource
     pub fn modify_resource_amount(
         &mut self,
         entity_id: u32,
@@ -28,6 +29,7 @@ impl World {
         Err("Resource component not found".to_string())
     }
 
+    /// Modify the amount of a resource in a stockpile
     pub fn modify_stockpile_resource(
         &mut self,
         entity_id: u32,

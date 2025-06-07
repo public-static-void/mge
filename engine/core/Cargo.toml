@@ -4,6 +4,8 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+engine_macros = { path = "../../engine_macros" }
+schema_validator = { path = "../tools/schema_validator" }
 mlua = { version = "0.10.5", features = ["luajit", "serialize"] }
 serde = { version = "1.0", features = ["derive"] }
 schemars = { version = "0.9", features = ["derive"] }
@@ -11,7 +13,6 @@ serde_json = "1.0.140"
 bson = "2.15.0"
 semver = { version = "1.0.26", features = ["serde"] }
 thiserror = "2.0.12"
-engine_macros = { path = "../../engine_macros" }
 anyhow = "1.0.98"
 libloading = "0.8"
 jsonschema = "0.30"
@@ -24,6 +25,7 @@ rand = "0.9.1"
 gag = "1.0.0"
 regex = "1.11.1"
 parking_lot = "0.12"
+walkdir = "2.5.0"
 
 [dev-dependencies]
 tempfile = "3.20.0"

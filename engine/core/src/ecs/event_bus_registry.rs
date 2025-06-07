@@ -3,24 +3,32 @@ use std::any::{Any, TypeId};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
+/// Metadata about a registered event bus.
 pub struct EventBusInfo {
+    /// The type ID of the event bus.
     pub type_id: TypeId,
+    /// The type name (best effort).
     pub type_name: &'static str,
+    /// The name of the event bus.
     pub name: String,
+    /// The number of subscribers.
     pub subscriber_count: usize,
 }
 
+/// Registry for event buses of various types.
 pub struct EventBusRegistry {
     buses: HashMap<(TypeId, String), Arc<dyn Any + Send + Sync>>,
 }
 
 impl EventBusRegistry {
+    /// Creates a new, empty event bus registry.
     pub fn new() -> Self {
         Self {
             buses: HashMap::new(),
         }
     }
 
+    /// Registers an event bus of type T with the given name.
     pub fn register_event_bus<T: 'static + Send + Sync>(
         &mut self,
         name: String,
@@ -30,6 +38,7 @@ impl EventBusRegistry {
             .insert((TypeId::of::<T>(), name), bus as Arc<dyn Any + Send + Sync>);
     }
 
+    /// Retrieves an event bus by type and name.
     pub fn get_event_bus<T: 'static + Send + Sync>(
         &self,
         name: &str,
@@ -39,6 +48,7 @@ impl EventBusRegistry {
             .and_then(|arc_any| arc_any.clone().downcast::<Mutex<EventBus<T>>>().ok())
     }
 
+    /// Unregisters an event bus by type and name.
     pub fn unregister_event_bus<T: 'static + Send + Sync>(&mut self, name: &str) -> bool {
         self.buses
             .remove(&(TypeId::of::<T>(), name.to_string()))
@@ -69,6 +79,7 @@ impl EventBusRegistry {
         }
     }
 
+    /// Subscribe to an event bus by type and name.
     pub fn subscribe<T, F>(&self, name: &str, handler: F) -> Option<SubscriberId>
     where
         T: 'static + Send + Sync + Clone,
@@ -78,6 +89,7 @@ impl EventBusRegistry {
             .map(|bus| bus.lock().unwrap().subscribe(handler))
     }
 
+    /// Unsubscribe from an event bus by type and name.
     pub fn unsubscribe<T>(&self, name: &str, id: SubscriberId) -> bool
     where
         T: 'static + Send + Sync + Clone,

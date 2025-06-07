@@ -7,7 +7,7 @@ use schemars::Schema;
 #[test]
 fn test_component_registration() {
     let mut registry = ComponentRegistry::new();
-    registry.register::<PositionComponent>().unwrap();
+    registry.register_component::<PositionComponent>().unwrap();
     assert!(registry.get_schema::<PositionComponent>().is_some());
 
     let json = registry.schema_to_json::<PositionComponent>().unwrap();
@@ -27,7 +27,7 @@ fn test_component_registration() {
 #[test]
 fn test_health_component() {
     let mut registry = ComponentRegistry::new();
-    registry.register::<Health>().unwrap();
+    registry.register_component::<Health>().unwrap();
     assert!(registry.get_schema::<Health>().is_some());
 
     let json = registry.schema_to_json::<Health>().unwrap();
@@ -286,4 +286,80 @@ fn test_register_and_unregister_external_schema() {
 
     registry.unregister_external_schema("TestComponent");
     assert!(registry.get_schema_by_name("TestComponent").is_none());
+}
+
+#[test]
+fn test_register_and_unregister_rust_native_component() {
+    use engine_core::ecs::components::position::PositionComponent;
+    use engine_core::ecs::registry::ComponentRegistry;
+
+    let mut registry = ComponentRegistry::new();
+
+    // Register component
+    assert!(registry.register_component::<PositionComponent>().is_ok());
+    assert!(registry.get_schema::<PositionComponent>().is_some());
+
+    // Unregister component
+    registry.unregister_component::<PositionComponent>();
+    assert!(registry.get_schema::<PositionComponent>().is_none());
+}
+
+#[test]
+fn test_components_for_mode() {
+    use engine_core::ecs::ComponentSchema;
+    use engine_core::ecs::registry::ComponentRegistry;
+    use schemars::Schema;
+
+    let mut registry = ComponentRegistry::new();
+
+    // Register two external components for different modes
+    registry.register_external_schema(ComponentSchema {
+        name: "A".to_string(),
+        schema: Schema::default().into(),
+        modes: vec!["foo".to_string()],
+    });
+    registry.register_external_schema(ComponentSchema {
+        name: "B".to_string(),
+        schema: Schema::default().into(),
+        modes: vec!["bar".to_string()],
+    });
+
+    let foo_comps = registry.components_for_mode("foo");
+    let bar_comps = registry.components_for_mode("bar");
+    assert!(foo_comps.contains(&"A".to_string()));
+    assert!(!foo_comps.contains(&"B".to_string()));
+    assert!(bar_comps.contains(&"B".to_string()));
+    assert!(!bar_comps.contains(&"A".to_string()));
+}
+
+#[test]
+fn test_is_registered() {
+    use engine_core::ecs::ComponentSchema;
+    use engine_core::ecs::registry::ComponentRegistry;
+    use schemars::Schema;
+
+    let mut registry = ComponentRegistry::new();
+
+    // Register an external component
+    registry.register_external_schema(ComponentSchema {
+        name: "Foo".to_string(),
+        schema: Schema::default().into(),
+        modes: vec!["test".to_string()],
+    });
+
+    // Should be registered
+    assert!(registry.is_registered("Foo"));
+    // Should not be registered
+    assert!(!registry.is_registered("Bar"));
+}
+
+#[test]
+fn test_is_registered_rust_native() {
+    use engine_core::ecs::components::position::PositionComponent;
+    use engine_core::ecs::registry::ComponentRegistry;
+
+    let mut registry = ComponentRegistry::new();
+    assert!(!registry.is_registered(std::any::type_name::<PositionComponent>()));
+    registry.register_component::<PositionComponent>().unwrap();
+    assert!(registry.is_registered(std::any::type_name::<PositionComponent>()));
 }
