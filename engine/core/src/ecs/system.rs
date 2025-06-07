@@ -45,6 +45,22 @@ impl SystemRegistry {
         self.systems.keys().cloned().collect()
     }
 
+    pub fn is_registered(&self, name: &str) -> bool {
+        self.systems.contains_key(name)
+    }
+
+    pub fn get_system(&self, name: &str) -> Option<std::cell::Ref<Box<dyn System>>> {
+        self.systems.get(name).map(|cell| cell.borrow())
+    }
+
+    pub fn sorted_systems(&self) -> Vec<std::cell::Ref<Box<dyn System>>> {
+        let names = self.sorted_system_names();
+        names
+            .into_iter()
+            .filter_map(|name| self.get_system(&name))
+            .collect()
+    }
+
     pub fn get_system_mut(&self, name: &str) -> Option<std::cell::RefMut<Box<dyn System>>> {
         self.systems.get(name).map(|cell| cell.borrow_mut())
     }

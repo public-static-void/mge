@@ -1,3 +1,4 @@
+use super::TimeOfDay;
 use super::World;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -17,6 +18,10 @@ impl World {
         let mut all = self.systems.sorted_system_names();
         all.extend(self.dynamic_systems.list_systems());
         all
+    }
+
+    pub fn has_system(&self, name: &str) -> bool {
+        self.systems.is_registered(name) || self.dynamic_systems.is_registered(name)
     }
 
     pub fn register_dynamic_system<F>(&mut self, name: &str, run: F)
@@ -97,5 +102,25 @@ impl World {
             world.update_event_buses::<serde_json::Value>();
             world.turn += 1;
         }
+    }
+
+    pub fn tick(world_rc: Rc<RefCell<World>>) {
+        World::simulation_tick(Rc::clone(&world_rc));
+        world_rc.borrow_mut().advance_time_of_day();
+    }
+
+    fn advance_time_of_day(&mut self) {
+        self.time_of_day.minute += 1;
+        if self.time_of_day.minute >= 60 {
+            self.time_of_day.minute = 0;
+            self.time_of_day.hour += 1;
+            if self.time_of_day.hour >= 24 {
+                self.time_of_day.hour = 0;
+            }
+        }
+    }
+
+    pub fn get_time_of_day(&self) -> TimeOfDay {
+        self.time_of_day
     }
 }

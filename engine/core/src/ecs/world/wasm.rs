@@ -12,6 +12,7 @@ pub struct WasmWorld {
 }
 
 impl WasmWorld {
+    /// Create a new world
     pub fn new() -> Self {
         WasmWorld {
             entities: Vec::new(),
@@ -22,6 +23,7 @@ impl WasmWorld {
         }
     }
 
+    /// Spawn a new entity
     pub fn spawn_entity(&mut self) -> u32 {
         let id = self.next_id;
         self.next_id += 1;
@@ -29,6 +31,7 @@ impl WasmWorld {
         id
     }
 
+    /// Despawn an entity
     pub fn despawn_entity(&mut self, entity: u32) {
         for comps in self.components.values_mut() {
             comps.remove(&entity);
@@ -36,10 +39,12 @@ impl WasmWorld {
         self.entities.retain(|&id| id != entity);
     }
 
+    /// Get all entities
     pub fn get_entities(&self) -> &[u32] {
         &self.entities
     }
 
+    /// Get all entities with a specific component
     pub fn get_entities_with_component(&self, name: &str) -> Vec<u32> {
         self.components
             .get(name)
@@ -47,6 +52,7 @@ impl WasmWorld {
             .unwrap_or_default()
     }
 
+    /// Get all entities with specific components
     pub fn get_entities_with_components(&self, names: &[&str]) -> Vec<u32> {
         if names.is_empty() {
             return self.entities.clone();
@@ -66,14 +72,17 @@ impl WasmWorld {
             .collect()
     }
 
+    /// Count all entities of a specific type
     pub fn count_entities_with_type(&self, type_str: &str) -> usize {
         self.get_entities_with_component(type_str).len()
     }
 
+    /// Check if an entity is alive
     pub fn is_entity_alive(&self, entity_id: u32) -> bool {
         self.entities.contains(&entity_id)
     }
 
+    /// Move an entity
     pub fn move_entity(&mut self, entity_id: u32, dx: f32, dy: f32) {
         // This implementation assumes a "Position" component with "x" and "y" fields.
         let comps = self.components.entry("Position".to_string()).or_default();
@@ -87,6 +96,7 @@ impl WasmWorld {
         *pos = serde_json::json!({"x": x, "y": y});
     }
 
+    /// Damage an entity
     pub fn damage_entity(&mut self, entity_id: u32, amount: f32) {
         // This implementation assumes a "Health" component with an "hp" field.
         let comps = self.components.entry("Health".to_string()).or_default();

@@ -2,14 +2,22 @@ use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use std::sync::{Arc, Weak};
 
+/// Unique identifier for event subscribers.
 pub type SubscriberId = usize;
+/// A filter function for event subscription.
 pub type FilterFn<E> = Box<dyn Fn(&E) -> bool + Send + Sync>;
+/// A mapping function for event subscription.
 pub type MapFn<E, U> = Box<dyn Fn(&E) -> Option<U> + Send + Sync>;
 
+/// Represents a subscriber to an event bus.
 pub struct Subscriber<E> {
+    /// The unique subscriber ID.
     pub id: SubscriberId,
+    /// The handler function to call when an event is received.
     pub handler: Box<dyn Fn(&E) + Send + Sync>,
+    /// If true, the subscriber is removed after the first event.
     pub once: bool,
+    /// Optional weak reference for automatic unsubscription.
     pub weak_owner: Option<Weak<()>>,
 }
 
@@ -34,6 +42,7 @@ impl<E> Default for EventBus<E> {
 }
 
 impl<E> EventBus<E> {
+    /// Returns the number of subscribers to this event bus.
     pub fn subscriber_count(&self) -> usize {
         self.subscribers.len()
     }
@@ -62,10 +71,12 @@ impl<E> EventBus<E> {
         })
     }
 
+    /// Set the current event buffer.
     pub fn set_events(&mut self, events: std::collections::VecDeque<E>) {
         self.events = events;
     }
 
+    /// Set the last event buffer.
     pub fn set_last_events(&mut self, last_events: std::collections::VecDeque<E>) {
         self.last_events = last_events;
     }
@@ -126,10 +137,17 @@ impl<E: Clone + Send + Sync + 'static> EventBus<E> {
         self.events.clear();
     }
 
+    /// Returns the last events sent to this event bus.
     pub fn last_events(&self) -> &VecDeque<E> {
         &self.last_events
     }
 
+    /// Returns the last event sent to this event bus.
+    pub fn last_event(&self) -> Option<E> {
+        self.last_events.front().cloned()
+    }
+
+    /// Try to receive an event from the event bus.
     pub fn try_recv(&mut self) -> Option<E> {
         self.events.pop_front()
     }
@@ -201,15 +219,20 @@ pub struct EventReader {
 }
 
 impl EventReader {
+    /// Creates a new event reader.
     pub fn new() -> Self {
         Self { last_index: 0 }
     }
+
+    /// Reads unread events from the bus.
     pub fn read<'a, E>(&mut self, bus: &'a EventBus<E>) -> impl Iterator<Item = &'a E> {
         let events = &bus.last_events;
         let start = self.last_index.min(events.len());
         self.last_index = events.len();
         events.iter().skip(start)
     }
+
+    /// Reads all events from the bus.
     pub fn read_all<'a, E>(&self, bus: &'a EventBus<E>) -> impl Iterator<Item = &'a E> {
         bus.last_events.iter()
     }

@@ -16,6 +16,10 @@ impl World {
         self.entities.retain(|&id| id != entity);
     }
 
+    pub fn entity_exists(&self, entity: u32) -> bool {
+        self.entities.contains(&entity)
+    }
+
     pub fn get_entities(&self) -> Vec<u32> {
         self.entities.clone()
     }
@@ -28,6 +32,12 @@ impl World {
             .get(name)
             .map(|map| map.keys().cloned().collect())
             .unwrap_or_default()
+    }
+
+    pub fn has_component(&self, entity: u32, name: &str) -> bool {
+        self.components
+            .get(name)
+            .is_some_and(|m| m.contains_key(&entity))
     }
 
     pub fn get_entities_with_components(&self, names: &[&str]) -> Vec<u32> {

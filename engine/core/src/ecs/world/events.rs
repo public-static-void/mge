@@ -7,6 +7,7 @@ use std::{
 };
 
 impl World {
+    /// Send an event to the given event bus
     pub fn send_event(&mut self, event_type: &str, payload: JsonValue) -> Result<(), String> {
         println!(
             "Rust: send_event called for type '{}' with payload {:?}",
@@ -25,6 +26,7 @@ impl World {
         Ok(())
     }
 
+    /// Get an event bus by name
     pub fn get_event_bus<T: 'static + Send + Sync>(
         &self,
         name: &str,
@@ -32,6 +34,7 @@ impl World {
         self.event_buses.get_event_bus::<T>(name)
     }
 
+    /// Get or create an event bus
     pub fn get_or_create_event_bus<T: 'static + Send + Sync>(
         &mut self,
         name: &str,
@@ -43,10 +46,12 @@ impl World {
         }
     }
 
+    /// Update all event buses
     pub fn update_event_buses<T: 'static + Send + Sync + Clone>(&self) {
         self.event_buses.update_event_buses::<T>();
     }
 
+    /// Get all events of the given type
     pub fn take_events(&mut self, event_type: &str) -> Vec<serde_json::Value> {
         if let Some(bus) = self.event_buses.get_event_bus(event_type) {
             let mut reader = crate::ecs::event::EventReader::default();
@@ -84,6 +89,7 @@ impl World {
         }
     }
 
+    /// Register a new event bus
     pub fn register_event_bus<T: 'static + Send + Sync>(
         &mut self,
         name: &str,
@@ -94,6 +100,7 @@ impl World {
         bus
     }
 
+    /// Subscribe to an event
     pub fn subscribe<T, F>(&self, name: &str, handler: F) -> Option<SubscriberId>
     where
         T: 'static + Send + Sync + Clone,
@@ -102,6 +109,7 @@ impl World {
         self.event_buses.subscribe::<T, F>(name, handler)
     }
 
+    /// Unsubscribe from an event
     pub fn unsubscribe<T>(&self, name: &str, id: SubscriberId) -> bool
     where
         T: 'static + Send + Sync + Clone,
@@ -109,18 +117,22 @@ impl World {
         self.event_buses.unsubscribe::<T>(name, id)
     }
 
+    /// List all event buses
     pub fn list_event_buses(&self) -> Vec<crate::ecs::event_bus_registry::EventBusInfo> {
         self.event_buses.list_buses()
     }
 
+    /// List all event bus names
     pub fn list_event_bus_names(&self) -> Vec<String> {
         self.event_buses.list_bus_names()
     }
 
+    /// List all event bus types and names
     pub fn list_event_bus_types_and_names(&self) -> Vec<(String, String)> {
         self.event_buses.list_bus_types_and_names()
     }
 
+    /// Get the number of subscribers to the given event
     pub fn event_bus_subscriber_count<T: 'static + Send + Sync>(
         &self,
         name: &str,

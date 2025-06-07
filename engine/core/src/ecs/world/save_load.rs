@@ -3,11 +3,13 @@ use crate::ecs::registry::ComponentRegistry;
 use std::sync::{Arc, Mutex};
 
 impl World {
+    /// Save the world to a file
     pub fn save_to_file(&self, path: &std::path::Path) -> Result<(), std::io::Error> {
         let json = serde_json::to_string_pretty(&self)?;
         std::fs::write(path, json)
     }
 
+    /// Load a world from a file
     pub fn load_from_file(
         path: &std::path::Path,
         registry: Arc<Mutex<ComponentRegistry>>,

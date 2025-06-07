@@ -44,7 +44,9 @@ impl ComponentRegistry {
     }
 
     /// Register a component type and its schema.
-    pub fn register<T: super::Component>(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn register_component<T: super::Component>(
+        &mut self,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let type_id = TypeId::of::<T>();
         let schema = T::generate_schema();
 
@@ -61,11 +63,23 @@ impl ComponentRegistry {
         Ok(())
     }
 
+    /// Returns true if a component with the given name is registered
+    pub fn is_registered(&self, name: &str) -> bool {
+        self.get_schema_by_name(name).is_some()
+    }
+
+    /// Unregister a Rust-native component type by TypeId.
+    pub fn unregister_component<T: super::Component>(&mut self) {
+        let type_id = std::any::TypeId::of::<T>();
+        self.components.remove(&type_id);
+    }
+
     /// Get the schema for a registered component type.
     pub fn get_schema<T: super::Component>(&self) -> Option<&ComponentSchema> {
         self.components.get(&TypeId::of::<T>())
     }
 
+    /// Get the schema for a registered component type by name.
     pub fn get_schema_by_name(&self, name: &str) -> Option<&ComponentSchema> {
         self.components
             .values()
@@ -98,6 +112,7 @@ impl ComponentRegistry {
         T::migrate(from_version, data)
     }
 
+    /// Return all component names registered in the registry
     pub fn all_component_names(&self) -> Vec<String> {
         let mut names = std::collections::HashSet::new();
         for schema in self.components.values() {
@@ -109,6 +124,7 @@ impl ComponentRegistry {
         names.into_iter().collect()
     }
 
+    /// Register an external component schema at runtime.
     pub fn register_external_schema(&mut self, schema: ComponentSchema) {
         self.external_components.insert(schema.name.clone(), schema);
     }
@@ -146,6 +162,7 @@ impl ComponentRegistry {
         Ok(())
     }
 
+    /// Return all component modes registered in the registry
     pub fn all_modes(&self) -> std::collections::HashSet<String> {
         let mut modes = std::collections::HashSet::new();
         for schema in self
@@ -158,6 +175,16 @@ impl ComponentRegistry {
             }
         }
         modes
+    }
+
+    // Get all component names registered for a given mode.
+    pub fn components_for_mode(&self, mode: &str) -> Vec<String> {
+        self.components
+            .values()
+            .chain(self.external_components.values())
+            .filter(|schema| schema.modes.iter().any(|m| m == mode))
+            .map(|schema| schema.name.clone())
+            .collect()
     }
 
     /// Unregister an external component schema by name.
