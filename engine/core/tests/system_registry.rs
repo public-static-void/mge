@@ -64,3 +64,86 @@ fn test_register_and_unregister_system() {
     registry.unregister_system("DummySystem");
     assert!(!registry.list_systems().contains(&"DummySystem".to_string()));
 }
+
+struct A;
+impl System for A {
+    fn name(&self) -> &'static str {
+        "A"
+    }
+    fn run(&mut self, _world: &mut World, _lua: Option<&mlua::Lua>) {}
+    fn dependencies(&self) -> &'static [&'static str] {
+        &[]
+    }
+}
+
+struct B;
+impl System for B {
+    fn name(&self) -> &'static str {
+        "B"
+    }
+    fn run(&mut self, _world: &mut World, _lua: Option<&mlua::Lua>) {}
+    fn dependencies(&self) -> &'static [&'static str] {
+        &["A"]
+    }
+}
+
+#[test]
+fn test_register_and_query_systems() {
+    let mut reg = SystemRegistry::new();
+    reg.register_system(A);
+    reg.register_system(B);
+
+    assert!(reg.is_registered("A"));
+    assert!(reg.is_registered("B"));
+    assert!(!reg.is_registered("C"));
+
+    assert!(reg.get_system("A").is_some());
+    assert!(reg.get_system_mut("A").is_some());
+}
+
+#[test]
+fn test_unregister_system() {
+    let mut reg = SystemRegistry::new();
+    reg.register_system(A);
+    assert!(reg.is_registered("A"));
+    reg.unregister_system("A");
+    assert!(!reg.is_registered("A"));
+}
+
+#[test]
+fn test_sorted_system_names() {
+    let mut reg = SystemRegistry::new();
+    reg.register_system(A);
+    reg.register_system(B);
+    let sorted = reg.sorted_system_names();
+    assert_eq!(sorted, vec!["A".to_string(), "B".to_string()]);
+}
+
+#[test]
+#[should_panic]
+fn test_cycle_detection() {
+    struct C;
+    impl System for C {
+        fn name(&self) -> &'static str {
+            "C"
+        }
+        fn run(&mut self, _world: &mut World, _lua: Option<&mlua::Lua>) {}
+        fn dependencies(&self) -> &'static [&'static str] {
+            &["D"]
+        }
+    }
+    struct D;
+    impl System for D {
+        fn name(&self) -> &'static str {
+            "D"
+        }
+        fn run(&mut self, _world: &mut World, _lua: Option<&mlua::Lua>) {}
+        fn dependencies(&self) -> &'static [&'static str] {
+            &["C"]
+        }
+    }
+    let mut reg = SystemRegistry::new();
+    reg.register_system(C);
+    reg.register_system(D);
+    reg.sorted_system_names(); // Should panic due to cycle
+}

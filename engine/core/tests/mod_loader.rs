@@ -15,14 +15,10 @@ fn setup_test_mod_dir() -> (tempfile::TempDir, std::path::PathBuf) {
 
     // Write schema
     let schema = r#"{
-        "name": "TestComponent",
-        "schema": {
-            "title": "TestComponent",
-            "type": "object",
-            "properties": { "foo": { "type": "number" } },
-            "required": ["foo"],
-            "modes": ["colony"]
-        },
+        "title": "TestComponent",
+        "type": "object",
+        "properties": { "foo": { "type": "number" } },
+        "required": ["foo"],
         "modes": ["colony"]
     }"#;
     std::fs::write(mod_dir.join("schemas").join("test_component.json"), schema).unwrap();
