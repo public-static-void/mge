@@ -15,7 +15,7 @@ pub struct ComponentRegistry {
 /// Trait for ECS components supporting schema, versioning, and migration.
 pub trait Component: 'static + Send + Sync {
     /// Generate a JSON schema for this component.
-    fn generate_schema() -> Option<schemars::schema::RootSchema>;
+    fn generate_schema() -> Option<schemars::Schema>;
 
     /// Return the component's version.
     fn version() -> Version {
@@ -52,7 +52,9 @@ impl ComponentRegistry {
             type_id,
             ComponentSchema {
                 name: std::any::type_name::<T>().to_string(),
-                schema: schema.expect("schema must be present"),
+                schema: schema
+                    .map(|s| serde_json::to_value(&s).expect("failed to convert schema to JSON"))
+                    .expect("schema must be present"),
                 modes: vec![],
             },
         );
@@ -116,9 +118,6 @@ impl ComponentRegistry {
         // Parse the JSON string into a serde_json::Value
         let v: serde_json::Value = serde_json::from_str(json)?;
 
-        // Parse as RootSchema for validation/storage
-        let schema: schemars::schema::RootSchema = serde_json::from_value(v.clone())?;
-
         // Extract title (name)
         let name = v
             .get("title")
@@ -140,7 +139,7 @@ impl ComponentRegistry {
         // Insert into registry
         let cs = ComponentSchema {
             name: name.clone(),
-            schema,
+            schema: v, // Store as serde_json::Value
             modes,
         };
         self.external_components.insert(name, cs);

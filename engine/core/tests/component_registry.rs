@@ -2,7 +2,7 @@ use engine_core::ecs::ComponentSchema;
 use engine_core::ecs::Health;
 use engine_core::ecs::components::position::PositionComponent;
 use engine_core::ecs::registry::ComponentRegistry;
-use schemars::schema::RootSchema;
+use schemars::Schema;
 
 #[test]
 fn test_component_registration() {
@@ -278,7 +278,7 @@ fn test_register_and_unregister_external_schema() {
     let mut registry = ComponentRegistry::new();
     let schema = ComponentSchema {
         name: "TestComponent".to_string(),
-        schema: RootSchema::default(),
+        schema: Schema::default().into(),
         modes: vec!["test".to_string()],
     };
     registry.register_external_schema(schema.clone());

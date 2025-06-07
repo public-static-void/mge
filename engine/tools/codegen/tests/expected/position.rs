@@ -16,7 +16,7 @@ pub struct PositionComponent {
 }
 
 impl Component for PositionComponent {
-    fn generate_schema() -> Option<schemars::schema::RootSchema> {
+    fn generate_schema() -> Option<schemars::schema::Schema> {
         Some(schemars::schema_for!(PositionComponent))
     }
 

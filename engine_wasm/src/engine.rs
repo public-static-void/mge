@@ -134,7 +134,7 @@ impl WasmScriptEngine {
         if results.is_empty() {
             Ok(None)
         } else {
-            Ok(Some(WasmValue::try_from(results[0].clone())?))
+            Ok(Some(WasmValue::try_from(results[0])?))
         }
     }
 }

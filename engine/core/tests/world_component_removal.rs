@@ -1,7 +1,7 @@
 use engine_core::ecs::ComponentSchema;
 use engine_core::ecs::registry::ComponentRegistry;
 use engine_core::ecs::world::World;
-use schemars::schema::RootSchema;
+use schemars::Schema;
 use std::sync::{Arc, Mutex};
 
 #[test]
@@ -9,7 +9,7 @@ fn test_component_data_cleanup_on_unregister() {
     let mut registry = ComponentRegistry::new();
     let schema = ComponentSchema {
         name: "CleanupComponent".to_string(),
-        schema: RootSchema::default(),
+        schema: Schema::default().into(),
         modes: vec!["colony".to_string()],
     };
     registry.register_external_schema(schema);

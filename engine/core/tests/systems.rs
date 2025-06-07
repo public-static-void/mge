@@ -2,13 +2,13 @@ use engine_core::ecs::registry::ComponentRegistry;
 use engine_core::ecs::schema::ComponentSchema;
 use engine_core::ecs::world::World;
 use engine_core::systems::death_decay::ProcessDeaths;
-use schemars::schema::RootSchema;
+use schemars::Schema;
 use serde_json::Value;
 use serde_json::json;
 use std::sync::{Arc, Mutex};
 
-/// Helper: Convert a serde_json::Value into a RootSchema for registration.
-fn make_schema_from_json(value: Value) -> RootSchema {
+/// Helper: Convert a serde_json::Value into a Schema for registration.
+fn make_schema_from_json(value: Value) -> Schema {
     serde_json::from_value(value).expect("Invalid schema JSON")
 }
 
@@ -29,7 +29,7 @@ pub fn make_test_world_with_positions() -> World {
         let schema = make_schema_from_json(schema_json);
         reg.register_external_schema(ComponentSchema {
             name: "Position".to_string(),
-            schema: schema.clone(),
+            schema: schema.clone().into(),
             modes: vec!["colony".to_string(), "roguelike".to_string()],
         });
     } // lock is dropped here
@@ -60,7 +60,7 @@ pub fn make_test_world_with_health() -> (World, u32) {
         let schema = make_schema_from_json(schema_json);
         reg.register_external_schema(ComponentSchema {
             name: "Health".to_string(),
-            schema: schema.clone(),
+            schema: schema.clone().into(),
             modes: vec!["colony".to_string(), "roguelike".to_string()],
         });
     } // lock is dropped here

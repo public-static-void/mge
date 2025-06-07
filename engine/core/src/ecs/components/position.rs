@@ -23,7 +23,7 @@ pub struct LegacyPosition {
 }
 
 impl crate::ecs::Component for PositionComponent {
-    fn generate_schema() -> Option<schemars::schema::RootSchema> {
+    fn generate_schema() -> Option<schemars::Schema> {
         Some(schemars::schema_for!(PositionComponent))
     }
 
