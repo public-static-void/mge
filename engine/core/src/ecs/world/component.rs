@@ -41,7 +41,25 @@ impl World {
 
     /// Gets a reference to a component value for an entity.
     pub fn get_component(&self, entity: u32, name: &str) -> Option<&JsonValue> {
+        if !self.is_component_allowed_in_mode(name, &self.current_mode) {
+            return None;
+        }
         self.components.get(name)?.get(&entity)
+    }
+
+    /// Removes a component from an entity, enforcing mode restrictions and emitting events if needed.
+    pub fn remove_component(&mut self, entity: u32, name: &str) -> Result<(), String> {
+        if !self.is_component_allowed_in_mode(name, &self.current_mode) {
+            return Err(format!(
+                "Component {} not allowed in mode {}",
+                name, self.current_mode
+            ));
+        }
+        if let Some(comps) = self.components.get_mut(name) {
+            comps.remove(&entity);
+        }
+        // Optionally: emit event, log, etc.
+        Ok(())
     }
 
     /// Returns true if the component is allowed in the current mode.

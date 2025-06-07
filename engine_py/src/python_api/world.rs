@@ -102,7 +102,7 @@ impl PyWorld {
     ) -> PyResult<Option<PyObject>> {
         ComponentApi::get_component(self, py, entity_id, name)
     }
-    fn remove_component(&self, entity_id: u32, name: String) {
+    fn remove_component(&self, entity_id: u32, name: String) -> PyResult<()> {
         ComponentApi::remove_component(self, entity_id, name)
     }
     fn get_entities_with_component(&self, name: String) -> PyResult<Vec<u32>> {

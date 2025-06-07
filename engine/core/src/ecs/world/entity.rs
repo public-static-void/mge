@@ -1,4 +1,5 @@
 use super::World;
+use crate::ecs::components::position::{Position, PositionComponent};
 
 impl World {
     pub fn spawn_entity(&mut self) -> u32 {
@@ -20,6 +21,9 @@ impl World {
     }
 
     pub fn get_entities_with_component(&self, name: &str) -> Vec<u32> {
+        if !self.is_component_allowed_in_mode(name, &self.current_mode) {
+            return vec![];
+        }
         self.components
             .get(name)
             .map(|map| map.keys().cloned().collect())
@@ -30,9 +34,16 @@ impl World {
         if names.is_empty() {
             return self.entities.clone();
         }
-        let mut sets: Vec<std::collections::HashSet<u32>> = names
+        let allowed_names: Vec<&&str> = names
             .iter()
-            .filter_map(|name| self.components.get(*name))
+            .filter(|&&name| self.is_component_allowed_in_mode(name, &self.current_mode))
+            .collect();
+        if allowed_names.is_empty() {
+            return vec![];
+        }
+        let mut sets: Vec<std::collections::HashSet<u32>> = allowed_names
+            .iter()
+            .filter_map(|&&name| self.components.get(name))
             .map(|comps| comps.keys().cloned().collect())
             .collect();
         if sets.is_empty() {
@@ -43,6 +54,61 @@ impl World {
             .fold(first, |acc, set| acc.intersection(&set).cloned().collect())
             .into_iter()
             .collect()
+    }
+
+    pub fn move_entity(&mut self, entity: u32, dx: f32, dy: f32) {
+        if let Some(value) = self.get_component(entity, "Position").cloned() {
+            if let Ok(mut pos_comp) = serde_json::from_value::<PositionComponent>(value) {
+                if let Position::Square { x, y, .. } = &mut pos_comp.pos {
+                    *x += dx as i32;
+                    *y += dy as i32;
+                }
+                let _ = self.set_component(
+                    entity,
+                    "Position",
+                    serde_json::to_value(&pos_comp).unwrap(),
+                );
+            }
+        }
+    }
+
+    pub fn damage_entity(&mut self, entity: u32, amount: f32) {
+        if let Some(healths) = self.components.get_mut("Health") {
+            if let Some(value) = healths.get_mut(&entity) {
+                if let Some(obj) = value.as_object_mut() {
+                    if let Some(current) = obj.get_mut("current") {
+                        if let Some(cur_val) = current.as_f64() {
+                            *current = serde_json::json!((cur_val - amount as f64).max(0.0));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn is_entity_alive(&self, entity: u32) -> bool {
+        if let Some(health) = self.get_component(entity, "Health") {
+            health
+                .get("current")
+                .and_then(|v| v.as_f64())
+                .unwrap_or(0.0)
+                > 0.0
+        } else {
+            false
+        }
+    }
+
+    pub fn count_entities_with_type(&self, type_str: &str) -> usize {
+        self.get_entities_with_component("Type")
+            .into_iter()
+            .filter(|&id| {
+                self.get_component(id, "Type")
+                    .and_then(|v| v.get("kind"))
+                    .and_then(|k| k.as_str())
+                    .map(|k| k == type_str)
+                    .unwrap_or(false)
+            })
+            .count()
     }
 
     /// Returns all entity IDs in the given cell.
