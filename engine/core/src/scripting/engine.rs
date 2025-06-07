@@ -4,6 +4,7 @@ use super::lua_api::register_all_api_functions;
 use super::system_bridge::register_system_functions;
 use crate::ecs::world::World;
 use crate::scripting::helpers::json_to_lua_table;
+use crate::scripting::lua_api::world::register_world_api;
 use crate::scripting::lua_api::worldgen::register_worldgen_api;
 use crate::worldgen::WorldgenRegistry;
 use mlua::RegistryKey;
@@ -21,6 +22,7 @@ pub struct ScriptEngine {
 }
 
 impl ScriptEngine {
+    /// Creates a new ScriptEngine
     pub fn new() -> Self {
         Self::new_with_input(Box::new(StdinInput))
     }
@@ -75,12 +77,17 @@ impl ScriptEngine {
         }
     }
 
+    /// Runs the given Lua script
     pub fn run_script(&self, code: &str) -> LuaResult<()> {
         self.lua.load(code).call(())
     }
 
+    /// Registers the world to the Lua VM and exposes it as a global `world` userdata
     pub fn register_world(&mut self, world: Rc<RefCell<World>>) -> mlua::Result<()> {
         let globals = self.lua.globals();
+
+        // Expose the ECS world as a Lua userdata with methods
+        register_world_api(&self.lua, &globals, world.clone())?;
 
         register_worldgen_api(&self.lua, &globals, self.worldgen_registry.clone())?;
 
@@ -104,6 +111,7 @@ impl ScriptEngine {
         Ok(())
     }
 
+    /// Sets the command line arguments
     pub fn set_lua_args(&self, args: Vec<String>) {
         let globals = self.lua.globals();
         let lua_args = self
@@ -118,6 +126,11 @@ impl ScriptEngine {
         globals
             .set("arg", lua_args)
             .expect("Failed to set global arg in Lua");
+    }
+
+    /// Returns a mutable reference to the worldgen registry.
+    pub fn worldgen_registry_mut(&self) -> std::cell::RefMut<'_, WorldgenRegistry> {
+        self.worldgen_registry.borrow_mut()
     }
 }
 

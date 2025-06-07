@@ -16,6 +16,7 @@ pub mod save_load;
 pub mod time_of_day;
 pub mod turn;
 pub mod ui;
+pub mod world;
 pub mod worldgen;
 
 use crate::ecs::world::World;

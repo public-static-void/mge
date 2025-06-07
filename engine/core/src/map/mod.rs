@@ -26,8 +26,9 @@ impl Map {
     }
 
     /// Deserialize a Map from a JSON value.
-    pub fn from_json(value: &Value) -> Option<Self> {
+    pub fn from_json(value: &Value) -> Result<Self, String> {
         crate::map::deserialize::map_from_json(value)
+            .ok_or_else(|| "Map parse error: could not parse map from JSON".to_string())
     }
 
     /// Check if the Map contains a cell.
