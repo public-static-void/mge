@@ -428,6 +428,19 @@ impl PyWorld {
         }
     }
 
+    fn apply_generated_map(&self, map: Bound<'_, PyAny>) -> PyResult<()> {
+        let map_json: serde_json::Value = pythonize::depythonize(&map)?;
+        let mut world = self.inner.borrow_mut();
+        world
+            .apply_generated_map(&map_json)
+            .map_err(pyo3::exceptions::PyValueError::new_err)
+    }
+
+    fn get_map_cell_count(&self) -> usize {
+        let world = self.inner.borrow();
+        world.map.as_ref().map(|m| m.all_cells().len()).unwrap_or(0)
+    }
+
     fn get_time_of_day(&self, py: Python) -> PyObject {
         TimeOfDayApi::get_time_of_day(self, py)
     }
