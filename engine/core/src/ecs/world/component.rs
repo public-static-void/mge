@@ -1,10 +1,10 @@
 use super::World;
 use crate::ecs::error::RegistryError;
 use crate::ecs::schema::ComponentSchema;
-use jsonschema::{Draft, JSONSchema};
 use serde_json::Value as JsonValue;
 
 impl World {
+    /// Sets a component value for an entity, validating against its schema if present.
     pub fn set_component(
         &mut self,
         entity: u32,
@@ -19,13 +19,15 @@ impl World {
         }
 
         if let Some(schema) = self.registry.lock().unwrap().get_schema_by_name(name) {
-            let compiled = JSONSchema::options()
-                .with_draft(Draft::Draft7)
-                .compile(&serde_json::to_value(&schema.schema).unwrap())
+            // Directly use the schema as serde_json::Value
+            let validator = jsonschema::validator_for(&schema.schema)
                 .map_err(|e| format!("Schema compile error: {e}"))?;
-            let result = compiled.validate(&value);
-            if let Err(errors) = result {
-                let msg = errors.map(|e| e.to_string()).collect::<Vec<_>>().join(", ");
+            let mut errors = validator.iter_errors(&value);
+            if let Some(first_error) = errors.next() {
+                // Collect all error messages
+                let mut msgs = vec![first_error.to_string()];
+                msgs.extend(errors.map(|e| e.to_string()));
+                let msg = msgs.join(", ");
                 return Err(format!("Schema validation failed: {msg}"));
             }
         }
@@ -37,10 +39,12 @@ impl World {
         Ok(())
     }
 
+    /// Gets a reference to a component value for an entity.
     pub fn get_component(&self, entity: u32, name: &str) -> Option<&JsonValue> {
         self.components.get(name)?.get(&entity)
     }
 
+    /// Returns true if the component is allowed in the current mode.
     pub fn is_component_allowed_in_mode(&self, component: &str, mode: &str) -> bool {
         if let Some(schema) = self.registry.lock().unwrap().get_schema_by_name(component) {
             schema.modes.contains(&mode.to_string())
@@ -68,6 +72,7 @@ impl World {
         self.registry.lock().unwrap().update_external_schema(schema)
     }
 
+    /// Hot-reload a component schema and migrate component data.
     pub fn hotreload_schema_with_migration<F>(
         &mut self,
         schema: ComponentSchema,
