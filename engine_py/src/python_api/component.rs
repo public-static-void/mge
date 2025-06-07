@@ -12,7 +12,7 @@ pub trait ComponentApi {
         entity_id: u32,
         name: String,
     ) -> PyResult<Option<PyObject>>;
-    fn remove_component(&self, entity_id: u32, name: String);
+    fn remove_component(&self, entity_id: u32, name: String) -> PyResult<()>;
     fn get_entities_with_component(&self, name: String) -> PyResult<Vec<u32>>;
     fn get_entities_with_components(&self, names: Vec<String>) -> Vec<u32>;
     fn list_components(&self) -> Vec<String>;
@@ -44,11 +44,11 @@ impl ComponentApi for PyWorld {
         }
     }
 
-    fn remove_component(&self, entity_id: u32, name: String) {
+    fn remove_component(&self, entity_id: u32, name: String) -> PyResult<()> {
         let mut world = self.inner.borrow_mut();
-        if let Some(comps) = world.components.get_mut(&name) {
-            comps.remove(&entity_id);
-        }
+        world
+            .remove_component(entity_id, &name)
+            .map_err(pyo3::exceptions::PyValueError::new_err)
     }
 
     fn get_entities_with_component(&self, name: String) -> PyResult<Vec<u32>> {
