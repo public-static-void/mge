@@ -6,6 +6,7 @@ use super::square::SquareGridMap;
 use crate::map::topology::MapTopology;
 use serde_json::Value;
 
+/// Convert a JSON map to a Map object
 pub fn map_from_json(value: &Value) -> Option<Map> {
     let topology = value.get("topology")?.as_str()?;
     match topology {

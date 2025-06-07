@@ -12,15 +12,20 @@ pub struct RegionMap {
 }
 
 impl RegionMap {
+    /// Create a new empty map
     pub fn new() -> Self {
         Self {
             cells: HashMap::new(),
             cell_metadata: HashMap::new(),
         }
     }
+
+    /// Add a cell
     pub fn add_cell(&mut self, id: &str) {
         self.cells.entry(id.to_string()).or_default();
     }
+
+    /// Add a neighbor
     pub fn add_neighbor(&mut self, from: &str, to: &str) {
         self.cells
             .entry(from.to_string())
@@ -36,6 +41,7 @@ impl Default for RegionMap {
 }
 
 impl MapTopology for RegionMap {
+    /// Returns the neighbors of a cell
     fn neighbors(&self, cell: &CellKey) -> Vec<CellKey> {
         if let CellKey::Region { id } = cell {
             self.cells
@@ -50,29 +56,43 @@ impl MapTopology for RegionMap {
             vec![]
         }
     }
+
+    /// Returns true if the map contains the cell
     fn contains(&self, cell: &CellKey) -> bool {
         matches!(cell, CellKey::Region { id } if self.cells.contains_key(id))
     }
+
+    /// Returns all the cells
     fn all_cells(&self) -> Vec<CellKey> {
         self.cells
             .keys()
             .map(|id| CellKey::Region { id: id.clone() })
             .collect()
     }
+
+    /// Returns the type of the topology
     fn topology_type(&self) -> &'static str {
         "region"
     }
+
+    /// Returns a reference to the topology
     fn as_any(&self) -> &dyn std::any::Any {
         self
     }
+
+    /// Returns a mutable reference to the topology
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
         self
     }
+
+    /// Sets the metadata for a cell
     fn set_cell_metadata(&mut self, cell: &CellKey, data: Value) {
         if let CellKey::Region { id } = cell {
             self.cell_metadata.insert(id.clone(), data);
         }
     }
+
+    /// Gets the metadata for a cell
     fn get_cell_metadata(&self, cell: &CellKey) -> Option<&Value> {
         if let CellKey::Region { id } = cell {
             self.cell_metadata.get(id)
