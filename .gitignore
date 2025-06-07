@@ -80,3 +80,7 @@ plugins/*/[^./]*
 !plugins/**/Cargo.toml
 !plugins/**/plugin.json
 !plugins/**/src/
+
+# Ignore all WASM files in test/build directories
+engine_wasm/wasm_tests/*.wasm
+engine_wasm/tests/*.wasm
