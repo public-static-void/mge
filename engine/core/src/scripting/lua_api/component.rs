@@ -50,12 +50,12 @@ pub fn register_component_api(
 
     // remove_component(entity, name)
     let world_remove_component = world.clone();
-    let remove_component = lua.create_function_mut(move |_, (entity, name): (u32, String)| {
+    let remove_component = lua.create_function_mut(move |lua, (entity, name): (u32, String)| {
         let mut world = world_remove_component.borrow_mut();
-        if let Some(comps) = world.components.get_mut(&name) {
-            comps.remove(&entity);
+        match world.remove_component(entity, &name) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(crate::scripting::helpers::lua_error_msg(lua, &e)),
         }
-        Ok(())
     })?;
     globals.set("remove_component", remove_component)?;
 
