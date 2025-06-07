@@ -21,6 +21,9 @@ impl World {
     }
 
     pub fn get_entities_with_component(&self, name: &str) -> Vec<u32> {
+        if !self.is_component_allowed_in_mode(name, &self.current_mode) {
+            return vec![];
+        }
         self.components
             .get(name)
             .map(|map| map.keys().cloned().collect())
@@ -31,9 +34,16 @@ impl World {
         if names.is_empty() {
             return self.entities.clone();
         }
-        let mut sets: Vec<std::collections::HashSet<u32>> = names
+        let allowed_names: Vec<&&str> = names
             .iter()
-            .filter_map(|name| self.components.get(*name))
+            .filter(|&&name| self.is_component_allowed_in_mode(name, &self.current_mode))
+            .collect();
+        if allowed_names.is_empty() {
+            return vec![];
+        }
+        let mut sets: Vec<std::collections::HashSet<u32>> = allowed_names
+            .iter()
+            .filter_map(|&&name| self.components.get(name))
             .map(|comps| comps.keys().cloned().collect())
             .collect();
         if sets.is_empty() {
