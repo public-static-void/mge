@@ -68,3 +68,17 @@ fn test_mode_switching_removes_disallowed_components() {
     world.set_mode("roguelike");
     assert!(!world.has_component(eid, "Foo"));
 }
+
+#[test]
+fn test_get_and_set_mode() {
+    use engine_core::ecs::registry::ComponentRegistry;
+    use engine_core::ecs::world::World;
+    use std::sync::{Arc, Mutex};
+
+    let registry = Arc::new(Mutex::new(ComponentRegistry::new()));
+    let mut world = World::new(registry);
+
+    assert_eq!(world.get_mode(), "colony");
+    world.set_mode("roguelike");
+    assert_eq!(world.get_mode(), "roguelike");
+}
