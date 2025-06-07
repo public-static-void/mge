@@ -21,6 +21,10 @@ impl DynamicSystemRegistry {
         }
     }
 
+    pub fn is_registered(&self, name: &str) -> bool {
+        self.systems.contains_key(name)
+    }
+
     pub fn register_system(&mut self, name: String, run: DynSystemFn) {
         self.systems.insert(name.clone(), run);
         self.dependencies.entry(name).or_default();
