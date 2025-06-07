@@ -120,6 +120,7 @@ fn test_loads_and_initializes_plugin() {
         .and_then(|p| p.parent())
         .expect("Failed to find project root")
         .join("plugins")
+        .join("test_plugin")
         .join("libtest_plugin.so");
 
     unsafe {
@@ -165,6 +166,7 @@ fn test_plugin_registers_system() {
         .and_then(|p| p.parent())
         .expect("Failed to find project root")
         .join("plugins")
+        .join("test_plugin")
         .join("libtest_plugin.so");
 
     unsafe {
@@ -224,6 +226,7 @@ fn test_plugin_registers_and_frees_dynamic_systems() {
         .and_then(|p| p.parent())
         .expect("Failed to find project root")
         .join("plugins")
+        .join("test_plugin")
         .join("libtest_plugin.so");
 
     // This will call free_systems if present (for static array it's NULL, so no-op)
@@ -297,7 +300,8 @@ fn test_load_plugin_with_manifest_and_metadata() {
         .parent()
         .and_then(|p| p.parent())
         .expect("Failed to find project root")
-        .join("plugins");
+        .join("plugins")
+        .join("test_plugin");
     let manifest_path = plugin_dir.join("plugin.json");
 
     // Write a test manifest file pointing to the test plugin
