@@ -2,9 +2,11 @@ use super::World;
 use crate::ecs::error::RegistryError;
 use crate::ecs::schema::ComponentSchema;
 use serde_json::Value as JsonValue;
+use serde_json::json;
 
 impl World {
-    /// Sets a component value for an entity, validating against its schema if present.
+    /// Sets a component value for an entity, validating against its schema if present,
+    /// and emits a component_changed event.
     pub fn set_component(
         &mut self,
         entity: u32,
@@ -32,10 +34,31 @@ impl World {
             }
         }
 
+        // Save old value for event emission
+        let old = self
+            .components
+            .get(name)
+            .and_then(|m| m.get(&entity))
+            .cloned();
+
         self.components
             .entry(name.to_string())
             .or_default()
-            .insert(entity, value);
+            .insert(entity, value.clone());
+
+        // Emit component_changed event
+        self.send_event(
+            "component_changed",
+            json!({
+                "entity": entity,
+                "component": name,
+                "action": "set",
+                "old": old,
+                "new": value
+            }),
+        )
+        .ok();
+
         Ok(())
     }
 
@@ -47,7 +70,7 @@ impl World {
         self.components.get(name)?.get(&entity)
     }
 
-    /// Removes a component from an entity, enforcing mode restrictions and emitting events if needed.
+    /// Removes a component from an entity, enforcing mode restrictions and emitting a component_changed event.
     pub fn remove_component(&mut self, entity: u32, name: &str) -> Result<(), String> {
         if !self.is_component_allowed_in_mode(name, &self.current_mode) {
             return Err(format!(
@@ -55,11 +78,27 @@ impl World {
                 name, self.current_mode
             ));
         }
-        if let Some(comps) = self.components.get_mut(name) {
-            comps.remove(&entity);
+        let old = self
+            .components
+            .get_mut(name)
+            .and_then(|m| m.remove(&entity));
+        if old.is_some() {
+            // Emit component_changed event
+            self.send_event(
+                "component_changed",
+                json!({
+                    "entity": entity,
+                    "component": name,
+                    "action": "removed",
+                    "old": old,
+                    "new": null
+                }),
+            )
+            .ok();
+            Ok(())
+        } else {
+            Err("Component not found".to_string())
         }
-        // Optionally: emit event, log, etc.
-        Ok(())
     }
 
     /// Returns true if the component is allowed in the current mode.
