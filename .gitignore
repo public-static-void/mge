@@ -57,7 +57,14 @@ target/
 # Project-specific
 test_save.json
 
-# Plugins
+# Plugins: ignore build artifacts in all subfolders
+plugins/*/*.so
+plugins/*/*.dll
+plugins/*/*.dylib
+plugins/*/*.o
+plugins/*/*.obj
+
+# Ignore CMake and build system artifacts in plugins
 plugins/**/build/
 plugins/**/CMakeFiles/
 plugins/**/cmake-build-*/
