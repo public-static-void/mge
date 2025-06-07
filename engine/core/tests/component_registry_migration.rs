@@ -1,6 +1,6 @@
 use engine_core::ecs::ComponentSchema;
 use engine_core::ecs::registry::ComponentRegistry;
-use schemars::schema::RootSchema;
+use schemars::Schema;
 use serde_json::json;
 
 #[test]
@@ -10,7 +10,7 @@ fn test_update_external_schema_with_data_migration() {
     // Register initial schema
     let schema_v1 = ComponentSchema {
         name: "MigratingComponent".to_string(),
-        schema: RootSchema::default(),
+        schema: Schema::default().into(),
         modes: vec!["colony".to_string()],
     };
     registry.register_external_schema(schema_v1);
@@ -32,7 +32,7 @@ fn test_update_external_schema_with_data_migration() {
     // Update schema with migration
     let schema_v2 = ComponentSchema {
         name: "MigratingComponent".to_string(),
-        schema: RootSchema::default(),
+        schema: Schema::default().into(),
         modes: vec!["colony".to_string()],
     };
     registry
