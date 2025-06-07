@@ -20,7 +20,7 @@ pub fn register_mode_api(lua: &Lua, globals: &Table, world: Rc<RefCell<World>>) 
     let world_get_mode = world.clone();
     let get_mode = lua.create_function_mut(move |_, ()| {
         let world = world_get_mode.borrow();
-        Ok(world.current_mode.clone())
+        Ok(world.get_mode().to_string())
     })?;
     globals.set("get_mode", get_mode)?;
 
