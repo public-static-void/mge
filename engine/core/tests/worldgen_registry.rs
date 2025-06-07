@@ -95,6 +95,7 @@ fn test_register_and_invoke_cabi_worldgen_plugin() {
         .and_then(|p| p.parent())
         .expect("Failed to find project root")
         .join("plugins")
+        .join("simple_square_plugin")
         .join("libsimple_square_plugin.so");
 
     let result = unsafe {

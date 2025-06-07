@@ -165,26 +165,45 @@ fn build_and_deploy_plugins() -> Result<(), Box<dyn std::error::Error>> {
 fn build_c_plugins() -> Result<(), Box<dyn std::error::Error>> {
     let plugins_dir = Path::new("plugins");
     let engine_dir = Path::new("engine");
+
     for entry in fs::read_dir(plugins_dir)? {
         let entry = entry?;
         let path = entry.path();
-        if path.extension().and_then(|e| e.to_str()) == Some("c") {
-            let base = path.file_stem().unwrap().to_str().unwrap();
-            let out_lib = plugins_dir.join(format!("lib{}.so", base));
-            println!("Compiling {} -> {}", path.display(), out_lib.display());
-            let status = Command::new("gcc")
-                .args([
-                    "-I",
-                    engine_dir.to_str().unwrap(),
-                    "-shared",
-                    "-fPIC",
-                    path.to_str().unwrap(),
-                    "-o",
-                    out_lib.to_str().unwrap(),
-                ])
-                .status()?;
-            if !status.success() {
-                return Err(format!("Failed to compile {}", path.display()).into());
+        if path.is_dir() {
+            // Look for a single .c file in the plugin subdirectory
+            let mut c_files = Vec::new();
+            for file in fs::read_dir(&path)? {
+                let file = file?;
+                if file.path().extension().and_then(|e| e.to_str()) == Some("c") {
+                    c_files.push(file.path());
+                }
+            }
+            if c_files.len() == 1 {
+                let c_file = &c_files[0];
+                let base = c_file.file_stem().unwrap().to_str().unwrap();
+                let out_lib = path.join(format!("lib{}.so", base));
+                println!("Compiling {} -> {}", c_file.display(), out_lib.display());
+                let status = Command::new("gcc")
+                    .args([
+                        "-I",
+                        engine_dir.to_str().unwrap(),
+                        "-shared",
+                        "-fPIC",
+                        c_file.to_str().unwrap(),
+                        "-o",
+                        out_lib.to_str().unwrap(),
+                    ])
+                    .status()?;
+                if !status.success() {
+                    return Err(format!("Failed to compile {}", c_file.display()).into());
+                }
+            } else if !c_files.is_empty() {
+                return Err(format!(
+                    "Expected exactly one .c file in {}, found {}",
+                    path.display(),
+                    c_files.len()
+                )
+                .into());
             }
         }
     }
