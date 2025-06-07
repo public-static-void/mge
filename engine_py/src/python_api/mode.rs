@@ -9,12 +9,12 @@ pub trait ModeApi {
 impl ModeApi for PyWorld {
     fn set_mode(&self, mode: String) {
         let mut world = self.inner.borrow_mut();
-        world.current_mode = mode;
+        world.set_mode(&mode);
     }
 
     fn get_mode(&self) -> String {
-        let world = self.inner.borrow_mut();
-        world.current_mode.clone()
+        let world = self.inner.borrow();
+        world.get_mode().to_string()
     }
 
     fn get_available_modes(&self) -> Vec<String> {
