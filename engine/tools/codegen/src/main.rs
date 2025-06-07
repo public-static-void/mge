@@ -137,7 +137,7 @@ pub struct {title}Component {{
 {fields}}}
 
 impl Component for {title}Component {{
-    fn generate_schema() -> Option<schemars::schema::RootSchema> {{
+    fn generate_schema() -> Option<schemars::schema::Schema> {{
         Some(schemars::schema_for!({title}Component))
     }}
 
@@ -157,7 +157,10 @@ impl Component for {title}Component {{
         ))
     }}
 }}
-"#
+"#,
+        title = title,
+        enums = enums,
+        fields = fields
     )
 }
 
