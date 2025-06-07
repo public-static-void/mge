@@ -13,7 +13,7 @@ mod ecs {
         {
             unimplemented!()
         }
-        fn generate_schema() -> Option<schemars::schema::RootSchema> {
+        fn generate_schema() -> Option<schemars::Schema> {
             None
         }
     }
@@ -84,8 +84,15 @@ fn test_component_serde_roundtrip() {
 
 #[test]
 fn test_component_schema_fields() {
+    // Use the macro to get the full schema struct (which has a .schema field)
     let schema = TestComponent::generate_schema().unwrap();
-    let props = &schema.schema.object.as_ref().unwrap().properties;
+    let schema_json = serde_json::to_value(&schema).unwrap();
+
+    let props = schema_json
+        .get("properties")
+        .and_then(|v| v.as_object())
+        .expect("Expected 'properties' object in schema");
+
     assert!(props.contains_key("x"));
     assert!(props.contains_key("y"));
 }
