@@ -9,6 +9,7 @@ use engine_core::systems::economic::{EconomicSystem, load_recipes_from_dir};
 use engine_core::systems::equipment_logic::EquipmentLogicSystem;
 use engine_core::systems::inventory::InventoryConstraintSystem;
 use engine_core::systems::job::{JobSystem, JobTypeRegistry, load_job_types_from_dir};
+use engine_core::worldgen::register_builtin_worldgen_plugins;
 use gag::BufferRedirect;
 use regex::Regex;
 use std::cell::RefCell;
@@ -170,6 +171,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         world.borrow_mut().register_system(BodyEquipmentSyncSystem);
 
         let mut engine = ScriptEngine::new();
+
+        // --- Register built-in worldgen plugins for Lua scripting ---
+        register_builtin_worldgen_plugins(&mut engine.worldgen_registry_mut());
+
         engine
             .register_world(world.clone())
             .expect("Failed to register ECS API");
@@ -178,14 +183,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let lua = Rc::clone(&engine.lua);
         let package: mlua::Table = lua.globals().get("package")?;
         let old_path: String = package.get("path")?;
-        let new_path = format!("engine/scripts/lua/tests/?.lua;{}", old_path);
+        let new_path = format!(
+            "engine/scripts/lua/?.lua;engine/scripts/lua/tests/?.lua;{}",
+            old_path
+        );
         package.set("path", new_path)?;
 
         // Prepare Lua code: require the module and call only the test function
         let script = format!(
             r#"
+            require("world_postprocessors")
             local mod = require("{mod}");
             mod["{func}"]();
+            if world and run_world_postprocessors then
+                run_world_postprocessors(world)
+            end
             "#,
             mod = modname,
             func = fname
