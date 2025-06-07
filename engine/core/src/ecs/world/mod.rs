@@ -18,6 +18,8 @@ mod save_load;
 mod systems;
 pub mod wasm;
 
+pub type MapPostprocessor = Arc<dyn Fn(&mut World) -> Result<(), String> + Send + Sync>;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct TimeOfDay {
     pub hour: u8,
@@ -47,6 +49,8 @@ pub struct World {
     #[serde(skip)]
     pub map: Option<Map>,
     event_queues: HashMap<String, (VecDeque<JsonValue>, VecDeque<JsonValue>)>, // (write, read)
+    #[serde(skip)]
+    pub map_postprocessors: Vec<MapPostprocessor>,
 }
 
 impl World {
@@ -66,6 +70,7 @@ impl World {
             job_types: JobTypeRegistry::default(),
             map: None,
             event_queues: HashMap::new(),
+            map_postprocessors: Vec::new(),
         }
     }
 }

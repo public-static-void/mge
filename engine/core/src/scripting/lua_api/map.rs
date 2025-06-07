@@ -1,6 +1,6 @@
 use crate::ecs::world::World;
 use crate::map::CellKey;
-use crate::scripting::helpers::{json_to_lua_table, lua_value_to_json};
+use crate::scripting::helpers::{json_to_lua_table, lua_table_to_json, lua_value_to_json};
 use mlua::{Lua, Result as LuaResult, Table, Value as LuaValue};
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -200,6 +200,37 @@ pub fn register_map_api(lua: &Lua, globals: &Table, world: Rc<RefCell<World>>) -
         }
     })?;
     globals.set("find_path", find_path)?;
+
+    // apply_generated_map(map_table)
+    let world_for_apply = world.clone();
+    let apply_generated_map = lua.create_function_mut(move |lua, map_table: Table| {
+        let map_json = lua_table_to_json(lua, &map_table, None)?;
+        let mut world = world_for_apply.borrow_mut();
+        world
+            .apply_generated_map(&map_json)
+            .map_err(mlua::Error::external)
+    })?;
+    globals.set("apply_generated_map", apply_generated_map)?;
+
+    // get_map_topology_type()
+    let world_for_topology = world.clone();
+    let get_map_topology_type = lua.create_function(move |_, ()| {
+        let world = world_for_topology.borrow();
+        Ok(world
+            .map
+            .as_ref()
+            .map(|m| m.topology_type().to_string())
+            .unwrap_or_else(|| "none".to_string()))
+    })?;
+    globals.set("get_map_topology_type", get_map_topology_type)?;
+
+    // get_map_cell_count()
+    let world_for_cell_count = world.clone();
+    let get_map_cell_count = lua.create_function(move |_, ()| {
+        let world = world_for_cell_count.borrow();
+        Ok(world.map.as_ref().map(|m| m.all_cells().len()).unwrap_or(0))
+    })?;
+    globals.set("get_map_cell_count", get_map_cell_count)?;
 
     Ok(())
 }
