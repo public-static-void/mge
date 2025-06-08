@@ -1,6 +1,6 @@
 import os
 import pytest
-import mge
+import engine_py
 
 
 @pytest.fixture
@@ -10,6 +10,6 @@ def make_world():
         schema_dir = os.path.abspath(
             os.path.join(here, "../../engine/assets/schemas")
         )
-        return mge.PyWorld(schema_dir)
+        return engine_py.PyWorld(schema_dir)
 
     return _make_world

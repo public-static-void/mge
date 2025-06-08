@@ -14,7 +14,7 @@ use worldgen_bridge::{
 };
 
 #[pymodule]
-fn mge(_py: Python, m: &Bound<'_, pyo3::types::PyModule>) -> PyResult<()> {
+fn engine_py(_py: Python, m: &Bound<'_, pyo3::types::PyModule>) -> PyResult<()> {
     register_all_widgets();
     m.add_class::<PyWorld>()?;
     m.add_function(wrap_pyfunction!(register_worldgen_plugin, m)?)?;

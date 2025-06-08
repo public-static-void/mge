@@ -1,6 +1,6 @@
 import pytest
 
-import mge
+import engine_py
 
 
 def test_register_and_invoke_worldgen():
@@ -9,11 +9,11 @@ def test_register_and_invoke_worldgen():
         assert params.get("width") == 5
         return {"cells": [{"id": "pycell", "x": 0, "y": 0}]}
 
-    mge.register_worldgen_plugin("pygen", pygen)
-    names = mge.list_worldgen_plugins()
+    engine_py.register_worldgen_plugin("pygen", pygen)
+    names = engine_py.list_worldgen_plugins()
     assert "pygen" in names
 
-    result = mge.invoke_worldgen_plugin("pygen", {"width": 5})
+    result = engine_py.invoke_worldgen_plugin("pygen", {"width": 5})
     assert "cells" in result
     assert result["cells"][0]["id"] == "pycell"
 
@@ -23,8 +23,8 @@ def test_register_and_list_worldgen_plugins():
         assert isinstance(params, dict)
         return {"topology": "square", "cells": [{"x": 0, "y": 0}]}
 
-    mge.register_worldgen_plugin("pygen_list", pygen_list)
-    plugins = mge.list_worldgen_plugins()
+    engine_py.register_worldgen_plugin("pygen_list", pygen_list)
+    plugins = engine_py.list_worldgen_plugins()
     assert "pygen_list" in plugins
 
 
@@ -35,8 +35,8 @@ def test_invoke_worldgen_plugin():
         cells = [{"x": x, "y": y} for x in range(w) for y in range(h)]
         return {"topology": "square", "cells": cells}
 
-    mge.register_worldgen_plugin("pygen2", pygen2)
-    result = mge.invoke_worldgen_plugin("pygen2", {"width": 2, "height": 2})
+    engine_py.register_worldgen_plugin("pygen2", pygen2)
+    result = engine_py.invoke_worldgen_plugin("pygen2", {"width": 2, "height": 2})
     assert result["topology"] == "square"
     assert isinstance(result["cells"], list)
     assert len(result["cells"]) == 4
@@ -46,7 +46,7 @@ def test_invoke_worldgen_plugin():
 
 def test_invoke_nonexistent_plugin_raises():
     with pytest.raises(Exception) as excinfo:
-        mge.invoke_worldgen_plugin("nope", {})
+        engine_py.invoke_worldgen_plugin("nope", {})
     assert (
         "NotFound" in str(excinfo.value)
         or "not found" in str(excinfo.value).lower()
