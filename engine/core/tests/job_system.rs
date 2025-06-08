@@ -81,7 +81,7 @@ fn job_system_advances_progress_and_completes_job() {
     world.set_component(eid, "Job", job_val.clone()).unwrap();
 
     // Register and run the production JobSystem
-    world.register_system(JobSystem::default());
+    world.register_system(JobSystem);
 
     // Simulate ticks
     for _ in 0..5 {
@@ -122,7 +122,7 @@ fn job_system_emits_event_on_completion() {
     world.set_component(eid, "Job", job_val.clone()).unwrap();
 
     // Register JobSystem
-    world.register_system(JobSystem::default());
+    world.register_system(JobSystem);
 
     // Run system enough times to complete the job
     for _ in 0..6 {
@@ -175,7 +175,7 @@ fn job_system_emits_event_on_failure() {
     world.set_component(eid, "Job", job_val.clone()).unwrap();
 
     // Register JobSystem
-    world.register_system(JobSystem::default());
+    world.register_system(JobSystem);
 
     // Run system enough times to process the job
     for _ in 0..6 {
@@ -200,7 +200,7 @@ fn job_system_emits_event_on_failure() {
 fn job_system_uses_custom_job_type_logic() {
     use engine_core::ecs::registry::ComponentRegistry;
     use engine_core::ecs::world::World;
-    use engine_core::systems::job::{JobSystem, JobTypeRegistry};
+    use engine_core::systems::job::JobSystem;
     use serde_json::json;
     use std::sync::{Arc, Mutex};
 
@@ -215,23 +215,20 @@ fn job_system_uses_custom_job_type_logic() {
     world.current_mode = "colony".to_string();
 
     // Create a job type registry and register a custom job type
-    let mut job_types = JobTypeRegistry::default();
-    job_types.register_native(
-        "fast_job",
-        Box::new(|job: &serde_json::Value, progress: f64| {
-            // Fast jobs complete in 1 tick
+    world
+        .job_handler_registry
+        .register_handler("fast_job", |world, _agent_id, job_id, job| {
             let mut job = job.clone();
-            let new_progress = progress + 10.0;
-            job["progress"] = json!(new_progress);
-            if new_progress >= 10.0 {
-                job["status"] = json!("complete");
+            let progress = job.get("progress").and_then(|v| v.as_f64()).unwrap_or(0.0) + 10.0;
+            job["progress"] = serde_json::json!(progress);
+            if progress >= 10.0 {
+                job["status"] = serde_json::json!("complete");
             }
+            world.set_component(job_id, "Job", job.clone()).unwrap();
             job
-        }),
-    );
+        });
 
-    // Attach job_types to JobSystem (assume JobSystem takes a registry reference)
-    let job_system = JobSystem::with_registry(job_types);
+    let job_system = JobSystem::new();
 
     // Spawn entity with a fast_job
     let eid = world.spawn_entity();
@@ -288,7 +285,7 @@ fn hierarchical_job_completes_only_when_all_children_complete() {
     });
     world.set_component(eid, "Job", parent_job).unwrap();
 
-    world.register_system(JobSystem::default());
+    world.register_system(JobSystem);
 
     // Simulate ticks: children should complete first
     for _ in 0..4 {
@@ -341,7 +338,7 @@ fn cancelling_parent_job_cancels_all_children() {
     });
     world.set_component(eid, "Job", parent_job).unwrap();
 
-    world.register_system(JobSystem::default());
+    world.register_system(JobSystem);
     world.run_system("JobSystem", None).unwrap();
 
     let job = world.get_component(eid, "Job").unwrap();
