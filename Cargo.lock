@@ -670,7 +670,6 @@ dependencies = [
  "anyhow",
  "bson",
  "engine_macros",
- "gag",
  "indexmap",
  "jsonschema",
  "libloading",
@@ -678,7 +677,6 @@ dependencies = [
  "once_cell",
  "parking_lot",
  "rand",
- "regex",
  "schema_validator",
  "schemars",
  "semver",
@@ -694,6 +692,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "engine_lua"
+version = "0.1.0"
+dependencies = [
+ "engine_core",
+ "gag",
+ "mlua",
+ "regex",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
 name = "engine_macros"
 version = "0.1.0"
 dependencies = [
@@ -706,6 +717,18 @@ dependencies = [
  "serde_json",
  "syn",
  "thiserror 2.0.12",
+]
+
+[[package]]
+name = "engine_py"
+version = "0.1.0"
+dependencies = [
+ "engine_core",
+ "once_cell",
+ "pyo3",
+ "pythonize",
+ "serde-pyobject",
+ "serde_json",
 ]
 
 [[package]]
@@ -1433,18 +1456,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "488016bfae457b036d996092f6cb448677611ce4449e970ceaf42695203f218a"
 dependencies = [
  "autocfg",
-]
-
-[[package]]
-name = "mge"
-version = "0.1.0"
-dependencies = [
- "engine_core",
- "once_cell",
- "pyo3",
- "pythonize",
- "serde-pyobject",
- "serde_json",
 ]
 
 [[package]]
