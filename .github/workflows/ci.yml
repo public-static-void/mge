@@ -170,6 +170,9 @@ jobs:
       - name: Install Lua
         run: sudo apt-get update && sudo apt-get install -y lua5.1 && sudo apt-get clean
 
+      - name: Build Lua test runner
+        run: cargo build --package engine_lua --bin mge_lua_test_runner
+
       - name: Lua tests (xtask via Makefile)
         run: ./run_lua_tests.sh
 
