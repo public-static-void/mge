@@ -15,6 +15,35 @@
       "type": "integer",
       "description": "Entity ID assigned to this job"
     },
+    "priority": {
+      "type": "integer",
+      "default": 0,
+      "description": "Higher value means higher priority"
+    },
+    "resource_requirements": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "kind": { "type": "string" },
+          "amount": { "type": "integer" }
+        },
+        "required": ["kind", "amount"]
+      },
+      "description": "Resources required to start this job"
+    },
+    "resource_outputs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "kind": { "type": "string" },
+          "amount": { "type": "integer" }
+        },
+        "required": ["kind", "amount"]
+      },
+      "description": "Resources produced by this job"
+    },
     "children": {
       "type": "array",
       "items": { "$ref": "#" },
