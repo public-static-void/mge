@@ -2,10 +2,25 @@ use engine_core::ecs::ComponentRegistry;
 use engine_core::ecs::World;
 use engine_core::map::{CellKey, Map};
 use engine_core::plugins::{EngineApi, load_plugin_and_register_worldgen};
-use engine_core::worldgen::{WorldgenError, WorldgenPlugin, WorldgenRegistry};
-use mlua::Lua;
+use engine_core::worldgen::{
+    ScriptingWorldgenPlugin, WorldgenError, WorldgenPlugin, WorldgenRegistry,
+};
 use serde_json::json;
 use std::sync::{Arc, Mutex};
+
+struct DummyWorldgenPlugin;
+
+impl ScriptingWorldgenPlugin for DummyWorldgenPlugin {
+    fn invoke(
+        &self,
+        _params: &serde_json::Value,
+    ) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
+        Ok(json!({ "cells": [] }))
+    }
+    fn backend(&self) -> &str {
+        "dummy"
+    }
+}
 
 #[test]
 fn test_register_and_list_worldgen_plugins() {
@@ -17,9 +32,10 @@ fn test_register_and_list_worldgen_plugins() {
         generate: Box::new(|_| json!({ "cells": [] })),
         _lib: None,
     });
-    registry.register(WorldgenPlugin::Python {
+    registry.register(WorldgenPlugin::Scripting {
         name: "cave_gen".to_string(),
-        generate: Box::new(|_| json!({ "cells": [] })),
+        backend: "python".to_string(),
+        opaque: Box::new(DummyWorldgenPlugin),
     });
 
     let names = registry.list_names();
@@ -52,18 +68,13 @@ fn test_invoke_worldgen_plugin_returns_map() {
 
 #[test]
 fn test_register_and_list_lua_worldgen_plugin() {
-    let lua = Lua::new();
     let mut registry = WorldgenRegistry::new();
 
-    // Register a Lua function
-    let func = lua
-        .create_function(|_, _params: mlua::Table| Ok(mlua::Value::Nil))
-        .unwrap();
-    let key = lua.create_registry_value(func).unwrap();
-
-    registry.register(WorldgenPlugin::Lua {
+    // Register a Lua function (mocked as a dummy plugin for core test)
+    registry.register(WorldgenPlugin::Scripting {
         name: "hex_map".to_string(),
-        registry_key: key,
+        backend: "lua".to_string(),
+        opaque: Box::new(DummyWorldgenPlugin),
     });
 
     let names = registry.list_names();
