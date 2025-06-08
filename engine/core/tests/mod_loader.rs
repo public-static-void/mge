@@ -1,12 +1,14 @@
 use engine_core::ecs::registry::ComponentRegistry;
 use engine_core::ecs::world::World;
-use engine_core::mods::loader::load_mod;
-use engine_core::scripting::ScriptEngine;
+use engine_core::mods::loader::{ModScriptEngine, load_mod};
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
+use tempfile::TempDir;
 
-fn setup_test_mod_dir() -> (tempfile::TempDir, std::path::PathBuf) {
+/// Creates a dummy mod directory with a schema, a system, and a manifest.
+/// Returns (TempDir, mod_dir_path).
+pub fn setup_test_mod_dir() -> (TempDir, std::path::PathBuf) {
     let temp_dir = tempfile::tempdir().unwrap();
     let mod_dir = temp_dir.path().join("example_mod");
     std::fs::create_dir(&mod_dir).unwrap();
@@ -23,9 +25,9 @@ fn setup_test_mod_dir() -> (tempfile::TempDir, std::path::PathBuf) {
     }"#;
     std::fs::write(mod_dir.join("schemas").join("test_component.json"), schema).unwrap();
 
-    // Write dummy Lua system
-    let lua_system = r#"register_system("TestSystem", function() end)"#;
-    std::fs::write(mod_dir.join("systems").join("test_system.lua"), lua_system).unwrap();
+    // Write dummy system (contents are backend-specific)
+    let system = r#""#;
+    std::fs::write(mod_dir.join("systems").join("test_system.txt"), system).unwrap();
 
     // Write mod.json
     let manifest = r#"{
@@ -33,23 +35,21 @@ fn setup_test_mod_dir() -> (tempfile::TempDir, std::path::PathBuf) {
         "version": "1.0.0",
         "schemas": ["schemas/test_component.json"],
         "systems": [
-            { "file": "systems/test_system.lua", "name": "TestSystem" }
+            { "file": "systems/test_system.txt", "name": "TestSystem" }
         ],
-        "main_script": "systems/test_system.lua"
+        "main_script": "systems/test_system.txt"
     }"#;
     std::fs::write(mod_dir.join("mod.json"), manifest).unwrap();
 
     (temp_dir, mod_dir)
 }
 
-#[test]
-fn test_load_mod_registers_schema_and_system() {
+/// Generic test for mod loading. Backend-specific tests should call this with their ScriptEngine.
+pub fn mod_loader_test<E: ModScriptEngine + Default>(mut script_engine: E) {
     let (_temp_dir, mod_dir) = setup_test_mod_dir();
     let registry = Arc::new(Mutex::new(ComponentRegistry::new()));
     let world = World::new(registry.clone());
-    let mut script_engine = ScriptEngine::new();
     let world_rc = Rc::new(RefCell::new(world));
-    script_engine.register_world(world_rc.clone()).unwrap();
 
     load_mod(
         mod_dir.to_str().unwrap(),
@@ -67,7 +67,7 @@ fn test_load_mod_registers_schema_and_system() {
             .is_some()
     );
 
-    // Assert system is registered (depends on your API)
+    // Assert system is registered (depends on API)
     assert!(
         world_rc
             .borrow()

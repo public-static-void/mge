@@ -22,8 +22,6 @@ topo_sort = "0.4.0"
 serde_yaml = "0.9.34"
 toml = "0.8.23"
 rand = "0.9.1"
-gag = "1.0.0"
-regex = "1.11.1"
 parking_lot = "0.12"
 walkdir = "2.5.0"
 
@@ -31,6 +29,7 @@ walkdir = "2.5.0"
 tempfile = "3.20.0"
 serial_test = "3"
 
-[[bin]]
-name = "mge-cli"
-path = "src/bin/mge_cli.rs"
+[features]
+lua = []
+python = []
+wasm = []

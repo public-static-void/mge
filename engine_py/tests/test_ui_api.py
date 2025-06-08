@@ -1,10 +1,10 @@
 import pytest
 
-import mge
+import engine_py
 
 
 def test_create_button_widget():
-    ui = mge.UiApi()
+    ui = engine_py.UiApi()
     widget_id = ui.create_widget(
         "Button", {"label": "OK", "pos": [1, 2], "color": [255, 255, 255]}
     )
@@ -13,7 +13,7 @@ def test_create_button_widget():
 
 
 def test_load_json_button():
-    ui = mge.UiApi()
+    ui = engine_py.UiApi()
     ids = ui.load_json(
         '{"type": "Button", "props": {"label": "Root", "pos": [0,0], "color":'
         " [255,255,255]}}"
@@ -24,7 +24,7 @@ def test_load_json_button():
 
 
 def test_remove_widget():
-    ui = mge.UiApi()
+    ui = engine_py.UiApi()
     widget_id = ui.create_widget(
         "Button", {"label": "RemoveMe", "pos": [0, 0], "color": [10, 10, 10]}
     )
@@ -37,7 +37,7 @@ def test_remove_widget():
 
 
 def test_set_widget_props():
-    ui = mge.UiApi()
+    ui = engine_py.UiApi()
     widget_id = ui.create_widget(
         "Button", {"label": "Old", "pos": [0, 0], "color": [1, 2, 3]}
     )
@@ -50,7 +50,7 @@ def test_set_widget_props():
 
 
 def test_get_widget_props():
-    ui = mge.UiApi()
+    ui = engine_py.UiApi()
     widget_id = ui.create_widget(
         "Button", {"label": "QueryMe", "pos": [3, 4], "color": [10, 20, 30]}
     )
@@ -67,7 +67,7 @@ def test_get_widget_props():
 
 
 def test_add_remove_child_panel():
-    ui = mge.UiApi()
+    ui = engine_py.UiApi()
     panel_id = ui.create_widget("Panel", {"pos": [0, 0]})
     btn_id = ui.create_widget(
         "Button", {"label": "Child", "pos": [1, 1], "color": [1, 2, 3]}
@@ -80,7 +80,7 @@ def test_add_remove_child_panel():
 
 
 def test_set_callback_and_trigger(monkeypatch):
-    ui = mge.UiApi()
+    ui = engine_py.UiApi()
     widget_id = ui.create_widget(
         "Button", {"label": "CB", "pos": [1, 2], "color": [1, 2, 3]}
     )
@@ -96,7 +96,7 @@ def test_set_callback_and_trigger(monkeypatch):
 
 
 def test_focus_widget():
-    ui = mge.UiApi()
+    ui = engine_py.UiApi()
     widget_id = ui.create_widget(
         "Button", {"label": "Focus", "pos": [1, 2], "color": [1, 2, 3]}
     )
@@ -104,7 +104,7 @@ def test_focus_widget():
 
 
 def test_send_ui_event_alias():
-    ui = mge.UiApi()
+    ui = engine_py.UiApi()
     widget_id = ui.create_widget(
         "Button", {"label": "SendEvent", "pos": [1, 2], "color": [1, 2, 3]}
     )
@@ -120,7 +120,7 @@ def test_send_ui_event_alias():
 
 
 def test_get_widget_type():
-    ui = mge.UiApi()
+    ui = engine_py.UiApi()
     btn_id = ui.create_widget(
         "Button", {"label": "Test", "pos": [0, 0], "color": [255, 255, 255]}
     )
@@ -136,7 +136,7 @@ def test_get_widget_type():
 
 
 def test_get_parent_and_child_relationship():
-    ui = mge.UiApi()
+    ui = engine_py.UiApi()
     panel_id = ui.create_widget("Panel", {"pos": [0, 0]})
     btn_id = ui.create_widget(
         "Button", {"label": "Child", "pos": [1, 1], "color": [1, 2, 3]}
@@ -159,7 +159,7 @@ def test_get_parent_and_child_relationship():
 
 
 def test_set_and_get_z_order():
-    ui = mge.UiApi()
+    ui = engine_py.UiApi()
     btn_id = ui.create_widget(
         "Button", {"label": "ZOrder", "pos": [0, 0], "color": [255, 255, 255]}
     )
@@ -179,7 +179,7 @@ def test_set_and_get_z_order():
 
 
 def test_dynamic_widget_registration():
-    ui = mge.UiApi()
+    ui = engine_py.UiApi()
 
     # Register a new widget type "CustomWidget" dynamically
     def custom_widget_ctor(props):
@@ -199,7 +199,7 @@ def test_dynamic_widget_registration():
 
 
 def test_remove_callback():
-    ui = mge.UiApi()
+    ui = engine_py.UiApi()
     btn_id = ui.create_widget(
         "Button", {"label": "CB", "pos": [1, 2], "color": [1, 2, 3]}
     )
@@ -221,7 +221,7 @@ def test_remove_callback():
 
 
 def test_get_children_explicit():
-    ui = mge.UiApi()
+    ui = engine_py.UiApi()
     panel_id = ui.create_widget("Panel", {"pos": [0, 0]})
     btn1_id = ui.create_widget(
         "Button", {"label": "Child1", "pos": [1, 1], "color": [1, 2, 3]}

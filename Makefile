@@ -64,6 +64,7 @@ test-python: build-python
 # ====== LUA TEST TARGET ======
 test-lua:
 	@echo "Running Lua tests..."
+	cargo build --package engine_lua --bin mge_lua_test_runner
 	./run_lua_tests.sh
 
 # ====== AGGREGATED TEST TARGETS ======

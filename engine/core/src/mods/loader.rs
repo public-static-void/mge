@@ -1,13 +1,13 @@
 use crate::ecs::schema::load_schemas_from_dir;
 use crate::ecs::world::World;
-use crate::scripting::ScriptEngine;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-pub fn load_mod(
+/// Loads a mod, registers schemas, and runs the main script via a scripting engine passed in.
+pub fn load_mod<S: ModScriptEngine>(
     mod_dir: &str,
     world: Rc<RefCell<World>>,
-    engine: &mut ScriptEngine,
+    engine: &mut S,
 ) -> anyhow::Result<()> {
     // Load the mod manifest (mod.json)
     let manifest_path = format!("{}/mod.json", mod_dir);
@@ -44,4 +44,9 @@ pub fn load_mod(
     }
 
     Ok(())
+}
+
+/// Trait for scripting engines that can run mod scripts.
+pub trait ModScriptEngine {
+    fn run_script(&mut self, script: &str) -> Result<(), String>;
 }

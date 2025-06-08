@@ -3,7 +3,6 @@ use engine_core::ecs::registry::ComponentRegistry;
 use engine_core::ecs::schema::load_schemas_from_dir;
 use engine_core::ecs::world::World;
 use engine_core::map::{HexGridMap, Map, RegionMap, SquareGridMap};
-use engine_core::scripting::ScriptEngine;
 use std::sync::{Arc, Mutex};
 
 #[test]
@@ -63,45 +62,6 @@ fn test_move_all_moves_positions() {
 
     assert_eq!(pos1.pos, Position::Square { x: 2, y: 1, z: 0 });
     assert_eq!(pos2.pos, Position::Square { x: 6, y: 6, z: 0 });
-}
-
-#[test]
-fn test_lua_move_all() {
-    let schema_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap() + "/../assets/schemas";
-    let schemas = load_schemas_from_dir(&schema_dir).expect("Failed to load schemas");
-    let mut registry = ComponentRegistry::new();
-    for (_name, schema) in schemas {
-        registry.register_external_schema(schema);
-    }
-    let registry = Arc::new(Mutex::new(registry));
-
-    let mut engine = ScriptEngine::new();
-    let world = std::rc::Rc::new(std::cell::RefCell::new(World::new(registry.clone())));
-    world.borrow_mut().current_mode = "colony".to_string();
-
-    // Setup map with both the original and target squares
-    let mut grid = SquareGridMap::new();
-    grid.add_cell(0, 0, 0); // initial
-    grid.add_cell(2, 3, 0); // after move
-    world.borrow_mut().map = Some(Map::new(Box::new(grid)));
-
-    engine.register_world(world.clone()).unwrap();
-
-    let script = r#"
-        local id = spawn_entity()
-        set_component(id, "Position", { pos = { Square = { x = 0, y = 0, z = 0 } } })
-        for _, eid in ipairs(get_entities_with_component("Position")) do
-            local pos = get_component(eid, "Position")
-            pos.pos.Square.x = pos.pos.Square.x + 2
-            pos.pos.Square.y = pos.pos.Square.y + 3
-            set_component(eid, "Position", pos)
-        end
-        local pos = get_component(id, "Position")
-        assert(math.abs(pos.pos.Square.x - 2) < 1e-6)
-        assert(math.abs(pos.pos.Square.y - 3) < 1e-6)
-    "#;
-
-    engine.run_script(script).unwrap();
 }
 
 fn setup_world_with_map(map: Map) -> World {

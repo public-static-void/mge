@@ -3,6 +3,7 @@ members = [
   "engine/core",
   "engine_macros",
   "engine_py",
+  "engine_lua",
   "engine_wasm",
   "engine/tools/schema_validator",
   "plugins/rust_test_plugin",

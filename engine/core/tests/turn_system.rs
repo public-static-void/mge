@@ -1,7 +1,7 @@
 use engine_core::ecs::registry::ComponentRegistry;
 use engine_core::ecs::schema::load_schemas_from_dir;
 use engine_core::ecs::world::World;
-use engine_core::scripting::ScriptEngine;
+use engine_core::mods::loader::ModScriptEngine;
 use engine_core::systems::death_decay::{ProcessDeaths, ProcessDecay};
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -17,6 +17,50 @@ fn setup_registry() -> Arc<Mutex<ComponentRegistry>> {
     Arc::new(Mutex::new(registry))
 }
 
+pub fn scripting_tick_test<E: ModScriptEngine>(mut engine: E) {
+    let registry = setup_registry();
+    let world = Rc::new(RefCell::new(World::new(registry.clone())));
+    world.borrow_mut().current_mode = "colony".to_string();
+
+    use engine_core::map::{Map, SquareGridMap};
+    let mut grid = SquareGridMap::new();
+    grid.add_cell(0, 0, 0); // initial
+    grid.add_cell(1, 0, 0); // after move
+    world.borrow_mut().map = Some(Map::new(Box::new(grid)));
+
+    // NOTE: If your scripting engine needs to register the world,
+    // do it in the bridge test before calling this function.
+
+    let script = r#"
+        local id = spawn_entity()
+        set_component(id, "Position", { pos = { Square = { x = 0, y = 0, z = 0 } } })
+        set_component(id, "Health", { current = 10.0, max = 10.0 })
+        -- Move all: increment x for all entities with Position (Square)
+        for _, eid in ipairs(get_entities_with_component("Position")) do
+            local pos = get_component(eid, "Position")
+            if pos.pos and pos.pos.Square then
+                pos.pos.Square.x = pos.pos.Square.x + 1
+                set_component(eid, "Position", pos)
+            end
+        end
+        -- Damage all: decrement health for all entities with Health
+        for _, eid in ipairs(get_entities_with_component("Health")) do
+            local h = get_component(eid, "Health")
+            h.current = h.current - 1.0
+            set_component(eid, "Health", h)
+        end
+        tick()
+        local pos = get_component(id, "Position")
+        local health = get_component(id, "Health")
+        assert(math.abs(pos.pos.Square.x - 1.0) < 1e-6)
+        assert(math.abs(health.current - 9.0) < 1e-6)
+        assert(get_turn() == 1)
+    "#;
+
+    engine.run_script(script).unwrap();
+}
+
+// The rest of this file can contain pure core tests as before.
 #[test]
 fn test_tick_advances_turn_and_runs_systems() {
     let registry = setup_registry();
@@ -88,49 +132,4 @@ fn test_tick_advances_turn_and_runs_systems() {
     assert!((pos["pos"]["Square"]["x"].as_f64().unwrap() - 2.0).abs() < 1e-6);
     assert!((health["current"].as_f64().unwrap() - 9.0).abs() < 1e-6);
     assert_eq!(world.turn, 1);
-}
-
-#[test]
-fn test_lua_tick() {
-    let mut engine = ScriptEngine::new();
-    let registry = setup_registry();
-    let world = Rc::new(RefCell::new(World::new(registry.clone())));
-    world.borrow_mut().current_mode = "colony".to_string();
-
-    // Add map with both the initial and target cells
-    use engine_core::map::{Map, SquareGridMap};
-    let mut grid = SquareGridMap::new();
-    grid.add_cell(0, 0, 0); // initial
-    grid.add_cell(1, 0, 0); // after move
-    world.borrow_mut().map = Some(Map::new(Box::new(grid)));
-
-    engine.register_world(world.clone()).unwrap();
-
-    let script = r#"
-        local id = spawn_entity()
-        set_component(id, "Position", { pos = { Square = { x = 0, y = 0, z = 0 } } })
-        set_component(id, "Health", { current = 10.0, max = 10.0 })
-        -- Move all: increment x for all entities with Position (Square)
-        for _, eid in ipairs(get_entities_with_component("Position")) do
-            local pos = get_component(eid, "Position")
-            if pos.pos and pos.pos.Square then
-                pos.pos.Square.x = pos.pos.Square.x + 1
-                set_component(eid, "Position", pos)
-            end
-        end
-        -- Damage all: decrement health for all entities with Health
-        for _, eid in ipairs(get_entities_with_component("Health")) do
-            local h = get_component(eid, "Health")
-            h.current = h.current - 1.0
-            set_component(eid, "Health", h)
-        end
-        tick()
-        local pos = get_component(id, "Position")
-        local health = get_component(id, "Health")
-        assert(math.abs(pos.pos.Square.x - 1.0) < 1e-6)
-        assert(math.abs(health.current - 9.0) < 1e-6)
-        assert(get_turn() == 1)
-    "#;
-
-    engine.run_script(script).unwrap();
 }

@@ -2,4 +2,4 @@
 
 set -e
 
-cargo run --quiet --bin mge_lua_test_runner -- "$@"
+cargo run --package engine_lua --bin mge_lua_test_runner --quiet -- "$@"
