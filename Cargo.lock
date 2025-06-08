@@ -672,6 +672,7 @@ dependencies = [
  "engine_macros",
  "indexmap",
  "jsonschema",
+ "lazy_static",
  "libloading",
  "mlua",
  "once_cell",
