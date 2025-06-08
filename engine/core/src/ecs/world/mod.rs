@@ -45,10 +45,17 @@ pub struct World {
     #[serde(skip)]
     pub job_types: JobTypeRegistry,
     #[serde(skip)]
+    pub job_handler_registry: crate::systems::job::job_handler_registry::JobHandlerRegistry,
+    #[serde(skip)]
+    pub effect_processor_registry:
+        Option<crate::systems::job::effect_processor_registry::EffectProcessorRegistry>,
+    #[serde(skip)]
     pub map: Option<Map>,
     event_queues: HashMap<String, (VecDeque<JsonValue>, VecDeque<JsonValue>)>, // (write, read)
     #[serde(skip)]
     pub map_postprocessors: Vec<MapPostprocessor>,
+    #[serde(skip)]
+    pub ai_event_intents: VecDeque<JsonValue>,
 }
 
 impl World {
@@ -65,9 +72,15 @@ impl World {
             event_buses: crate::ecs::event_bus_registry::EventBusRegistry::new(),
             dynamic_systems: DynamicSystemRegistry::new(),
             job_types: JobTypeRegistry::default(),
+            job_handler_registry:
+                crate::systems::job::job_handler_registry::JobHandlerRegistry::new(),
+            effect_processor_registry: Some(
+                crate::systems::job::effect_processor_registry::EffectProcessorRegistry::new(),
+            ),
             map: None,
             event_queues: HashMap::new(),
             map_postprocessors: Vec::new(),
+            ai_event_intents: VecDeque::new(),
         }
     }
 }

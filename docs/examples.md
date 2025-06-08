@@ -378,9 +378,9 @@ print(ids[1])
 ### Python
 
 ```python
-import mge
+import engine_py
 
-ui = mge.UiApi()
+ui = engine_py.UiApi()
 
 # Create a Button widget
 widget_id = ui.create_widget("Button", {"label": "OK", "pos": [1, 2], "color": [255, 255, 255]})

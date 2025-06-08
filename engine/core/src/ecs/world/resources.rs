@@ -55,4 +55,29 @@ impl World {
         }
         Err("Stockpile component not found".to_string())
     }
+
+    /// Returns a scarcity score for a resource kind (higher = more scarce).
+    /// This is a simple example; you can expand it as needed.
+    pub fn get_global_resource_scarcity(&self, kind: &str) -> f64 {
+        // Example: scan all stockpiles, sum amounts, invert for scarcity
+        let mut total = 0;
+        if let Some(stockpiles) = self.components.get("Stockpile") {
+            for stockpile in stockpiles.values() {
+                if let Some(resources) = stockpile.get("resources").and_then(|v| v.as_object()) {
+                    if let Some(amount) = resources.get(kind).and_then(|v| v.as_i64()) {
+                        total += amount;
+                    }
+                }
+            }
+        }
+        if total <= 0 {
+            10.0 // very scarce
+        } else if total < 10 {
+            5.0
+        } else if total < 100 {
+            1.0
+        } else {
+            0.0 // not scarce
+        }
+    }
 }

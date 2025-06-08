@@ -1,69 +1,102 @@
-use serde::Deserialize;
-use std::collections::HashMap;
+use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
+use std::fs;
+use std::path::Path;
 
+/// The function signature for native job logic.
 pub type JobFn = dyn Fn(&serde_json::Value, f64) -> serde_json::Value + Send + Sync + 'static;
 
-#[derive(Debug, Deserialize)]
+/// Data structure for a job type loaded from JSON.
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JobTypeData {
     pub name: String,
-    pub requirements: Option<Vec<String>>,
+    #[serde(default)]
+    pub requirements: Vec<String>,
+    #[serde(default)]
     pub duration: Option<f64>,
-    pub effects: Option<Vec<serde_json::Value>>,
+    #[serde(default)]
+    pub effects: Vec<serde_json::Value>,
 }
 
+/// Enum for the logic associated with a job type.
 pub enum JobLogic {
     Native(Box<JobFn>),
     Lua(mlua::RegistryKey),
+    Data,
 }
 
 #[derive(Default)]
 pub struct JobTypeRegistry {
+    // Keyed by normalized job type name.
+    types: HashMap<String, JobTypeData>,
     logic: HashMap<String, JobLogic>,
+    names: HashSet<String>, // Set of all registered job type names with original casing
 }
 
 impl JobTypeRegistry {
-    pub fn register_native(&mut self, job_type: &str, logic: Box<JobFn>) {
-        self.logic
-            .insert(job_type.to_string(), JobLogic::Native(logic));
-    }
-
-    pub fn register_lua(&mut self, job_type: &str, key: mlua::RegistryKey) {
-        self.logic.insert(job_type.to_string(), JobLogic::Lua(key));
-    }
-
-    pub fn register_data_job(&mut self, job: JobTypeData) {
-        let logic = move |old_job: &serde_json::Value, progress: f64| {
-            let mut job = old_job.clone();
-            let status = job.get("status").and_then(|v| v.as_str()).unwrap_or("");
-            if status == "failed" || status == "complete" || status == "cancelled" {
-            } else if status == "pending" {
-                job["status"] = serde_json::json!("in_progress");
-            } else if status == "in_progress" {
-                let progress = progress + 1.0;
-                job["progress"] = serde_json::json!(progress);
-                if let Some(duration) = job.get("duration").and_then(|v| v.as_f64()).or(job
-                    .get("duration")
-                    .and_then(|v| v.as_i64())
-                    .map(|i| i as f64))
-                {
-                    if progress >= duration {
-                        job["status"] = serde_json::json!("complete");
-                    }
-                } else if progress >= 3.0 {
-                    job["status"] = serde_json::json!("complete");
-                }
+    /// Loads all job types from a directory of JSON files.
+    pub fn load_from_dir(dir: &Path) -> Result<Self, String> {
+        let mut types = HashMap::new();
+        let mut names = HashSet::new();
+        for entry in fs::read_dir(dir).map_err(|e| e.to_string())? {
+            let entry = entry.map_err(|e| e.to_string())?;
+            let path = entry.path();
+            if path.extension().and_then(|e| e.to_str()) == Some("json") {
+                let data = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+                let job_type: JobTypeData =
+                    serde_json::from_str(&data).map_err(|e| e.to_string())?;
+                let key = Self::normalize_key(&job_type.name);
+                names.insert(job_type.name.clone());
+                types.insert(key, job_type);
             }
-            job
-        };
-        self.logic
-            .insert(job.name.clone(), JobLogic::Native(Box::new(logic)));
+        }
+        Ok(JobTypeRegistry {
+            types,
+            logic: HashMap::new(),
+            names,
+        })
     }
 
-    pub fn get(&self, job_type: &str) -> Option<&JobLogic> {
-        self.logic.get(job_type)
+    /// Registers a native Rust function as job logic.
+    pub fn register_native(&mut self, job_type: &str, logic: Box<JobFn>) {
+        let key = Self::normalize_key(job_type);
+        self.logic.insert(key, JobLogic::Native(logic));
+        self.names.insert(job_type.to_string());
     }
 
+    /// Registers a Lua function as job logic.
+    pub fn register_lua(&mut self, job_type: &str, key: mlua::RegistryKey) {
+        let norm = Self::normalize_key(job_type);
+        self.logic.insert(norm, JobLogic::Lua(key));
+        self.names.insert(job_type.to_string());
+    }
+
+    /// Registers a data-driven job (uses default progress/duration logic).
+    pub fn register_data_job(&mut self, job: JobTypeData) {
+        let key = Self::normalize_key(&job.name);
+        self.names.insert(job.name.clone());
+        self.types.insert(key.clone(), job);
+        self.logic.insert(key, JobLogic::Data);
+    }
+
+    /// Gets the logic for a job type, if registered.
+    pub fn get_logic(&self, job_type: &str) -> Option<&JobLogic> {
+        self.logic.get(&Self::normalize_key(job_type))
+    }
+
+    /// Gets the data for a job type, if loaded.
+    pub fn get_data(&self, job_type: &str) -> Option<&JobTypeData> {
+        self.types.get(&Self::normalize_key(job_type))
+    }
+
+    /// Returns a Vec of all job type names (as Strings, original casing).
     pub fn job_type_names(&self) -> Vec<String> {
-        self.logic.keys().cloned().collect()
+        let mut names: Vec<String> = self.names.iter().cloned().collect();
+        names.sort();
+        names
+    }
+
+    fn normalize_key(key: &str) -> String {
+        key.trim().to_lowercase().replace(' ', "_")
     }
 }

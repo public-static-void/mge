@@ -22,7 +22,7 @@ MGE is a modular, cross-language game engine blueprint for rapid prototyping, ex
 ### Lua Scripting Example:
 
 ```sh
-cargo run --bin mge-cli -- engine/scripts/lua/demos/roguelike_mvp.lua
+cargo run --bin mge_cli -- engine/scripts/lua/demos/roguelike_mvp.lua
 ```
 
 Controls: `w/a/s/d` = move, `e` = attack, `q` = quit
@@ -50,7 +50,7 @@ Example output:
 ### Roguelike MVP Viewport Demo Mod
 
 ```bash
-cargo run --bin mge-cli -- --mod mvp_roguelike
+cargo run --bin mge_cli -- --mod mvp_roguelike
 ```
 
 Controls: `w/a/s/d` = move, `e` = attack, `q` = quit

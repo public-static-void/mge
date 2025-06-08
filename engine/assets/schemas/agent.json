@@ -1,0 +1,31 @@
+{
+  "name": "Agent",
+  "title": "Agent",
+  "type": "object",
+  "modes": ["colony", "roguelike"],
+  "properties": {
+    "entity_id": { "type": "integer" },
+    "skills": {
+      "type": "object",
+      "additionalProperties": { "type": "number" }
+    },
+    "preferences": {
+      "type": "object",
+      "additionalProperties": { "type": "number" }
+    },
+    "current_job": { "type": "integer" },
+    "job_queue": {
+      "type": "array",
+      "items": { "type": "integer" },
+      "description": "Queue of job entity IDs"
+    },
+    "stamina": { "type": "number", "default": 100 },
+    "morale": { "type": "number", "default": 100 },
+    "state": {
+      "type": "string",
+      "enum": ["idle", "working", "resting", "unavailable"],
+      "default": "idle"
+    }
+  },
+  "required": ["entity_id"]
+}

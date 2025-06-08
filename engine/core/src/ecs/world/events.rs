@@ -139,4 +139,15 @@ impl World {
     ) -> Option<usize> {
         self.event_buses.subscriber_count::<T>(name)
     }
+
+    /// Register a new effect handler
+    pub fn register_effect_handler<F>(&mut self, action: &str, handler: F)
+    where
+        F: Fn(&mut World, u32, &serde_json::Value) + Send + Sync + 'static,
+    {
+        self.effect_processor_registry
+            .as_mut()
+            .expect("EffectProcessorRegistry missing")
+            .register_handler(action, handler);
+    }
 }

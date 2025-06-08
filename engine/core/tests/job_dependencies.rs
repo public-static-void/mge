@@ -2,7 +2,7 @@ use engine_core::ecs::registry::ComponentRegistry;
 use engine_core::ecs::schema::load_schemas_from_dir;
 use engine_core::ecs::system::System;
 use engine_core::ecs::world::World;
-use engine_core::systems::job::{JobSystem, JobTypeRegistry};
+use engine_core::systems::job::JobSystem;
 use serde_json::json;
 use std::sync::{Arc, Mutex};
 
@@ -46,8 +46,7 @@ fn job_with_unfinished_dependency_remains_pending() {
         )
         .unwrap();
 
-    let job_types = JobTypeRegistry::default();
-    let mut job_system = JobSystem::with_registry(job_types);
+    let mut job_system = JobSystem::new();
     job_system.run(&mut world, None);
 
     let main_job_after = world.get_component(main_eid, "Job").unwrap();
@@ -83,8 +82,7 @@ fn job_with_completed_dependency_can_start() {
         )
         .unwrap();
 
-    let job_types = JobTypeRegistry::default();
-    let mut job_system = JobSystem::with_registry(job_types);
+    let mut job_system = JobSystem::new();
     job_system.run(&mut world, None);
 
     let main_job_after = world.get_component(main_eid, "Job").unwrap();

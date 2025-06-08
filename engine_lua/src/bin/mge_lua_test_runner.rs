@@ -190,7 +190,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         for job in job_types {
             job_registry.register_data_job(job);
         }
-        let job_system = JobSystem::with_registry(job_registry);
+        let job_system = JobSystem::new();
         world.borrow_mut().register_system(job_system);
 
         world

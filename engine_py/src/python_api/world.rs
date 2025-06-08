@@ -58,7 +58,7 @@ impl PyWorld {
 
         world.register_system(engine_core::systems::death_decay::ProcessDeaths);
         world.register_system(engine_core::systems::death_decay::ProcessDecay);
-        world.register_system(engine_core::systems::job::JobSystem::default());
+        world.register_system(engine_core::systems::job::JobSystem);
         Ok(PyWorld {
             inner: Rc::new(RefCell::new(world)),
             systems: Rc::new(SystemBridge {
