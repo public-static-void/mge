@@ -1,6 +1,6 @@
-use engine_core::worldgen::register_builtin_worldgen_plugins;
-use engine_core::worldgen::{WorldgenPlugin, WorldgenRegistry};
-use pyo3::Bound;
+use engine_core::worldgen::{
+    ScriptingWorldgenPlugin, WorldgenPlugin, WorldgenRegistry, register_builtin_worldgen_plugins,
+};
 use pyo3::prelude::*;
 use pyo3::types::PyAny;
 use serde_json::Value;
@@ -12,19 +12,33 @@ thread_local! {
     static WORLDGEN_REGISTRY: Rc<RefCell<WorldgenRegistry>> = Rc::new(RefCell::new(WorldgenRegistry::new()));
 }
 
+struct PythonWorldgenPlugin {
+    callback: Py<PyAny>,
+}
+
+impl ScriptingWorldgenPlugin for PythonWorldgenPlugin {
+    fn invoke(&self, params: &Value) -> Result<Value, Box<dyn std::error::Error>> {
+        Python::with_gil(|py| {
+            let arg = to_pyobject(py, params)?;
+            let result = self.callback.call1(py, (arg,))?;
+            from_pyobject(result.bind(py).clone()).map_err(|e| Box::new(e) as _)
+        })
+    }
+    fn backend(&self) -> &str {
+        "python"
+    }
+}
+
 #[pyfunction]
 pub fn register_worldgen_plugin(py: Python, name: String, callback: Py<PyAny>) -> PyResult<()> {
-    let cb = callback.clone_ref(py);
+    let plugin = PythonWorldgenPlugin {
+        callback: callback.clone_ref(py),
+    };
     WORLDGEN_REGISTRY.with(|registry| {
-        registry.borrow_mut().register(WorldgenPlugin::Python {
+        registry.borrow_mut().register(WorldgenPlugin::Scripting {
             name,
-            generate: Box::new(move |params| {
-                Python::with_gil(|py| {
-                    let arg = to_pyobject(py, params).unwrap();
-                    let result = cb.call1(py, (arg,)).unwrap();
-                    from_pyobject(result.bind(py).clone()).unwrap_or(serde_json::Value::Null)
-                })
-            }),
+            backend: "python".to_string(),
+            opaque: Box::new(plugin),
         });
     });
     Ok(())

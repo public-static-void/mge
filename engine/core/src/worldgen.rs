@@ -1,14 +1,33 @@
-use crate::scripting::helpers::{json_to_lua_table, lua_value_to_json};
 use libloading::Library;
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use serde_json::Value as JsonValue;
 use std::fmt;
 
+/// Plugins can be native (C ABI) or scripting (opaque, e.g. Lua, Python, etc.)
+pub enum WorldgenPlugin {
+    CAbi {
+        name: String,
+        generate: Box<dyn Fn(&JsonValue) -> JsonValue + Send + Sync>,
+        _lib: Option<Library>,
+    },
+    Scripting {
+        name: String,
+        backend: String, // e.g. "lua", "python", etc.
+        opaque: Box<dyn ScriptingWorldgenPlugin>,
+    },
+}
+
+pub trait ScriptingWorldgenPlugin {
+    /// The backend is responsible for downcasting and invoking the correct script.
+    fn invoke(&self, params: &JsonValue) -> Result<JsonValue, Box<dyn std::error::Error>>;
+    fn backend(&self) -> &str;
+}
+
 #[derive(Debug)]
 pub enum WorldgenError {
     NotFound,
-    LuaError(mlua::Error),
+    ScriptError(String),
 }
 
 impl fmt::Display for WorldgenError {
@@ -18,22 +37,6 @@ impl fmt::Display for WorldgenError {
 }
 
 impl std::error::Error for WorldgenError {}
-
-pub enum WorldgenPlugin {
-    CAbi {
-        name: String,
-        generate: Box<dyn Fn(&JsonValue) -> JsonValue + Send + Sync>,
-        _lib: Option<Library>, // Keeps the dynamic library alive!
-    },
-    Python {
-        name: String,
-        generate: Box<dyn Fn(&JsonValue) -> JsonValue + Send + Sync>,
-    },
-    Lua {
-        name: String,
-        registry_key: mlua::RegistryKey,
-    },
-}
 
 pub struct WorldgenRegistry {
     plugins: Vec<WorldgenPlugin>,
@@ -54,9 +57,8 @@ impl WorldgenRegistry {
         self.plugins
             .iter()
             .map(|p| match p {
-                WorldgenPlugin::CAbi { name, .. }
-                | WorldgenPlugin::Python { name, .. }
-                | WorldgenPlugin::Lua { name, .. } => name.clone(),
+                WorldgenPlugin::CAbi { name, .. } => name.clone(),
+                WorldgenPlugin::Scripting { name, .. } => name.clone(),
             })
             .collect()
     }
@@ -64,45 +66,19 @@ impl WorldgenRegistry {
     pub fn invoke(&self, name: &str, params: &JsonValue) -> Result<JsonValue, WorldgenError> {
         for plugin in &self.plugins {
             let plugin_name = match plugin {
-                WorldgenPlugin::CAbi { name, .. }
-                | WorldgenPlugin::Python { name, .. }
-                | WorldgenPlugin::Lua { name, .. } => name,
+                WorldgenPlugin::CAbi { name, .. } => name,
+                WorldgenPlugin::Scripting { name, .. } => name,
             };
             if plugin_name == name {
-                let generate = match plugin {
-                    WorldgenPlugin::CAbi { generate, .. }
-                    | WorldgenPlugin::Python { generate, .. } => generate,
-                    WorldgenPlugin::Lua { .. } => {
-                        return Err(WorldgenError::NotFound);
+                match plugin {
+                    WorldgenPlugin::CAbi { generate, .. } => {
+                        return Ok(generate(params));
                     }
-                };
-                return Ok(generate(params));
-            }
-        }
-        Err(WorldgenError::NotFound)
-    }
-
-    pub fn invoke_lua(
-        &self,
-        lua: &mlua::Lua,
-        name: &str,
-        params: &JsonValue,
-    ) -> Result<JsonValue, WorldgenError> {
-        for plugin in &self.plugins {
-            if let WorldgenPlugin::Lua {
-                name: plugin_name,
-                registry_key,
-            } = plugin
-            {
-                if plugin_name == name {
-                    let func: mlua::Function = lua
-                        .registry_value(registry_key)
-                        .map_err(WorldgenError::LuaError)?;
-                    let params_table =
-                        json_to_lua_table(lua, params).map_err(WorldgenError::LuaError)?;
-                    let result: mlua::Value =
-                        func.call(params_table).map_err(WorldgenError::LuaError)?;
-                    return lua_value_to_json(lua, result, None).map_err(WorldgenError::LuaError);
+                    WorldgenPlugin::Scripting { opaque, .. } => {
+                        return opaque
+                            .invoke(params)
+                            .map_err(|e| WorldgenError::ScriptError(e.to_string()));
+                    }
                 }
             }
         }
@@ -154,7 +130,6 @@ pub fn register_builtin_worldgen_plugins(registry: &mut WorldgenRegistry) {
             for z in 0..z_levels {
                 for y in 0..height {
                     for x in 0..width {
-                        // Pick a biome and terrain randomly (deterministic via seed)
                         let biome_idx = rng.random_range(0..biome_names.len());
                         let biome = biome_names[biome_idx];
                         let tiles = &biome_tiles[biome_idx];
@@ -164,7 +139,6 @@ pub fn register_builtin_worldgen_plugins(registry: &mut WorldgenRegistry) {
                             "unknown"
                         };
 
-                        // --- Neighbor calculation ---
                         let mut neighbors = Vec::new();
                         let deltas = [(-1, 0), (1, 0), (0, -1), (0, 1)];
                         for (dx, dy) in deltas.iter() {
@@ -195,6 +169,6 @@ pub fn register_builtin_worldgen_plugins(registry: &mut WorldgenRegistry) {
                 "cells": cells
             })
         }),
-        _lib: None, // Built-in: no dynamic library
+        _lib: None,
     });
 }
