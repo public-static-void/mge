@@ -209,7 +209,6 @@
 | `ui.remove_callback(id, event)`        | Remove a callback for a widget event                             |
 | `ui.remove_child(parent_id, child_id)` | Remove a child widget from a parent                              |
 | `ui.remove_widget(id)`                 | Remove a widget by ID                                            |
-| `ui.send_ui_event(...)`                | Alias for `ui.trigger_event`                                     |
 | `ui.set_callback(id, event, fn)`       | Register a callback for a widget event (e.g., "click")           |
 | `ui.set_widget_props(id, props)`       | Set properties on a widget                                       |
 | `ui.set_z_order(id, z)`                | Set the z-order of a widget                                      |
