@@ -17,10 +17,11 @@ use pyo3::types::{PyAny, PyDict};
 use std::cell::RefCell;
 use std::rc::Rc;
 
-#[pyclass(unsendable)]
+#[pyclass(unsendable, subclass)]
 pub struct PyWorld {
     pub inner: Rc<RefCell<World>>,
     pub systems: Rc<SystemBridge>,
+    pub map_postprocessors: RefCell<Vec<Py<PyAny>>>,
 }
 
 #[pymethods]
@@ -64,6 +65,7 @@ impl PyWorld {
             systems: Rc::new(SystemBridge {
                 systems: RefCell::new(std::collections::HashMap::new()),
             }),
+            map_postprocessors: RefCell::new(Vec::new()),
         })
     }
 
@@ -428,17 +430,39 @@ impl PyWorld {
         }
     }
 
-    fn apply_generated_map(&self, map: Bound<'_, PyAny>) -> PyResult<()> {
+    fn apply_generated_map<'py>(slf: Bound<'py, Self>, map: Bound<'py, PyAny>) -> PyResult<()> {
         let map_json: serde_json::Value = pythonize::depythonize(&map)?;
-        let mut world = self.inner.borrow_mut();
+
+        let slf_borrow = slf.borrow();
+        let mut world = slf_borrow.inner.borrow_mut();
         world
             .apply_generated_map(&map_json)
-            .map_err(pyo3::exceptions::PyValueError::new_err)
+            .map_err(pyo3::exceptions::PyValueError::new_err)?;
+        drop(world); // release mutable borrow before next borrow
+
+        let slf_borrow = slf.borrow();
+        let postprocessors = slf_borrow.map_postprocessors.borrow();
+        for callback in postprocessors.iter() {
+            callback.call1(slf.py(), (slf.clone(),))?;
+        }
+        Ok(())
     }
 
     fn get_map_cell_count(&self) -> usize {
         let world = self.inner.borrow();
         world.map.as_ref().map(|m| m.all_cells().len()).unwrap_or(0)
+    }
+
+    /// Register a Python map postprocessor (called after apply_generated_map).
+    fn register_map_postprocessor(&self, py: Python, callback: Py<PyAny>) {
+        self.map_postprocessors
+            .borrow_mut()
+            .push(callback.clone_ref(py));
+    }
+
+    /// Clear all registered Python map postprocessors.
+    fn clear_map_postprocessors(&self) {
+        self.map_postprocessors.borrow_mut().clear();
     }
 
     fn get_time_of_day(&self, py: Python) -> PyObject {

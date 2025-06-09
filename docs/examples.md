@@ -165,6 +165,42 @@ print(len(e_kind_room)) # 2
 
 ---
 
+## Map Generation and Postprocessor Hooks
+
+### Lua
+
+```lua
+world:register_map_postprocessor(function(w)
+    -- Validate or modify the world after map generation
+    print("Map postprocessor called, cell count:", w:get_map_cell_count())
+    -- Raise error to block map application if needed
+    -- error("Invalid map!")
+end)
+
+-- Apply a generated map (this triggers postprocessors)
+world:apply_generated_map({ topology = "square", cells = { { x = 0, y = 0, z = 0 } } })
+
+-- Later, to clear:
+world:clear_map_postprocessors()
+```
+
+### Python
+
+```python
+def validator(world):
+    print("Map postprocessor called, cell count:", world.get_map_cell_count())
+    # raise ValueError("Invalid map!")  # To abort map application
+
+world.register_map_postprocessor(validator)
+
+# Apply a generated map (triggers postprocessors)
+world.apply_generated_map({ "topology": "square", "cells": [ { "x": 0, "y": 0, "z": 0 } ] })
+
+world.clear_map_postprocessors()
+```
+
+---
+
 ## Inventory Example
 
 ### Lua
