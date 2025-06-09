@@ -223,12 +223,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Prepare Lua code: require the module and call only the test function
         let script = format!(
             r#"
-            require("world_postprocessors")
             local mod = require("{mod}");
             mod["{func}"]();
-            if world and run_world_postprocessors then
-                run_world_postprocessors(world)
-            end
             "#,
             mod = modname,
             func = fname
