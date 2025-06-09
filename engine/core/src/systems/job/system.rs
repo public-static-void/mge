@@ -90,19 +90,8 @@ impl JobSystem {
             let assigned_to = job.get("assigned_to").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
             let job_id = job.get("id").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
 
-            let handler_opt = {
-                world
-                    .job_handler_registry
-                    .get(&job_type)
-                    .map(|h| h as *const _)
-            };
-            if let Some(handler_ptr) = handler_opt {
-                let handler: &dyn Fn(
-                    &mut World,
-                    u32,
-                    u32,
-                    &serde_json::Value,
-                ) -> serde_json::Value = unsafe { &*handler_ptr };
+            if let Some(handler) = world.job_handler_registry.get(&job_type) {
+                let handler = handler.clone();
                 handler(world, assigned_to, job_id, &job)
             } else {
                 let mut job = job.clone();

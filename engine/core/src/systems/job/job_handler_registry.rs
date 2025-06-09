@@ -1,8 +1,9 @@
 use crate::ecs::world::World;
 use std::collections::HashMap;
+use std::sync::Arc;
 
 pub type JobHandler =
-    Box<dyn Fn(&mut World, u32, u32, &serde_json::Value) -> serde_json::Value + Send + Sync>;
+    Arc<dyn Fn(&mut World, u32, u32, &serde_json::Value) -> serde_json::Value + Send + Sync>;
 
 #[derive(Default)]
 pub struct JobHandlerRegistry {
@@ -24,7 +25,7 @@ impl JobHandlerRegistry {
             + 'static,
     {
         self.handlers
-            .insert(job_type.to_string(), Box::new(handler));
+            .insert(job_type.to_string(), Arc::new(handler));
     }
 
     pub fn get(&self, job_type: &str) -> Option<&JobHandler> {

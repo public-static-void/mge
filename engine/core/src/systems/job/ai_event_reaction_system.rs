@@ -24,7 +24,7 @@ impl System for AiEventReactionSystem {
                                     && job
                                         .get("resource_outputs")
                                         .and_then(|v| v.as_array())
-                                        .map_or(false, |outputs| {
+                                        .is_some_and(|outputs| {
                                             outputs.iter().any(|output| {
                                                 output.get("kind").and_then(|v| v.as_str())
                                                     == Some(kind)
@@ -40,6 +40,7 @@ impl System for AiEventReactionSystem {
                     })
                     .unwrap_or_default();
 
+                let mut updates = Vec::new();
                 for (&agent_id, agent) in
                     world.components.get("Agent").unwrap_or(&Default::default())
                 {
@@ -53,6 +54,10 @@ impl System for AiEventReactionSystem {
                             queue.push(JsonValue::from(*job_eid));
                         }
                     }
+                    updates.push((agent_id, queue));
+                }
+                // --- Now apply updates mutably ---
+                for (agent_id, queue) in updates {
                     if let Some(agent_entry) = world
                         .components
                         .get_mut("Agent")
