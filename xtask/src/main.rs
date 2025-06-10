@@ -192,6 +192,7 @@ fn build_c_plugins() -> Result<(), Box<dyn std::error::Error>> {
                         c_file.to_str().unwrap(),
                         "-o",
                         out_lib.to_str().unwrap(),
+                        "-ljansson",
                     ])
                     .status()?;
                 if !status.success() {
