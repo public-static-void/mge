@@ -62,12 +62,18 @@ fn test_unregistered_component() {
 
 #[test]
 fn test_external_schema_loading() {
+    use engine_core::config::GameConfig;
     use engine_core::ecs::registry::ComponentRegistry;
-    use engine_core::ecs::schema::load_schemas_from_dir;
+    use engine_core::ecs::schema::load_schemas_from_dir_with_modes;
     use std::sync::{Arc, Mutex};
 
+    let config = GameConfig::load_from_file(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../game.toml"),
+    )
+    .expect("Failed to load config");
     let schema_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap() + "/../assets/schemas";
-    let schemas = load_schemas_from_dir(&schema_dir).expect("Failed to load schemas");
+    let schemas = load_schemas_from_dir_with_modes(&schema_dir, &config.allowed_modes)
+        .expect("Failed to load schemas");
     assert!(
         schemas.contains_key("Health"),
         "Health schema should be loaded"

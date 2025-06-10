@@ -1,5 +1,5 @@
 use engine_core::ecs::registry::ComponentRegistry;
-use engine_core::ecs::schema::load_schemas_from_dir;
+use engine_core::ecs::schema::{load_allowed_modes, load_schemas_from_dir_with_modes};
 use engine_core::ecs::world::World;
 use engine_core::map::{CellKey, MapTopology, SquareGridMap};
 use std::path::PathBuf;
@@ -26,7 +26,8 @@ fn test_multiz_cell_neighbors() {
 fn test_entities_in_cell_and_zlevel() {
     // Load schemas
     let schema_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../assets/schemas");
-    let schemas = load_schemas_from_dir(&schema_dir).unwrap();
+    let allowed_modes = load_allowed_modes().unwrap();
+    let schemas = load_schemas_from_dir_with_modes(&schema_dir, &allowed_modes).unwrap();
     let mut registry = ComponentRegistry::new();
     for (_name, schema) in schemas {
         registry.register_external_schema(schema);
