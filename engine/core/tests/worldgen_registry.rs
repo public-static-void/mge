@@ -8,6 +8,7 @@ use engine_core::worldgen::{
 use serde_json::json;
 use std::sync::{Arc, Mutex};
 
+#[derive(Clone)]
 struct DummyWorldgenPlugin;
 
 impl ScriptingWorldgenPlugin for DummyWorldgenPlugin {
@@ -29,7 +30,7 @@ fn test_register_and_list_worldgen_plugins() {
     // Simulate registering plugins from different sources
     registry.register(WorldgenPlugin::CAbi {
         name: "simple_square".to_string(),
-        generate: Box::new(|_| json!({ "cells": [] })),
+        generate: Arc::new(|_| json!({ "cells": [] })),
         _lib: None,
     });
     registry.register(WorldgenPlugin::Scripting {
@@ -50,7 +51,7 @@ fn test_invoke_worldgen_plugin_returns_map() {
 
     registry.register(WorldgenPlugin::CAbi {
         name: "simple_square".to_string(),
-        generate: Box::new(|params| {
+        generate: Arc::new(|params: &serde_json::Value| {
             assert_eq!(params["width"], 10);
             json!({ "cells": [ { "id": "0,0", "x": 0, "y": 0 } ] })
         }),
@@ -120,12 +121,20 @@ fn test_register_and_invoke_cabi_worldgen_plugin() {
     let names = registry.list_names();
     assert!(names.contains(&"simple_square".to_string()));
 
-    let params = serde_json::json!({});
+    let params = serde_json::json!({
+        "width": 1,
+        "height": 1,
+        "z_levels": 1,
+        "seed": 0,
+        "chunk_x": 0,
+        "chunk_y": 0
+    });
     let map = registry
         .invoke("simple_square", &params)
         .expect("plugin should exist");
     assert!(map.get("cells").is_some());
-    assert_eq!(map["cells"][0]["id"], "0,0");
+    // The C plugin returns id as "0,0,0"
+    assert_eq!(map["cells"][0]["id"], "0,0,0");
 }
 
 // Dummy engine API functions for testing
