@@ -32,6 +32,21 @@ impl RegionMap {
             .or_default()
             .insert(to.to_string());
     }
+
+    /// Merge another RegionMap into this one
+    pub fn merge_from(&mut self, other: &RegionMap) {
+        for (id, neighbors) in &other.cells {
+            self.cells
+                .entry(id.clone())
+                .or_default()
+                .extend(neighbors.iter().cloned());
+        }
+        for (id, meta) in &other.cell_metadata {
+            self.cell_metadata
+                .entry(id.clone())
+                .or_insert_with(|| meta.clone());
+        }
+    }
 }
 
 impl Default for RegionMap {

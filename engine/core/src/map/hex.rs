@@ -42,6 +42,21 @@ impl HexGridMap {
                 z: to.2,
             });
     }
+
+    /// Merge another HexGridMap into this one
+    pub fn merge_from(&mut self, other: &HexGridMap) {
+        for (cell, neighbors) in &other.cells {
+            self.cells
+                .entry(cell.clone())
+                .or_default()
+                .extend(neighbors.iter().cloned());
+        }
+        for (cell, meta) in &other.cell_metadata {
+            self.cell_metadata
+                .entry(cell.clone())
+                .or_insert_with(|| meta.clone());
+        }
+    }
 }
 
 impl Default for HexGridMap {

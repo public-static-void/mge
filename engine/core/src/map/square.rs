@@ -42,6 +42,28 @@ impl SquareGridMap {
                 z: to.2,
             });
     }
+
+    /// Merge another SquareGridMap into this one
+    pub fn merge_from(&mut self, other: &SquareGridMap) {
+        for (cell, neighbors) in &other.cells {
+            self.cells
+                .entry(cell.clone())
+                .or_default()
+                .extend(neighbors.iter().cloned());
+        }
+        for (cell, meta) in &other.cell_metadata {
+            self.cell_metadata
+                .entry(cell.clone())
+                .or_insert_with(|| meta.clone());
+        }
+        // Debug print: print all cell coordinates after merge
+        let cell_list: Vec<_> = self.cells.keys().collect();
+        println!(
+            "SquareGridMap::merge_from: now {} cells: {:?}",
+            self.cells.len(),
+            cell_list
+        );
+    }
 }
 
 impl Default for SquareGridMap {

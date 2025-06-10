@@ -2,6 +2,7 @@
 //!
 //! Exposes ECS and mode management modules.
 
+pub mod config;
 pub mod ecs;
 pub mod map;
 pub mod modes;

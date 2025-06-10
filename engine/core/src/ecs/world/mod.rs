@@ -19,6 +19,7 @@ mod systems;
 pub mod wasm;
 
 pub type MapPostprocessor = Arc<dyn Fn(&mut World) -> Result<(), String> + Send + Sync>;
+pub type MapValidator = Arc<dyn Fn(&serde_json::Value) -> Result<(), String> + Send + Sync>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct TimeOfDay {
@@ -55,6 +56,8 @@ pub struct World {
     #[serde(skip)]
     pub map_postprocessors: Vec<MapPostprocessor>,
     #[serde(skip)]
+    pub map_validators: Vec<MapValidator>,
+    #[serde(skip)]
     pub ai_event_intents: VecDeque<JsonValue>,
 }
 
@@ -80,6 +83,7 @@ impl World {
             map: None,
             event_queues: HashMap::new(),
             map_postprocessors: Vec::new(),
+            map_validators: Vec::new(),
             ai_event_intents: VecDeque::new(),
         }
     }
