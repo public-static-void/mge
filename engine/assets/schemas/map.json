@@ -1,0 +1,81 @@
+{
+  "title": "GeneratedMap",
+  "type": "object",
+  "description": "Schema for generated maps and map chunks.",
+  "properties": {
+    "topology": {
+      "type": "string",
+      "enum": ["square", "hex", "region"]
+    },
+    "cells": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": ["x", "y", "z"],
+            "properties": {
+              "x": { "type": "integer" },
+              "y": { "type": "integer" },
+              "z": { "type": "integer" },
+              "biome": { "type": "string" },
+              "terrain": { "type": "string" },
+              "neighbors": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["x", "y", "z"],
+                  "properties": {
+                    "x": { "type": "integer" },
+                    "y": { "type": "integer" },
+                    "z": { "type": "integer" }
+                  }
+                }
+              },
+              "metadata": { "type": "object" }
+            }
+          },
+          {
+            "type": "object",
+            "required": ["q", "r", "z"],
+            "properties": {
+              "q": { "type": "integer" },
+              "r": { "type": "integer" },
+              "z": { "type": "integer" },
+              "biome": { "type": "string" },
+              "terrain": { "type": "string" },
+              "neighbors": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["q", "r", "z"],
+                  "properties": {
+                    "q": { "type": "integer" },
+                    "r": { "type": "integer" },
+                    "z": { "type": "integer" }
+                  }
+                }
+              },
+              "metadata": { "type": "object" }
+            }
+          },
+          {
+            "type": "object",
+            "required": ["id"],
+            "properties": {
+              "id": { "type": "string" },
+              "biome": { "type": "string" },
+              "terrain": { "type": "string" },
+              "neighbors": {
+                "type": "array",
+                "items": { "type": "string" }
+              },
+              "metadata": { "type": "object" }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "required": ["topology", "cells"]
+}
