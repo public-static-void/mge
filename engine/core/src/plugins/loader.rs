@@ -1,6 +1,9 @@
+use crate::config::GameConfig;
 use crate::ecs::World;
 use crate::plugins::types::{EngineApi, PluginManifest, PluginVTable, SystemPlugin};
-use crate::worldgen::{WorldgenPlugin, WorldgenRegistry};
+use crate::worldgen::{
+    ThreadSafeWorldgenPlugin, ThreadSafeWorldgenRegistry, WorldgenPlugin, WorldgenRegistry,
+};
 use libloading::{Library, Symbol};
 use serde_json::Value;
 use std::cell::RefCell;
@@ -8,8 +11,9 @@ use std::collections::HashMap;
 use std::ffi::{CStr, CString};
 use std::fs;
 use std::os::raw::{c_char, c_int, c_void};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
+use std::sync::Arc;
 use topo_sort::TopoSort;
 
 /// # Safety
@@ -34,6 +38,75 @@ pub unsafe fn load_plugin<P: AsRef<Path>>(
     let init_result = unsafe { (vtable_ref.init)(engine_api as *mut _, world) };
     if init_result != 0 {
         return Err(format!("Plugin init failed with code {}", init_result));
+    }
+
+    Ok(())
+}
+
+/// # Safety
+///
+/// - `path` must point to a valid dynamic library exposing a compatible plugin vtable.
+/// - `engine_api`, `world`, and `worldgen_registry` must be valid for the duration of the plugin.
+/// - The caller must ensure all pointer arguments are valid and not aliased elsewhere.
+pub unsafe fn load_plugin_and_register_worldgen_threadsafe<P: AsRef<Path>>(
+    path: P,
+    engine_api: &mut EngineApi,
+    world: *mut c_void,
+    worldgen_registry: &mut ThreadSafeWorldgenRegistry,
+) -> Result<(), String> {
+    let lib = unsafe { Library::new(path.as_ref()) }.map_err(|e| e.to_string())?;
+    let vtable: Symbol<*mut *mut PluginVTable> =
+        unsafe { lib.get(b"PLUGIN_VTABLE\0") }.map_err(|e| e.to_string())?;
+    let plugin_vtable: *mut PluginVTable = unsafe { **vtable };
+    if plugin_vtable.is_null() {
+        return Err("PLUGIN_VTABLE symbol is null".to_string());
+    }
+    let vtable_ref: &PluginVTable = unsafe { &*plugin_vtable };
+
+    let init_result = unsafe { (vtable_ref.init)(engine_api as *mut _, world) };
+    if init_result != 0 {
+        return Err(format!("Plugin init failed with code {}", init_result));
+    }
+
+    // --- Worldgen registration ---
+    {
+        let worldgen_name_fn = vtable_ref.worldgen_name;
+        let generate_world_fn = vtable_ref.generate_world;
+        let free_result_json_fn = vtable_ref.free_result_json;
+
+        let name = if let Some(worldgen_name_fn) = worldgen_name_fn {
+            let cstr = unsafe { CStr::from_ptr(worldgen_name_fn()) };
+            cstr.to_str().unwrap().to_owned()
+        } else {
+            return Err("Plugin does not provide worldgen_name".to_string());
+        };
+
+        let generate: Arc<dyn Fn(&Value) -> Value + Send + Sync> =
+            Arc::new(move |params: &Value| -> Value {
+                let params_json = serde_json::to_string(params).unwrap();
+                let c_params = CString::new(params_json).unwrap();
+                let mut out_ptr: *mut c_char = std::ptr::null_mut();
+
+                if let Some(generate_world_fn) = generate_world_fn {
+                    let res = unsafe { generate_world_fn(c_params.as_ptr(), &mut out_ptr) };
+                    if res != 0 || out_ptr.is_null() {
+                        return Value::Null;
+                    }
+                    let result = unsafe { CStr::from_ptr(out_ptr).to_string_lossy().into_owned() };
+                    if let Some(free_result_json_fn) = free_result_json_fn {
+                        unsafe { free_result_json_fn(out_ptr) };
+                    }
+                    serde_json::from_str(&result).unwrap_or(Value::Null)
+                } else {
+                    Value::Null
+                }
+            });
+
+        worldgen_registry.register(ThreadSafeWorldgenPlugin::CAbi {
+            name,
+            generate,
+            _lib: Some(lib), // Dynamic plugin: keep the library alive
+        });
     }
 
     Ok(())
@@ -77,29 +150,30 @@ pub unsafe fn load_plugin_and_register_worldgen<P: AsRef<Path>>(
             return Err("Plugin does not provide worldgen_name".to_string());
         };
 
-        let generate = move |params: &Value| -> Value {
-            let params_json = serde_json::to_string(params).unwrap();
-            let c_params = CString::new(params_json).unwrap();
-            let mut out_ptr: *mut c_char = std::ptr::null_mut();
+        let generate: Arc<dyn Fn(&Value) -> Value + Send + Sync> =
+            Arc::new(move |params: &Value| -> Value {
+                let params_json = serde_json::to_string(params).unwrap();
+                let c_params = CString::new(params_json).unwrap();
+                let mut out_ptr: *mut c_char = std::ptr::null_mut();
 
-            if let Some(generate_world_fn) = generate_world_fn {
-                let res = unsafe { generate_world_fn(c_params.as_ptr(), &mut out_ptr) };
-                if res != 0 || out_ptr.is_null() {
-                    return Value::Null;
+                if let Some(generate_world_fn) = generate_world_fn {
+                    let res = unsafe { generate_world_fn(c_params.as_ptr(), &mut out_ptr) };
+                    if res != 0 || out_ptr.is_null() {
+                        return Value::Null;
+                    }
+                    let result = unsafe { CStr::from_ptr(out_ptr).to_string_lossy().into_owned() };
+                    if let Some(free_result_json_fn) = free_result_json_fn {
+                        unsafe { free_result_json_fn(out_ptr) };
+                    }
+                    serde_json::from_str(&result).unwrap_or(Value::Null)
+                } else {
+                    Value::Null
                 }
-                let result = unsafe { CStr::from_ptr(out_ptr).to_string_lossy().into_owned() };
-                if let Some(free_result_json_fn) = free_result_json_fn {
-                    unsafe { free_result_json_fn(out_ptr) };
-                }
-                serde_json::from_str(&result).unwrap_or(Value::Null)
-            } else {
-                Value::Null
-            }
-        };
+            });
 
         worldgen_registry.register(WorldgenPlugin::CAbi {
             name,
-            generate: Box::new(generate),
+            generate,
             _lib: Some(lib), // Dynamic plugin: keep the library alive
         });
     }
@@ -271,4 +345,98 @@ pub fn resolve_plugin_load_order(
     }
 
     Ok(order)
+}
+
+/// # Safety
+///
+/// - `world_ptr` must be valid for the duration of plugin loading.
+/// - The caller must ensure all pointer arguments are valid and not aliased elsewhere.
+pub unsafe fn load_native_plugins_from_config_threadsafe(
+    config: &GameConfig,
+    engine_api: &mut EngineApi,
+    world_ptr: *mut std::os::raw::c_void,
+    worldgen_registry: &mut ThreadSafeWorldgenRegistry,
+) -> Result<(), String> {
+    if let Some(plugins) = &config.plugins {
+        // Determine workspace root robustly
+        let workspace_root = std::env::var("MGE_WORKSPACE_ROOT")
+            .ok()
+            .map(PathBuf::from)
+            .unwrap_or_else(|| {
+                // Fallback: go up from CARGO_MANIFEST_DIR until "plugins" dir exists
+                let mut dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+                while !dir.join("plugins").exists() {
+                    if !dir.pop() {
+                        panic!("Could not find workspace root containing 'plugins' directory");
+                    }
+                }
+                dir
+            });
+
+        for plugin_path in &plugins.native {
+            let abs_path = workspace_root.join(plugin_path);
+            if !abs_path.exists() {
+                return Err(format!(
+                    "Plugin not found: {} (resolved as {:?})",
+                    plugin_path, abs_path
+                ));
+            }
+            unsafe {
+                load_plugin_and_register_worldgen_threadsafe(
+                    &abs_path,
+                    engine_api,
+                    world_ptr,
+                    worldgen_registry,
+                )?;
+            }
+        }
+    }
+    Ok(())
+}
+
+/// # Safety
+///
+/// - `world_ptr` must be valid for the duration of plugin loading.
+/// - The caller must ensure all pointer arguments are valid and not aliased elsewhere.
+pub unsafe fn load_native_plugins_from_config(
+    config: &GameConfig,
+    engine_api: &mut EngineApi,
+    world_ptr: *mut std::os::raw::c_void,
+    worldgen_registry: &mut WorldgenRegistry,
+) -> Result<(), String> {
+    if let Some(plugins) = &config.plugins {
+        // Determine workspace root robustly
+        let workspace_root = std::env::var("MGE_WORKSPACE_ROOT")
+            .ok()
+            .map(PathBuf::from)
+            .unwrap_or_else(|| {
+                // Fallback: go up from CARGO_MANIFEST_DIR until "plugins" dir exists
+                let mut dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+                while !dir.join("plugins").exists() {
+                    if !dir.pop() {
+                        panic!("Could not find workspace root containing 'plugins' directory");
+                    }
+                }
+                dir
+            });
+
+        for plugin_path in &plugins.native {
+            let abs_path = workspace_root.join(plugin_path);
+            if !abs_path.exists() {
+                return Err(format!(
+                    "Plugin not found: {} (resolved as {:?})",
+                    plugin_path, abs_path
+                ));
+            }
+            unsafe {
+                load_plugin_and_register_worldgen(
+                    &abs_path,
+                    engine_api,
+                    world_ptr,
+                    worldgen_registry,
+                )?;
+            }
+        }
+    }
+    Ok(())
 }
