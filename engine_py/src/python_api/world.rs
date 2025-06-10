@@ -22,6 +22,7 @@ pub struct PyWorld {
     pub inner: Rc<RefCell<World>>,
     pub systems: Rc<SystemBridge>,
     pub map_postprocessors: RefCell<Vec<Py<PyAny>>>,
+    pub map_validators: RefCell<Vec<Py<PyAny>>>,
 }
 
 #[pymethods]
@@ -30,7 +31,7 @@ impl PyWorld {
     #[pyo3(signature = (schema_dir=None))]
     fn new(schema_dir: Option<String>) -> PyResult<Self> {
         use engine_core::ecs::registry::ComponentRegistry;
-        use engine_core::ecs::schema::load_schemas_from_dir;
+        use engine_core::ecs::schema::{load_allowed_modes, load_schemas_from_dir_with_modes};
         use std::path::PathBuf;
 
         let schema_path = match schema_dir {
@@ -38,12 +39,16 @@ impl PyWorld {
             None => PathBuf::from("engine/assets/schemas"),
         };
 
-        let schemas = load_schemas_from_dir(&schema_path).map_err(|e| {
-            pyo3::exceptions::PyValueError::new_err(format!(
-                "Failed to load schemas from {:?}: {e}",
-                schema_path
-            ))
+        let allowed_modes = load_allowed_modes().map_err(|e| {
+            pyo3::exceptions::PyValueError::new_err(format!("Failed to load allowed modes: {e}"))
         })?;
+        let schemas =
+            load_schemas_from_dir_with_modes(&schema_path, &allowed_modes).map_err(|e| {
+                pyo3::exceptions::PyValueError::new_err(format!(
+                    "Failed to load schemas from {:?}: {e}",
+                    schema_path
+                ))
+            })?;
 
         let mut registry = ComponentRegistry::new();
         for (_name, schema) in schemas {
@@ -66,6 +71,7 @@ impl PyWorld {
                 systems: RefCell::new(std::collections::HashMap::new()),
             }),
             map_postprocessors: RefCell::new(Vec::new()),
+            map_validators: RefCell::new(Vec::new()),
         })
     }
 
@@ -430,20 +436,51 @@ impl PyWorld {
         }
     }
 
+    fn register_map_validator(&self, py: Python, callback: Py<PyAny>) {
+        self.map_validators
+            .borrow_mut()
+            .push(callback.clone_ref(py));
+    }
+
+    fn clear_map_validators(&self) {
+        self.map_validators.borrow_mut().clear();
+    }
+
     fn apply_generated_map<'py>(slf: Bound<'py, Self>, map: Bound<'py, PyAny>) -> PyResult<()> {
         let map_json: serde_json::Value = pythonize::depythonize(&map)?;
 
-        let slf_borrow = slf.borrow();
-        let mut world = slf_borrow.inner.borrow_mut();
-        world
-            .apply_generated_map(&map_json)
-            .map_err(pyo3::exceptions::PyValueError::new_err)?;
-        drop(world); // release mutable borrow before next borrow
+        // Run all validators first, fail fast on error
+        {
+            let slf_borrow = slf.borrow();
+            let validators = slf_borrow.map_validators.borrow();
+            for callback in validators.iter() {
+                let ok: bool = callback
+                    .call1(slf.py(), (map.clone(),))?
+                    .extract(slf.py())?;
+                if !ok {
+                    return Err(pyo3::exceptions::PyValueError::new_err(
+                        "Map validator failed",
+                    ));
+                }
+            }
+        }
 
-        let slf_borrow = slf.borrow();
-        let postprocessors = slf_borrow.map_postprocessors.borrow();
-        for callback in postprocessors.iter() {
-            callback.call1(slf.py(), (slf.clone(),))?;
+        // Apply map
+        {
+            let slf_borrow = slf.borrow();
+            let mut world = slf_borrow.inner.borrow_mut();
+            world
+                .apply_generated_map(&map_json)
+                .map_err(pyo3::exceptions::PyValueError::new_err)?;
+        }
+
+        // Run postprocessors
+        {
+            let slf_borrow = slf.borrow();
+            let postprocessors = slf_borrow.map_postprocessors.borrow();
+            for callback in postprocessors.iter() {
+                callback.call1(slf.py(), (slf.clone(),))?;
+            }
         }
         Ok(())
     }
@@ -463,6 +500,16 @@ impl PyWorld {
     /// Clear all registered Python map postprocessors.
     fn clear_map_postprocessors(&self) {
         self.map_postprocessors.borrow_mut().clear();
+    }
+
+    /// Apply a chunk
+    fn apply_chunk<'py>(slf: Bound<'py, Self>, chunk: Bound<'py, PyAny>) -> PyResult<()> {
+        let chunk_json: serde_json::Value = pythonize::depythonize(&chunk)?;
+        let binding = slf.borrow();
+        let mut world = binding.inner.borrow_mut();
+        world
+            .apply_chunk(&chunk_json)
+            .map_err(pyo3::exceptions::PyValueError::new_err)
     }
 
     fn get_time_of_day(&self, py: Python) -> PyObject {
