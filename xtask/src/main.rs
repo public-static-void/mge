@@ -187,6 +187,8 @@ fn build_c_plugins() -> Result<(), Box<dyn std::error::Error>> {
                     .args([
                         "-I",
                         engine_dir.to_str().unwrap(),
+                        "-L",
+                        "/usr/lib/x86_64-linux-gnu",
                         "-shared",
                         "-fPIC",
                         c_file.to_str().unwrap(),
