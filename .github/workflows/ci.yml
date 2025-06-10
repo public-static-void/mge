@@ -46,7 +46,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install build-essential
+      - name: Install deps
         run: sudo apt-get update && sudo apt-get install -y build-essential libjansson-dev && sudo apt-get clean
 
       - name: Build all C plugins (xtask via Makefile)
@@ -86,6 +86,9 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: moonrepo/setup-rust@v1
+
+      - name: Install deps
+        run: sudo apt-get update && sudo apt-get install -y build-essential libjansson-dev && sudo apt-get clean
 
       - name: Install wasm32-unknown-unknown target
         run: rustup target add wasm32-unknown-unknown
