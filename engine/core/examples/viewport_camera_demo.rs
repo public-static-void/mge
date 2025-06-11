@@ -1,7 +1,7 @@
 //! Interactive camera movement demo. Use WASD to move camera, q to quit.
 
 use engine_core::ecs::registry::ComponentRegistry;
-use engine_core::ecs::schema::load_schemas_from_dir;
+use engine_core::ecs::schema::{load_allowed_modes, load_schemas_from_dir_with_modes};
 use engine_core::ecs::world::World;
 use engine_core::map::{Map, SquareGridMap, cell_key::CellKey};
 use engine_core::presentation::renderer::TerminalRenderer;
@@ -12,9 +12,11 @@ use std::io::{self, Read};
 use std::sync::{Arc, Mutex};
 
 fn main() {
-    // Load schemas
+    // Load schemas with mode validation
     let schema_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../assets/schemas");
-    let schemas = load_schemas_from_dir(&schema_dir).expect("Failed to load schemas");
+    let allowed_modes = load_allowed_modes().expect("Failed to load allowed modes");
+    let schemas = load_schemas_from_dir_with_modes(&schema_dir, &allowed_modes)
+        .expect("Failed to load schemas");
 
     let mut registry = ComponentRegistry::new();
     for schema in schemas.values() {

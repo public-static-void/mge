@@ -73,16 +73,21 @@ impl System for DeathProcessor {
 
 #[test]
 fn test_death_event_flow() {
-    use engine_core::ecs::schema::load_schemas_from_dir;
+    use engine_core::config::GameConfig;
+    use engine_core::ecs::schema::load_schemas_from_dir_with_modes;
 
     // Setup registry and load schemas using an absolute path
     let registry = Arc::new(Mutex::new(
         engine_core::ecs::registry::ComponentRegistry::new(),
     ));
+    let config = GameConfig::load_from_file(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../game.toml"),
+    )
+    .expect("Failed to load config");
     let schema_dir =
         std::env::var("CARGO_MANIFEST_DIR").unwrap().to_string() + "/../assets/schemas";
     println!("Loading schemas from: {}", schema_dir);
-    let schemas = load_schemas_from_dir(&schema_dir)
+    let schemas = load_schemas_from_dir_with_modes(&schema_dir, &config.allowed_modes)
         .unwrap_or_else(|_| panic!("Failed to load schemas from {schema_dir}"));
     {
         let mut reg = registry.lock().unwrap();

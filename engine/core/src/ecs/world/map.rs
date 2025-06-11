@@ -38,6 +38,20 @@ impl World {
         Ok(())
     }
 
+    /// Applies a generated map after running all validators. Validators receive the map JSON.
+    /// If any validator fails, returns an error and does not apply the map.
+    pub fn apply_generated_map_with_validation(
+        &mut self,
+        map_json: &serde_json::Value,
+    ) -> Result<(), String> {
+        for validator in &self.map_validators {
+            validator(map_json).map_err(|e| format!("Map validator failed: {}", e))?;
+        }
+        self.apply_generated_map(map_json)
+            .map_err(|e| format!("Apply map failed: {}", e))?;
+        Ok(())
+    }
+
     /// Returns a reference to the world's map, if present.
     pub fn get_map(&self) -> Option<&Map> {
         self.map.as_ref()
@@ -54,5 +68,16 @@ impl World {
     /// Clear all map postprocessors.
     pub fn clear_map_postprocessors(&mut self) {
         self.map_postprocessors.clear();
+    }
+
+    /// Apply a map chunk (merge into the current map).
+    pub fn apply_chunk(&mut self, chunk_json: &serde_json::Value) -> Result<(), String> {
+        let chunk = Map::from_json(chunk_json)?;
+        if let Some(ref mut map) = self.map {
+            map.merge_chunk(&chunk);
+        } else {
+            self.map = Some(chunk);
+        }
+        Ok(())
     }
 }

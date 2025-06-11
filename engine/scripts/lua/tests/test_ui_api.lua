@@ -79,16 +79,6 @@ local function test_focus_widget()
 	assert.is_true(ui.focus_widget(id), "Should be able to focus widget")
 end
 
-local function test_send_ui_event_alias()
-	local id = ui.create_widget("Button", { label = "SendEvent", pos = { 1, 2 }, color = { 1, 2, 3 } })
-	local called = false
-	ui.set_callback(id, "click", function(widget_id)
-		called = true
-	end)
-	ui.send_ui_event(id, "click", { x = 1, y = 2 })
-	assert.is_true(called, "send_ui_event should trigger callback")
-end
-
 return {
 	test_create_button_widget = test_create_button_widget,
 	test_load_json_button = test_load_json_button,
@@ -98,5 +88,4 @@ return {
 	test_add_remove_child_panel = test_add_remove_child_panel,
 	test_set_callback_and_trigger = test_set_callback_and_trigger,
 	test_focus_widget = test_focus_widget,
-	test_send_ui_event_alias = test_send_ui_event_alias,
 }

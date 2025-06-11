@@ -165,37 +165,54 @@ print(len(e_kind_room)) # 2
 
 ---
 
-## Map Generation and Postprocessor Hooks
+## Map Generation, Validation, and Postprocessor Hooks
 
 ### Lua
 
 ```lua
-world:register_map_postprocessor(function(w)
-    -- Validate or modify the world after map generation
-    print("Map postprocessor called, cell count:", w:get_map_cell_count())
-    -- Raise error to block map application if needed
-    -- error("Invalid map!")
+-- Register a validator: called before map is applied, receives the map table.
+world:register_map_validator(function(map)
+    -- Return false to block the map, true to accept.
+    if not map.topology or #map.cells == 0 then
+        return false
+    end
+    return true
 end)
 
--- Apply a generated map (this triggers postprocessors)
+-- Register a postprocessor: called after map is applied, receives the world object.
+world:register_map_postprocessor(function(w)
+    print("Map postprocessor called, cell count:", w:get_map_cell_count())
+end)
+
+-- Apply a generated map (runs validators, then postprocessors)
 world:apply_generated_map({ topology = "square", cells = { { x = 0, y = 0, z = 0 } } })
 
--- Later, to clear:
+-- Clear all
+world:clear_map_validators()
 world:clear_map_postprocessors()
 ```
 
 ### Python
 
 ```python
-def validator(world):
-    print("Map postprocessor called, cell count:", world.get_map_cell_count())
-    # raise ValueError("Invalid map!")  # To abort map application
+# Register a validator: called before map is applied, receives the map dict.
+def validator(map_obj):
+    # Return False to block the map, True to accept.
+    return bool(map_obj.get("topology")) and len(map_obj.get("cells", [])) > 0
 
-world.register_map_postprocessor(validator)
+world.register_map_validator(validator)
 
-# Apply a generated map (triggers postprocessors)
+# Register a postprocessor: called after map is applied, receives the world object.
+def postprocessor(world_obj):
+    print("Map postprocessor called, cell count:", world_obj.get_map_cell_count())
+
+world.register_map_postprocessor(postprocessor)
+
+# Apply a generated map (runs validators, then postprocessors)
 world.apply_generated_map({ "topology": "square", "cells": [ { "x": 0, "y": 0, "z": 0 } ] })
 
+# Clear all
+world.clear_map_validators()
 world.clear_map_postprocessors()
 ```
 

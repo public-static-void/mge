@@ -1,0 +1,13 @@
+title = "Dummy Game"
+version = "0.1.0"
+allowed_modes = [
+  "colony",
+  "roguelike",
+  "editor",
+  "simulation",
+  "single",
+  "multi",
+]
+
+[plugins]
+native = ["plugins/simple_square_plugin/libsimple_square_plugin.so"]

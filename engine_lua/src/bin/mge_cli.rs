@@ -1,6 +1,10 @@
+use engine_core::config::GameConfig;
 use engine_core::ecs::registry::ComponentRegistry;
 use engine_core::ecs::world::World;
 use engine_core::mods::loader::load_mod;
+use engine_core::plugins::loader::load_native_plugins_from_config;
+use engine_core::plugins::types::EngineApi;
+use engine_core::worldgen::WorldgenRegistry;
 use engine_lua::ScriptEngine;
 use std::cell::RefCell;
 use std::env;
@@ -18,6 +22,15 @@ fn find_schema_dir() -> PathBuf {
     }
     // Default: relative to engine_lua's Cargo.toml
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../engine/assets/schemas")
+}
+
+fn find_config_file() -> PathBuf {
+    // Try env var override first
+    if let Ok(path) = env::var("MGE_CONFIG_FILE") {
+        return PathBuf::from(path);
+    }
+    // Default: project root
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../game.toml")
 }
 
 fn main() {
@@ -64,13 +77,38 @@ fn main() {
             );
             std::process::exit(1);
         }
-        let engine_schemas = engine_core::ecs::schema::load_schemas_from_dir(&schema_dir)
-            .expect("Failed to load engine schemas");
+        let config_file = find_config_file();
+        let config = GameConfig::load_from_file(&config_file)
+            .unwrap_or_else(|e| panic!("Failed to load config from {:?}: {:?}", config_file, e));
+        let engine_schemas = engine_core::ecs::schema::load_schemas_from_dir_with_modes(
+            &schema_dir,
+            &config.allowed_modes,
+        )
+        .expect("Failed to load engine schemas");
 
         let registry = Arc::new(Mutex::new(ComponentRegistry::new()));
         for (_name, schema) in engine_schemas {
             registry.lock().unwrap().register_external_schema(schema);
         }
+
+        // --- Plugin registration ---
+        let mut engine_api = EngineApi {
+            // Fill with function pointers as needed for your engine
+            spawn_entity: engine_core::plugins::ffi::ffi_spawn_entity,
+            set_component: engine_core::plugins::ffi::ffi_set_component,
+        };
+        let mut worldgen_registry = WorldgenRegistry::new();
+        let world_ptr: *mut std::os::raw::c_void = std::ptr::null_mut(); // Use actual pointer if needed
+
+        unsafe {
+            load_native_plugins_from_config(
+                &config,
+                &mut engine_api,
+                world_ptr,
+                &mut worldgen_registry,
+            )
+        }
+        .expect("Failed to load native plugins from config");
 
         // Read mod manifest and parse mode if present
         let manifest_path = format!("{}/mod.json", mod_dir);
@@ -120,12 +158,36 @@ fn main() {
             );
             std::process::exit(1);
         }
-        let schemas = engine_core::ecs::schema::load_schemas_from_dir(&schema_dir)
-            .expect("Failed to load schemas");
+        let config_file = find_config_file();
+        let config = GameConfig::load_from_file(&config_file)
+            .unwrap_or_else(|e| panic!("Failed to load config from {:?}: {:?}", config_file, e));
+        let schemas = engine_core::ecs::schema::load_schemas_from_dir_with_modes(
+            &schema_dir,
+            &config.allowed_modes,
+        )
+        .expect("Failed to load schemas");
         let registry = Arc::new(Mutex::new(ComponentRegistry::new()));
         for (_name, schema) in schemas {
             registry.lock().unwrap().register_external_schema(schema);
         }
+
+        // --- Plugin registration ---
+        let mut engine_api = EngineApi {
+            spawn_entity: engine_core::plugins::ffi::ffi_spawn_entity,
+            set_component: engine_core::plugins::ffi::ffi_set_component,
+        };
+        let mut worldgen_registry = WorldgenRegistry::new();
+        let world_ptr: *mut std::os::raw::c_void = std::ptr::null_mut();
+
+        unsafe {
+            load_native_plugins_from_config(
+                &config,
+                &mut engine_api,
+                world_ptr,
+                &mut worldgen_registry,
+            )
+        }
+        .expect("Failed to load native plugins from config");
 
         let mut world = World::new(registry.clone());
         if let Some(mode) = mode_arg {

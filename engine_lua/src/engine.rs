@@ -7,7 +7,7 @@ use crate::lua_api::world::register_world_api;
 use crate::lua_api::worldgen::register_worldgen_api;
 use engine_core::ecs::world::World;
 use engine_core::mods::loader::ModScriptEngine;
-use engine_core::worldgen::WorldgenRegistry;
+use engine_core::worldgen::{GLOBAL_WORLDGEN_REGISTRY, WorldgenRegistry};
 use mlua::RegistryKey;
 use mlua::{Lua, Result as LuaResult};
 use std::cell::RefCell;
@@ -70,10 +70,20 @@ impl ScriptEngine {
                 .expect("Failed to set require_json function");
         }
 
+        // --- Import plugins from the global registry into the local Lua registry ---
+        let worldgen_registry = {
+            let mut local = WorldgenRegistry::new();
+            {
+                let global = GLOBAL_WORLDGEN_REGISTRY.lock().unwrap();
+                local.import_threadsafe_plugins(&global);
+            }
+            Rc::new(RefCell::new(local))
+        };
+
         Self {
             lua: Rc::new(lua),
             input_provider: Arc::new(Mutex::new(input_provider)),
-            worldgen_registry: Rc::new(RefCell::new(WorldgenRegistry::new())),
+            worldgen_registry,
             lua_systems: Rc::new(RefCell::new(HashMap::new())),
         }
     }

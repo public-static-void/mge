@@ -1,14 +1,15 @@
 use engine_core::ecs::registry::ComponentRegistry;
-use engine_core::ecs::schema::load_schemas_from_dir;
+use engine_core::ecs::schema::{load_allowed_modes, load_schemas_from_dir_with_modes};
 use engine_core::ecs::world::World;
 use engine_core::map::{Map, SquareGridMap};
+use engine_core::plugins::loader::load_plugin_and_register_worldgen_threadsafe;
+use engine_core::plugins::types::EngineApi;
 use engine_core::systems::body_equipment_sync::BodyEquipmentSyncSystem;
 use engine_core::systems::death_decay::{ProcessDeaths, ProcessDecay};
 use engine_core::systems::economic::{EconomicSystem, load_recipes_from_dir};
 use engine_core::systems::equipment_logic::EquipmentLogicSystem;
 use engine_core::systems::inventory::InventoryConstraintSystem;
 use engine_core::systems::job::{JobSystem, JobTypeRegistry, load_job_types_from_dir};
-use engine_core::worldgen::register_builtin_worldgen_plugins;
 use engine_lua::ScriptEngine;
 use gag::BufferRedirect;
 use regex::Regex;
@@ -16,6 +17,7 @@ use std::cell::RefCell;
 use std::env;
 use std::fs;
 use std::io::Read;
+use std::os::raw::{c_char, c_void};
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
@@ -114,6 +116,49 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         std::process::exit(1);
     }
 
+    // --- Ensure C plugins are loaded into the global registry ---
+    {
+        unsafe extern "C" fn dummy_spawn_entity(_world: *mut c_void) -> u32 {
+            0
+        }
+        unsafe extern "C" fn dummy_set_component(
+            _world: *mut c_void,
+            _entity: u32,
+            _name: *const c_char,
+            _json_value: *const c_char,
+        ) -> i32 {
+            0
+        }
+
+        let mut engine_api = EngineApi {
+            spawn_entity: dummy_spawn_entity,
+            set_component: dummy_set_component,
+        };
+        let world_ptr = std::ptr::null_mut();
+        let mut dir = workspace_root();
+        while !dir.join("plugins").exists() {
+            if !dir.pop() {
+                panic!("Could not find workspace root containing 'plugins' directory");
+            }
+        }
+        let plugin_path = dir.join("plugins/simple_square_plugin/libsimple_square_plugin.so");
+        if plugin_path.exists() {
+            unsafe {
+                load_plugin_and_register_worldgen_threadsafe(
+                    plugin_path.to_str().unwrap(),
+                    &mut engine_api,
+                    world_ptr,
+                    &mut engine_core::worldgen::GLOBAL_WORLDGEN_REGISTRY
+                        .lock()
+                        .unwrap(),
+                )
+                .expect("Failed to load C plugin");
+            }
+        } else {
+            panic!("C plugin not found at {:?}", plugin_path);
+        }
+    }
+
     // Run each test in a fresh World and Lua state
     let mut total = 0;
     let mut failed = 0;
@@ -137,7 +182,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("{}{}", color(COLOR_CYAN, "[RUN]    "), testname);
 
         // --- ECS + Lua context ---
-        let schemas = load_schemas_from_dir(schema_dir())?;
+        let allowed_modes = load_allowed_modes()?;
+        let schemas = load_schemas_from_dir_with_modes(schema_dir(), &allowed_modes)?;
         let registry = Arc::new(Mutex::new(ComponentRegistry::new()));
         for (_name, schema) in schemas.clone() {
             registry.lock().unwrap().register_external_schema(schema);
@@ -200,9 +246,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         world.borrow_mut().register_system(BodyEquipmentSyncSystem);
 
         let mut engine = ScriptEngine::new();
-
-        // --- Register built-in worldgen plugins for Lua scripting ---
-        register_builtin_worldgen_plugins(&mut engine.worldgen_registry_mut());
 
         engine
             .register_world(world.clone())

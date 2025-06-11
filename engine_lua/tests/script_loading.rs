@@ -65,9 +65,22 @@ fn test_cli_executes_lua_script_file() {
         script_path
     );
 
+    // Find workspace root and config path
+    let workspace_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent() // engine_lua/
+        .unwrap()
+        .to_path_buf();
+    let config_path = workspace_root.join("game.toml");
+    assert!(
+        config_path.exists(),
+        "Config file does not exist: {:?}",
+        config_path
+    );
+
     let output = Command::new("cargo")
         .args(["run", "--bin", "mge_cli", "--"])
         .arg(script_path.to_str().unwrap())
+        .env("MGE_CONFIG_FILE", config_path.to_str().unwrap())
         .output()
         .expect("Failed to execute CLI");
 

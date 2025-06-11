@@ -1,5 +1,16 @@
 use schema_validator::validate_schema;
 
+fn allowed_modes() -> Vec<String> {
+    vec![
+        "colony".to_string(),
+        "roguelike".to_string(),
+        "editor".to_string(),
+        "simulation".to_string(),
+        "single".to_string(),
+        "multi".to_string(),
+    ]
+}
+
 #[test]
 fn test_missing_title_field() {
     let schema_json = r#"
@@ -13,7 +24,7 @@ fn test_missing_title_field() {
     }
     "#;
 
-    let result = validate_schema(schema_json);
+    let result = validate_schema(schema_json, &allowed_modes());
     assert!(result.is_err());
     assert!(
         result
@@ -36,7 +47,7 @@ fn test_invalid_mode_name() {
     }
     "#;
 
-    let result = validate_schema(schema_json);
+    let result = validate_schema(schema_json, &allowed_modes());
     assert!(result.is_err());
     assert!(result.unwrap_err().contains("Unknown mode 'invalid_mode'"));
 }
@@ -55,7 +66,7 @@ fn test_min_greater_than_max() {
     }
     "#;
 
-    let result = validate_schema(schema_json);
+    let result = validate_schema(schema_json, &allowed_modes());
     assert!(result.is_err());
     assert!(
         result

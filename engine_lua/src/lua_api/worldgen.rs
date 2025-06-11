@@ -1,6 +1,6 @@
 use crate::helpers::{json_to_lua_table, lua_table_to_json, lua_value_to_json};
 use engine_core::worldgen::{ScriptingWorldgenPlugin, WorldgenPlugin, WorldgenRegistry};
-use mlua::{Function, Lua, RegistryKey, Result as LuaResult, Table};
+use mlua::{Function, Lua, RegistryKey, Result as LuaResult, Table, Value as LuaValue};
 use serde_json::Value as JsonValue;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -10,11 +10,30 @@ struct LuaWorldgenPlugin {
     func_key: RegistryKey,
 }
 
+impl Clone for LuaWorldgenPlugin {
+    fn clone(&self) -> Self {
+        // SAFETY: Rc<Lua> is shared and valid; registry_value gives us a Function,
+        // create_registry_value stores a new key for the same function.
+        let func: Function = self
+            .lua
+            .registry_value(&self.func_key)
+            .expect("registry_value failed");
+        let new_key = self
+            .lua
+            .create_registry_value(func)
+            .expect("create_registry_value failed");
+        LuaWorldgenPlugin {
+            lua: Rc::clone(&self.lua),
+            func_key: new_key,
+        }
+    }
+}
+
 impl ScriptingWorldgenPlugin for LuaWorldgenPlugin {
     fn invoke(&self, params: &JsonValue) -> Result<JsonValue, Box<dyn std::error::Error>> {
         let func: Function = self.lua.registry_value(&self.func_key)?;
         let params_table = json_to_lua_table(&self.lua, params)?;
-        let result: mlua::Value = func.call(params_table)?;
+        let result: LuaValue = func.call(params_table)?;
         lua_value_to_json(&self.lua, result, None).map_err(|e| Box::new(e) as _)
     }
     fn backend(&self) -> &str {
@@ -70,6 +89,47 @@ pub fn register_worldgen_api(
         })?
     };
     globals.set("register_worldgen_plugin", register_worldgen_plugin)?;
+
+    // Register a validator from Lua (not Send+Sync)
+    let worldgen_registry_for_validator = Rc::clone(&worldgen_registry);
+    let lua_rc_outer = Rc::clone(&lua_rc);
+    let register_validator = lua.create_function(move |lua, func: Function| {
+        let func_key = lua.create_registry_value(func)?;
+        let lua_rc_inner = Rc::clone(&lua_rc_outer);
+        worldgen_registry_for_validator
+            .borrow_mut()
+            .register_scripting_validator(move |map| {
+                let lua_rc = Rc::clone(&lua_rc_inner);
+                let func: Function = lua_rc.registry_value(&func_key).unwrap();
+                let map_tbl = json_to_lua_table(&lua_rc, map).unwrap();
+                let result: LuaValue = func.call(map_tbl).unwrap();
+                match result {
+                    LuaValue::Nil | LuaValue::Boolean(true) => Ok(()),
+                    LuaValue::String(s) => Err(s.to_str().unwrap().to_string()),
+                    _ => Err("Validator failed".to_string()),
+                }
+            });
+        Ok(())
+    })?;
+    globals.set("register_worldgen_validator", register_validator)?;
+
+    // Register a postprocessor from Lua (not Send+Sync)
+    let worldgen_registry_for_post = Rc::clone(&worldgen_registry);
+    let lua_rc_outer = Rc::clone(&lua_rc);
+    let register_postprocessor = lua.create_function(move |lua, func: Function| {
+        let func_key = lua.create_registry_value(func)?;
+        let lua_rc_inner = Rc::clone(&lua_rc_outer);
+        worldgen_registry_for_post
+            .borrow_mut()
+            .register_scripting_postprocessor(move |map| {
+                let lua_rc = Rc::clone(&lua_rc_inner);
+                let func: Function = lua_rc.registry_value(&func_key).unwrap();
+                let map_tbl = json_to_lua_table(&lua_rc, map).unwrap();
+                let _: () = func.call(map_tbl.clone()).unwrap();
+            });
+        Ok(())
+    })?;
+    globals.set("register_worldgen_postprocessor", register_postprocessor)?;
 
     Ok(())
 }

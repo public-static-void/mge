@@ -1,9 +1,63 @@
-use engine_core::worldgen::{WorldgenPlugin, WorldgenRegistry, register_builtin_worldgen_plugins};
+use engine_core::plugins::loader::load_plugin_and_register_worldgen;
+use engine_core::plugins::types::EngineApi;
+use engine_core::worldgen::{WorldgenPlugin, WorldgenRegistry};
 use serde_json::{Value, json};
+use std::os::raw::{c_char, c_void};
+use std::path::PathBuf;
+use std::sync::Arc;
+
+/// Minimal C ABI-compatible spawn_entity function for testing
+unsafe extern "C" fn test_spawn_entity(_world: *mut c_void) -> u32 {
+    0
+}
+unsafe extern "C" fn test_set_component(
+    _world: *mut c_void,
+    _entity: u32,
+    _name: *const c_char,
+    _json_value: *const c_char,
+) -> i32 {
+    0
+}
+
+fn setup_registry_with_c_plugin() -> WorldgenRegistry {
+    let mut registry = WorldgenRegistry::new();
+
+    let mut engine_api = EngineApi {
+        spawn_entity: test_spawn_entity,
+        set_component: test_set_component,
+    };
+    let world_ptr = std::ptr::null_mut();
+
+    // Find workspace root by going up until we see a "plugins" directory
+    let mut dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    while !dir.join("plugins").exists() {
+        if !dir.pop() {
+            panic!("Could not find workspace root containing 'plugins' directory");
+        }
+    }
+    let plugin_path = dir.join("plugins/simple_square_plugin/libsimple_square_plugin.so");
+
+    assert!(
+        plugin_path.exists(),
+        "Plugin .so not found at {:?}. CWD: {:?}",
+        plugin_path,
+        std::env::current_dir().unwrap()
+    );
+
+    unsafe {
+        load_plugin_and_register_worldgen(
+            plugin_path.to_str().unwrap(),
+            &mut engine_api,
+            world_ptr,
+            &mut registry,
+        )
+        .expect("Failed to load C plugin");
+    }
+    registry
+}
 
 #[test]
 fn test_register_and_invoke_rust_worldgen_plugin() {
-    // 1. Define worldgen schema input
     let params = json!({
         "topology": "square",
         "width": 4,
@@ -12,10 +66,9 @@ fn test_register_and_invoke_rust_worldgen_plugin() {
         "seed": 123
     });
 
-    // 2. Create a dummy plugin that generates a minimal map
     let plugin = WorldgenPlugin::CAbi {
         name: "test_square_worldgen".to_string(),
-        generate: Box::new(|params: &Value| {
+        generate: Arc::new(|params: &Value| {
             let width = params.get("width").and_then(|v| v.as_u64()).unwrap() as i32;
             let height = params.get("height").and_then(|v| v.as_u64()).unwrap() as i32;
             let z_levels = params.get("z_levels").and_then(|v| v.as_u64()).unwrap() as i32;
@@ -28,7 +81,7 @@ fn test_register_and_invoke_rust_worldgen_plugin() {
                             "x": x,
                             "y": y,
                             "z": z,
-                            "neighbors": [] // For simplicity
+                            "neighbors": []
                         }));
                     }
                 }
@@ -41,21 +94,16 @@ fn test_register_and_invoke_rust_worldgen_plugin() {
         _lib: None,
     };
 
-    // 3. Register the plugin
     let mut registry = WorldgenRegistry::new();
     registry.register(plugin);
 
-    // 4. Invoke the plugin
     let result = registry
         .invoke("test_square_worldgen", &params)
         .expect("Worldgen plugin should succeed");
 
-    // 5. Assert output structure
     assert_eq!(result.get("topology").unwrap(), "square");
     let cells = result.get("cells").unwrap().as_array().unwrap();
     assert_eq!(cells.len(), 4 * 3);
-
-    // 6. Check that first cell has expected coordinates
     let first = &cells[0];
     assert_eq!(first.get("x").unwrap(), 0);
     assert_eq!(first.get("y").unwrap(), 0);
@@ -72,10 +120,9 @@ fn test_basic_square_worldgen_plugin() {
         "seed": 42
     });
 
-    let mut registry = WorldgenRegistry::new();
-    register_builtin_worldgen_plugins(&mut registry);
+    let registry = setup_registry_with_c_plugin();
 
-    let result = registry.invoke("basic_square_worldgen", &params);
+    let result = registry.invoke("simple_square", &params);
 
     assert!(result.is_ok(), "Expected worldgen plugin to succeed");
     let map = result.unwrap();
@@ -98,10 +145,9 @@ fn test_basic_square_worldgen_with_terrain_and_biomes() {
         ]
     });
 
-    let mut registry = WorldgenRegistry::new();
-    register_builtin_worldgen_plugins(&mut registry);
+    let registry = setup_registry_with_c_plugin();
 
-    let result = registry.invoke("basic_square_worldgen", &params);
+    let result = registry.invoke("simple_square", &params);
     assert!(result.is_ok(), "Expected worldgen plugin to succeed");
     let map = result.unwrap();
 
@@ -109,13 +155,11 @@ fn test_basic_square_worldgen_with_terrain_and_biomes() {
     let cells = map.get("cells").unwrap().as_array().unwrap();
     assert_eq!(cells.len(), 4 * 3);
 
-    // Each cell must have a "terrain" and "biome" field
     for cell in cells {
         let terrain = cell.get("terrain").expect("Cell missing terrain");
         let biome = cell.get("biome").expect("Cell missing biome");
         assert!(terrain.is_string(), "Terrain must be a string");
         assert!(biome.is_string(), "Biome must be a string");
-        // Optionally: check biome is one of the biomes from params
         let biome_str = biome.as_str().unwrap();
         assert!(biome_str == "Plains" || biome_str == "Forest");
     }
@@ -134,10 +178,9 @@ fn test_basic_square_worldgen_with_neighbors() {
         ]
     });
 
-    let mut registry = engine_core::worldgen::WorldgenRegistry::new();
-    engine_core::worldgen::register_builtin_worldgen_plugins(&mut registry);
+    let registry = setup_registry_with_c_plugin();
 
-    let result = registry.invoke("basic_square_worldgen", &params);
+    let result = registry.invoke("simple_square", &params);
     assert!(result.is_ok(), "Expected worldgen plugin to succeed");
     let map = result.unwrap();
     assert_eq!(map.get("topology").unwrap(), "square");

@@ -75,23 +75,33 @@
 
 ---
 
-## Map Generation and Postprocessor Hooks
-
-| Function                           | Description                                                                                                                                                         |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `apply_generated_map(map)`         | Apply a generated map (as a table/dict). Triggers all registered postprocessors.                                                                                    |
-| `clear_map_postprocessors()`       | Clear all registered map postprocessor functions.                                                                                                                   |
-| `register_map_postprocessor(func)` | Register a function to be called after every map generation. The function receives the `world` object as an argument. Errors in the function abort map application. |
+## Map Generation, Validation, and Postprocessor Hooks
 
 > **Note:**
+> In **Lua**, methods on the `world` object use a colon (`:`):
 >
-> In **Lua**, methods on the `world` object use a colon, as the colon (`:`) in Lua is syntactic sugar for passing the object as the first parameter (`self`).
+> ```lua
+> world:register_map_validator(function(map) ... end)
+> world:register_map_postprocessor(function(w) ... end)
+> ```
 >
-> `world:register_map_postprocessor(function(w) ... end)`
+> In **Python**, use a dot (`.`):
 >
-> In **Python**, they use a dot:
+> ```python
+> world.register_map_validator(validator)
+> world.register_map_postprocessor(postprocessor)
+> ```
 >
-> `world.register_map_postprocessor(validator)`
+> Validators run **before** the map is applied, and can block invalid maps.
+> Postprocessors run **after** the map is applied, and can mutate the world.
+
+| Function                           | Description                                                                                                                             |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `apply_generated_map(map)`         | Apply a generated map (as a table/dict). Runs all registered validators first, then applies the map, then postprocessors.               |
+| `register_map_validator(func)`     | Register a function to be called before every map application. Receives the map as argument. If any returns false, the map is rejected. |
+| `clear_map_validators()`           | Clear all registered map validator functions.                                                                                           |
+| `register_map_postprocessor(func)` | Register a function to be called after every map application. Receives the world object as argument. Errors abort application.          |
+| `clear_map_postprocessors()`       | Clear all registered map postprocessor functions.                                                                                       |
 
 ---
 
@@ -209,7 +219,6 @@
 | `ui.remove_callback(id, event)`        | Remove a callback for a widget event                             |
 | `ui.remove_child(parent_id, child_id)` | Remove a child widget from a parent                              |
 | `ui.remove_widget(id)`                 | Remove a widget by ID                                            |
-| `ui.send_ui_event(...)`                | Alias for `ui.trigger_event`                                     |
 | `ui.set_callback(id, event, fn)`       | Register a callback for a widget event (e.g., "click")           |
 | `ui.set_widget_props(id, props)`       | Set properties on a widget                                       |
 | `ui.set_z_order(id, z)`                | Set the z-order of a widget                                      |

@@ -258,15 +258,6 @@ impl UiApi {
         }
     }
 
-    pub fn send_ui_event(
-        &self,
-        widget_id: u64,
-        event_type: String,
-        event_data: Bound<'_, PyAny>,
-    ) -> PyResult<bool> {
-        self.trigger_event(widget_id, event_type, event_data)
-    }
-
     pub fn get_widget_type(&self, widget_id: u64) -> Option<String> {
         let registry_binding = WIDGET_REGISTRY.lock();
         let registry = registry_binding.borrow();

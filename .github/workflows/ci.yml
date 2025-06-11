@@ -46,8 +46,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install build-essential
-        run: sudo apt-get update && sudo apt-get install -y build-essential && sudo apt-get clean
+      - name: Install deps
+        run: sudo apt-get update && sudo apt-get install -y build-essential libjansson-dev && sudo apt-get clean
 
       - name: Build all C plugins (xtask via Makefile)
         run: cargo run -p xtask -- build-c-plugins
@@ -87,6 +87,9 @@ jobs:
 
       - uses: moonrepo/setup-rust@v1
 
+      - name: Install deps
+        run: sudo apt-get update && sudo apt-get install -y build-essential libjansson-dev && sudo apt-get clean
+
       - name: Install wasm32-unknown-unknown target
         run: rustup target add wasm32-unknown-unknown
 
@@ -119,36 +122,29 @@ jobs:
     needs: build-all
     steps:
       - uses: actions/checkout@v4
-
       - uses: moonrepo/setup-rust@v1
-
       - name: Install wasm32-unknown-unknown target
         run: rustup target add wasm32-unknown-unknown
-
       - name: Install LuaJIT and pkg-config
         run: sudo apt-get update && sudo apt-get install -y libluajit-5.1-dev pkg-config && sudo apt-get clean
-
       - name: Set PKG_CONFIG_PATH
         run: echo "PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig" >> $GITHUB_ENV
-
       - name: Download C plugins
         uses: actions/download-artifact@v4
         with:
           name: c-plugins
           path: plugins
-
       - name: Download WASM test artifacts
         uses: actions/download-artifact@v4
         with:
           name: wasm-tests
           path: engine_wasm/wasm_tests
-
-      - name: Test Rust (xtask via Makefile)
+      - name: Build and deploy plugins
+        run: cargo run -p xtask -- build-plugins
+      - name: Test Rust
         run: |
           export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(pwd)/plugins
-          cargo run -p xtask -- build-all
           cargo test --all
-
       - name: Clean up Rust build artifacts
         run: cargo clean
 

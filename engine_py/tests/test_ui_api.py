@@ -103,22 +103,6 @@ def test_focus_widget():
     assert ui.focus_widget(widget_id)
 
 
-def test_send_ui_event_alias():
-    ui = engine_py.UiApi()
-    widget_id = ui.create_widget(
-        "Button", {"label": "SendEvent", "pos": [1, 2], "color": [1, 2, 3]}
-    )
-    called = {"flag": False}
-
-    def cb(wid):
-        print("PYTHON: callback called with wid", wid)
-        called["flag"] = wid == widget_id
-
-    ui.set_callback(widget_id, "click", cb)
-    ui.send_ui_event(widget_id, "click", {"x": 1, "y": 2})
-    assert called["flag"]
-
-
 def test_get_widget_type():
     ui = engine_py.UiApi()
     btn_id = ui.create_widget(

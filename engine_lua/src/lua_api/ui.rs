@@ -258,8 +258,6 @@ pub fn register_ui_api(lua: &Lua, globals: &Table) -> LuaResult<()> {
         )?,
     )?;
 
-    ui.set("send_ui_event", ui.get::<LuaFunction>("trigger_event")?)?;
-
     globals.set("ui", ui)?;
     Ok(())
 }

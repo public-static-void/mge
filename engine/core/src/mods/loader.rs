@@ -1,4 +1,5 @@
-use crate::ecs::schema::load_schemas_from_dir;
+use crate::ecs::schema::load_allowed_modes;
+use crate::ecs::schema::load_schemas_from_dir_with_modes;
 use crate::ecs::world::World;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -18,7 +19,8 @@ pub fn load_mod<S: ModScriptEngine>(
 
     // Load schemas using the unified loader
     let schema_dir = format!("{}/schemas", mod_dir);
-    let schemas = load_schemas_from_dir(&schema_dir)
+    let allowed_modes = load_allowed_modes()?;
+    let schemas = load_schemas_from_dir_with_modes(&schema_dir, &allowed_modes)
         .map_err(|e| anyhow::anyhow!("Failed to load schemas: {}", e))?;
 
     // Register schemas with the world's registry

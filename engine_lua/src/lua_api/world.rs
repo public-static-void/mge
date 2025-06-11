@@ -14,6 +14,7 @@ pub fn register_world_api(
     let world_userdata = lua.create_userdata(WorldWrapper {
         world: world.clone(),
         map_postprocessors: RefCell::new(Vec::new()),
+        map_validators: RefCell::new(Vec::new()),
         self_userdata: RefCell::new(None),
     })?;
     // Store a reference to itself
@@ -31,33 +32,58 @@ pub fn register_world_api(
 pub struct WorldWrapper {
     pub world: Rc<RefCell<World>>,
     pub map_postprocessors: RefCell<Vec<RegistryKey>>,
+    pub map_validators: RefCell<Vec<RegistryKey>>,
     pub self_userdata: RefCell<Option<AnyUserData>>,
 }
 
 impl UserData for WorldWrapper {
     fn add_methods<M: UserDataMethods<Self>>(methods: &mut M) {
-        // Register a map postprocessor (called after apply_generated_map)
+        // Map Validator Registration
+        methods.add_method("register_map_validator", |lua, this, func: Function| {
+            let key = lua.create_registry_value(func)?;
+            this.map_validators.borrow_mut().push(key);
+            Ok(())
+        });
+
+        methods.add_method("clear_map_validators", |_, this, ()| {
+            this.map_validators.borrow_mut().clear();
+            Ok(())
+        });
+
+        // Map Postprocessor Registration
         methods.add_method("register_map_postprocessor", |lua, this, func: Function| {
             let key = lua.create_registry_value(func)?;
             this.map_postprocessors.borrow_mut().push(key);
             Ok(())
         });
 
-        // Clear all registered map postprocessors
         methods.add_method("clear_map_postprocessors", |_, this, ()| {
             this.map_postprocessors.borrow_mut().clear();
             Ok(())
         });
 
-        // Apply generated map and run all postprocessors
+        // Apply Generated Map: run validators, then apply, then postprocessors
         methods.add_method("apply_generated_map", |lua, this, map_table: Table| {
             let map_json = crate::helpers::lua_table_to_json(lua, &map_table, None)?;
+
+            // Run all validators first, fail fast on error
+            let validators = this.map_validators.borrow();
+            for key in validators.iter() {
+                let func: Function = lua.registry_value(key)?;
+                let ok: bool = func.call(map_table.clone())?;
+                if !ok {
+                    return Err(mlua::Error::external("Map validator failed"));
+                }
+            }
+
+            // Apply map
             {
                 let mut world = this.world.borrow_mut();
                 world
                     .apply_generated_map(&map_json)
                     .map_err(mlua::Error::external)?;
             }
+
             // Run all postprocessors, fail fast on error
             let postprocessors = this.map_postprocessors.borrow();
             let world_userdata = this
@@ -68,7 +94,7 @@ impl UserData for WorldWrapper {
                 .clone();
             for key in postprocessors.iter() {
                 let func: Function = lua.registry_value(key)?;
-                func.call::<()>(world_userdata.clone())?; // pass world userdata
+                func.call::<()>(world_userdata.clone())?;
             }
             Ok(())
         });
@@ -85,6 +111,15 @@ impl UserData for WorldWrapper {
         methods.add_method("get_map_cell_count", |_, this, ()| {
             let world = this.world.borrow();
             Ok(world.map.as_ref().map(|m| m.all_cells().len()).unwrap_or(0))
+        });
+
+        methods.add_method("apply_chunk", |lua, this, chunk_table: Table| {
+            let chunk_json = crate::helpers::lua_table_to_json(lua, &chunk_table, None)?;
+            let mut world = this.world.borrow_mut();
+            world
+                .apply_chunk(&chunk_json)
+                .map_err(mlua::Error::external)?;
+            Ok(())
         });
     }
 }
