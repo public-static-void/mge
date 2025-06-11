@@ -16,7 +16,10 @@ impl ScriptingWorldgenPlugin for DummyWorldgenPlugin {
         &self,
         _params: &serde_json::Value,
     ) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
-        Ok(json!({ "cells": [] }))
+        Ok(json!({
+            "topology": "square",
+            "cells": []
+        }))
     }
     fn backend(&self) -> &str {
         "dummy"
@@ -30,7 +33,12 @@ fn test_register_and_list_worldgen_plugins() {
     // Simulate registering plugins from different sources
     registry.register(WorldgenPlugin::CAbi {
         name: "simple_square".to_string(),
-        generate: Arc::new(|_| json!({ "cells": [] })),
+        generate: Arc::new(|_| {
+            json!({
+                "topology": "square",
+                "cells": []
+            })
+        }),
         _lib: None,
     });
     registry.register(WorldgenPlugin::Scripting {
@@ -53,7 +61,12 @@ fn test_invoke_worldgen_plugin_returns_map() {
         name: "simple_square".to_string(),
         generate: Arc::new(|params: &serde_json::Value| {
             assert_eq!(params["width"], 10);
-            json!({ "cells": [ { "id": "0,0", "x": 0, "y": 0 } ] })
+            json!({
+                "topology": "square",
+                "cells": [
+                    { "x": 0, "y": 0, "z": 0, "neighbors": [] }
+                ]
+            })
         }),
         _lib: None,
     });
@@ -64,7 +77,10 @@ fn test_invoke_worldgen_plugin_returns_map() {
         .expect("plugin should exist");
 
     assert!(map.get("cells").is_some());
-    assert_eq!(map["cells"][0]["id"], "0,0");
+    let cell = &map["cells"][0];
+    assert_eq!(cell["x"], 0);
+    assert_eq!(cell["y"], 0);
+    assert_eq!(cell["z"], 0);
 }
 
 #[test]
@@ -133,8 +149,10 @@ fn test_register_and_invoke_cabi_worldgen_plugin() {
         .invoke("simple_square", &params)
         .expect("plugin should exist");
     assert!(map.get("cells").is_some());
-    // The C plugin returns id as "0,0,0"
-    assert_eq!(map["cells"][0]["id"], "0,0,0");
+    let cell = &map["cells"][0];
+    assert_eq!(cell["x"], 0);
+    assert_eq!(cell["y"], 0);
+    assert_eq!(cell["z"], 0);
 }
 
 // Dummy engine API functions for testing
@@ -208,5 +226,64 @@ fn test_map_from_json_region() {
         vec![CellKey::Region {
             id: "B".to_string()
         }]
+    );
+}
+
+#[test]
+fn test_worldgen_plugin_schema_validation() {
+    use engine_core::worldgen::{WorldgenPlugin, WorldgenRegistry};
+    use serde_json::json;
+    use std::sync::Arc;
+
+    // Valid map (should succeed)
+    let valid_map = json!({
+        "topology": "square",
+        "cells": [
+            { "x": 0, "y": 0, "z": 0, "neighbors": [] }
+        ]
+    });
+
+    // Invalid map (missing required "z" field)
+    let invalid_map = json!({
+        "topology": "square",
+        "cells": [
+            { "x": 0, "y": 0, "neighbors": [] }
+        ]
+    });
+
+    let mut registry = WorldgenRegistry::new();
+
+    // Plugin that returns valid map
+    registry.register(WorldgenPlugin::CAbi {
+        name: "valid_plugin".to_string(),
+        generate: Arc::new(move |_| valid_map.clone()),
+        _lib: None,
+    });
+
+    // Plugin that returns invalid map
+    registry.register(WorldgenPlugin::CAbi {
+        name: "invalid_plugin".to_string(),
+        generate: Arc::new(move |_| invalid_map.clone()),
+        _lib: None,
+    });
+
+    // Should succeed
+    let result = registry.invoke("valid_plugin", &serde_json::json!({}));
+    assert!(
+        result.is_ok(),
+        "Valid plugin output should pass schema validation"
+    );
+
+    // Should fail
+    let result = registry.invoke("invalid_plugin", &serde_json::json!({}));
+    assert!(
+        result.is_err(),
+        "Invalid plugin output should fail schema validation"
+    );
+    let err = result.err().unwrap().to_string();
+    assert!(
+        err.contains("Map schema validation failed"),
+        "Error should mention schema validation: {}",
+        err
     );
 }
