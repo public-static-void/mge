@@ -146,10 +146,9 @@ jobs:
           name: wasm-tests
           path: engine_wasm/wasm_tests
 
-      - name: Test Rust (xtask via Makefile)
+      - name: Test Rust
         run: |
           export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(pwd)/plugins
-          cargo run -p xtask -- build-all
           cargo test --all
 
       - name: Clean up Rust build artifacts

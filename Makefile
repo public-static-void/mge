@@ -36,7 +36,6 @@ build-all:
 
 # ====== RUST TEST TARGET ======
 test-rust:
-	cargo run -p xtask -- build-all
 	cargo test --all
 
 # ====== PYTHON SETUP, BUILD, AND TEST TARGETS ======
