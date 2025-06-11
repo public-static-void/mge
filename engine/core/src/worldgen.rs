@@ -1,3 +1,4 @@
+use crate::map::deserialize::validate_map_schema;
 use libloading::Library;
 use once_cell::sync::Lazy;
 use serde_json::Value as JsonValue;
@@ -148,6 +149,8 @@ impl ThreadSafeWorldgenRegistry {
                         .map_err(|e| WorldgenError::ScriptError(e.to_string()))?,
                 };
                 self.run_postprocessors(&mut map);
+                // --- NEW: Validate map schema here ---
+                validate_map_schema(&map).map_err(WorldgenError::ValidationError)?;
                 self.run_validators(&map)
                     .map_err(WorldgenError::ValidationError)?;
                 return Ok(map);
@@ -263,6 +266,8 @@ impl WorldgenRegistry {
                         .map_err(|e| WorldgenError::ScriptError(e.to_string()))?,
                 };
                 self.run_postprocessors(&mut map);
+                // --- NEW: Validate map schema here ---
+                validate_map_schema(&map).map_err(WorldgenError::ValidationError)?;
                 self.run_validators(&map)
                     .map_err(WorldgenError::ValidationError)?;
                 return Ok(map);
