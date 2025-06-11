@@ -2,7 +2,6 @@ use super::event_bus::register_event_bus_and_globals;
 use super::input::{InputProvider, StdinInput};
 use super::lua_api::register_all_api_functions;
 use super::system_bridge::register_system_functions;
-use crate::helpers::json_to_lua_table;
 use crate::lua_api::world::register_world_api;
 use crate::lua_api::worldgen::register_worldgen_api;
 use engine_core::ecs::world::World;
@@ -62,12 +61,23 @@ impl ScriptEngine {
                         serde_json::from_str(&json_str).map_err(|e| {
                             mlua::Error::external(format!("Failed to parse JSON: {}", e))
                         })?;
-                    json_to_lua_table(lua, &json_val)
+                    crate::helpers::json_to_lua_table(lua, &json_val)
                 })
                 .expect("Failed to create require_json function");
             globals
                 .set("require_json", require_json)
                 .expect("Failed to set require_json function");
+
+            // Expose array metatable for marking tables as arrays
+            let array_mt = lua
+                .create_table()
+                .expect("Failed to create array metatable");
+            array_mt
+                .set("__is_array", true)
+                .expect("Failed to set __is_array");
+            globals
+                .set("array_mt", array_mt)
+                .expect("Failed to set array_mt global");
         }
 
         // --- Import plugins from the global registry into the local Lua registry ---
@@ -77,14 +87,16 @@ impl ScriptEngine {
                 let global = GLOBAL_WORLDGEN_REGISTRY.lock().unwrap();
                 local.import_threadsafe_plugins(&global);
             }
-            Rc::new(RefCell::new(local))
+            std::rc::Rc::new(std::cell::RefCell::new(local))
         };
 
         Self {
-            lua: Rc::new(lua),
-            input_provider: Arc::new(Mutex::new(input_provider)),
+            lua: std::rc::Rc::new(lua),
+            input_provider: std::sync::Arc::new(std::sync::Mutex::new(input_provider)),
             worldgen_registry,
-            lua_systems: Rc::new(RefCell::new(HashMap::new())),
+            lua_systems: std::rc::Rc::new(
+                std::cell::RefCell::new(std::collections::HashMap::new()),
+            ),
         }
     }
 

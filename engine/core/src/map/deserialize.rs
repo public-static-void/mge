@@ -8,7 +8,7 @@ use serde_json::Value;
 use std::fs;
 
 /// Validate map JSON against the schema before parsing.
-fn validate_map_schema(map_json: &Value) -> Result<(), String> {
+pub fn validate_map_schema(map_json: &Value) -> Result<(), String> {
     let schema_path = format!("{}/../assets/schemas/map.json", env!("CARGO_MANIFEST_DIR"));
     let schema_str = fs::read_to_string(&schema_path)
         .map_err(|e| format!("Failed to read map schema at {}: {}", schema_path, e))?;

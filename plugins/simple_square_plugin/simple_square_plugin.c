@@ -45,9 +45,6 @@ int generate_world(const char *params_json, char **out_result_json) {
         int gy = chunk_y + y;
 
         json_t *cell = json_object();
-        char idbuf[64];
-        snprintf(idbuf, sizeof(idbuf), "%d,%d,%d", gx, gy, z);
-        json_object_set_new(cell, "id", json_string(idbuf));
         json_object_set_new(cell, "x", json_integer(gx));
         json_object_set_new(cell, "y", json_integer(gy));
         json_object_set_new(cell, "z", json_integer(z));
