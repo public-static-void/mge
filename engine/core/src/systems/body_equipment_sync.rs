@@ -3,6 +3,34 @@ use crate::ecs::world::World;
 use serde_json::{Value as JsonValue, json};
 use std::collections::HashMap;
 
+/// Recursively ensure every part (and its children) has "equipped" and "children" as arrays.
+/// Also ensures the top-level "parts" field on the body is always an array.
+fn ensure_body_part_arrays(body: &mut JsonValue) {
+    // Ensure top-level "parts" is always an array
+    if !body.get("parts").is_some_and(|v| v.is_array()) {
+        body["parts"] = json!([]);
+    }
+    if let Some(parts) = body.get_mut("parts").and_then(|v| v.as_array_mut()) {
+        for part in parts {
+            ensure_part_arrays_recursive(part);
+        }
+    }
+}
+
+fn ensure_part_arrays_recursive(part: &mut JsonValue) {
+    if !part.get("equipped").is_some_and(|v| v.is_array()) {
+        part["equipped"] = json!([]);
+    }
+    if !part.get("children").is_some_and(|v| v.is_array()) {
+        part["children"] = json!([]);
+    }
+    if let Some(children) = part.get_mut("children").and_then(|v| v.as_array_mut()) {
+        for child in children {
+            ensure_part_arrays_recursive(child);
+        }
+    }
+}
+
 fn find_part_mut<'a>(part: &'a mut JsonValue, name: &str) -> Option<&'a mut JsonValue> {
     if part.get("name").and_then(|n| n.as_str()) == Some(name) {
         return Some(part);
@@ -40,6 +68,10 @@ fn clear_equipped_on_unhealthy_parts(part: &mut JsonValue) {
     if status != "healthy" {
         if let Some(eq) = part.get_mut("equipped").and_then(|v| v.as_array_mut()) {
             eq.clear();
+        }
+        // Ensure equipped is still present as an array
+        if !part.get("equipped").is_some_and(|v| v.is_array()) {
+            part["equipped"] = json!([]);
         }
     }
     if let Some(children) = part.get_mut("children").and_then(|v| v.as_array_mut()) {
@@ -95,7 +127,7 @@ impl System for BodyEquipmentSyncSystem {
                 }
             }
 
-            // Step 1: Equipment → Body (only equip if healthy)
+            // Step 1: Equipment -> Body (only equip if healthy)
             if let Some(parts) = body.get_mut("parts").and_then(|v| v.as_array_mut()) {
                 for (slot_name, item_id_val) in slots.iter_mut() {
                     let part = parts.iter_mut().find_map(|p| find_part_mut(p, slot_name));
@@ -105,6 +137,10 @@ impl System for BodyEquipmentSyncSystem {
                             .and_then(|s| s.as_str())
                             .unwrap_or("healthy")
                             .to_string();
+                        // Always ensure equipped is present as an array
+                        if !part.get("equipped").is_some_and(|v| v.is_array()) {
+                            part["equipped"] = json!([]);
+                        }
                         let equipped = part
                             .get_mut("equipped")
                             .and_then(|v| v.as_array_mut())
@@ -123,7 +159,7 @@ impl System for BodyEquipmentSyncSystem {
                 }
             }
 
-            // Step 2: Body → Equipment (always update slot from equipped)
+            // Step 2: Body -> Equipment (always update slot from equipped)
             let slot_names: Vec<String> = slots.keys().cloned().collect();
             let mut slot_infos = Vec::new();
             if let Some(parts) = body.get("parts").and_then(|v| v.as_array()) {
@@ -157,12 +193,15 @@ impl System for BodyEquipmentSyncSystem {
                 }
             }
 
-            // Step 3: Write back updated Equipment and Body components
+            // Step 3: Recursively ensure all arrays are present and schema-compliant
+            ensure_body_part_arrays(&mut body);
+
+            // Step 4: Write back updated Equipment and Body components
             equipment["slots"] = JsonValue::Object(slots);
             let _ = world.set_component(eid, "Equipment", equipment.clone());
             let _ = world.set_component(eid, "Body", body.clone());
 
-            // Step 4: Aggregate effects from all equipped items on body parts
+            // Step 5: Aggregate effects from all equipped items on body parts
             let mut equipped_items = Vec::new();
             if let Some(parts) = body.get("parts").and_then(|v| v.as_array()) {
                 for part in parts {

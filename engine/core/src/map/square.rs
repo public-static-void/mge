@@ -56,13 +56,6 @@ impl SquareGridMap {
                 .entry(cell.clone())
                 .or_insert_with(|| meta.clone());
         }
-        // Debug print: print all cell coordinates after merge
-        let cell_list: Vec<_> = self.cells.keys().collect();
-        println!(
-            "SquareGridMap::merge_from: now {} cells: {:?}",
-            self.cells.len(),
-            cell_list
-        );
     }
 }
 
