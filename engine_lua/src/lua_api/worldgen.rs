@@ -125,7 +125,13 @@ pub fn register_worldgen_api(
                 let lua_rc = Rc::clone(&lua_rc_inner);
                 let func: Function = lua_rc.registry_value(&func_key).unwrap();
                 let map_tbl = json_to_lua_table(&lua_rc, map).unwrap();
-                let _: () = func.call(map_tbl.clone()).unwrap();
+                let map_tbl = match map_tbl {
+                    mlua::Value::Table(t) => t,
+                    _ => panic!("Expected Lua Table from json_to_lua_table"),
+                };
+                let _: () = func.call(map_tbl.clone()).unwrap(); // ok: for Lua function call
+                let new_map = lua_table_to_json(&lua_rc, &map_tbl, None).unwrap(); // must be &Table
+                *map = new_map;
             });
         Ok(())
     })?;
