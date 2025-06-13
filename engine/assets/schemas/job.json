@@ -54,7 +54,23 @@
       "items": { "type": "string" },
       "description": "IDs or references of prerequisite jobs"
     },
-    "cancelled": { "type": "boolean", "default": false }
+    "cancelled": { "type": "boolean", "default": false },
+    "applied_effects": {
+      "type": "array",
+      "items": { "type": "integer" },
+      "description": "Indices of effects that have been applied; enables rollback on cancel/failure.",
+      "default": []
+    },
+    "assignment_count": {
+      "type": "integer",
+      "default": 0,
+      "description": "How many times this job has been assigned to any agent."
+    },
+    "last_assigned_tick": {
+      "type": "integer",
+      "default": 0,
+      "description": "Game tick when this job was last assigned."
+    }
   },
   "required": ["job_type", "status"]
 }

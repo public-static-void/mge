@@ -25,6 +25,11 @@
       "type": "string",
       "enum": ["idle", "working", "resting", "unavailable"],
       "default": "idle"
+    },
+    "jobs_completed": {
+      "type": "integer",
+      "default": 0,
+      "description": "How many jobs this agent has completed (for fairness/round-robin)."
     }
   },
   "required": ["entity_id"]
