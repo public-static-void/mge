@@ -142,8 +142,10 @@ impl World {
         F: Fn(&mut World, u32, &serde_json::Value) + Send + Sync + 'static,
     {
         self.effect_processor_registry
-            .as_mut()
+            .as_ref()
             .expect("EffectProcessorRegistry missing")
+            .lock()
+            .unwrap()
             .register_handler(action, handler);
     }
 }

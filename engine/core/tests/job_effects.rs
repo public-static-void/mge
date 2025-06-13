@@ -49,8 +49,10 @@ fn job_effects_are_processed_on_completion() {
     // Register a simple effect handler for "ModifyTerrain"
     world
         .effect_processor_registry
-        .as_mut()
+        .as_ref()
         .expect("EffectProcessorRegistry missing")
+        .lock()
+        .unwrap()
         .register_handler("ModifyTerrain", |world, eid, effect| {
             let to = effect
                 .get("to")

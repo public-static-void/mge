@@ -34,6 +34,24 @@ impl JobSystem {
         true
     }
 
+    fn cleanup_agent_on_job_status(&self, world: &mut World, job: &serde_json::Value) {
+        if let Some(agent_id) = job.get("assigned_to").and_then(|v| v.as_u64()) {
+            let agent_id = agent_id as u32;
+            if let Some(agent) = world
+                .components
+                .get_mut("Agent")
+                .and_then(|m| m.get_mut(&agent_id))
+            {
+                if agent.get("current_job").and_then(|v| v.as_u64())
+                    == job.get("id").and_then(|v| v.as_u64())
+                {
+                    agent.as_object_mut().unwrap().remove("current_job");
+                    agent["state"] = serde_json::json!("idle");
+                }
+            }
+        }
+    }
+
     fn process_job(
         &self,
         world: &World,
@@ -121,7 +139,31 @@ impl JobSystem {
         // Default logic if no handler
         if !matches!(current_status.as_str(), "failed" | "complete" | "cancelled") {
             if current_status == "in_progress" {
-                let progress = job.get("progress").and_then(|v| v.as_f64()).unwrap_or(0.0) + 1.0;
+                // --- Begin agent-driven progress logic ---
+                let assigned_to =
+                    job.get("assigned_to").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
+                let mut progress_increment = 1.0;
+                if assigned_to != 0 {
+                    if let Some(agent) = world.get_component(assigned_to, "Agent") {
+                        let skills = agent.get("skills").and_then(|v| v.as_object());
+                        let skill = skills
+                            .and_then(|map| map.get(&job_type))
+                            .and_then(|v| v.as_f64())
+                            .unwrap_or(1.0);
+                        let stamina = agent
+                            .get("stamina")
+                            .and_then(|v| v.as_f64())
+                            .unwrap_or(100.0);
+                        // Example formula: progress = base * (skill) * (stamina / 100.0)
+                        progress_increment = 1.0 * skill * (stamina / 100.0);
+                        // Clamp to minimum progress
+                        if progress_increment < 0.1 {
+                            progress_increment = 0.1;
+                        }
+                    }
+                }
+                let progress = job.get("progress").and_then(|v| v.as_f64()).unwrap_or(0.0)
+                    + progress_increment;
                 job["progress"] = serde_json::json!(progress);
                 if progress >= 3.0 {
                     job["progress"] = serde_json::json!(progress.max(3.0));
@@ -140,19 +182,56 @@ impl JobSystem {
         }
     }
 
-    fn cleanup_agent_on_job_status(&self, world: &mut World, job: &JsonValue) {
-        if let Some(agent_id) = job.get("assigned_to").and_then(|v| v.as_u64()) {
-            let agent_id = agent_id as u32;
-            if let Some(agent) = world
-                .components
-                .get_mut("Agent")
-                .and_then(|m| m.get_mut(&agent_id))
-            {
-                if agent.get("current_job").and_then(|v| v.as_u64())
-                    == job.get("id").and_then(|v| v.as_u64())
+    /// Modular, generic, and extensible effect application and rollback.
+    fn process_job_effects(
+        world: &mut World,
+        job_id: u32,
+        job_type: &str,
+        job: &mut serde_json::Map<String, serde_json::Value>,
+        on_cancel: bool,
+    ) {
+        let empty = Vec::new();
+        let effects: Vec<_> = world
+            .job_types
+            .get_data(job_type)
+            .map(|jt| jt.effects.clone())
+            .unwrap_or_else(|| empty.clone());
+
+        // Clone the Arc to avoid borrow checker issues!
+        let effect_registry = world.effect_processor_registry.as_ref().unwrap().clone();
+
+        // Get or create the applied_effects array
+        let applied_effects = job
+            .entry("applied_effects")
+            .or_insert_with(|| serde_json::Value::Array(vec![]))
+            .as_array_mut()
+            .unwrap();
+
+        if on_cancel {
+            // Rollback all applied effects
+            for idx in applied_effects.iter().filter_map(|v| v.as_u64()) {
+                if let Some(effect) = effects.get(idx as usize) {
+                    effect_registry.lock().unwrap().rollback_effects(
+                        world,
+                        job_id,
+                        &[effect.clone()],
+                    );
+                }
+            }
+            applied_effects.clear();
+        } else {
+            // Apply effects if not yet applied
+            for (idx, effect) in effects.iter().enumerate() {
+                if !applied_effects
+                    .iter()
+                    .any(|v| v.as_u64() == Some(idx as u64))
                 {
-                    agent.as_object_mut().unwrap().remove("current_job");
-                    agent["state"] = JsonValue::from("idle");
+                    effect_registry.lock().unwrap().process_effects(
+                        world,
+                        job_id,
+                        &[effect.clone()],
+                    );
+                    applied_effects.push(serde_json::Value::from(idx as u64));
                 }
             }
         }
@@ -191,13 +270,19 @@ impl System for JobSystem {
 
         for eid in sorted_eids {
             let old_job = world.get_component(eid, "Job").unwrap().clone();
-            let new_job = self.process_job(world, lua, eid, old_job.clone());
+            let mut new_job = self.process_job(world, lua, eid, old_job.clone());
             let old_status = old_job
                 .get("status")
                 .and_then(|v| v.as_str())
                 .unwrap_or("")
                 .to_string();
             let new_status = new_job.get("status").and_then(|v| v.as_str()).unwrap_or("");
+            let job_type = new_job
+                .get("job_type")
+                .and_then(|v| v.as_str())
+                .unwrap_or("default")
+                .to_string();
+
             if old_status != new_status {
                 if matches!(new_status, "complete" | "failed" | "cancelled") {
                     self.cleanup_agent_on_job_status(world, &new_job);
@@ -209,22 +294,8 @@ impl System for JobSystem {
                     });
                     let _ = world.send_event("job_completed", event);
 
-                    let mut effects: Vec<serde_json::Value> = Vec::new();
-                    let job_type_name_opt = new_job.get("job_type").and_then(|v| v.as_str());
-                    if let Some(job_type_name) = job_type_name_opt {
-                        if let Some(job_type) = world.job_types.get_data(job_type_name) {
-                            for e in &job_type.effects {
-                                effects.push(serde_json::to_value(e).unwrap());
-                            }
-                        }
-                    }
-                    if !effects.is_empty() {
-                        let mut registry = world
-                            .effect_processor_registry
-                            .take()
-                            .expect("EffectProcessorRegistry missing");
-                        registry.process_effects(world, eid, &effects);
-                        world.effect_processor_registry = Some(registry);
+                    if let Some(obj) = new_job.as_object_mut() {
+                        Self::process_job_effects(world, eid, &job_type, obj, false);
                     }
                 } else if new_status == "failed" {
                     let event = json!({
@@ -232,12 +303,20 @@ impl System for JobSystem {
                         "job_type": new_job.get("job_type").cloned().unwrap_or(json!(null))
                     });
                     let _ = world.send_event("job_failed", event);
+
+                    if let Some(obj) = new_job.as_object_mut() {
+                        Self::process_job_effects(world, eid, &job_type, obj, true);
+                    }
                 } else if new_status == "cancelled" {
                     let event = json!({
                         "entity": eid,
                         "job_type": new_job.get("job_type").cloned().unwrap_or(json!(null))
                     });
                     let _ = world.send_event("job_cancelled", event);
+
+                    if let Some(obj) = new_job.as_object_mut() {
+                        Self::process_job_effects(world, eid, &job_type, obj, true);
+                    }
                 }
             }
             world.set_component(eid, "Job", new_job).unwrap();

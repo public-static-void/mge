@@ -50,7 +50,7 @@ fn test_job_assignment_claims_job() {
     let mut board = JobBoard::default();
     board.update(&world);
 
-    let result = board.claim_job(actor_eid, &mut world);
+    let result = board.claim_job(actor_eid, &mut world, 0);
     assert_eq!(result, JobAssignmentResult::Assigned(eid));
 
     let assigned_job = world.get_component(eid, "Job").unwrap();
@@ -68,6 +68,6 @@ fn test_job_assignment_no_jobs_available() {
     let mut board = JobBoard::default();
     board.update(&world);
 
-    let result = board.claim_job(actor_eid, &mut world);
+    let result = board.claim_job(actor_eid, &mut world, 0);
     assert_eq!(result, JobAssignmentResult::NoJobsAvailable);
 }

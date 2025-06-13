@@ -120,11 +120,13 @@ fn test_job_preemption_and_reassignment() {
 
     assign_jobs(&mut world, &mut job_board);
 
-    let agent = world.get_component(1, "Agent").unwrap();
-    let job = world.get_component(100, "Job").unwrap();
-    assert_eq!(agent["current_job"], 100);
-    assert_eq!(agent["state"], "working");
-    assert_eq!(job["assigned_to"], 1);
+    {
+        let agent = world.get_component(1, "Agent").unwrap();
+        let job = world.get_component(100, "Job").unwrap();
+        assert_eq!(agent["current_job"], 100);
+        assert_eq!(agent["state"], "working");
+        assert_eq!(job["assigned_to"], 1);
+    }
 
     // Now, a higher-priority job appears
     world
@@ -144,13 +146,45 @@ fn test_job_preemption_and_reassignment() {
     job_board.update(&world);
     assign_jobs(&mut world, &mut job_board);
 
-    let agent = world.get_component(1, "Agent").unwrap();
-    let job100 = world.get_component(100, "Job").unwrap();
-    let job200 = world.get_component(200, "Job").unwrap();
+    {
+        let agent = world.get_component(1, "Agent").unwrap();
+        let job100 = world.get_component(100, "Job").unwrap();
+        let job200 = world.get_component(200, "Job").unwrap();
 
-    // The agent will still be working on job 100 (no preemption in current logic)
-    assert_eq!(agent["current_job"], 100);
-    assert_eq!(agent["state"], "working");
-    assert_eq!(job100["assigned_to"], 1);
-    assert!(job200.get("assigned_to").is_none());
+        // The agent should now be working on job 200 (preemption)
+        assert_eq!(agent["current_job"], 200);
+        assert_eq!(agent["state"], "working");
+        assert_eq!(job200["assigned_to"], 1);
+
+        // Job 100 should be unassigned and set to pending
+        assert!(job100.get("assigned_to").is_none());
+        assert_eq!(job100["status"], "pending");
+    }
+
+    // Simulate job 200 completion and agent becoming idle
+    {
+        let mut job = world.get_component(200, "Job").unwrap().clone();
+        job["status"] = json!("complete");
+        world.set_component(200, "Job", job).unwrap();
+    }
+
+    {
+        let mut agent = world.get_component(1, "Agent").unwrap().clone();
+        agent.as_object_mut().unwrap().remove("current_job");
+        agent["state"] = json!("idle");
+        world.set_component(1, "Agent", agent).unwrap();
+    }
+
+    job_board.update(&world);
+    assign_jobs(&mut world, &mut job_board);
+
+    {
+        let agent = world.get_component(1, "Agent").unwrap();
+        let job100 = world.get_component(100, "Job").unwrap();
+
+        // The agent should now be reassigned to job 100
+        assert_eq!(agent["current_job"], 100);
+        assert_eq!(agent["state"], "working");
+        assert_eq!(job100["assigned_to"], 1);
+    }
 }

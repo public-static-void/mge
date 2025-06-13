@@ -51,7 +51,7 @@ pub fn assign_jobs(world: &mut World, job_board: &mut JobBoard) {
     let mut jobs_to_remove: Vec<u32> = Vec::new();
 
     for agent_id in &agent_ids {
-        let (agent_state, agent_queue, has_current_job) = {
+        let (mut agent_state, agent_queue, mut has_current_job, mut current_job_eid) = {
             let agent = match world.components.get("Agent").and_then(|m| m.get(agent_id)) {
                 Some(agent) => agent,
                 None => continue,
@@ -66,9 +66,120 @@ pub fn assign_jobs(world: &mut World, job_board: &mut JobBoard) {
                 .and_then(|v| v.as_array())
                 .cloned()
                 .unwrap_or_default();
-            let has_current_job = agent.get("current_job").is_some();
-            (agent_state, agent_queue, has_current_job)
+            let current_job = agent
+                .get("current_job")
+                .and_then(|v| v.as_u64())
+                .map(|v| v as u32);
+            let has_current_job = current_job.is_some();
+            (agent_state, agent_queue, has_current_job, current_job)
         };
+
+        // --- Abandon blocked job logic ---
+        if let Some(job_eid) = current_job_eid {
+            if let Some(job) = world.get_component(job_eid, "Job") {
+                if job
+                    .get("blocked")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false)
+                {
+                    // Unassign agent from job
+                    let mut job = job.clone();
+                    job.as_object_mut().unwrap().remove("assigned_to");
+                    world.set_component(job_eid, "Job", job).unwrap();
+
+                    // Unassign job from agent
+                    if let Some(agent_entry) =
+                        world.components.get("Agent").and_then(|m| m.get(agent_id))
+                    {
+                        let mut agent_obj = agent_entry.clone();
+                        agent_obj.as_object_mut().unwrap().remove("current_job");
+                        agent_obj["state"] = serde_json::json!("idle");
+                        world.set_component(*agent_id, "Agent", agent_obj).unwrap();
+                    }
+                    // After abandoning, treat as idle for this tick
+                    agent_state = "idle".to_string();
+                    has_current_job = false;
+                    current_job_eid = None;
+                }
+            }
+        }
+
+        // --- Preemption logic ---
+        if agent_state == "working" && has_current_job {
+            let current_job_eid = current_job_eid.unwrap();
+            let current_job = world.get_component(current_job_eid, "Job");
+            let current_priority = current_job
+                .and_then(|job| job.get("priority").and_then(|v| v.as_i64()))
+                .unwrap_or(0);
+            let agent = world
+                .components
+                .get("Agent")
+                .and_then(|m| m.get(agent_id))
+                .unwrap();
+
+            job_board.update(world);
+
+            // Find the best available job for this agent
+            let mut best_job = None;
+            let mut best_utility = f64::MIN;
+            let mut best_priority = None;
+            for &job_eid in &job_board.jobs {
+                let job = match world.get_component(job_eid, "Job") {
+                    Some(j) => j,
+                    None => continue,
+                };
+                let priority = job.get("priority").and_then(|v| v.as_i64()).unwrap_or(0);
+                let utility = compute_job_utility(agent, job, world);
+                // Only consider jobs with higher priority than current
+                if (priority > current_priority)
+                    && (utility > best_utility
+                        || (utility == best_utility && Some(priority) > best_priority))
+                {
+                    best_utility = utility;
+                    best_priority = Some(priority);
+                    best_job = Some((job_eid, priority));
+                }
+            }
+
+            if let Some((new_job_eid, _priority)) = best_job {
+                // Unassign agent from current job
+                if let Some(mut job) = world.get_component(current_job_eid, "Job").cloned() {
+                    job.as_object_mut().unwrap().remove("assigned_to");
+                    job["status"] = serde_json::json!("pending");
+                    world.set_component(current_job_eid, "Job", job).unwrap();
+                }
+                // Push preempted job back to agent's queue
+                if let Some(agent_entry) =
+                    world.components.get("Agent").and_then(|m| m.get(agent_id))
+                {
+                    let mut agent_obj = agent_entry.clone();
+                    // Insert at front or back depending on desired behavior (here: front)
+                    let mut queue = agent_obj
+                        .get("job_queue")
+                        .and_then(|v| v.as_array().cloned())
+                        .unwrap_or_default();
+                    queue.insert(0, serde_json::json!(current_job_eid));
+                    agent_obj["job_queue"] = serde_json::json!(queue);
+                    world.set_component(*agent_id, "Agent", agent_obj).unwrap();
+                }
+                // Assign agent to new job
+                if let Some(mut job) = world.get_component(new_job_eid, "Job").cloned() {
+                    job["assigned_to"] = serde_json::json!(*agent_id);
+                    world.set_component(new_job_eid, "Job", job).unwrap();
+                }
+                // Update agent
+                if let Some(agent_entry) =
+                    world.components.get("Agent").and_then(|m| m.get(agent_id))
+                {
+                    let mut agent_obj = agent_entry.clone();
+                    agent_obj["current_job"] = serde_json::json!(new_job_eid);
+                    agent_obj["state"] = serde_json::json!("working");
+                    world.set_component(*agent_id, "Agent", agent_obj).unwrap();
+                }
+                jobs_to_remove.push(new_job_eid);
+                continue; // Preemption done, skip to next agent
+            }
+        }
 
         // Only assign jobs to idle agents
         if agent_state != "idle" {
