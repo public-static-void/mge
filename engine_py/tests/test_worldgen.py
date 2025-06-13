@@ -75,3 +75,31 @@ def test_invoke_nonexistent_plugin_raises():
         "NotFound" in str(excinfo.value)
         or "not found" in str(excinfo.value).lower()
     )
+
+
+def test_python_worldgen_validator_and_postprocessor():
+    called = {}
+
+    def pygen(params):
+        return {
+            "topology": "square",
+            "cells": [{"x": 0, "y": 0, "z": 0, "neighbors": []}],
+        }
+
+    def validator(map_):
+        called["validator"] = True
+        assert map_["topology"] == "square"
+        return True
+
+    def postprocessor(map_):
+        called["postprocessor"] = True
+        map_["py_post"] = 123
+
+    engine_py.register_worldgen_plugin("pygen3", pygen)
+    engine_py.register_worldgen_validator(validator)
+    engine_py.register_worldgen_postprocessor(postprocessor)
+
+    result = engine_py.invoke_worldgen_plugin("pygen3", {})
+    assert called["validator"]
+    assert called["postprocessor"]
+    assert result["py_post"] == 123

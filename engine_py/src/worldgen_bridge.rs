@@ -90,8 +90,23 @@ pub fn register_worldgen_postprocessor(py: Python, callback: Py<PyAny>) -> PyRes
     let mut registry = GLOBAL_WORLDGEN_REGISTRY.lock().unwrap();
     registry.register_postprocessor(move |map| {
         Python::with_gil(|py| {
-            let arg = to_pyobject(py, map).map_err(|e| e.to_string()).unwrap();
-            let _: PyObject = cb.call1(py, (arg,)).map_err(|e| e.to_string()).unwrap();
+            let arg = to_pyobject(py, map).expect("Failed to convert map to PyObject");
+            let result: PyObject = cb
+                .call1(py, (arg.clone(),))
+                .expect("Postprocessor call failed");
+            // If the Python function returned a dict, use it to update the map
+            if let Ok(dict) = result.extract::<pyo3::Bound<'_, pyo3::types::PyDict>>(py) {
+                let new_map: Value =
+                    from_pyobject(dict).expect("Failed to convert PyDict to Value");
+                *map = new_map;
+            } else if let Ok(bound_any) = arg.extract::<pyo3::Bound<'_, pyo3::types::PyAny>>() {
+                if let Ok(dict) = bound_any.extract::<pyo3::Bound<'_, pyo3::types::PyDict>>() {
+                    // If the user mutated the dict in place, update map from arg
+                    let new_map: Value =
+                        from_pyobject(dict).expect("Failed to convert PyDict to Value");
+                    *map = new_map;
+                }
+            }
         });
     });
     Ok(())

@@ -287,3 +287,89 @@ fn test_worldgen_plugin_schema_validation() {
         err
     );
 }
+
+#[test]
+fn test_worldgen_custom_validator_and_postprocessor() {
+    use engine_core::worldgen::{WorldgenPlugin, WorldgenRegistry};
+    use serde_json::json;
+    use std::sync::Arc;
+
+    let mut registry = WorldgenRegistry::new();
+
+    // Register a plugin that just returns a simple map
+    registry.register(WorldgenPlugin::CAbi {
+        name: "simple".to_string(),
+        generate: Arc::new(|_| {
+            json!({
+                "topology": "square",
+                "cells": [
+                    { "x": 0, "y": 0, "z": 0, "neighbors": [] }
+                ]
+            })
+        }),
+        _lib: None,
+    });
+
+    // Register a validator that rejects maps with no cells
+    registry.register_validator(|map| {
+        let cells = map.get("cells").and_then(|v| v.as_array()).unwrap();
+        if cells.is_empty() {
+            Err("No cells".to_string())
+        } else {
+            Ok(())
+        }
+    });
+
+    // Register a postprocessor that adds a marker field
+    registry.register_postprocessor(|map| {
+        map.as_object_mut()
+            .unwrap()
+            .insert("postprocessed".to_string(), json!(true));
+    });
+
+    let params = json!({});
+    let result = registry.invoke("simple", &params).unwrap();
+    assert_eq!(result["postprocessed"], true);
+}
+
+#[test]
+fn test_worldgen_scripting_validator_and_postprocessor() {
+    use engine_core::worldgen::{WorldgenPlugin, WorldgenRegistry};
+    use serde_json::json;
+    use std::sync::Arc;
+
+    let mut registry = WorldgenRegistry::new();
+
+    registry.register(WorldgenPlugin::CAbi {
+        name: "simple2".to_string(),
+        generate: Arc::new(|_| {
+            json!({
+                "topology": "square",
+                "cells": [
+                    { "x": 0, "y": 0, "z": 0, "neighbors": [] }
+                ]
+            })
+        }),
+        _lib: None,
+    });
+
+    // Register scripting validator
+    registry.register_scripting_validator(|map| {
+        if map.get("cells").unwrap().as_array().unwrap().len() != 1 {
+            Err("Expected exactly one cell".to_string())
+        } else {
+            Ok(())
+        }
+    });
+
+    // Register scripting postprocessor
+    registry.register_scripting_postprocessor(|map| {
+        map.as_object_mut()
+            .unwrap()
+            .insert("lua_post".to_string(), json!("ok"));
+    });
+
+    let params = json!({});
+    let result = registry.invoke("simple2", &params).unwrap();
+    assert_eq!(result["lua_post"], "ok");
+}

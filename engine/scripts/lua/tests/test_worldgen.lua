@@ -1,11 +1,13 @@
 local assert = require("assert")
 
+array_mt = { __is_array = true }
+
 local function test_register_and_invoke_worldgen()
 	register_worldgen_plugin("luagen", function(params)
 		assert.equals(type(params), "table")
 		assert.equals(params.width, 7)
 		local neighbors = {}
-		setmetatable(neighbors, array_mt) -- Mark as array for Rust serialization
+		setmetatable(neighbors, array_mt)
 		return {
 			topology = "square",
 			cells = {
@@ -33,6 +35,38 @@ local function test_register_and_invoke_worldgen()
 	assert.is_table(result.cells[1].neighbors)
 end
 
+local function test_lua_validator_and_postprocessor()
+	local called_validator = false
+	local called_post = false
+
+	register_worldgen_validator(function(map)
+		called_validator = true
+		assert.equals(map.topology, "square")
+		return true
+	end)
+	register_worldgen_postprocessor(function(map)
+		called_post = true
+		map.lua_post = 42
+	end)
+
+	register_worldgen_plugin("luagen2", function(params)
+		local neighbors = {}
+		setmetatable(neighbors, array_mt)
+		return {
+			topology = "square",
+			cells = {
+				{ x = 0, y = 0, z = 0, neighbors = neighbors },
+			},
+		}
+	end)
+
+	local result = invoke_worldgen_plugin("luagen2", {})
+	assert.is_true(called_validator)
+	assert.is_true(called_post)
+	assert.equals(result.lua_post, 42)
+end
+
 return {
 	test_register_and_invoke_worldgen = test_register_and_invoke_worldgen,
+	test_lua_validator_and_postprocessor = test_lua_validator_and_postprocessor,
 }

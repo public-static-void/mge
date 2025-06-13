@@ -13,12 +13,11 @@
 //! 3. Register new Lua functions in `register_world`.
 //! 4. Add Lua and Rust tests.
 
-pub mod input;
-
 pub mod engine;
+pub mod input;
 pub use engine::ScriptEngine;
-
 pub mod event_bus;
 pub mod helpers;
 pub mod lua_api;
+pub mod schemas;
 pub mod system_bridge;

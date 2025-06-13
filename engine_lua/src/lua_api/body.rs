@@ -1,6 +1,9 @@
 //! Body helpers for scripting API.
 
-use crate::helpers::{json_to_lua_table, lua_error_from_any, lua_error_msg, lua_table_to_json};
+use crate::helpers::{
+    ensure_schema_arrays, json_to_lua_table, lua_error_from_any, lua_error_msg, lua_table_to_json,
+};
+use crate::schemas::get_schema;
 use engine_core::ecs::world::World;
 use mlua::{Lua, Result as LuaResult, Table};
 use serde_json::Value as JsonValue;
@@ -12,8 +15,10 @@ pub fn register_body_api(lua: &Lua, globals: &Table, world: Rc<RefCell<World>>) 
     let world_get_body = world.clone();
     let get_body = lua.create_function_mut(move |lua, entity: u32| {
         let world = world_get_body.borrow();
-        if let Some(val) = world.get_component(entity, "Body") {
-            json_to_lua_table(lua, val)
+        if let Some(mut val) = world.get_component(entity, "Body").cloned() {
+            let schema = get_schema("Body").expect("Body schema missing");
+            ensure_schema_arrays(&mut val, schema);
+            json_to_lua_table(lua, &val)
         } else {
             Ok(mlua::Value::Nil)
         }
@@ -24,7 +29,9 @@ pub fn register_body_api(lua: &Lua, globals: &Table, world: Rc<RefCell<World>>) 
     let world_set_body = world.clone();
     let set_body = lua.create_function_mut(move |lua, (entity, table): (u32, Table)| {
         let mut world = world_set_body.borrow_mut();
-        let json_value: JsonValue = lua_table_to_json(lua, &table, None)?;
+        let mut json_value: JsonValue = lua_table_to_json(lua, &table, None)?;
+        let schema = get_schema("Body").expect("Body schema missing");
+        ensure_schema_arrays(&mut json_value, schema);
         world
             .set_component(entity, "Body", json_value)
             .map_err(|e| lua_error_from_any(lua, e))
@@ -47,8 +54,18 @@ pub fn register_body_api(lua: &Lua, globals: &Table, world: Rc<RefCell<World>>) 
             body["parts"] = serde_json::json!([]);
             body.get_mut("parts").unwrap().as_array_mut().unwrap()
         };
-        let part_json: JsonValue = lua_table_to_json(lua, &part, None)?;
+        let mut part_json: JsonValue = lua_table_to_json(lua, &part, None)?;
+        let schema = get_schema("Body").expect("Body schema missing");
+        ensure_schema_arrays(
+            &mut part_json,
+            schema
+                .get("properties")
+                .and_then(|p| p.get("parts"))
+                .and_then(|s| s.get("items"))
+                .unwrap_or(schema),
+        );
         parts.push(part_json);
+        ensure_schema_arrays(&mut body, schema);
         world
             .set_component(entity, "Body", body)
             .map_err(|e| lua_error_from_any(lua, e))
@@ -87,6 +104,36 @@ pub fn register_body_api(lua: &Lua, globals: &Table, world: Rc<RefCell<World>>) 
 
             if let Some(parts) = body.get_mut("parts").and_then(|v| v.as_array_mut()) {
                 if remove_part_recursive(parts, &part_name) {
+                    let schema = get_schema("Body").expect("Body schema missing");
+                    ensure_schema_arrays(&mut body, schema);
+
+                    fn fix_empty_arrays(part: &mut serde_json::Value) {
+                        if let Some(children) = part.get_mut("children") {
+                            if children.is_null()
+                                || (children.is_array() && children.as_array().unwrap().is_empty())
+                            {
+                                *children = serde_json::json!([]);
+                            } else if let Some(arr) = children.as_array_mut() {
+                                for child in arr {
+                                    fix_empty_arrays(child);
+                                }
+                            }
+                        }
+                        if let Some(equipped) = part.get_mut("equipped") {
+                            if equipped.is_null()
+                                || (equipped.is_array() && equipped.as_array().unwrap().is_empty())
+                            {
+                                *equipped = serde_json::json!([]);
+                            }
+                        }
+                    }
+
+                    if let Some(parts) = body.get_mut("parts").and_then(|v| v.as_array_mut()) {
+                        for part in parts {
+                            fix_empty_arrays(part);
+                        }
+                    }
+
                     world
                         .set_component(entity, "Body", body)
                         .map_err(|e| lua_error_from_any(lua, e))
@@ -104,11 +151,23 @@ pub fn register_body_api(lua: &Lua, globals: &Table, world: Rc<RefCell<World>>) 
     let get_body_part =
         lua.create_function_mut(move |lua, (entity, part_name): (u32, String)| {
             let world = world_get_body_part.borrow();
-            if let Some(body) = world.get_component(entity, "Body") {
+            if let Some(mut body) = world.get_component(entity, "Body").cloned() {
+                let schema = get_schema("Body").expect("Body schema missing");
+                ensure_schema_arrays(&mut body, schema);
                 if let Some(parts) = body.get("parts").and_then(|v| v.as_array()) {
                     for part in parts {
                         if part.get("name").and_then(|n| n.as_str()) == Some(&part_name) {
-                            return json_to_lua_table(lua, part);
+                            // Ensure part is schema-compliant before returning
+                            let mut part_clone = part.clone();
+                            ensure_schema_arrays(
+                                &mut part_clone,
+                                schema
+                                    .get("properties")
+                                    .and_then(|p| p.get("parts"))
+                                    .and_then(|s| s.get("items"))
+                                    .unwrap_or(schema),
+                            );
+                            return json_to_lua_table(lua, &part_clone);
                         }
                     }
                 }

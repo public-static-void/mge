@@ -46,7 +46,8 @@ pub struct World {
     #[serde(skip)]
     pub job_types: JobTypeRegistry,
     #[serde(skip)]
-    pub job_handler_registry: crate::systems::job::job_handler_registry::JobHandlerRegistry,
+    pub job_handler_registry:
+        Arc<Mutex<crate::systems::job::job_handler_registry::JobHandlerRegistry>>,
     #[serde(skip)]
     pub effect_processor_registry:
         Option<crate::systems::job::effect_processor_registry::EffectProcessorRegistry>,
@@ -75,8 +76,9 @@ impl World {
             event_buses: crate::ecs::event_bus_registry::EventBusRegistry::new(),
             dynamic_systems: DynamicSystemRegistry::new(),
             job_types: JobTypeRegistry::default(),
-            job_handler_registry:
+            job_handler_registry: Arc::new(Mutex::new(
                 crate::systems::job::job_handler_registry::JobHandlerRegistry::new(),
+            )),
             effect_processor_registry: Some(
                 crate::systems::job::effect_processor_registry::EffectProcessorRegistry::new(),
             ),

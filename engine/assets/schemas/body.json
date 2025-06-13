@@ -62,7 +62,9 @@
         "temperature",
         "ideal_temperature",
         "insulation",
-        "heat_loss"
+        "heat_loss",
+        "children",
+        "equipped"
       ]
     }
   }

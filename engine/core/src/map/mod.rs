@@ -85,11 +85,6 @@ impl Map {
 
     /// Merge another map (chunk) into this map.
     pub fn merge_chunk(&mut self, other: &Map) {
-        println!(
-            "Merging chunk: self.topology_type() = {}, other.topology_type() = {}",
-            self.topology_type(),
-            other.topology_type()
-        );
         if self.topology_type() == other.topology_type() {
             if let Some(this_sq) = self.topology.as_any_mut().downcast_mut::<SquareGridMap>() {
                 if let Some(other_sq) = other.topology.as_any().downcast_ref::<SquareGridMap>() {
@@ -108,8 +103,5 @@ impl Map {
         } else {
             println!("Topology types do not match; skipping merge.");
         }
-        // Print the new cell count after merging
-        let cell_count = self.all_cells().len();
-        println!("After merge_chunk: map has {} cells", cell_count);
     }
 }

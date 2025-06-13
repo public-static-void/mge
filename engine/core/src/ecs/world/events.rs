@@ -9,10 +9,6 @@ use std::{
 impl World {
     /// Send an event to the given event bus
     pub fn send_event(&mut self, event_type: &str, payload: JsonValue) -> Result<(), String> {
-        println!(
-            "Rust: send_event called for type '{}' with payload {:?}",
-            event_type, payload
-        );
         let bus = self
             .event_buses
             .get_event_bus(event_type)

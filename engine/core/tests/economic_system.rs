@@ -26,15 +26,7 @@ fn workshop_produces_resources_using_recipe() {
     // Explicitly set the mode to "colony"
     world.current_mode = "colony".to_string();
 
-    // Debug: print current mode
-    println!("Current mode: {}", world.current_mode);
-
-    // Debug: check if Stockpile is allowed in this mode
     let allowed = world.is_component_allowed_in_mode("Stockpile", &world.current_mode);
-    println!(
-        "Is 'Stockpile' allowed in mode '{}'? {}",
-        world.current_mode, allowed
-    );
     assert!(
         allowed,
         "'Stockpile' should be allowed in mode '{}', but is_component_allowed_in_mode returned false",

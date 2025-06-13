@@ -3,7 +3,11 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 pub type JobHandler =
-    Arc<dyn Fn(&mut World, u32, u32, &serde_json::Value) -> serde_json::Value + Send + Sync>;
+    Arc<dyn Fn(&World, u32, u32, &serde_json::Value) -> serde_json::Value + Send + Sync>;
+
+fn normalize_key(key: &str) -> String {
+    key.trim().to_lowercase().replace(' ', "_")
+}
 
 #[derive(Default)]
 pub struct JobHandlerRegistry {
@@ -19,16 +23,18 @@ impl JobHandlerRegistry {
 
     pub fn register_handler<F>(&mut self, job_type: &str, handler: F)
     where
-        F: Fn(&mut World, u32, u32, &serde_json::Value) -> serde_json::Value
-            + Send
-            + Sync
-            + 'static,
+        F: Fn(&World, u32, u32, &serde_json::Value) -> serde_json::Value + Send + Sync + 'static,
     {
-        self.handlers
-            .insert(job_type.to_string(), Arc::new(handler));
+        let key = normalize_key(job_type);
+        self.handlers.insert(key, Arc::new(handler));
     }
 
     pub fn get(&self, job_type: &str) -> Option<&JobHandler> {
-        self.handlers.get(job_type)
+        let key = normalize_key(job_type);
+        self.handlers.get(&key)
+    }
+
+    pub fn keys(&self) -> Vec<String> {
+        self.handlers.keys().cloned().collect()
     }
 }

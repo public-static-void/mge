@@ -9,8 +9,15 @@ pub fn register_entity_api(lua: &Lua, globals: &Table, world: Rc<RefCell<World>>
     // spawn_entity()
     let world_spawn = world.clone();
     let spawn_entity = lua.create_function_mut(move |_, ()| {
-        let mut world = world_spawn.borrow_mut();
-        Ok(world.spawn_entity())
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let mut world = world_spawn.borrow_mut();
+            let eid = world.spawn_entity();
+            Ok(eid)
+        }));
+        match result {
+            Ok(ok) => ok,
+            Err(_) => Err(mlua::Error::external("spawn_entity panicked")),
+        }
     })?;
     globals.set("spawn_entity", spawn_entity)?;
 

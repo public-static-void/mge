@@ -255,7 +255,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let lua = Rc::clone(&engine.lua);
         let package: mlua::Table = lua.globals().get("package")?;
         let old_path: String = package.get("path")?;
-        let tests_dir = lua_tests_dir(); // FIX: keep PathBuf alive
+        let tests_dir = lua_tests_dir();
         let tests_dir_str = tests_dir.to_str().unwrap();
         let new_path = format!(
             "{}/?.lua;{}/?.lua;{}",
@@ -274,15 +274,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
 
         // --- Capture stdout/stderr for this test only during test execution ---
-        let out_buf = BufferRedirect::stdout().unwrap();
-        let err_buf = BufferRedirect::stderr().unwrap();
+        // let out_buf = BufferRedirect::stdout().unwrap();
+        // let err_buf = BufferRedirect::stderr().unwrap();
 
         // Run the test
         let result = engine.run_script(&script);
 
         // Stop capturing and read output
-        drop(out_buf);
-        drop(err_buf);
+        // drop(out_buf);
+        // drop(err_buf);
 
         let mut output = String::new();
         let mut error_output = String::new();

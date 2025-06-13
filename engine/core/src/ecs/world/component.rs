@@ -4,6 +4,42 @@ use crate::ecs::schema::ComponentSchema;
 use serde_json::Value as JsonValue;
 use serde_json::json;
 
+/// Recursively ensures all array/object fields required by the schema are present and correct.
+/// This is generic and works for any schema-driven component, including deeply nested ones.
+fn enforce_schema_arrays(value: &mut JsonValue, schema: &JsonValue) {
+    if let (JsonValue::Object(map), Some(props)) =
+        (value, schema.get("properties").and_then(|p| p.as_object()))
+    {
+        for (key, prop_schema) in props {
+            if let Some(field_type) = prop_schema.get("type").and_then(|t| t.as_str()) {
+                if field_type == "array" {
+                    match map.get_mut(key) {
+                        Some(JsonValue::Null) | None => {
+                            map.insert(key.clone(), JsonValue::Array(vec![]));
+                        }
+                        Some(JsonValue::Array(_)) => {}
+                        Some(_) => {}
+                    }
+                }
+                // Recurse into objects/arrays if needed
+                if field_type == "object" {
+                    if let Some(child) = map.get_mut(key) {
+                        enforce_schema_arrays(child, prop_schema);
+                    }
+                } else if field_type == "array" {
+                    if let Some(items_schema) = prop_schema.get("items") {
+                        if let Some(JsonValue::Array(arr)) = map.get_mut(key) {
+                            for item in arr {
+                                enforce_schema_arrays(item, items_schema);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 impl World {
     /// Sets a component value for an entity, validating against its schema if present,
     /// and emits a component_changed event.
@@ -11,7 +47,7 @@ impl World {
         &mut self,
         entity: u32,
         name: &str,
-        value: JsonValue,
+        mut value: JsonValue,
     ) -> Result<(), String> {
         if !self.is_component_allowed_in_mode(name, &self.current_mode) {
             return Err(format!(
@@ -21,7 +57,10 @@ impl World {
         }
 
         if let Some(schema) = self.registry.lock().unwrap().get_schema_by_name(name) {
-            // Directly use the schema as serde_json::Value
+            // Enforce all array/object fields are present and correct before validation
+            enforce_schema_arrays(&mut value, &schema.schema);
+
+            // Validate against JSON schema
             let validator = jsonschema::validator_for(&schema.schema)
                 .map_err(|e| format!("Schema compile error: {e}"))?;
             let mut errors = validator.iter_errors(&value);
@@ -30,6 +69,7 @@ impl World {
                 let mut msgs = vec![first_error.to_string()];
                 msgs.extend(errors.map(|e| e.to_string()));
                 let msg = msgs.join(", ");
+                println!("SCHEMA VALIDATION FAILED: {msg}"); // <--- Add this line
                 return Err(format!("Schema validation failed: {msg}"));
             }
         }
