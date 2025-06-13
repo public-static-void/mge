@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::Path;
@@ -77,6 +78,20 @@ impl JobTypeRegistry {
         self.names.insert(job.name.clone());
         self.types.insert(key.clone(), job);
         self.logic.insert(key, JobLogic::Data);
+    }
+
+    /// Register a job type with the given name and effects.
+    pub fn register_job_type(&mut self, name: &str, effects: Vec<Value>) {
+        let key = Self::normalize_key(name);
+        self.types.insert(
+            key,
+            JobTypeData {
+                name: name.to_string(),
+                effects,
+                requirements: Vec::new(),
+                duration: None,
+            },
+        );
     }
 
     /// Gets the logic for a job type, if registered.
