@@ -24,11 +24,6 @@ int generate_world(const char *params_json, char **out_result_json) {
   int chunk_x = json_integer_value(json_object_get(params, "chunk_x"));
   int chunk_y = json_integer_value(json_object_get(params, "chunk_y"));
 
-  fprintf(
-      stderr,
-      "simple_square: chunk_x=%d chunk_y=%d width=%d height=%d z_levels=%d\n",
-      chunk_x, chunk_y, width, height, z_levels);
-
   // Biome/terrain support
   json_t *biomes = json_object_get(params, "biomes");
   int use_biomes =
