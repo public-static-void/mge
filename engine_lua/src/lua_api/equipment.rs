@@ -1,8 +1,12 @@
 //! Equipment helpers for scripting API.
 
-use crate::helpers::{json_to_lua_table, lua_error_from_any, lua_error_msg};
+use crate::helpers::{
+    ensure_schema_arrays, json_to_lua_table, lua_error_from_any, lua_error_msg, lua_table_to_json,
+};
+use crate::schemas::get_schema;
 use engine_core::ecs::world::World;
 use mlua::{Lua, Result as LuaResult, Table};
+use serde_json::Value as JsonValue;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -15,13 +19,28 @@ pub fn register_equipment_api(
     let world_get_equipment = world.clone();
     let get_equipment = lua.create_function_mut(move |lua, entity: u32| {
         let world = world_get_equipment.borrow();
-        if let Some(val) = world.get_component(entity, "Equipment") {
-            json_to_lua_table(lua, val)
+        if let Some(mut val) = world.get_component(entity, "Equipment").cloned() {
+            let schema = get_schema("Equipment").expect("Equipment schema missing");
+            ensure_schema_arrays(&mut val, schema);
+            json_to_lua_table(lua, &val)
         } else {
             Ok(mlua::Value::Table(lua.create_table()?))
         }
     })?;
     globals.set("get_equipment", get_equipment)?;
+
+    // set_equipment(entity, table)
+    let world_set_equipment = world.clone();
+    let set_equipment = lua.create_function_mut(move |lua, (entity, table): (u32, Table)| {
+        let mut world = world_set_equipment.borrow_mut();
+        let mut json_value: JsonValue = lua_table_to_json(lua, &table, None)?;
+        let schema = get_schema("Equipment").expect("Equipment schema missing");
+        ensure_schema_arrays(&mut json_value, schema);
+        world
+            .set_component(entity, "Equipment", json_value)
+            .map_err(|e| lua_error_from_any(lua, e))
+    })?;
+    globals.set("set_equipment", set_equipment)?;
 
     // equip_item(entity, item_id, slot)
     let world_equip_item = world.clone();
@@ -89,6 +108,11 @@ pub fn register_equipment_api(
 
             // 7. Equip
             slots_obj.insert(slot.clone(), serde_json::Value::String(item_id.clone()));
+
+            // 8. Schema enforcement
+            let schema = get_schema("Equipment").expect("Equipment schema missing");
+            ensure_schema_arrays(&mut equipment, schema);
+
             world
                 .set_component(entity, "Equipment", equipment)
                 .map_err(|e| lua_error_from_any(lua, e))
@@ -108,6 +132,11 @@ pub fn register_equipment_api(
             .and_then(|v| v.as_object_mut())
             .ok_or_else(|| lua_error_msg(lua, "Equipment slots must be an object"))?;
         slots_obj.insert(slot, serde_json::Value::Null);
+
+        // Schema enforcement
+        let schema = get_schema("Equipment").expect("Equipment schema missing");
+        ensure_schema_arrays(&mut equipment, schema);
+
         world
             .set_component(entity, "Equipment", equipment)
             .map_err(|e| lua_error_from_any(lua, e))
