@@ -1,6 +1,7 @@
 use crate::ecs::system::System;
 use crate::ecs::world::World;
 use serde_json::{Value as JsonValue, json};
+use topo_sort::{SortResults, TopoSort};
 
 #[derive(Default)]
 pub struct JobSystem;
@@ -35,29 +36,30 @@ impl JobSystem {
 
     fn process_job(
         &self,
-        world: &mut World,
+        world: &World,
         _lua: Option<&mlua::Lua>,
         _eid: u32,
-        mut job: JsonValue,
-    ) -> JsonValue {
+        mut job: serde_json::Value,
+    ) -> serde_json::Value {
         let job_type = job
             .get("job_type")
             .and_then(|v| v.as_str())
             .unwrap_or("default")
             .to_string();
-        let progress = job.get("progress").and_then(|v| v.as_f64()).unwrap_or(0.0);
         let is_cancelled = job
             .get("cancelled")
             .and_then(|v| v.as_bool())
             .unwrap_or(false);
 
-        let status = job.get("status").and_then(|v| v.as_str()).unwrap_or("");
-        if status == "pending" && !self.dependencies_complete(world, &job) {
+        if !self.dependencies_complete(world, &job) {
+            if job.get("status").and_then(|v| v.as_str()) != Some("pending") {
+                job["status"] = serde_json::json!("pending");
+            }
             return job;
         }
 
         if is_cancelled {
-            job["status"] = json!("cancelled");
+            job["status"] = serde_json::json!("cancelled");
         }
 
         if let Some(children_val) = job.get_mut("children") {
@@ -70,7 +72,7 @@ impl JobSystem {
                 let processed = self.process_job(world, _lua, _eid, child.take());
                 if is_cancelled {
                     *child = processed;
-                    child["status"] = json!("cancelled");
+                    child["status"] = serde_json::json!("cancelled");
                 } else {
                     *child = processed;
                 }
@@ -78,41 +80,62 @@ impl JobSystem {
                     all_children_complete = false;
                 }
             }
-            *children_val = JsonValue::Array(children);
-
-            if !is_cancelled && all_children_complete {
-                job["status"] = json!("complete");
+            let children_is_empty = children.is_empty();
+            *children_val = serde_json::Value::Array(children);
+            if !is_cancelled && !children_is_empty && all_children_complete {
+                job["status"] = serde_json::json!("complete");
             }
         }
 
-        let status = job.get("status").and_then(|v| v.as_str()).unwrap_or("");
-        if !matches!(status, "failed" | "complete" | "cancelled") {
+        if job
+            .get("should_fail")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false)
+        {
+            job["status"] = serde_json::json!("failed");
+            return job;
+        }
+
+        // Always set to in_progress if pending
+        if job.get("status").and_then(|v| v.as_str()) == Some("pending") {
+            job["status"] = serde_json::json!("in_progress");
+        }
+
+        // Handler lookup should always happen here, after status normalization
+        let current_status = job
+            .get("status")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+
+        if !matches!(current_status.as_str(), "failed" | "complete" | "cancelled") {
             let assigned_to = job.get("assigned_to").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
             let job_id = job.get("id").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
 
-            if let Some(handler) = world.job_handler_registry.get(&job_type) {
-                let handler = handler.clone();
-                handler(world, assigned_to, job_id, &job)
-            } else {
-                let mut job = job.clone();
-                if job
-                    .get("should_fail")
-                    .and_then(|v| v.as_bool())
-                    .unwrap_or(false)
-                {
-                    job["status"] = json!("failed");
-                } else if status == "pending" {
-                    job["status"] = json!("in_progress");
-                } else if status == "in_progress" {
-                    let progress = progress + 1.0;
-                    job["progress"] = json!(progress);
-                    if progress >= 3.0 {
-                        job["status"] = json!("complete");
-                    }
-                }
-                job
+            let registry = world.job_handler_registry.lock().unwrap();
+            if let Some(handler) = registry.get(&job_type) {
+                return handler(world, assigned_to, job_id, &job);
             }
+        }
+
+        // Default logic if no handler
+        if !matches!(current_status.as_str(), "failed" | "complete" | "cancelled") {
+            if current_status == "in_progress" {
+                let progress = job.get("progress").and_then(|v| v.as_f64()).unwrap_or(0.0) + 1.0;
+                job["progress"] = serde_json::json!(progress);
+                if progress >= 3.0 {
+                    job["progress"] = serde_json::json!(progress.max(3.0));
+                    job["status"] = serde_json::json!("complete");
+                }
+            }
+            job
         } else {
+            // Only set progress to 3.0 if status is complete and progress is unset or less than 3.0
+            if current_status == "complete"
+                && job.get("progress").and_then(|v| v.as_f64()).unwrap_or(0.0) < 3.0
+            {
+                job["progress"] = serde_json::json!(3.0);
+            }
             job
         }
     }
@@ -142,29 +165,52 @@ impl System for JobSystem {
     }
 
     fn run(&mut self, world: &mut World, lua: Option<&mlua::Lua>) {
-        let entities = world.get_entities_with_component("Job");
-        for eid in entities {
+        let job_entities: Vec<u32> = world.get_entities_with_component("Job");
+        let mut sorter = TopoSort::new();
+
+        for &eid in &job_entities {
+            let job = world.get_component(eid, "Job").unwrap();
+            let deps: Vec<u32> = job
+                .get("dependencies")
+                .and_then(|v| v.as_array())
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|x| x.as_str()?.parse().ok())
+                        .collect()
+                })
+                .unwrap_or_default();
+            sorter.insert(eid, deps);
+        }
+
+        let sorted_eids = match sorter.into_vec_nodes() {
+            SortResults::Full(order) => order,
+            SortResults::Partial(cycle) => {
+                panic!("Cycle detected in job dependencies: {:?}", cycle);
+            }
+        };
+
+        for eid in sorted_eids {
             let old_job = world.get_component(eid, "Job").unwrap().clone();
+            let new_job = self.process_job(world, lua, eid, old_job.clone());
             let old_status = old_job
                 .get("status")
                 .and_then(|v| v.as_str())
                 .unwrap_or("")
                 .to_string();
-            let job = self.process_job(world, lua, eid, old_job);
-            let new_status = job.get("status").and_then(|v| v.as_str()).unwrap_or("");
+            let new_status = new_job.get("status").and_then(|v| v.as_str()).unwrap_or("");
             if old_status != new_status {
                 if matches!(new_status, "complete" | "failed" | "cancelled") {
-                    self.cleanup_agent_on_job_status(world, &job);
+                    self.cleanup_agent_on_job_status(world, &new_job);
                 }
                 if new_status == "complete" {
                     let event = json!({
                         "entity": eid,
-                        "job_type": job.get("job_type").cloned().unwrap_or(json!(null))
+                        "job_type": new_job.get("job_type").cloned().unwrap_or(json!(null))
                     });
                     let _ = world.send_event("job_completed", event);
 
                     let mut effects: Vec<serde_json::Value> = Vec::new();
-                    let job_type_name_opt = job.get("job_type").and_then(|v| v.as_str());
+                    let job_type_name_opt = new_job.get("job_type").and_then(|v| v.as_str());
                     if let Some(job_type_name) = job_type_name_opt {
                         if let Some(job_type) = world.job_types.get_data(job_type_name) {
                             for e in &job_type.effects {
@@ -183,18 +229,18 @@ impl System for JobSystem {
                 } else if new_status == "failed" {
                     let event = json!({
                         "entity": eid,
-                        "job_type": job.get("job_type").cloned().unwrap_or(json!(null))
+                        "job_type": new_job.get("job_type").cloned().unwrap_or(json!(null))
                     });
                     let _ = world.send_event("job_failed", event);
                 } else if new_status == "cancelled" {
                     let event = json!({
                         "entity": eid,
-                        "job_type": job.get("job_type").cloned().unwrap_or(json!(null))
+                        "job_type": new_job.get("job_type").cloned().unwrap_or(json!(null))
                     });
                     let _ = world.send_event("job_cancelled", event);
                 }
             }
-            world.set_component(eid, "Job", job).unwrap();
+            world.set_component(eid, "Job", new_job).unwrap();
         }
     }
 }

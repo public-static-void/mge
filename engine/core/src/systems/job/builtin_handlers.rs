@@ -20,7 +20,7 @@ pub fn register_builtin_job_handlers(
         let logic_opt = job_type_registry.get_logic(&job_type_name);
 
         if let Some(JobLogic::Native(_logic_fn)) = logic_opt {
-            world.job_handler_registry.register_handler(
+            world.job_handler_registry.lock().unwrap().register_handler(
                 &job_type_name,
                 move |world, _agent_id, job_id, _data| {
                     let mut job = world.get_component(job_id, "Job").cloned().unwrap();
@@ -32,8 +32,8 @@ pub fn register_builtin_job_handlers(
                     } else {
                         job["status"] = serde_json::json!("in_progress");
                     }
-                    world.set_component(job_id, "Job", job).unwrap();
-                    serde_json::json!({ "result": "ok" })
+                    // Do NOT mutate world here, just return the job value
+                    job
                 },
             );
         }
