@@ -225,3 +225,220 @@ fn test_agent_job_queue_and_resource_aware_assignment() {
     let agent = world.get_component(1, "Agent").unwrap();
     assert_eq!(agent["current_job"], 200);
 }
+
+#[test]
+fn test_job_preemption_by_higher_priority() {
+    let registry = setup_registry();
+    let mut world = World::new(registry);
+
+    // Agent: idle, can do both jobs
+    world
+        .set_component(
+            1,
+            "Agent",
+            json!({
+                "entity_id": 1,
+                "skills": { "dig": 5.0, "build": 5.0 },
+                "preferences": { "dig": 2.0, "build": 2.0 },
+                "state": "idle"
+            }),
+        )
+        .unwrap();
+    world.entities.push(1);
+
+    // Job 100: dig, priority 1
+    world
+        .set_component(
+            100,
+            "Job",
+            json!({
+                "job_type": "dig",
+                "status": "pending",
+                "priority": 1
+            }),
+        )
+        .unwrap();
+    world.entities.push(100);
+
+    // Assign initial job
+    let mut job_board = JobBoard::default();
+    job_board.update(&world);
+    assign_jobs(&mut world, &mut job_board);
+
+    let agent = world.get_component(1, "Agent").unwrap();
+    assert_eq!(agent["current_job"], 100);
+    assert_eq!(agent["state"], "working");
+
+    // Simulate job 100 in progress
+    let mut job = world.get_component(100, "Job").unwrap().clone();
+    job["status"] = json!("in_progress");
+    world.set_component(100, "Job", job).unwrap();
+
+    // Now, add a higher-priority job
+    world
+        .set_component(
+            200,
+            "Job",
+            json!({
+                "job_type": "build",
+                "status": "pending",
+                "priority": 10
+            }),
+        )
+        .unwrap();
+    world.entities.push(200);
+
+    // Run assignment again: agent should preempt job 100 for job 200
+    job_board.update(&world);
+    assign_jobs(&mut world, &mut job_board);
+
+    let agent = world.get_component(1, "Agent").unwrap();
+    assert_eq!(
+        agent["current_job"], 200,
+        "Agent should preempt to higher-priority job"
+    );
+    assert_eq!(agent["state"], "working");
+
+    let job100 = world.get_component(100, "Job").unwrap();
+    assert!(
+        job100.get("assigned_to").is_none() || job100["assigned_to"] != 1,
+        "Old job should be unassigned"
+    );
+    let job200 = world.get_component(200, "Job").unwrap();
+    assert_eq!(job200["assigned_to"], 1);
+}
+
+#[test]
+fn test_agent_abandons_job_if_blocked() {
+    let registry = setup_registry();
+    let mut world = World::new(registry);
+
+    // Agent: working on job 100
+    world
+        .set_component(
+            1,
+            "Agent",
+            json!({
+                "entity_id": 1,
+                "skills": { "dig": 5.0 },
+                "preferences": { "dig": 2.0 },
+                "state": "working",
+                "current_job": 100
+            }),
+        )
+        .unwrap();
+    world.entities.push(1);
+
+    // Job 100: dig, assigned to agent, but now blocked (simulate with "blocked": true)
+    world
+        .set_component(
+            100,
+            "Job",
+            json!({
+                "job_type": "dig",
+                "status": "in_progress",
+                "assigned_to": 1,
+                "blocked": true
+            }),
+        )
+        .unwrap();
+    world.entities.push(100);
+
+    // Run assignment: agent should abandon blocked job and become idle
+    let mut job_board = JobBoard::default();
+    job_board.update(&world);
+    assign_jobs(&mut world, &mut job_board);
+
+    let agent = world.get_component(1, "Agent").unwrap();
+    assert!(
+        agent.get("current_job").is_none(),
+        "Agent should abandon blocked job"
+    );
+    assert_eq!(agent["state"], "idle");
+    let job = world.get_component(100, "Job").unwrap();
+    assert!(
+        job.get("assigned_to").is_none(),
+        "Blocked job should be unassigned"
+    );
+}
+
+#[test]
+fn test_dynamic_priority_update_affects_assignment() {
+    let registry = setup_registry();
+    let mut world = World::new(registry);
+
+    // Agent: idle, can do both jobs
+    world
+        .set_component(
+            1,
+            "Agent",
+            json!({
+                "entity_id": 1,
+                "skills": { "dig": 5.0, "build": 5.0 },
+                "preferences": { "dig": 2.0, "build": 2.0 },
+                "state": "idle"
+            }),
+        )
+        .unwrap();
+    world.entities.push(1);
+
+    // Job 100: dig, priority 1
+    world
+        .set_component(
+            100,
+            "Job",
+            json!({
+                "job_type": "dig",
+                "status": "pending",
+                "priority": 1
+            }),
+        )
+        .unwrap();
+    world.entities.push(100);
+
+    // Job 200: build, priority 5
+    world
+        .set_component(
+            200,
+            "Job",
+            json!({
+                "job_type": "build",
+                "status": "pending",
+                "priority": 5
+            }),
+        )
+        .unwrap();
+    world.entities.push(200);
+
+    // Initial assignment: agent should pick job 200 (higher priority)
+    let mut job_board = JobBoard::default();
+    job_board.update(&world);
+    assign_jobs(&mut world, &mut job_board);
+
+    let agent = world.get_component(1, "Agent").unwrap();
+    assert_eq!(agent["current_job"], 200);
+
+    // Now, increase priority of job 100 and re-run assignment
+    let mut job = world.get_component(100, "Job").unwrap().clone();
+    job["priority"] = json!(10);
+    world.set_component(100, "Job", job).unwrap();
+
+    // Unassign agent from job 200
+    let mut job = world.get_component(200, "Job").unwrap().clone();
+    job.as_object_mut().unwrap().remove("assigned_to");
+    world.set_component(200, "Job", job).unwrap();
+
+    let mut agent = world.get_component(1, "Agent").unwrap().clone();
+    agent.as_object_mut().unwrap().remove("current_job");
+    agent["state"] = json!("idle");
+    world.set_component(1, "Agent", agent).unwrap();
+
+    job_board.update(&world);
+    assign_jobs(&mut world, &mut job_board);
+
+    let agent = world.get_component(1, "Agent").unwrap();
+    assert_eq!(
+        agent["current_job"], 100,
+        "Agent should now have the higher-priority job"
+    );
+}
