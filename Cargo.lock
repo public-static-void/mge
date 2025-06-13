@@ -698,6 +698,7 @@ version = "0.1.0"
 dependencies = [
  "engine_core",
  "gag",
+ "lazy_static",
  "mlua",
  "regex",
  "serde_json",
