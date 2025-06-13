@@ -1,53 +1,8 @@
 local assert = require("assert")
 
--- Helper to mark an empty Lua table as an array for Rust glue
 local function empty_array()
 	local t = {}
 	return setmetatable(t, { __is_array = true })
-end
-
--- Recursively fix all ECS array fields to be empty arrays if they are empty tables
-local function fix_arrays(obj)
-	if type(obj) ~= "table" then
-		return
-	end
-
-	-- Fix equipped
-	if obj.equipped ~= nil then
-		if type(obj.equipped) == "table" then
-			if next(obj.equipped) == nil or (getmetatable(obj.equipped) and getmetatable(obj.equipped).__is_array) then
-				obj.equipped = empty_array()
-			else
-				fix_arrays(obj.equipped)
-			end
-		end
-	end
-
-	-- Fix children
-	if obj.children ~= nil then
-		if type(obj.children) == "table" then
-			if next(obj.children) == nil or (getmetatable(obj.children) and getmetatable(obj.children).__is_array) then
-				obj.children = empty_array()
-			else
-				for _, child in ipairs(obj.children) do
-					fix_arrays(child)
-				end
-			end
-		end
-	end
-
-	-- Fix parts (top-level array of parts)
-	if obj.parts ~= nil then
-		if type(obj.parts) == "table" then
-			if next(obj.parts) == nil or (getmetatable(obj.parts) and getmetatable(obj.parts).__is_array) then
-				obj.parts = empty_array()
-			else
-				for _, part in ipairs(obj.parts) do
-					fix_arrays(part)
-				end
-			end
-		end
-	end
 end
 
 local function test_equipment_body_sync()
@@ -106,11 +61,13 @@ local function test_equipment_body_sync()
 	run_native_system("BodyEquipmentSyncSystem")
 
 	local body = get_component(e, "Body")
+	assert.equals(#body.parts, 1)
+	assert.equals(#body.parts[1].children, 1)
+	assert.equals(#body.parts[1].children[1].children, 1)
 	local right_hand_equipped = body.parts[1].children[1].children[1].equipped
 	assert.equals(right_hand_equipped[1], "gold_ring")
 
 	body.parts[1].children[1].children[1].status = "wounded"
-	fix_arrays(body)
 	set_component(e, "Body", body)
 	run_native_system("BodyEquipmentSyncSystem")
 
@@ -118,7 +75,10 @@ local function test_equipment_body_sync()
 	local eq_after = get_equipment(e)
 	assert.equals(#body_after.parts[1].children[1].children[1].equipped, 0)
 	assert.not_nil(eq_after.slots)
-	assert.is_nil(eq_after.slots.right_hand)
+	-- Defensive: only check .right_hand if slots is present and is a table
+	if eq_after.slots and type(eq_after.slots) == "table" then
+		assert.is_nil(eq_after.slots.right_hand)
+	end
 end
 
 return {

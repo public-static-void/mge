@@ -173,7 +173,6 @@ fn test_register_external_schema_from_json() {
 
     let registry = Arc::new(Mutex::new(registry));
 
-    // FIX: Avoid E0716 by binding the lock guard
     let guard = registry.lock().unwrap();
     let schema = guard.get_schema_by_name("MagicPower");
     assert!(

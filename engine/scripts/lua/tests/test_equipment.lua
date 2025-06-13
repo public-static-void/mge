@@ -9,6 +9,7 @@ local function test_equip_and_unequip()
 	add_item_to_inventory(e, "sword")
 
 	equip_item(e, "sword", "right_hand")
+
 	local eq = get_equipment(e)
 	assert.equals(eq.slots.right_hand, "sword")
 

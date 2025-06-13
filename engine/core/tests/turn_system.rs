@@ -34,9 +34,6 @@ pub fn scripting_tick_test<E: ModScriptEngine>(mut engine: E) {
     grid.add_cell(1, 0, 0); // after move
     world.borrow_mut().map = Some(Map::new(Box::new(grid)));
 
-    // NOTE: If your scripting engine needs to register the world,
-    // do it in the bridge test before calling this function.
-
     let script = r#"
         local id = spawn_entity()
         set_component(id, "Position", { pos = { Square = { x = 0, y = 0, z = 0 } } })
