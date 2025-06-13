@@ -49,8 +49,13 @@ pub struct World {
     pub job_handler_registry:
         Arc<Mutex<crate::systems::job::job_handler_registry::JobHandlerRegistry>>,
     #[serde(skip)]
-    pub effect_processor_registry:
-        Option<crate::systems::job::effect_processor_registry::EffectProcessorRegistry>,
+    pub effect_processor_registry: Option<
+        std::sync::Arc<
+            std::sync::Mutex<
+                crate::systems::job::effect_processor_registry::EffectProcessorRegistry,
+            >,
+        >,
+    >,
     #[serde(skip)]
     pub map: Option<Map>,
     event_queues: HashMap<String, (VecDeque<JsonValue>, VecDeque<JsonValue>)>, // (write, read)
@@ -79,9 +84,9 @@ impl World {
             job_handler_registry: Arc::new(Mutex::new(
                 crate::systems::job::job_handler_registry::JobHandlerRegistry::new(),
             )),
-            effect_processor_registry: Some(
+            effect_processor_registry: Some(std::sync::Arc::new(std::sync::Mutex::new(
                 crate::systems::job::effect_processor_registry::EffectProcessorRegistry::new(),
-            ),
+            ))),
             map: None,
             event_queues: HashMap::new(),
             map_postprocessors: Vec::new(),
