@@ -5,7 +5,9 @@ pub mod effect_processor_registry;
 pub mod job_handler_registry;
 pub mod job_type;
 pub mod loader;
+pub mod priority_aging;
 pub mod registry;
+pub mod resource_reservation;
 pub mod system;
 
 pub use ai::{assign_jobs, setup_ai_event_subscriptions};

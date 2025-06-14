@@ -1,27 +1,25 @@
+use engine_core::config::GameConfig;
+use engine_core::ecs::registry::ComponentRegistry;
+use engine_core::ecs::schema::load_schemas_from_dir_with_modes;
 use engine_core::ecs::system::System;
 use engine_core::ecs::world::World;
 use engine_core::systems::job::{JobSystem, assign_jobs};
 use engine_core::systems::job_board::JobBoard;
 use serde_json::json;
+use std::path::Path;
 use std::sync::{Arc, Mutex};
 
-fn setup_registry() -> Arc<Mutex<engine_core::ecs::registry::ComponentRegistry>> {
-    let mut registry = engine_core::ecs::registry::ComponentRegistry::default();
-    registry.register_external_schema(engine_core::ecs::schema::ComponentSchema {
-        name: "Agent".to_string(),
-        schema: serde_json::json!({ "type": "object" }),
-        modes: vec!["colony".to_string()],
-    });
-    registry.register_external_schema(engine_core::ecs::schema::ComponentSchema {
-        name: "Job".to_string(),
-        schema: serde_json::json!({ "type": "object" }),
-        modes: vec!["colony".to_string()],
-    });
-    registry.register_external_schema(engine_core::ecs::schema::ComponentSchema {
-        name: "Terrain".to_string(),
-        schema: serde_json::json!({ "type": "object" }),
-        modes: vec!["colony".to_string()],
-    });
+fn setup_registry() -> Arc<Mutex<ComponentRegistry>> {
+    let config =
+        GameConfig::load_from_file(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../game.toml"))
+            .expect("Failed to load config");
+    let schema_dir = "../../engine/assets/schemas";
+    let schemas = load_schemas_from_dir_with_modes(schema_dir, &config.allowed_modes)
+        .expect("Failed to load schemas");
+    let mut registry = ComponentRegistry::new();
+    for (_name, schema) in schemas {
+        registry.register_external_schema(schema);
+    }
     Arc::new(Mutex::new(registry))
 }
 
@@ -64,7 +62,8 @@ fn test_job_cancellation_cleans_up_agent_and_emits_event() {
                 "job_type": "dig",
                 "status": "pending",
                 "cancelled": false,
-                "priority": 1
+                "priority": 1,
+                "category": "mining"
             }),
         )
         .unwrap();
@@ -153,7 +152,8 @@ fn test_job_effect_rollback_on_cancel() {
                 "job_type": "dig",
                 "status": "pending",
                 "cancelled": false,
-                "priority": 1
+                "priority": 1,
+                "category": "mining"
             }),
         )
         .unwrap();
@@ -200,7 +200,8 @@ fn test_job_effect_rollback_on_cancel() {
                 "job_type": "dig",
                 "status": "pending",
                 "cancelled": true,
-                "priority": 1
+                "priority": 1,
+                "category": "mining"
             }),
         )
         .unwrap();
@@ -213,4 +214,60 @@ fn test_job_effect_rollback_on_cancel() {
         let terrain = world.get_component(100, "Terrain").unwrap();
         assert_eq!(terrain["kind"], "rock"); // Should remain unchanged
     }
+}
+
+#[test]
+fn test_job_cancellation_releases_resources_and_cancels_children() {
+    let registry = setup_registry();
+    let mut world = World::new(registry);
+
+    // Set up stockpile with resources and a job that reserves them
+    world
+        .set_component(200, "Stockpile", json!({ "resources": { "wood": 10 } }))
+        .unwrap();
+
+    world
+        .set_component(
+            101,
+            "Job",
+            json!({
+                "id": 101,
+                "job_type": "build",
+                "status": "pending",
+                "resource_requirements": [{ "kind": "wood", "amount": 5 }],
+                "reserved_resources": [{ "kind": "wood", "amount": 5 }],
+                "reserved_stockpile": 200,
+                "category": "construction",
+                "children": [
+                    {
+                        "id": 102,
+                        "job_type": "subtask",
+                        "status": "pending",
+                        "category": "construction"
+                    }
+                ]
+            }),
+        )
+        .unwrap();
+
+    // Cancel the parent job
+    let mut job = world.get_component(101, "Job").unwrap().clone();
+    job["cancelled"] = json!(true);
+    world.set_component(101, "Job", job).unwrap();
+
+    // Run job system to process cancellation
+    let mut job_system = JobSystem;
+    job_system.run(&mut world, None);
+
+    // Check that resources are released
+    let stockpile = world.get_component(200, "Stockpile").unwrap();
+    assert_eq!(stockpile["resources"]["wood"], 10);
+
+    // Check that child job is cancelled
+    let parent_job = world.get_component(101, "Job").unwrap();
+    let children = parent_job
+        .get("children")
+        .and_then(|v| v.as_array())
+        .unwrap();
+    assert_eq!(children[0]["status"], "cancelled");
 }

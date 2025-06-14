@@ -34,7 +34,8 @@ fn test_job_assignment_fairness() {
                 "status": "pending",
                 "priority": 10,
                 "assignment_count": 3,
-                "last_assigned_tick": 5
+                "last_assigned_tick": 5,
+                "category": "mining"
             }),
         )
         .unwrap();
@@ -50,7 +51,8 @@ fn test_job_assignment_fairness() {
                 "status": "pending",
                 "priority": 10,
                 "assignment_count": 1,
-                "last_assigned_tick": 2
+                "last_assigned_tick": 2,
+                "category": "mining"
             }),
         )
         .unwrap();
@@ -100,7 +102,8 @@ fn test_job_assignment_dynamic_priority() {
                 "status": "pending",
                 "priority": 5,
                 "assignment_count": 0,
-                "last_assigned_tick": 0
+                "last_assigned_tick": 0,
+                "category": "mining"
             }),
         )
         .unwrap();
@@ -116,7 +119,8 @@ fn test_job_assignment_dynamic_priority() {
                 "status": "pending",
                 "priority": 10,
                 "assignment_count": 0,
-                "last_assigned_tick": 0
+                "last_assigned_tick": 0,
+                "category": "mining"
             }),
         )
         .unwrap();
@@ -192,7 +196,8 @@ fn test_job_assignment_persistence() {
                 "status": "pending",
                 "priority": 5,
                 "assignment_count": 2,
-                "last_assigned_tick": 42
+                "last_assigned_tick": 42,
+                "category": "mining"
             }),
         )
         .unwrap();

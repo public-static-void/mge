@@ -11,6 +11,7 @@ use std::sync::{Arc, Mutex};
 mod component;
 mod entity;
 mod events;
+pub mod job_handlers;
 mod map;
 mod mode;
 mod resources;

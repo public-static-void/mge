@@ -20,7 +20,11 @@ impl JobBoard {
             if let Some(job) = world.get_component(eid, "Job") {
                 let assigned = job.get("assigned_to").and_then(|v| v.as_u64()).unwrap_or(0);
                 let status = job.get("status").and_then(|v| v.as_str()).unwrap_or("");
-                let priority = job.get("priority").and_then(|v| v.as_i64()).unwrap_or(0);
+                let priority = job
+                    .get("effective_priority")
+                    .and_then(|v| v.as_i64())
+                    .or_else(|| job.get("priority").and_then(|v| v.as_i64()))
+                    .unwrap_or(0);
                 let assignment_count = job
                     .get("assignment_count")
                     .and_then(|v| v.as_u64())
@@ -29,12 +33,25 @@ impl JobBoard {
                     .get("last_assigned_tick")
                     .and_then(|v| v.as_u64())
                     .unwrap_or(0);
+
+                // Only allow jobs with reserved resources (or no requirements) to be assignable
+                let resource_requirements = job.get("resource_requirements");
+                let has_reservation = job.get("reserved_resources").is_some()
+                    && job.get("reserved_stockpile").is_some();
+                let requirements_satisfied = resource_requirements.is_none()
+                    || resource_requirements
+                        .and_then(|v| v.as_array())
+                        .map(|arr| arr.is_empty())
+                        .unwrap_or(true)
+                    || has_reservation;
+
                 if assigned == 0
                     && status == "pending"
                     && !job
                         .get("blocked")
                         .and_then(|v| v.as_bool())
                         .unwrap_or(false)
+                    && requirements_satisfied
                 {
                     candidates.push((eid, priority, assignment_count, last_assigned_tick));
                 }
@@ -60,7 +77,16 @@ impl JobBoard {
             if let Some(job) = world.get_component(eid, "Job") {
                 let assigned = job.get("assigned_to").and_then(|v| v.as_u64()).unwrap_or(0);
                 let status = job.get("status").and_then(|v| v.as_str()).unwrap_or("");
-                assigned == 0 && status == "pending"
+                let resource_requirements = job.get("resource_requirements");
+                let has_reservation = job.get("reserved_resources").is_some()
+                    && job.get("reserved_stockpile").is_some();
+                let requirements_satisfied = resource_requirements.is_none()
+                    || resource_requirements
+                        .and_then(|v| v.as_array())
+                        .map(|arr| arr.is_empty())
+                        .unwrap_or(true)
+                    || has_reservation;
+                assigned == 0 && status == "pending" && requirements_satisfied
             } else {
                 false
             }

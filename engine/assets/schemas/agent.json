@@ -5,6 +5,11 @@
   "modes": ["colony", "roguelike"],
   "properties": {
     "entity_id": { "type": "integer" },
+    "specializations": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "List of job categories this agent specializes in"
+    },
     "skills": {
       "type": "object",
       "additionalProperties": { "type": "number" }

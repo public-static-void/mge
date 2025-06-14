@@ -25,8 +25,9 @@ fn make_test_world_with_job_schema() -> World {
 #[test]
 fn test_job_board_tracks_unassigned_jobs() {
     let mut world = make_test_world_with_job_schema();
-    let job1 = json!({"job_type": "mine", "status": "pending"});
-    let job2 = json!({"job_type": "haul", "status": "pending", "assigned_to": 42});
+    let job1 = json!({"job_type": "mine", "status": "pending", "category": "mining"});
+    let job2 =
+        json!({"job_type": "haul", "status": "pending", "assigned_to": 42, "category": "hauling"});
     let eid1 = world.spawn_entity();
     let eid2 = world.spawn_entity();
     world.set_component(eid1, "Job", job1.clone()).unwrap();
@@ -42,7 +43,7 @@ fn test_job_board_tracks_unassigned_jobs() {
 #[test]
 fn test_job_assignment_claims_job() {
     let mut world = make_test_world_with_job_schema();
-    let job = json!({"job_type": "build", "status": "pending"});
+    let job = json!({"job_type": "build", "status": "pending", "category": "construction"});
     let eid = world.spawn_entity();
     let actor_eid = world.spawn_entity();
     world.set_component(eid, "Job", job.clone()).unwrap();

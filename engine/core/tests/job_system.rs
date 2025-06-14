@@ -23,10 +23,12 @@ fn can_register_job_schema_and_assign_job_component() {
     // 3. Spawn entity and assign Job component
     let eid = world.spawn_entity();
     let job_val = json!({
+        "id": eid,
         "job_type": "haul_resource",
         "target": 42,
         "status": "pending",
-        "progress": 0.0
+        "progress": 0.0,
+        "category": "hauling"
     });
     assert!(world.set_component(eid, "Job", job_val.clone()).is_ok());
 
@@ -50,8 +52,10 @@ fn can_query_entities_with_job_component() {
     let eid = world.spawn_entity();
 
     let job_val = json!({
+        "id": eid,
         "job_type": "build_structure",
-        "status": "pending"
+        "status": "pending",
+        "category": "construction"
     });
     world.set_component(eid, "Job", job_val.clone()).unwrap();
 
@@ -78,7 +82,8 @@ fn job_system_advances_progress_and_completes_job() {
         "id": eid,
         "job_type": "test_job",
         "status": "pending",
-        "progress": 0.0
+        "progress": 0.0,
+        "category": "testing"
     });
     world.set_component(eid, "Job", job_val.clone()).unwrap();
 
@@ -115,9 +120,11 @@ fn job_system_emits_event_on_completion() {
     // Spawn entity with a Job
     let eid = world.spawn_entity();
     let job_val = json!({
+        "id": eid,
         "job_type": "test_job",
         "status": "pending",
-        "progress": 0.0
+        "progress": 0.0,
+        "category": "testing"
     });
     world.set_component(eid, "Job", job_val.clone()).unwrap();
 
@@ -169,7 +176,8 @@ fn job_system_emits_event_on_failure() {
         "job_type": "test_job",
         "status": "pending",
         "progress": 0.0,
-        "should_fail": true
+        "should_fail": true,
+        "category": "testing"
     });
     world.set_component(eid, "Job", job_val.clone()).unwrap();
 
@@ -254,7 +262,8 @@ fn job_system_uses_custom_job_type_logic() {
         "resource_requirements": [],
         "resource_outputs": [],
         "children": [],
-        "dependencies": []
+        "dependencies": [],
+        "category": "testing"
     });
     world.set_component(eid, "Job", job_val).unwrap();
 
@@ -290,9 +299,11 @@ fn job_assignment_is_recorded_and_queryable() {
     let worker_eid = world.spawn_entity();
     let job_eid = world.spawn_entity();
     let job_val = json!({
+        "id": job_eid,
         "job_type": "dig_tunnel",
         "status": "pending",
-        "assigned_to": worker_eid
+        "assigned_to": worker_eid,
+        "category": "mining"
     });
     world
         .set_component(job_eid, "Job", job_val.clone())

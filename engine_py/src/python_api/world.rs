@@ -291,6 +291,7 @@ impl PyWorld {
     ) -> PyResult<()> {
         let mut world = self.inner.borrow_mut();
         let mut job_val = serde_json::json!({
+            "id": entity_id,
             "job_type": job_type,
             "status": "pending",
             "progress": 0.0
