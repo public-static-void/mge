@@ -47,7 +47,7 @@ fn compute_job_utility(agent: &JsonValue, job: &JsonValue, world: &World) -> f64
 
     // Add a bonus if the agent specializes in this job's category
     let specialization_bonus =
-        if !job_category.is_empty() && specializations.iter().any(|&cat| cat == job_category) {
+        if !job_category.is_empty() && specializations.contains(&job_category) {
             1000.0 // Large enough to always prefer category match
         } else {
             0.0
