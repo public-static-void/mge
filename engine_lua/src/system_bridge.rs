@@ -87,6 +87,7 @@ pub fn register_system_functions(
             move |lua, (entity, job_type, fields): (u32, String, Option<Table>)| {
                 let mut world = world_assign_job.borrow_mut();
                 let mut job_val = serde_json::json!({
+                    "id": entity,
                     "job_type": job_type,
                     "status": "pending",
                     "progress": 0.0

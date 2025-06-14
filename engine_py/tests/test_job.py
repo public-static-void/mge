@@ -1,7 +1,7 @@
 def test_job_completion(make_world):
     world = make_world()
     eid = world.spawn_entity()
-    world.assign_job(eid, "test_job")
+    world.assign_job(eid, "test_job", category="testing")
     found = False
     for _ in range(12):  # enough ticks to guarantee completion
         world.run_native_system("JobSystem")

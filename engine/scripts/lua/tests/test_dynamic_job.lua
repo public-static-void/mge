@@ -14,7 +14,7 @@ local function test_dynamic_job_type_registration()
 		end
 		return job
 	end)
-	assign_job(eid, "LuaJob")
+	assign_job(eid, "LuaJob", { category = "testing" })
 	for i = 1, 4 do
 		run_native_system("JobSystem")
 	end

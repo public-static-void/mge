@@ -14,7 +14,7 @@ def test_dynamic_job_registration(make_world):
         return job
 
     world.register_job_type("TestJob", test_job_logic)
-    world.assign_job(eid, "TestJob")
+    world.assign_job(eid, "TestJob", category="testing")
 
     # Run the job system a few times
     for _ in range(4):
