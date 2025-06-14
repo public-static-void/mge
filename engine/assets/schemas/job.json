@@ -5,6 +5,10 @@
   "modes": ["colony", "roguelike"],
   "properties": {
     "job_type": { "type": "string" },
+    "category": {
+      "type": "string",
+      "description": "Job category, e.g. hauling, construction, crafting"
+    },
     "target": { "type": "integer" },
     "status": {
       "type": "string",
@@ -72,5 +76,5 @@
       "description": "Game tick when this job was last assigned."
     }
   },
-  "required": ["job_type", "status"]
+  "required": ["job_type", "status", "category"]
 }
