@@ -36,7 +36,8 @@ fn job_with_unfinished_dependency_remains_pending() {
             "Job",
             json!({
                 "job_type": "dig",
-                "status": "pending"
+                "status": "pending",
+                "category": "mining"
             }),
         )
         .unwrap();
@@ -48,7 +49,8 @@ fn job_with_unfinished_dependency_remains_pending() {
             json!({
                 "job_type": "build",
                 "status": "pending",
-                "dependencies": [dep_eid.to_string()]
+                "dependencies": [dep_eid.to_string()],
+                "category": "construction"
             }),
         )
         .unwrap();
@@ -85,7 +87,8 @@ fn job_with_completed_dependency_can_start() {
             "Job",
             json!({
                 "job_type": "dig",
-                "status": "complete"
+                "status": "complete",
+                "category": "mining"
             }),
         )
         .unwrap();
@@ -97,7 +100,8 @@ fn job_with_completed_dependency_can_start() {
             json!({
                 "job_type": "build",
                 "status": "pending",
-                "dependencies": [dep_eid.to_string()]
+                "dependencies": [dep_eid.to_string()],
+                "category": "construction"
             }),
         )
         .unwrap();
