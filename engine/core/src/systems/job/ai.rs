@@ -10,6 +10,7 @@ lazy_static::lazy_static! {
 
 fn compute_job_utility(agent: &JsonValue, job: &JsonValue, world: &World) -> f64 {
     let job_type = job.get("job_type").and_then(|v| v.as_str()).unwrap_or("");
+    let job_category = job.get("category").and_then(|v| v.as_str()).unwrap_or("");
     let empty = serde_json::Map::new();
     let skills = agent
         .get("skills")
@@ -19,6 +20,12 @@ fn compute_job_utility(agent: &JsonValue, job: &JsonValue, world: &World) -> f64
         .get("preferences")
         .and_then(|v| v.as_object())
         .unwrap_or(&empty);
+    let specializations = agent
+        .get("specializations")
+        .and_then(|v| v.as_array())
+        .map(|arr| arr.iter().filter_map(|v| v.as_str()).collect::<Vec<_>>())
+        .unwrap_or_default();
+
     let skill = skills.get(job_type).and_then(|v| v.as_f64()).unwrap_or(0.0);
     let pref = preferences
         .get(job_type)
@@ -38,7 +45,15 @@ fn compute_job_utility(agent: &JsonValue, job: &JsonValue, world: &World) -> f64
         }
     }
 
-    skill + pref + resource_bonus
+    // Add a bonus if the agent specializes in this job's category
+    let specialization_bonus =
+        if !job_category.is_empty() && specializations.iter().any(|&cat| cat == job_category) {
+            1000.0 // Large enough to always prefer category match
+        } else {
+            0.0
+        };
+
+    skill + pref + resource_bonus + specialization_bonus
 }
 
 pub fn assign_jobs(world: &mut World, job_board: &mut JobBoard) {
@@ -249,18 +264,20 @@ pub fn assign_jobs(world: &mut World, job_board: &mut JobBoard) {
         if let Some(job_eid) = assigned_job {
             if let Some(mut job) = world.get_component(job_eid, "Job").cloned() {
                 job["assigned_to"] = serde_json::json!(*agent_id);
-                world.set_component(job_eid, "Job", job).unwrap();
+                world.set_component(job_eid, "Job", job.clone()).unwrap();
+
+                // Emit job_assigned event
+                crate::systems::job::system::JobSystem::emit_job_event(
+                    world,
+                    "job_assigned",
+                    &job,
+                    None,
+                );
             }
             if let Some(agent_entry) = world.components.get("Agent").and_then(|m| m.get(agent_id)) {
                 let mut agent_obj = agent_entry.clone();
                 agent_obj["current_job"] = serde_json::json!(job_eid);
                 agent_obj["state"] = serde_json::json!("working");
-                agent_obj["job_queue"] = serde_json::json!(new_queue);
-                world.set_component(*agent_id, "Agent", agent_obj).unwrap();
-            }
-        } else if !has_current_job {
-            if let Some(agent_entry) = world.components.get("Agent").and_then(|m| m.get(agent_id)) {
-                let mut agent_obj = agent_entry.clone();
                 agent_obj["job_queue"] = serde_json::json!(new_queue);
                 world.set_component(*agent_id, "Agent", agent_obj).unwrap();
             }

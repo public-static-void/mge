@@ -148,4 +148,17 @@ impl World {
             .unwrap()
             .register_handler(action, handler);
     }
+
+    /// Drains all events of the given type and name, advancing the event bus.
+    /// This is the canonical way to get all events for a tick/frame in both production and tests.
+    pub fn drain_events<T: 'static + Send + Sync + Clone>(&mut self, event_name: &str) -> Vec<T> {
+        if let Some(bus) = self.get_event_bus::<T>(event_name) {
+            let reader = crate::ecs::event::EventReader::default();
+            let events: Vec<_> = reader.read_all(&*bus.lock().unwrap()).cloned().collect();
+            bus.lock().unwrap().update();
+            events
+        } else {
+            Vec::new()
+        }
+    }
 }

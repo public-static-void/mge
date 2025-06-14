@@ -1,6 +1,6 @@
 use crate::ecs::system::System;
 use crate::ecs::world::World;
-use serde_json::{Value as JsonValue, json};
+use serde_json::Value as JsonValue;
 use topo_sort::{SortResults, TopoSort};
 
 #[derive(Default)]
@@ -34,6 +34,28 @@ impl JobSystem {
         true
     }
 
+    fn dependency_failure_status(&self, world: &World, job: &JsonValue) -> Option<&'static str> {
+        if let Some(deps) = job.get("dependencies").and_then(|v| v.as_array()) {
+            for dep in deps {
+                if let Some(dep_id) = dep.as_str() {
+                    if let Ok(dep_eid) = dep_id.parse::<u32>() {
+                        if let Some(dep_job) = world.get_component(dep_eid, "Job") {
+                            let status =
+                                dep_job.get("status").and_then(|v| v.as_str()).unwrap_or("");
+                            if status == "failed" {
+                                return Some("failed");
+                            }
+                            if status == "cancelled" {
+                                return Some("cancelled");
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        None
+    }
+
     fn cleanup_agent_on_job_status(&self, world: &mut World, job: &serde_json::Value) {
         if let Some(agent_id) = job.get("assigned_to").and_then(|v| v.as_u64()) {
             let agent_id = agent_id as u32;
@@ -54,7 +76,7 @@ impl JobSystem {
 
     fn process_job(
         &self,
-        world: &World,
+        world: &mut World,
         _lua: Option<&mlua::Lua>,
         _eid: u32,
         mut job: serde_json::Value,
@@ -69,6 +91,28 @@ impl JobSystem {
             .and_then(|v| v.as_bool())
             .unwrap_or(false);
 
+        if let Some(dep_fail_status) = self.dependency_failure_status(world, &job) {
+            job["status"] = serde_json::json!(dep_fail_status);
+
+            // Conditional chaining: spawn children if requested
+            if dep_fail_status == "failed" {
+                if let Some(to_spawn) = job
+                    .get("on_dependency_failed_spawn")
+                    .and_then(|v| v.as_array())
+                {
+                    let mut children = job
+                        .get("children")
+                        .and_then(|v| v.as_array())
+                        .cloned()
+                        .unwrap_or_default();
+                    for child in to_spawn {
+                        children.push(child.clone());
+                    }
+                    job["children"] = serde_json::Value::Array(children);
+                }
+            }
+            return job;
+        }
         if !self.dependencies_complete(world, &job) {
             if job.get("status").and_then(|v| v.as_str()) != Some("pending") {
                 job["status"] = serde_json::json!("pending");
@@ -130,16 +174,25 @@ impl JobSystem {
             let assigned_to = job.get("assigned_to").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
             let job_id = job.get("id").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
 
-            let registry = world.job_handler_registry.lock().unwrap();
-            if let Some(handler) = registry.get(&job_type) {
-                return handler(world, assigned_to, job_id, &job);
+            {
+                let registry = world.job_handler_registry.lock().unwrap();
+                if let Some(handler) = registry.get(&job_type) {
+                    let prev_progress = job.get("progress").and_then(|v| v.as_f64());
+                    let result = handler(world, assigned_to, job_id, &job);
+                    let new_progress = result.get("progress").and_then(|v| v.as_f64());
+                    drop(registry); // Explicitly drop before mut borrow
+                    if new_progress != prev_progress {
+                        Self::emit_job_event(world, "job_progressed", &result, None);
+                    }
+                    return result;
+                }
             }
         }
 
         // Default logic if no handler
         if !matches!(current_status.as_str(), "failed" | "complete" | "cancelled") {
             if current_status == "in_progress" {
-                // --- Begin agent-driven progress logic ---
+                // --- Agent-driven progress logic ---
                 let assigned_to =
                     job.get("assigned_to").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
                 let mut progress_increment = 1.0;
@@ -154,7 +207,7 @@ impl JobSystem {
                             .get("stamina")
                             .and_then(|v| v.as_f64())
                             .unwrap_or(100.0);
-                        // Example formula: progress = base * (skill) * (stamina / 100.0)
+                        // progress = base * (skill) * (stamina / 100.0)
                         progress_increment = 1.0 * skill * (stamina / 100.0);
                         // Clamp to minimum progress
                         if progress_increment < 0.1 {
@@ -162,9 +215,12 @@ impl JobSystem {
                         }
                     }
                 }
-                let progress = job.get("progress").and_then(|v| v.as_f64()).unwrap_or(0.0)
-                    + progress_increment;
+                let prev_progress = job.get("progress").and_then(|v| v.as_f64()).unwrap_or(0.0);
+                let progress = prev_progress + progress_increment;
                 job["progress"] = serde_json::json!(progress);
+                if progress != prev_progress {
+                    Self::emit_job_event(world, "job_progressed", &job, None);
+                }
                 if progress >= 3.0 {
                     job["progress"] = serde_json::json!(progress.max(3.0));
                     job["status"] = serde_json::json!("complete");
@@ -236,6 +292,39 @@ impl JobSystem {
             }
         }
     }
+
+    /// Emit a job event
+    pub fn emit_job_event(
+        world: &mut crate::ecs::world::World,
+        event: &str,
+        job: &serde_json::Value,
+        extra: Option<&serde_json::Map<String, serde_json::Value>>,
+    ) {
+        let mut payload = serde_json::Map::new();
+        if let Some(id) = job.get("id") {
+            payload.insert("entity".to_string(), id.clone());
+        }
+        if let Some(job_type) = job.get("job_type") {
+            payload.insert("job_type".to_string(), job_type.clone());
+        }
+        if let Some(status) = job.get("status") {
+            payload.insert("status".to_string(), status.clone());
+        }
+        if let Some(progress) = job.get("progress") {
+            payload.insert("progress".to_string(), progress.clone());
+        }
+        if let Some(assigned_to) = job.get("assigned_to") {
+            payload.insert("assigned_to".to_string(), assigned_to.clone());
+        }
+        if let Some(extra) = extra {
+            for (k, v) in extra {
+                payload.insert(k.clone(), v.clone());
+            }
+        }
+        world
+            .send_event(event, serde_json::Value::Object(payload))
+            .ok();
+    }
 }
 
 impl System for JobSystem {
@@ -287,36 +376,26 @@ impl System for JobSystem {
                 if matches!(new_status, "complete" | "failed" | "cancelled") {
                     self.cleanup_agent_on_job_status(world, &new_job);
                 }
-                if new_status == "complete" {
-                    let event = json!({
-                        "entity": eid,
-                        "job_type": new_job.get("job_type").cloned().unwrap_or(json!(null))
-                    });
-                    let _ = world.send_event("job_completed", event);
-
-                    if let Some(obj) = new_job.as_object_mut() {
-                        Self::process_job_effects(world, eid, &job_type, obj, false);
+                match new_status {
+                    "complete" => {
+                        Self::emit_job_event(world, "job_completed", &new_job, None);
+                        if let Some(obj) = new_job.as_object_mut() {
+                            Self::process_job_effects(world, eid, &job_type, obj, false);
+                        }
                     }
-                } else if new_status == "failed" {
-                    let event = json!({
-                        "entity": eid,
-                        "job_type": new_job.get("job_type").cloned().unwrap_or(json!(null))
-                    });
-                    let _ = world.send_event("job_failed", event);
-
-                    if let Some(obj) = new_job.as_object_mut() {
-                        Self::process_job_effects(world, eid, &job_type, obj, true);
+                    "failed" => {
+                        Self::emit_job_event(world, "job_failed", &new_job, None);
+                        if let Some(obj) = new_job.as_object_mut() {
+                            Self::process_job_effects(world, eid, &job_type, obj, true);
+                        }
                     }
-                } else if new_status == "cancelled" {
-                    let event = json!({
-                        "entity": eid,
-                        "job_type": new_job.get("job_type").cloned().unwrap_or(json!(null))
-                    });
-                    let _ = world.send_event("job_cancelled", event);
-
-                    if let Some(obj) = new_job.as_object_mut() {
-                        Self::process_job_effects(world, eid, &job_type, obj, true);
+                    "cancelled" => {
+                        Self::emit_job_event(world, "job_cancelled", &new_job, None);
+                        if let Some(obj) = new_job.as_object_mut() {
+                            Self::process_job_effects(world, eid, &job_type, obj, true);
+                        }
                     }
+                    _ => {}
                 }
             }
             world.set_component(eid, "Job", new_job).unwrap();

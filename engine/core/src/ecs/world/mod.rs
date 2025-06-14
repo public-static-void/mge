@@ -14,6 +14,7 @@ mod events;
 mod map;
 mod mode;
 mod resources;
+pub mod job_handlers;
 mod save_load;
 mod systems;
 pub mod wasm;
