@@ -67,6 +67,12 @@ fn test_scripted_effect_handler_invoked() {
     EffectProcessorRegistry::process_effects_arc(&effect_proc, &mut world, eid, &effects);
 
     let scripted = world.get_component(eid, "Scripted").unwrap();
-    assert_eq!(scripted["ran"], true, "Scripted component should have ran=true");
-    assert_eq!(scripted["param"], "test", "Scripted component should have param='test'");
+    assert_eq!(
+        scripted["ran"], true,
+        "Scripted component should have ran=true"
+    );
+    assert_eq!(
+        scripted["param"], "test",
+        "Scripted component should have param='test'"
+    );
 }
