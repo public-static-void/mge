@@ -1,29 +1,21 @@
-use engine_core::ecs::World;
+#[path = "helpers/world.rs"]
+mod world_helper;
+use world_helper::make_test_world;
+
+#[path = "helpers/world_io.rs"]
+mod world_io_helper;
+use world_io_helper::save_and_load_roundtrip;
+
 use engine_core::ecs::components::position::{Position, PositionComponent};
-use engine_core::ecs::registry::ComponentRegistry;
-use std::sync::{Arc, Mutex};
-use tempfile::NamedTempFile;
 
 #[test]
-fn save_and_load_world_roundtrip() {
-    // Setup registry and load schemas
-    let mut registry = ComponentRegistry::new();
+fn test_save_and_load_world_roundtrip() {
+    let world = make_test_world();
+    let registry = world.registry.clone();
 
-    // Load all JSON schemas from the directory
-    let schema_dir = std::path::Path::new("../assets/schemas");
-    for entry in std::fs::read_dir(schema_dir).unwrap() {
-        let path = entry.unwrap().path();
-        if path.extension().map(|e| e == "json").unwrap_or(false) {
-            let json = std::fs::read_to_string(&path).unwrap();
-            registry.register_external_schema_from_json(&json).unwrap();
-        }
-    }
-    let registry = Arc::new(Mutex::new(registry));
-
-    let mut world = World::new(registry.clone());
+    let mut world = world;
     world.current_mode = "roguelike".to_string();
 
-    // Spawn entities and set components
     let e1 = world.spawn_entity();
     world
         .set_component(
@@ -41,14 +33,8 @@ fn save_and_load_world_roundtrip() {
         .set_component(e2, "Position", serde_json::to_value(&pos).unwrap())
         .unwrap();
 
-    // Save world to file
-    let file = NamedTempFile::new().unwrap();
-    world.save_to_file(file.path()).unwrap();
+    let loaded_world = save_and_load_roundtrip(&world, registry);
 
-    // Load world from file
-    let loaded_world = World::load_from_file(file.path(), registry.clone()).unwrap();
-
-    // Assert entities/components are identical
     assert_eq!(world.entities, loaded_world.entities);
     assert_eq!(
         world.get_component(e1, "Health"),

@@ -1,77 +1,17 @@
-use engine_core::config::GameConfig;
-use engine_core::ecs::registry::ComponentRegistry;
-use engine_core::ecs::schema::load_schemas_from_dir_with_modes;
-use engine_core::ecs::world::World;
-use engine_core::mods::loader::ModScriptEngine;
+#[path = "helpers/world.rs"]
+mod world_helper;
+use world_helper::make_test_world;
+
+use engine_core::map::{Map, SquareGridMap};
 use engine_core::systems::death_decay::{ProcessDeaths, ProcessDecay};
-use std::cell::RefCell;
-use std::rc::Rc;
-use std::sync::{Arc, Mutex};
+use serde_json::json;
 
-fn setup_registry() -> Arc<Mutex<ComponentRegistry>> {
-    let config = GameConfig::load_from_file(
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../game.toml"),
-    )
-    .expect("Failed to load config");
-    let schema_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap() + "/../assets/schemas";
-    let schemas = load_schemas_from_dir_with_modes(&schema_dir, &config.allowed_modes)
-        .expect("Failed to load schemas");
-    let mut registry = ComponentRegistry::new();
-    for (_name, schema) in schemas {
-        registry.register_external_schema(schema);
-    }
-    Arc::new(Mutex::new(registry))
-}
-
-pub fn scripting_tick_test<E: ModScriptEngine>(mut engine: E) {
-    let registry = setup_registry();
-    let world = Rc::new(RefCell::new(World::new(registry.clone())));
-    world.borrow_mut().current_mode = "colony".to_string();
-
-    use engine_core::map::{Map, SquareGridMap};
-    let mut grid = SquareGridMap::new();
-    grid.add_cell(0, 0, 0); // initial
-    grid.add_cell(1, 0, 0); // after move
-    world.borrow_mut().map = Some(Map::new(Box::new(grid)));
-
-    let script = r#"
-        local id = spawn_entity()
-        set_component(id, "Position", { pos = { Square = { x = 0, y = 0, z = 0 } } })
-        set_component(id, "Health", { current = 10.0, max = 10.0 })
-        -- Move all: increment x for all entities with Position (Square)
-        for _, eid in ipairs(get_entities_with_component("Position")) do
-            local pos = get_component(eid, "Position")
-            if pos.pos and pos.pos.Square then
-                pos.pos.Square.x = pos.pos.Square.x + 1
-                set_component(eid, "Position", pos)
-            end
-        end
-        -- Damage all: decrement health for all entities with Health
-        for _, eid in ipairs(get_entities_with_component("Health")) do
-            local h = get_component(eid, "Health")
-            h.current = h.current - 1.0
-            set_component(eid, "Health", h)
-        end
-        tick()
-        local pos = get_component(id, "Position")
-        local health = get_component(id, "Health")
-        assert(math.abs(pos.pos.Square.x - 1.0) < 1e-6)
-        assert(math.abs(health.current - 9.0) < 1e-6)
-        assert(get_turn() == 1)
-    "#;
-
-    engine.run_script(script).unwrap();
-}
-
-// The rest of this file can contain pure core tests as before.
 #[test]
 fn test_tick_advances_turn_and_runs_systems() {
-    let registry = setup_registry();
-    let mut world = World::new(registry.clone());
+    let mut world = make_test_world();
     world.current_mode = "colony".to_string();
 
     // Add map with both the initial and target cells
-    use engine_core::map::{Map, SquareGridMap};
     let mut grid = SquareGridMap::new();
     grid.add_cell(1, 2, 0); // initial
     grid.add_cell(2, 2, 0); // after move
@@ -82,15 +22,11 @@ fn test_tick_advances_turn_and_runs_systems() {
         .set_component(
             id,
             "Position",
-            serde_json::json!({ "pos": { "Square": { "x": 1, "y": 2, "z": 0 } } }),
+            json!({ "pos": { "Square": { "x": 1, "y": 2, "z": 0 } } }),
         )
         .unwrap();
     world
-        .set_component(
-            id,
-            "Health",
-            serde_json::json!({ "current": 10.0, "max": 10.0 }),
-        )
+        .set_component(id, "Health", json!({ "current": 10.0, "max": 10.0 }))
         .unwrap();
 
     // Move all: increment x for all entities with Position (Square)
@@ -101,7 +37,7 @@ fn test_tick_advances_turn_and_runs_systems() {
                     if let Some(square) = pos.get_mut("Square") {
                         if let Some(x) = square.get_mut("x") {
                             if let Some(x_val) = x.as_i64() {
-                                *x = serde_json::json!(x_val + 1);
+                                *x = json!(x_val + 1);
                             }
                         }
                     }
@@ -116,7 +52,7 @@ fn test_tick_advances_turn_and_runs_systems() {
                 if let Some(current) = obj.get_mut("current") {
                     if let Some(cur_val) = current.as_f64() {
                         let new_val = (cur_val - 1.0).max(0.0);
-                        *current = serde_json::json!(new_val);
+                        *current = json!(new_val);
                     }
                 }
             }
