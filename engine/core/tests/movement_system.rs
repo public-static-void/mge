@@ -1,35 +1,20 @@
-use engine_core::config::GameConfig;
+#[path = "helpers/world.rs"]
+mod world_helper;
+use world_helper::make_test_world;
+
 use engine_core::ecs::components::position::{Position, PositionComponent};
-use engine_core::ecs::registry::ComponentRegistry;
-use engine_core::ecs::schema::load_schemas_from_dir_with_modes;
-use engine_core::ecs::world::World;
 use engine_core::map::{HexGridMap, Map, RegionMap, SquareGridMap};
-use std::sync::{Arc, Mutex};
 
 #[test]
 fn test_move_all_moves_positions() {
-    let config = GameConfig::load_from_file(
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../game.toml"),
-    )
-    .expect("Failed to load config");
-    let schema_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap() + "/../assets/schemas";
-    let schemas = load_schemas_from_dir_with_modes(&schema_dir, &config.allowed_modes)
-        .expect("Failed to load schemas");
-    let mut registry = ComponentRegistry::new();
-    for (_name, schema) in schemas {
-        registry.register_external_schema(schema);
-    }
-    let registry = Arc::new(Mutex::new(registry));
-    let mut world = World::new(registry.clone());
-    world.current_mode = "colony".to_string();
-
-    // Setup map with both the original and target squares
+    let mut world = make_test_world();
     let mut grid = SquareGridMap::new();
-    grid.add_cell(1, 2, 0); // initial pos1
-    grid.add_cell(2, 1, 0); // target pos1
-    grid.add_cell(5, 7, 0); // initial pos2
-    grid.add_cell(6, 6, 0); // target pos2
+    grid.add_cell(1, 2, 0);
+    grid.add_cell(2, 1, 0);
+    grid.add_cell(5, 7, 0);
+    grid.add_cell(6, 6, 0);
     world.map = Some(Map::new(Box::new(grid)));
+    world.current_mode = "colony".to_string();
 
     let id1 = world.spawn_entity();
     let id2 = world.spawn_entity();
@@ -47,7 +32,6 @@ fn test_move_all_moves_positions() {
         .set_component(id2, "Position", serde_json::to_value(&pos2).unwrap())
         .unwrap();
 
-    // Batch move: increment x by 1, y by -1 for all Square positions
     if let Some(positions) = world.components.get_mut("Position") {
         for (_eid, value) in positions.iter_mut() {
             if let Ok(mut pos_comp) = serde_json::from_value::<PositionComponent>(value.clone()) {
@@ -70,31 +54,14 @@ fn test_move_all_moves_positions() {
     assert_eq!(pos2.pos, Position::Square { x: 6, y: 6, z: 0 });
 }
 
-fn setup_world_with_map(map: Map) -> World {
-    let config = GameConfig::load_from_file(
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../game.toml"),
-    )
-    .expect("Failed to load config");
-    let schema_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap() + "/../assets/schemas";
-    let schemas = load_schemas_from_dir_with_modes(&schema_dir, &config.allowed_modes)
-        .expect("Failed to load schemas");
-    let mut registry = ComponentRegistry::new();
-    for (_name, schema) in schemas {
-        registry.register_external_schema(schema);
-    }
-    let registry = std::sync::Arc::new(std::sync::Mutex::new(registry));
-    let mut world = World::new(registry);
-    world.map = Some(map);
-    world
-}
-
 #[test]
 fn test_move_all_square() {
+    let mut world = make_test_world();
     let mut grid = SquareGridMap::new();
     grid.add_cell(0, 0, 0);
     grid.add_cell(1, 0, 0);
     grid.add_neighbor((0, 0, 0), (1, 0, 0));
-    let mut world = setup_world_with_map(Map::new(Box::new(grid)));
+    world.map = Some(Map::new(Box::new(grid)));
 
     let entity = world.spawn_entity();
     let pos = PositionComponent {
@@ -104,7 +71,6 @@ fn test_move_all_square() {
         .set_component(entity, "Position", serde_json::to_value(&pos).unwrap())
         .unwrap();
 
-    // Move all entities with Position (Square) by dx=1, dy=0, dz=0
     if let Some(positions) = world.components.get_mut("Position") {
         for (_eid, value) in positions.iter_mut() {
             if let Ok(mut pos_comp) = serde_json::from_value::<PositionComponent>(value.clone()) {
@@ -124,11 +90,12 @@ fn test_move_all_square() {
 
 #[test]
 fn test_move_all_hex() {
+    let mut world = make_test_world();
     let mut grid = HexGridMap::new();
     grid.add_cell(0, 0, 0);
     grid.add_cell(1, 0, 0);
     grid.add_neighbor((0, 0, 0), (1, 0, 0));
-    let mut world = setup_world_with_map(Map::new(Box::new(grid)));
+    world.map = Some(Map::new(Box::new(grid)));
 
     let entity = world.spawn_entity();
     let pos = PositionComponent {
@@ -138,7 +105,6 @@ fn test_move_all_hex() {
         .set_component(entity, "Position", serde_json::to_value(&pos).unwrap())
         .unwrap();
 
-    // Move all entities with Position (Hex) by dq=1, dr=0, dz=0
     if let Some(positions) = world.components.get_mut("Position") {
         for (_eid, value) in positions.iter_mut() {
             if let Ok(mut pos_comp) = serde_json::from_value::<PositionComponent>(value.clone()) {
@@ -158,11 +124,12 @@ fn test_move_all_hex() {
 
 #[test]
 fn test_move_all_region() {
+    let mut world = make_test_world();
     let mut grid = RegionMap::new();
     grid.add_cell("A");
     grid.add_cell("B");
     grid.add_neighbor("A", "B");
-    let mut world = setup_world_with_map(Map::new(Box::new(grid)));
+    world.map = Some(Map::new(Box::new(grid)));
 
     let entity = world.spawn_entity();
     let pos = PositionComponent {
@@ -172,7 +139,6 @@ fn test_move_all_region() {
         .set_component(entity, "Position", serde_json::to_value(&pos).unwrap())
         .unwrap();
 
-    // Move all entities with Position (Region) to id "B"
     if let Some(positions) = world.components.get_mut("Position") {
         for (_eid, value) in positions.iter_mut() {
             if let Ok(mut pos_comp) = serde_json::from_value::<PositionComponent>(value.clone()) {
