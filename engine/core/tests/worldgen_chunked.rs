@@ -1,44 +1,9 @@
-use engine_core::config::GameConfig;
+#[path = "helpers/worldgen.rs"]
+mod worldgen_helper;
+use worldgen_helper::setup_registry_with_c_plugin;
+
 use engine_core::map::Map;
-use engine_core::plugins::loader::load_native_plugins_from_config;
-use engine_core::plugins::types::EngineApi;
-use engine_core::worldgen::WorldgenRegistry;
 use serde_json::json;
-use std::os::raw::{c_char, c_void};
-use std::path::Path;
-
-unsafe extern "C" fn test_spawn_entity(_world: *mut c_void) -> u32 {
-    0
-}
-
-unsafe extern "C" fn test_set_component(
-    _world: *mut c_void,
-    _entity: u32,
-    _name: *const c_char,
-    _json_value: *const c_char,
-) -> i32 {
-    0
-}
-
-fn setup_registry_with_c_plugin() -> WorldgenRegistry {
-    let mut registry = WorldgenRegistry::new();
-
-    let mut engine_api = EngineApi {
-        spawn_entity: test_spawn_entity,
-        set_component: test_set_component,
-    };
-    let world_ptr = std::ptr::null_mut();
-
-    // Load config and register all plugins listed there
-    let config =
-        GameConfig::load_from_file(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../game.toml"))
-            .expect("Failed to load config");
-
-    unsafe { load_native_plugins_from_config(&config, &mut engine_api, world_ptr, &mut registry) }
-        .expect("Failed to load native plugins from config");
-
-    registry
-}
 
 #[test]
 fn test_generate_and_apply_chunk() {
