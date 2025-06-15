@@ -1,30 +1,14 @@
-use engine_core::ecs::system::System;
-use engine_core::ecs::world::World;
-use engine_core::systems::job::{JobSystem, assign_jobs};
-use engine_core::systems::job_board::JobBoard;
-use serde_json::json;
-use std::sync::{Arc, Mutex};
+#[path = "helpers/world.rs"]
+mod world_helper;
 
-/// Helper to register all schemas needed for these tests
-fn setup_registry() -> Arc<Mutex<engine_core::ecs::registry::ComponentRegistry>> {
-    let mut registry = engine_core::ecs::registry::ComponentRegistry::default();
-    registry.register_external_schema(engine_core::ecs::schema::ComponentSchema {
-        name: "Agent".to_string(),
-        schema: serde_json::json!({ "type": "object" }),
-        modes: vec!["colony".to_string()],
-    });
-    registry.register_external_schema(engine_core::ecs::schema::ComponentSchema {
-        name: "Job".to_string(),
-        schema: serde_json::json!({ "type": "object" }),
-        modes: vec!["colony".to_string()],
-    });
-    Arc::new(Mutex::new(registry))
-}
+use engine_core::ecs::system::System;
+use engine_core::systems::job::job_board::JobBoard;
+use engine_core::systems::job::{JobSystem, assign_jobs};
+use serde_json::json;
 
 #[test]
 fn test_agent_state_and_job_completion() {
-    let registry = setup_registry();
-    let mut world = World::new(registry);
+    let mut world = world_helper::make_test_world();
 
     world
         .set_component(
@@ -48,7 +32,8 @@ fn test_agent_state_and_job_completion() {
                 "id": 100,
                 "job_type": "dig",
                 "status": "pending",
-                "priority": 1
+                "priority": 1,
+                "category": "mining"
             }),
         )
         .unwrap();
@@ -62,9 +47,15 @@ fn test_agent_state_and_job_completion() {
     let agent = world.get_component(1, "Agent").unwrap();
     let job = world.get_component(100, "Job").unwrap();
 
-    assert_eq!(agent["current_job"], 100);
-    assert_eq!(agent["state"], "working");
-    assert_eq!(job["assigned_to"], 1);
+    assert_eq!(
+        agent["current_job"], 100,
+        "Agent should be assigned job 100"
+    );
+    assert_eq!(agent["state"], "working", "Agent should be working");
+    assert_eq!(
+        job["assigned_to"], 1,
+        "Job 100 should be assigned to agent 1"
+    );
 
     // Let the system process the job to completion
     let mut job_system = JobSystem;
@@ -77,14 +68,19 @@ fn test_agent_state_and_job_completion() {
     }
 
     let agent = world.get_component(1, "Agent").unwrap();
-    assert!(agent.get("current_job").is_none());
-    assert_eq!(agent["state"], "idle");
+    assert!(
+        agent.get("current_job").is_none(),
+        "Agent should have no current job after completion"
+    );
+    assert_eq!(
+        agent["state"], "idle",
+        "Agent should be idle after completion"
+    );
 }
 
 #[test]
 fn test_job_preemption_and_reassignment() {
-    let registry = setup_registry();
-    let mut world = World::new(registry);
+    let mut world = world_helper::make_test_world();
 
     world
         .set_component(
@@ -109,7 +105,8 @@ fn test_job_preemption_and_reassignment() {
                 "id": 100,
                 "job_type": "dig",
                 "status": "pending",
-                "priority": 1
+                "priority": 1,
+                "category": "mining"
             }),
         )
         .unwrap();
@@ -123,9 +120,15 @@ fn test_job_preemption_and_reassignment() {
     {
         let agent = world.get_component(1, "Agent").unwrap();
         let job = world.get_component(100, "Job").unwrap();
-        assert_eq!(agent["current_job"], 100);
-        assert_eq!(agent["state"], "working");
-        assert_eq!(job["assigned_to"], 1);
+        assert_eq!(
+            agent["current_job"], 100,
+            "Agent should be assigned job 100"
+        );
+        assert_eq!(agent["state"], "working", "Agent should be working");
+        assert_eq!(
+            job["assigned_to"], 1,
+            "Job 100 should be assigned to agent 1"
+        );
     }
 
     // Now, a higher-priority job appears
@@ -137,7 +140,8 @@ fn test_job_preemption_and_reassignment() {
                 "id": 200,
                 "job_type": "dig",
                 "status": "pending",
-                "priority": 10
+                "priority": 10,
+                "category": "mining"
             }),
         )
         .unwrap();
@@ -152,13 +156,22 @@ fn test_job_preemption_and_reassignment() {
         let job200 = world.get_component(200, "Job").unwrap();
 
         // The agent should now be working on job 200 (preemption)
-        assert_eq!(agent["current_job"], 200);
-        assert_eq!(agent["state"], "working");
-        assert_eq!(job200["assigned_to"], 1);
+        assert_eq!(
+            agent["current_job"], 200,
+            "Agent should be assigned job 200 (preemption)"
+        );
+        assert_eq!(agent["state"], "working", "Agent should be working");
+        assert_eq!(
+            job200["assigned_to"], 1,
+            "Job 200 should be assigned to agent 1"
+        );
 
         // Job 100 should be unassigned and set to pending
-        assert!(job100.get("assigned_to").is_none());
-        assert_eq!(job100["status"], "pending");
+        assert!(
+            job100.get("assigned_to").is_none(),
+            "Job 100 should be unassigned"
+        );
+        assert_eq!(job100["status"], "pending", "Job 100 should be pending");
     }
 
     // Simulate job 200 completion and agent becoming idle
@@ -183,8 +196,14 @@ fn test_job_preemption_and_reassignment() {
         let job100 = world.get_component(100, "Job").unwrap();
 
         // The agent should now be reassigned to job 100
-        assert_eq!(agent["current_job"], 100);
-        assert_eq!(agent["state"], "working");
-        assert_eq!(job100["assigned_to"], 1);
+        assert_eq!(
+            agent["current_job"], 100,
+            "Agent should be reassigned to job 100"
+        );
+        assert_eq!(agent["state"], "working", "Agent should be working");
+        assert_eq!(
+            job100["assigned_to"], 1,
+            "Job 100 should be assigned to agent 1"
+        );
     }
 }

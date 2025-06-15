@@ -1,33 +1,14 @@
-use std::path::Path;
-use std::sync::{Arc, Mutex};
+#[path = "helpers/world.rs"]
+mod world_helper;
 
-use engine_core::config::GameConfig;
-use engine_core::ecs::registry::ComponentRegistry;
-use engine_core::ecs::schema::load_schemas_from_dir_with_modes;
 use engine_core::ecs::system::System;
-use engine_core::ecs::world::World;
+use engine_core::systems::job::job_board::JobBoard;
 use engine_core::systems::job::{JobSystem, assign_jobs};
-use engine_core::systems::job_board::JobBoard;
 use serde_json::json;
-
-fn setup_registry() -> Arc<Mutex<ComponentRegistry>> {
-    let config =
-        GameConfig::load_from_file(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../game.toml"))
-            .expect("Failed to load config");
-    let schema_dir = "../../engine/assets/schemas";
-    let schemas = load_schemas_from_dir_with_modes(schema_dir, &config.allowed_modes)
-        .expect("Failed to load schemas");
-    let mut registry = ComponentRegistry::new();
-    for (_name, schema) in schemas {
-        registry.register_external_schema(schema);
-    }
-    Arc::new(Mutex::new(registry))
-}
 
 #[test]
 fn test_job_progressed_event_emitted_on_progress_change() {
-    let registry = setup_registry();
-    let mut world = World::new(registry);
+    let mut world = world_helper::make_test_world();
 
     // Agent and job setup
     world
@@ -81,9 +62,16 @@ fn test_job_progressed_event_emitted_on_progress_change() {
     // There should be at least one progress event, and all should have correct entity and progress
     assert!(!all_events.is_empty(), "No job_progressed events emitted");
     for event in &all_events {
-        assert_eq!(event.get("entity").and_then(|v| v.as_u64()), Some(100));
-        assert!(event.get("progress").is_some());
-        assert!(event.get("status").is_some());
+        assert_eq!(
+            event.get("entity").and_then(|v| v.as_u64()),
+            Some(100),
+            "Event should reference job entity 100"
+        );
+        assert!(
+            event.get("progress").is_some(),
+            "Event should have progress"
+        );
+        assert!(event.get("status").is_some(), "Event should have status");
     }
 
     // There should be no duplicate events for the same progress value
@@ -101,8 +89,7 @@ fn test_job_progressed_event_emitted_on_progress_change() {
 
 #[test]
 fn test_job_progressed_event_emitted_for_custom_handler() {
-    let registry = setup_registry();
-    let mut world = World::new(registry);
+    let mut world = world_helper::make_test_world();
 
     // Register a custom handler that sets progress in two steps
     world.register_job_handler(
@@ -173,6 +160,12 @@ fn test_job_progressed_event_emitted_for_custom_handler() {
         .iter()
         .map(|e| e.get("progress").and_then(|v| v.as_f64()).unwrap())
         .collect();
-    assert!(progresses.contains(&1.0));
-    assert!(progresses.contains(&2.0));
+    assert!(
+        progresses.contains(&1.0),
+        "Should have progress event for 1.0"
+    );
+    assert!(
+        progresses.contains(&2.0),
+        "Should have progress event for 2.0"
+    );
 }

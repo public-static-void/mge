@@ -1,31 +1,13 @@
-use engine_core::config::GameConfig;
-use engine_core::ecs::ComponentRegistry;
-use engine_core::ecs::schema::load_schemas_from_dir_with_modes;
-use engine_core::ecs::world::World;
-use engine_core::systems::job::priority_aging::JobPriorityAgingSystem;
-use engine_core::systems::job_board::{JobAssignmentResult, JobBoard};
-use serde_json::json;
-use std::path::Path;
-use std::sync::{Arc, Mutex};
+#[path = "helpers/world.rs"]
+mod world_helper;
 
-fn setup_world() -> World {
-    let config =
-        GameConfig::load_from_file(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../game.toml"))
-            .expect("Failed to load config");
-    let schema_dir = "../../engine/assets/schemas";
-    let schemas = load_schemas_from_dir_with_modes(schema_dir, &config.allowed_modes)
-        .expect("Failed to load schemas");
-    let mut registry = ComponentRegistry::new();
-    for (_name, schema) in schemas {
-        registry.register_external_schema(schema);
-    }
-    let registry = Arc::new(Mutex::new(registry));
-    World::new(registry)
-}
+use engine_core::systems::job::job_board::{JobAssignmentResult, JobBoard};
+use engine_core::systems::job::priority_aging::JobPriorityAgingSystem;
+use serde_json::json;
 
 #[test]
-fn high_priority_job_is_assigned_first() {
-    let mut world = setup_world();
+fn test_high_priority_job_is_assigned_first() {
+    let mut world = world_helper::make_test_world();
 
     let high_eid = world.spawn_entity();
     let low_eid = world.spawn_entity();
@@ -69,7 +51,6 @@ fn high_priority_job_is_assigned_first() {
         )
         .unwrap();
 
-    // Update priorities for tick 0
     let mut aging_system = JobPriorityAgingSystem::new();
     aging_system.run(&mut world, 0);
 
@@ -80,8 +61,8 @@ fn high_priority_job_is_assigned_first() {
 }
 
 #[test]
-fn low_priority_job_is_assigned_after_aging() {
-    let mut world = setup_world();
+fn test_low_priority_job_is_assigned_after_aging() {
+    let mut world = world_helper::make_test_world();
 
     let high_eid = world.spawn_entity();
     let low_eid = world.spawn_entity();
@@ -125,7 +106,6 @@ fn low_priority_job_is_assigned_after_aging() {
         )
         .unwrap();
 
-    // Assign and complete the high-priority job
     let mut aging_system = JobPriorityAgingSystem::new();
     aging_system.run(&mut world, 0);
     let mut job_board = JobBoard::default();
@@ -139,7 +119,6 @@ fn low_priority_job_is_assigned_after_aging() {
     agent["state"] = json!("idle");
     world.set_component(agent_eid, "Agent", agent).unwrap();
 
-    // Simulate many ticks to age the low-priority job
     let mut assigned = false;
     for tick in 1..=200 {
         aging_system.run(&mut world, tick);
@@ -149,7 +128,6 @@ fn low_priority_job_is_assigned_after_aging() {
             assigned = true;
             break;
         }
-        // Reset agent to idle for next tick
         let mut agent = world.get_component(agent_eid, "Agent").unwrap().clone();
         agent["state"] = json!("idle");
         world.set_component(agent_eid, "Agent", agent).unwrap();
@@ -158,8 +136,8 @@ fn low_priority_job_is_assigned_after_aging() {
 }
 
 #[test]
-fn job_priority_can_be_bumped_by_world_event() {
-    let mut world = setup_world();
+fn test_job_priority_can_be_bumped_by_world_event() {
+    let mut world = world_helper::make_test_world();
 
     let job_eid = world.spawn_entity();
     world
@@ -186,12 +164,10 @@ fn job_priority_can_be_bumped_by_world_event() {
         )
         .unwrap();
 
-    // Simulate a world event that bumps the job's priority
     let mut job = world.get_component(job_eid, "Job").unwrap().clone();
     job["priority"] = json!(1000);
     world.set_component(job_eid, "Job", job).unwrap();
 
-    // Recompute effective priorities
     let mut aging_system = JobPriorityAgingSystem::new();
     aging_system.run(&mut world, 1);
 
@@ -202,14 +178,13 @@ fn job_priority_can_be_bumped_by_world_event() {
 }
 
 #[test]
-fn jobs_get_priority_boost_on_resource_shortage_event() {
+fn test_jobs_get_priority_boost_on_resource_shortage_event() {
+    use engine_core::systems::job::job_board::{JobAssignmentResult, JobBoard};
     use engine_core::systems::job::priority_aging::JobPriorityAgingSystem;
-    use engine_core::systems::job_board::{JobAssignmentResult, JobBoard};
     use serde_json::json;
 
-    let mut world = setup_world();
+    let mut world = world_helper::make_test_world();
 
-    // Add a stockpile with enough wood and stone
     let stockpile_eid = world.spawn_entity();
     world
         .set_component(
@@ -219,7 +194,6 @@ fn jobs_get_priority_boost_on_resource_shortage_event() {
         )
         .unwrap();
 
-    // Agent
     let agent_eid = world.spawn_entity();
     world
         .set_component(
@@ -229,7 +203,6 @@ fn jobs_get_priority_boost_on_resource_shortage_event() {
         )
         .unwrap();
 
-    // Two jobs: one needs "wood", one needs "stone"
     let wood_job_eid = world.spawn_entity();
     world
         .set_component(
@@ -264,29 +237,23 @@ fn jobs_get_priority_boost_on_resource_shortage_event() {
         )
         .unwrap();
 
-    // Run resource reservation system so jobs can be reserved
     let mut reservation_system =
         engine_core::systems::job::resource_reservation::ResourceReservationSystem::new();
     reservation_system.run(&mut world, None);
 
-    // Emit a resource shortage event for "wood"
     world
         .send_event("resource_shortage", json!({ "kind": "wood" }))
         .unwrap();
 
-    // DELIVER THE EVENT so it will be seen by the aging system
     world.update_event_buses::<serde_json::Value>();
 
-    // Run priority aging system to process the event and apply boost
     let mut aging_system = JobPriorityAgingSystem::new();
     aging_system.run(&mut world, 1);
 
-    // Update job board and assign jobs
     let mut job_board = JobBoard::default();
     job_board.update(&world);
     let result = job_board.claim_job(agent_eid, &mut world, 1);
 
-    // The wood job should get a priority boost and be assigned
     assert_eq!(result, JobAssignmentResult::Assigned(wood_job_eid));
 
     let wood_job_effective = world

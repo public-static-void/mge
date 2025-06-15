@@ -1,28 +1,13 @@
+#[path = "helpers/world.rs"]
+mod world_helper;
+
 use engine_core::ecs::system::System;
-use engine_core::ecs::world::World;
 use engine_core::systems::job::system::JobSystem;
 use serde_json::json;
-use std::sync::{Arc, Mutex};
-
-fn setup_world() -> World {
-    let mut registry = engine_core::ecs::registry::ComponentRegistry::default();
-    registry.register_external_schema(engine_core::ecs::schema::ComponentSchema {
-        name: "Agent".to_string(),
-        schema: serde_json::json!({ "type": "object" }),
-        modes: vec!["colony".to_string()],
-    });
-    registry.register_external_schema(engine_core::ecs::schema::ComponentSchema {
-        name: "Job".to_string(),
-        schema: serde_json::json!({ "type": "object" }),
-        modes: vec!["colony".to_string()],
-    });
-    let registry = Arc::new(Mutex::new(registry));
-    World::new(registry)
-}
 
 #[test]
 fn test_job_progress_depends_on_agent_skill() {
-    let mut world = setup_world();
+    let mut world = world_helper::make_test_world();
 
     // Agent with high skill
     world
@@ -50,7 +35,8 @@ fn test_job_progress_depends_on_agent_skill() {
                 "job_type": "dig",
                 "progress": 0.0,
                 "status": "in_progress",
-                "assigned_to": 1
+                "assigned_to": 1,
+                "category": "mining"
             }),
         )
         .unwrap();
@@ -71,7 +57,7 @@ fn test_job_progress_depends_on_agent_skill() {
 
 #[test]
 fn test_job_progress_slow_with_low_stamina() {
-    let mut world = setup_world();
+    let mut world = world_helper::make_test_world();
 
     // Agent with skill but low stamina
     world
@@ -99,7 +85,8 @@ fn test_job_progress_slow_with_low_stamina() {
                 "job_type": "dig",
                 "progress": 0.0,
                 "status": "in_progress",
-                "assigned_to": 2
+                "assigned_to": 2,
+                "category": "mining"
             }),
         )
         .unwrap();
@@ -117,7 +104,7 @@ fn test_job_progress_slow_with_low_stamina() {
 
 #[test]
 fn test_job_completes_when_progress_threshold_met() {
-    let mut world = setup_world();
+    let mut world = world_helper::make_test_world();
 
     // Agent with moderate skill
     world
@@ -145,7 +132,8 @@ fn test_job_completes_when_progress_threshold_met() {
                 "job_type": "dig",
                 "progress": 2.5,
                 "status": "in_progress",
-                "assigned_to": 3
+                "assigned_to": 3,
+                "category": "mining"
             }),
         )
         .unwrap();
