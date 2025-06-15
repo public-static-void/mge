@@ -1,18 +1,12 @@
+#[path = "helpers/world.rs"]
+mod world_helper;
+
+use engine_core::systems::equipment_logic::EquipmentLogicSystem;
+use serde_json::json;
+
 #[test]
-fn can_register_equipment_schema_and_equip_items() {
-    use engine_core::ecs::registry::ComponentRegistry;
-    use engine_core::ecs::world::World;
-    use serde_json::json;
-    use std::sync::{Arc, Mutex};
-
-    let mut registry = ComponentRegistry::new();
-    let equipment_schema_json = include_str!("../../assets/schemas/equipment.json");
-    registry
-        .register_external_schema_from_json(equipment_schema_json)
-        .unwrap();
-    let registry = Arc::new(Mutex::new(registry));
-
-    let mut world = World::new(registry.clone());
+fn test_register_equipment_schema_and_equip_items() {
+    let mut world = world_helper::make_test_world();
     world.current_mode = "roguelike".to_string();
 
     let eid = world.spawn_entity();
@@ -49,28 +43,10 @@ fn can_register_equipment_schema_and_equip_items() {
 }
 
 #[test]
-fn cannot_equip_incompatible_item() {
-    use engine_core::ecs::registry::ComponentRegistry;
-    use engine_core::ecs::world::World;
-    use engine_core::systems::equipment_logic::EquipmentLogicSystem;
-    use serde_json::json;
-    use std::sync::{Arc, Mutex};
-
-    let mut registry = ComponentRegistry::new();
-    let equipment_schema_json = include_str!("../../assets/schemas/equipment.json");
-    let item_schema_json = include_str!("../../assets/schemas/item.json");
-    registry
-        .register_external_schema_from_json(equipment_schema_json)
-        .unwrap();
-    registry
-        .register_external_schema_from_json(item_schema_json)
-        .unwrap();
-    let registry = Arc::new(Mutex::new(registry));
-
-    let mut world = World::new(registry.clone());
+fn test_cannot_equip_incompatible_item() {
+    let mut world = world_helper::make_test_world();
     world.current_mode = "roguelike".to_string();
 
-    // Register the equipment logic system
     world.register_system(EquipmentLogicSystem);
 
     // Create an item that can only go in "head"
@@ -115,25 +91,8 @@ fn cannot_equip_incompatible_item() {
 }
 
 #[test]
-fn equipping_two_handed_weapon_blocks_both_hands() {
-    use engine_core::ecs::registry::ComponentRegistry;
-    use engine_core::ecs::world::World;
-    use engine_core::systems::equipment_logic::EquipmentLogicSystem;
-    use serde_json::json;
-    use std::sync::{Arc, Mutex};
-
-    let mut registry = ComponentRegistry::new();
-    let equipment_schema_json = include_str!("../../assets/schemas/equipment.json");
-    let item_schema_json = include_str!("../../assets/schemas/item.json");
-    registry
-        .register_external_schema_from_json(equipment_schema_json)
-        .unwrap();
-    registry
-        .register_external_schema_from_json(item_schema_json)
-        .unwrap();
-    let registry = Arc::new(Mutex::new(registry));
-
-    let mut world = World::new(registry.clone());
+fn test_equipping_two_handed_weapon_blocks_both_hands() {
+    let mut world = world_helper::make_test_world();
     world.current_mode = "roguelike".to_string();
     world.register_system(EquipmentLogicSystem);
 
@@ -175,25 +134,8 @@ fn equipping_two_handed_weapon_blocks_both_hands() {
 }
 
 #[test]
-fn cannot_equip_two_handed_weapon_if_other_hand_occupied() {
-    use engine_core::ecs::registry::ComponentRegistry;
-    use engine_core::ecs::world::World;
-    use engine_core::systems::equipment_logic::EquipmentLogicSystem;
-    use serde_json::json;
-    use std::sync::{Arc, Mutex};
-
-    let mut registry = ComponentRegistry::new();
-    let equipment_schema_json = include_str!("../../assets/schemas/equipment.json");
-    let item_schema_json = include_str!("../../assets/schemas/item.json");
-    registry
-        .register_external_schema_from_json(equipment_schema_json)
-        .unwrap();
-    registry
-        .register_external_schema_from_json(item_schema_json)
-        .unwrap();
-    let registry = Arc::new(Mutex::new(registry));
-
-    let mut world = World::new(registry.clone());
+fn test_cannot_equip_two_handed_weapon_if_other_hand_occupied() {
+    let mut world = world_helper::make_test_world();
     world.current_mode = "roguelike".to_string();
     world.register_system(EquipmentLogicSystem);
 
@@ -246,29 +188,8 @@ fn cannot_equip_two_handed_weapon_if_other_hand_occupied() {
 }
 
 #[test]
-fn cannot_equip_item_with_unmet_stat_requirement() {
-    use engine_core::ecs::registry::ComponentRegistry;
-    use engine_core::ecs::world::World;
-    use engine_core::systems::equipment_logic::EquipmentLogicSystem;
-    use serde_json::json;
-    use std::sync::{Arc, Mutex};
-
-    let mut registry = ComponentRegistry::new();
-    let equipment_schema_json = include_str!("../../assets/schemas/equipment.json");
-    let item_schema_json = include_str!("../../assets/schemas/item.json");
-    let stats_schema_json = include_str!("../../assets/schemas/stats.json");
-    registry
-        .register_external_schema_from_json(equipment_schema_json)
-        .unwrap();
-    registry
-        .register_external_schema_from_json(item_schema_json)
-        .unwrap();
-    registry
-        .register_external_schema_from_json(stats_schema_json)
-        .unwrap();
-    let registry = Arc::new(Mutex::new(registry));
-
-    let mut world = World::new(registry.clone());
+fn test_cannot_equip_item_with_unmet_stat_requirement() {
+    let mut world = world_helper::make_test_world();
     world.current_mode = "roguelike".to_string();
     world.register_system(EquipmentLogicSystem);
 
@@ -317,29 +238,8 @@ fn cannot_equip_item_with_unmet_stat_requirement() {
 }
 
 #[test]
-fn can_equip_item_with_met_stat_requirement() {
-    use engine_core::ecs::registry::ComponentRegistry;
-    use engine_core::ecs::world::World;
-    use engine_core::systems::equipment_logic::EquipmentLogicSystem;
-    use serde_json::json;
-    use std::sync::{Arc, Mutex};
-
-    let mut registry = ComponentRegistry::new();
-    let equipment_schema_json = include_str!("../../assets/schemas/equipment.json");
-    let item_schema_json = include_str!("../../assets/schemas/item.json");
-    let stats_schema_json = include_str!("../../assets/schemas/stats.json");
-    registry
-        .register_external_schema_from_json(equipment_schema_json)
-        .unwrap();
-    registry
-        .register_external_schema_from_json(item_schema_json)
-        .unwrap();
-    registry
-        .register_external_schema_from_json(stats_schema_json)
-        .unwrap();
-    let registry = Arc::new(Mutex::new(registry));
-
-    let mut world = World::new(registry.clone());
+fn test_can_equip_item_with_met_stat_requirement() {
+    let mut world = world_helper::make_test_world();
     world.current_mode = "roguelike".to_string();
     world.register_system(EquipmentLogicSystem);
 
