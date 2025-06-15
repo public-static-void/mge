@@ -1,33 +1,13 @@
-use engine_core::ecs::world::World;
-use engine_core::systems::job::assign_jobs;
-use engine_core::systems::job_board::JobBoard;
-use serde_json::json;
-use std::sync::{Arc, Mutex};
+#[path = "helpers/world.rs"]
+mod world_helper;
 
-fn setup_registry() -> Arc<Mutex<engine_core::ecs::registry::ComponentRegistry>> {
-    let mut registry = engine_core::ecs::registry::ComponentRegistry::default();
-    registry.register_external_schema(engine_core::ecs::schema::ComponentSchema {
-        name: "Agent".to_string(),
-        schema: serde_json::json!({ "type": "object" }),
-        modes: vec!["colony".to_string()],
-    });
-    registry.register_external_schema(engine_core::ecs::schema::ComponentSchema {
-        name: "Job".to_string(),
-        schema: serde_json::json!({ "type": "object" }),
-        modes: vec!["colony".to_string()],
-    });
-    registry.register_external_schema(engine_core::ecs::schema::ComponentSchema {
-        name: "Stockpile".to_string(),
-        schema: serde_json::json!({ "type": "object" }),
-        modes: vec!["colony".to_string()],
-    });
-    Arc::new(Mutex::new(registry))
-}
+use engine_core::systems::job::assign_jobs;
+use engine_core::systems::job::job_board::JobBoard;
+use serde_json::json;
 
 #[test]
 fn test_ai_job_assignment_priority_and_state() {
-    let registry = setup_registry();
-    let mut world = World::new(registry);
+    let mut world = world_helper::make_test_world();
 
     // Agent 1: idle, high dig skill
     world
@@ -38,7 +18,8 @@ fn test_ai_job_assignment_priority_and_state() {
                 "entity_id": 1,
                 "skills": { "dig": 5.0, "build": 1.0 },
                 "preferences": { "dig": 2.0 },
-                "state": "idle"
+                "state": "idle",
+                "category": "mining"
             }),
         )
         .unwrap();
@@ -53,7 +34,8 @@ fn test_ai_job_assignment_priority_and_state() {
                 "entity_id": 2,
                 "skills": { "dig": 0.0, "build": 6.0 },
                 "preferences": { "build": 2.0 },
-                "state": "idle"
+                "state": "idle",
+                "category": "mining"
             }),
         )
         .unwrap();
@@ -68,7 +50,8 @@ fn test_ai_job_assignment_priority_and_state() {
                 "entity_id": 3,
                 "skills": { "dig": 10.0 },
                 "preferences": { "dig": 10.0 },
-                "state": "working"
+                "state": "working",
+                "category": "mining"
             }),
         )
         .unwrap();
@@ -82,7 +65,8 @@ fn test_ai_job_assignment_priority_and_state() {
             json!({
                 "job_type": "dig",
                 "status": "pending",
-                "priority": 1
+                "priority": 1,
+                "category": "mining"
             }),
         )
         .unwrap();
@@ -96,7 +80,8 @@ fn test_ai_job_assignment_priority_and_state() {
             json!({
                 "job_type": "build",
                 "status": "pending",
-                "priority": 5
+                "priority": 5,
+                "category": "construction"
             }),
         )
         .unwrap();
@@ -110,7 +95,8 @@ fn test_ai_job_assignment_priority_and_state() {
             json!({
                 "job_type": "dig",
                 "status": "pending",
-                "priority": 10
+                "priority": 10,
+                "category": "construction"
             }),
         )
         .unwrap();
@@ -150,8 +136,7 @@ fn test_ai_job_assignment_priority_and_state() {
 
 #[test]
 fn test_agent_job_queue_and_resource_aware_assignment() {
-    let registry = setup_registry();
-    let mut world = World::new(registry);
+    let mut world = world_helper::make_test_world();
 
     world
         .set_component(10, "Stockpile", json!({ "resources": { "wood": 0 } }))
@@ -181,7 +166,8 @@ fn test_agent_job_queue_and_resource_aware_assignment() {
                 "id": 100,
                 "job_type": "dig",
                 "status": "pending",
-                "priority": 1
+                "priority": 1,
+                "category": "mining"
             }),
         )
         .unwrap();
@@ -196,7 +182,8 @@ fn test_agent_job_queue_and_resource_aware_assignment() {
                 "job_type": "build",
                 "status": "pending",
                 "priority": 1,
-                "resource_outputs": [ { "kind": "wood", "amount": 5 } ]
+                "resource_outputs": [ { "kind": "wood", "amount": 5 } ],
+                "category": "construction"
             }),
         )
         .unwrap();
@@ -228,8 +215,7 @@ fn test_agent_job_queue_and_resource_aware_assignment() {
 
 #[test]
 fn test_job_preemption_by_higher_priority() {
-    let registry = setup_registry();
-    let mut world = World::new(registry);
+    let mut world = world_helper::make_test_world();
 
     // Agent: idle, can do both jobs
     world
@@ -254,7 +240,8 @@ fn test_job_preemption_by_higher_priority() {
             json!({
                 "job_type": "dig",
                 "status": "pending",
-                "priority": 1
+                "priority": 1,
+                "category": "mining"
             }),
         )
         .unwrap();
@@ -282,7 +269,8 @@ fn test_job_preemption_by_higher_priority() {
             json!({
                 "job_type": "build",
                 "status": "pending",
-                "priority": 10
+                "priority": 10,
+                "category": "construction"
             }),
         )
         .unwrap();
@@ -310,8 +298,7 @@ fn test_job_preemption_by_higher_priority() {
 
 #[test]
 fn test_agent_abandons_job_if_blocked() {
-    let registry = setup_registry();
-    let mut world = World::new(registry);
+    let mut world = world_helper::make_test_world();
 
     // Agent: working on job 100
     world
@@ -338,7 +325,8 @@ fn test_agent_abandons_job_if_blocked() {
                 "job_type": "dig",
                 "status": "in_progress",
                 "assigned_to": 1,
-                "blocked": true
+                "blocked": true,
+                "category": "mining"
             }),
         )
         .unwrap();
@@ -364,8 +352,7 @@ fn test_agent_abandons_job_if_blocked() {
 
 #[test]
 fn test_dynamic_priority_update_affects_assignment() {
-    let registry = setup_registry();
-    let mut world = World::new(registry);
+    let mut world = world_helper::make_test_world();
 
     // Agent: idle, can do both jobs
     world
@@ -390,7 +377,8 @@ fn test_dynamic_priority_update_affects_assignment() {
             json!({
                 "job_type": "dig",
                 "status": "pending",
-                "priority": 1
+                "priority": 1,
+                "category": "mining"
             }),
         )
         .unwrap();
@@ -404,7 +392,8 @@ fn test_dynamic_priority_update_affects_assignment() {
             json!({
                 "job_type": "build",
                 "status": "pending",
-                "priority": 5
+                "priority": 5,
+                "category": "construction"
             }),
         )
         .unwrap();

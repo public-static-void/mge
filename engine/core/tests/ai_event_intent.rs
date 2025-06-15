@@ -1,29 +1,18 @@
-use engine_core::ecs::world::World;
+use engine_core::systems::job::job_board::JobBoard;
 use engine_core::systems::job::{
     ai_event_reaction_system::AiEventReactionSystem, assign_jobs, setup_ai_event_subscriptions,
 };
-use engine_core::systems::job_board::JobBoard;
 use serde_json::json;
-use std::sync::{Arc, Mutex};
+
+#[path = "helpers/world.rs"]
+mod world_helper;
+use world_helper::make_test_world;
 
 #[test]
 fn test_event_driven_ai_job_enqueue() {
-    // Register Agent and Job schemas for colony mode
-    let mut registry = engine_core::ecs::registry::ComponentRegistry::default();
-    registry.register_external_schema(engine_core::ecs::schema::ComponentSchema {
-        name: "Agent".to_string(),
-        schema: serde_json::json!({ "type": "object" }),
-        modes: vec!["colony".to_string()],
-    });
-    registry.register_external_schema(engine_core::ecs::schema::ComponentSchema {
-        name: "Job".to_string(),
-        schema: serde_json::json!({ "type": "object" }),
-        modes: vec!["colony".to_string()],
-    });
-    let registry = Arc::new(Mutex::new(registry));
-    let mut world = World::new(registry);
+    let mut world = make_test_world();
 
-    // Add an agent using set_component
+    // Add an agent
     world
         .set_component(
             1,
@@ -49,7 +38,8 @@ fn test_event_driven_ai_job_enqueue() {
                 "job_type": "production",
                 "status": "pending",
                 "priority": 1,
-                "resource_outputs": [ { "kind": "wood", "amount": 10 } ]
+                "resource_outputs": [ { "kind": "wood", "amount": 10 } ],
+                "category": "production"
             }),
         )
         .unwrap();
@@ -65,7 +55,7 @@ fn test_event_driven_ai_job_enqueue() {
 
     // Run the AI event reaction system
     let mut system = AiEventReactionSystem;
-    use engine_core::ecs::system::System; // Bring trait into scope for .run()
+    use engine_core::ecs::system::System;
     system.run(&mut world, None);
 
     // Agent's job queue should now contain the production job for wood
@@ -85,22 +75,9 @@ fn test_event_driven_ai_job_enqueue() {
 
 #[test]
 fn test_event_intent_queue_handles_multiple_events() {
-    // Register Agent and Job schemas for colony mode
-    let mut registry = engine_core::ecs::registry::ComponentRegistry::default();
-    registry.register_external_schema(engine_core::ecs::schema::ComponentSchema {
-        name: "Agent".to_string(),
-        schema: serde_json::json!({ "type": "object" }),
-        modes: vec!["colony".to_string()],
-    });
-    registry.register_external_schema(engine_core::ecs::schema::ComponentSchema {
-        name: "Job".to_string(),
-        schema: serde_json::json!({ "type": "object" }),
-        modes: vec!["colony".to_string()],
-    });
-    let registry = Arc::new(Mutex::new(registry));
-    let mut world = World::new(registry);
+    let mut world = make_test_world();
 
-    // Add an agent using set_component
+    // Add an agent
     world
         .set_component(
             2,
@@ -126,7 +103,8 @@ fn test_event_intent_queue_handles_multiple_events() {
                 "job_type": "production",
                 "status": "pending",
                 "priority": 1,
-                "resource_outputs": [ { "kind": "stone", "amount": 5 } ]
+                "resource_outputs": [ { "kind": "stone", "amount": 5 } ],
+                "category": "production"
             }),
         )
         .unwrap();
@@ -141,7 +119,8 @@ fn test_event_intent_queue_handles_multiple_events() {
                 "job_type": "production",
                 "status": "pending",
                 "priority": 1,
-                "resource_outputs": [ { "kind": "wood", "amount": 5 } ]
+                "resource_outputs": [ { "kind": "wood", "amount": 5 } ],
+                "category": "production"
             }),
         )
         .unwrap();

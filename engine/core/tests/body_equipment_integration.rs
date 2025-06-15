@@ -1,35 +1,16 @@
-use engine_core::ecs::registry::ComponentRegistry;
-use engine_core::ecs::world::World;
+#[path = "helpers/world.rs"]
+mod world_helper;
+
 use engine_core::systems::body_equipment_sync::BodyEquipmentSyncSystem;
 use serde_json::json;
-use std::sync::{Arc, Mutex};
 
 #[test]
-fn equipment_and_body_are_synchronized_and_enforced() {
-    // Register schemas
-    let mut registry = ComponentRegistry::new();
-    let equipment_schema_json = include_str!("../../assets/schemas/equipment.json");
-    let body_schema_json = include_str!("../../assets/schemas/body.json");
-    let item_schema_json = include_str!("../../assets/schemas/item.json");
-    let stats_schema_json = include_str!("../../assets/schemas/stats.json");
-    registry
-        .register_external_schema_from_json(equipment_schema_json)
-        .unwrap();
-    registry
-        .register_external_schema_from_json(body_schema_json)
-        .unwrap();
-    registry
-        .register_external_schema_from_json(item_schema_json)
-        .unwrap();
-    registry
-        .register_external_schema_from_json(stats_schema_json)
-        .unwrap();
-    let registry = Arc::new(Mutex::new(registry));
-
-    let mut world = World::new(registry.clone());
+fn test_body_equipment_sync_enforcement() {
+    // Use the shared helper to load all schemas via config and create world
+    let mut world = world_helper::make_test_world();
     world.current_mode = "roguelike".to_string();
 
-    // Register the integration system (to be implemented)
+    // Register the integration system
     world.register_system(BodyEquipmentSyncSystem);
 
     // Create an item (ring) with a stat effect
