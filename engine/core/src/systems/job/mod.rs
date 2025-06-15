@@ -2,6 +2,7 @@ pub mod ai;
 pub mod ai_event_reaction_system;
 pub mod builtin_handlers;
 pub mod effect_processor_registry;
+pub mod job_board;
 pub mod job_handler_registry;
 pub mod job_type;
 pub mod loader;

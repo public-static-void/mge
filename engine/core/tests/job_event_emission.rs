@@ -1,33 +1,14 @@
-use std::path::Path;
-use std::sync::{Arc, Mutex};
+#[path = "helpers/world.rs"]
+mod world_helper;
 
-use engine_core::config::GameConfig;
-use engine_core::ecs::registry::ComponentRegistry;
-use engine_core::ecs::schema::load_schemas_from_dir_with_modes;
 use engine_core::ecs::system::System;
-use engine_core::ecs::world::World;
+use engine_core::systems::job::job_board::JobBoard;
 use engine_core::systems::job::{JobSystem, assign_jobs};
-use engine_core::systems::job_board::JobBoard;
 use serde_json::json;
-
-fn setup_registry() -> Arc<Mutex<ComponentRegistry>> {
-    let config =
-        GameConfig::load_from_file(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../game.toml"))
-            .expect("Failed to load config");
-    let schema_dir = "../../engine/assets/schemas";
-    let schemas = load_schemas_from_dir_with_modes(schema_dir, &config.allowed_modes)
-        .expect("Failed to load schemas");
-    let mut registry = ComponentRegistry::new();
-    for (_name, schema) in schemas {
-        registry.register_external_schema(schema);
-    }
-    Arc::new(Mutex::new(registry))
-}
 
 #[test]
 fn test_job_lifecycle_events_emitted() {
-    let registry = setup_registry();
-    let mut world = World::new(registry);
+    let mut world = world_helper::make_test_world();
 
     // Agent and job setup
     world
@@ -124,8 +105,7 @@ fn test_job_lifecycle_events_emitted() {
 
 #[test]
 fn test_job_cancel_and_failure_events() {
-    let registry = setup_registry();
-    let mut world = World::new(registry);
+    let mut world = world_helper::make_test_world();
 
     // Setup a job that will fail
     world

@@ -1,32 +1,13 @@
-use std::path::Path;
-use std::sync::{Arc, Mutex};
+#[path = "helpers/world.rs"]
+mod world_helper;
 
-use engine_core::config::GameConfig;
-use engine_core::ecs::registry::ComponentRegistry;
-use engine_core::ecs::schema::load_schemas_from_dir_with_modes;
-use engine_core::ecs::world::World;
 use engine_core::systems::job::ai::assign_jobs;
-use engine_core::systems::job_board::JobBoard;
+use engine_core::systems::job::job_board::JobBoard;
 use serde_json::json;
 
-fn setup_world() -> World {
-    let config =
-        GameConfig::load_from_file(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../game.toml"))
-            .expect("Failed to load config");
-    let schema_dir = "../../engine/assets/schemas";
-    let schemas = load_schemas_from_dir_with_modes(schema_dir, &config.allowed_modes)
-        .expect("Failed to load schemas");
-    let mut registry = ComponentRegistry::new();
-    for (_name, schema) in schemas {
-        registry.register_external_schema(schema);
-    }
-    let registry = Arc::new(Mutex::new(registry));
-    World::new(registry)
-}
-
 #[test]
-fn agent_prefers_job_matching_specialization_category() {
-    let mut world = setup_world();
+fn test_agent_prefers_job_matching_specialization_category() {
+    let mut world = world_helper::make_test_world();
 
     // Agent 1 specializes in hauling
     let agent1_eid = world.spawn_entity();
@@ -111,14 +92,23 @@ fn agent_prefers_job_matching_specialization_category() {
     // Agent 1 should get hauling job
     let agent1 = world.get_component(agent1_eid, "Agent").unwrap();
     let assigned_job1 = agent1.get("current_job").and_then(|v| v.as_u64()).unwrap() as u32;
-    assert_eq!(assigned_job1, job1_eid);
+    assert_eq!(
+        assigned_job1, job1_eid,
+        "Agent 1 should be assigned the hauling job"
+    );
 
     // Agent 2 should get construction job
     let agent2 = world.get_component(agent2_eid, "Agent").unwrap();
     let assigned_job2 = agent2.get("current_job").and_then(|v| v.as_u64()).unwrap() as u32;
-    assert_eq!(assigned_job2, job2_eid);
+    assert_eq!(
+        assigned_job2, job2_eid,
+        "Agent 2 should be assigned the construction job"
+    );
 
     // Crafting job should remain unassigned
     let job3 = world.get_component(job3_eid, "Job").unwrap();
-    assert!(job3.get("assigned_to").is_none());
+    assert!(
+        job3.get("assigned_to").is_none(),
+        "Crafting job should remain unassigned"
+    );
 }

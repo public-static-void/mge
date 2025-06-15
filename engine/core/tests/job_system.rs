@@ -1,26 +1,16 @@
-use engine_core::ecs::ComponentSchema;
-use engine_core::ecs::registry::ComponentRegistry;
+#[path = "helpers/world.rs"]
+mod world_helper;
+
 use engine_core::ecs::system::System;
 use engine_core::ecs::world::World;
 use engine_core::systems::job::JobSystem;
 use serde_json::json;
-use std::sync::{Arc, Mutex};
 
 #[test]
-fn can_register_job_schema_and_assign_job_component() {
-    // 1. Setup registry and load Job schema
-    let mut registry = ComponentRegistry::new();
-    let job_schema_json = include_str!("../../assets/schemas/job.json");
-    registry
-        .register_external_schema_from_json(job_schema_json)
-        .unwrap();
-    let registry = Arc::new(Mutex::new(registry));
-
-    // 2. Create world
-    let mut world = World::new(registry.clone());
+fn test_register_job_schema_and_assign_job_component() {
+    let mut world = world_helper::make_test_world();
     world.current_mode = "colony".to_string();
 
-    // 3. Spawn entity and assign Job component
     let eid = world.spawn_entity();
     let job_val = json!({
         "id": eid,
@@ -32,22 +22,14 @@ fn can_register_job_schema_and_assign_job_component() {
     });
     assert!(world.set_component(eid, "Job", job_val.clone()).is_ok());
 
-    // 4. Query entity for Job component
     let job = world.get_component(eid, "Job").unwrap();
     assert_eq!(job.get("job_type").unwrap(), "haul_resource");
     assert_eq!(job.get("status").unwrap(), "pending");
 }
 
 #[test]
-fn can_query_entities_with_job_component() {
-    let mut registry = ComponentRegistry::new();
-    let job_schema_json = include_str!("../../assets/schemas/job.json");
-    registry
-        .register_external_schema_from_json(job_schema_json)
-        .unwrap();
-    let registry = Arc::new(Mutex::new(registry));
-
-    let mut world = World::new(registry.clone());
+fn test_query_entities_with_job_component() {
+    let mut world = world_helper::make_test_world();
     world.current_mode = "colony".to_string();
     let eid = world.spawn_entity();
 
@@ -64,17 +46,8 @@ fn can_query_entities_with_job_component() {
 }
 
 #[test]
-fn job_system_advances_progress_and_completes_job() {
-    use engine_core::systems::job::JobSystem;
-    use serde_json::json;
-
-    let mut registry = ComponentRegistry::new();
-    let job_schema_json = include_str!("../../assets/schemas/job.json");
-    registry
-        .register_external_schema_from_json(job_schema_json)
-        .unwrap();
-    let registry = Arc::new(Mutex::new(registry));
-    let mut world = World::new(registry.clone());
+fn test_job_system_advances_progress_and_completes_job() {
+    let mut world = world_helper::make_test_world();
     world.current_mode = "colony".to_string();
 
     let eid = world.spawn_entity();
@@ -89,7 +62,6 @@ fn job_system_advances_progress_and_completes_job() {
 
     world.register_system(JobSystem);
 
-    // 1 tick: pending -> in_progress, 3 more: progress increments
     for _ in 0..4 {
         world.run_system("JobSystem", None).unwrap();
     }
@@ -100,24 +72,10 @@ fn job_system_advances_progress_and_completes_job() {
 }
 
 #[test]
-fn job_system_emits_event_on_completion() {
-    use engine_core::ecs::registry::ComponentRegistry;
-    use engine_core::ecs::world::World;
-    use engine_core::systems::job::JobSystem;
-    use serde_json::json;
-    use std::sync::{Arc, Mutex};
-
-    // Setup registry and world
-    let mut registry = ComponentRegistry::new();
-    let job_schema_json = include_str!("../../assets/schemas/job.json");
-    registry
-        .register_external_schema_from_json(job_schema_json)
-        .unwrap();
-    let registry = Arc::new(Mutex::new(registry));
-    let mut world = World::new(registry.clone());
+fn test_job_system_emits_event_on_completion() {
+    let mut world = world_helper::make_test_world();
     world.current_mode = "colony".to_string();
 
-    // Spawn entity with a Job
     let eid = world.spawn_entity();
     let job_val = json!({
         "id": eid,
@@ -128,24 +86,20 @@ fn job_system_emits_event_on_completion() {
     });
     world.set_component(eid, "Job", job_val.clone()).unwrap();
 
-    // Register JobSystem
     world.register_system(JobSystem);
 
-    // Run system enough times to complete the job
     for _ in 0..6 {
         world.run_system("JobSystem", None).unwrap();
     }
 
     world.update_event_buses::<serde_json::Value>();
 
-    // Poll the event bus for "job_completed"
     let bus = world
         .get_event_bus::<serde_json::Value>("job_completed")
         .expect("event bus exists");
     let mut reader = engine_core::ecs::event::EventReader::default();
     let events: Vec<_> = reader.read(&*bus.lock().unwrap()).cloned().collect();
 
-    // There should be at least one event, and it should reference our entity
     assert!(!events.is_empty(), "No job_completed events emitted");
     let found = events.iter().any(|event: &serde_json::Value| {
         event.get("entity").and_then(|v| v.as_u64()) == Some(eid as u64)
@@ -154,20 +108,8 @@ fn job_system_emits_event_on_completion() {
 }
 
 #[test]
-fn job_system_emits_event_on_failure() {
-    use engine_core::ecs::registry::ComponentRegistry;
-    use engine_core::ecs::world::World;
-    use engine_core::systems::job::JobSystem;
-    use serde_json::json;
-    use std::sync::{Arc, Mutex};
-
-    let mut registry = ComponentRegistry::new();
-    let job_schema_json = include_str!("../../assets/schemas/job.json");
-    registry
-        .register_external_schema_from_json(job_schema_json)
-        .unwrap();
-    let registry = Arc::new(Mutex::new(registry));
-    let mut world = World::new(registry.clone());
+fn test_job_system_emits_event_on_failure() {
+    let mut world = world_helper::make_test_world();
     world.current_mode = "colony".to_string();
 
     let eid = world.spawn_entity();
@@ -183,7 +125,6 @@ fn job_system_emits_event_on_failure() {
 
     world.register_system(JobSystem);
 
-    // 1 tick: pending -> in_progress, 2nd: should_fail triggers "failed"
     for _ in 0..2 {
         world.run_system("JobSystem", None).unwrap();
     }
@@ -203,9 +144,14 @@ fn job_system_emits_event_on_failure() {
 }
 
 #[test]
-fn job_system_uses_custom_job_type_logic() {
+fn test_job_system_uses_custom_job_type_logic() {
+    use engine_core::ecs::ComponentSchema;
+    use engine_core::ecs::registry::ComponentRegistry;
+    use serde_json::Value;
+    use std::sync::{Arc, Mutex};
+
     let job_schema_json = std::fs::read_to_string("../assets/schemas/job.json").unwrap();
-    let job_schema_value: serde_json::Value = serde_json::from_str(&job_schema_json).unwrap();
+    let job_schema_value: Value = serde_json::from_str(&job_schema_json).unwrap();
     let name = job_schema_value
         .get("name")
         .and_then(|v| v.as_str())
@@ -234,7 +180,6 @@ fn job_system_uses_custom_job_type_logic() {
     let mut world = World::new(registry);
     world.current_mode = "colony".to_string();
 
-    // Register the custom handler on the ACTUAL registry used by the world
     {
         let mut reg = world.job_handler_registry.lock().unwrap();
         reg.register_handler("fast_job", |_world, _agent_id, _job_id, job| {
@@ -252,7 +197,6 @@ fn job_system_uses_custom_job_type_logic() {
         println!("TEST: Registered handler keys: {:?}", reg.keys());
     }
 
-    // Insert a job with type "fast_job"
     let eid = world.spawn_entity();
     let job_val = json!({
         "id": eid,
@@ -267,35 +211,23 @@ fn job_system_uses_custom_job_type_logic() {
     });
     world.set_component(eid, "Job", job_val).unwrap();
 
-    // Register and run the system for a few ticks
     let mut job_system = JobSystem;
     for _ in 0..2 {
         System::run(&mut job_system, &mut world, None);
     }
 
-    // Check the job after ticks
     let job = world.get_component(eid, "Job").unwrap();
     println!("job after ticks: {:?}", job);
 
-    // The handler should have set progress to at least 10.0 and status to complete
     assert_eq!(job.get("status").unwrap(), "complete");
     assert!(job.get("progress").unwrap().as_f64().unwrap() >= 10.0);
 }
 
 #[test]
-fn job_assignment_is_recorded_and_queryable() {
-    use serde_json::json;
-
-    let mut registry = ComponentRegistry::new();
-    let job_schema_json = include_str!("../../assets/schemas/job.json");
-    registry
-        .register_external_schema_from_json(job_schema_json)
-        .unwrap();
-    let registry = Arc::new(Mutex::new(registry));
-    let mut world = World::new(registry.clone());
+fn test_job_assignment_is_recorded_and_queryable() {
+    let mut world = world_helper::make_test_world();
     world.current_mode = "colony".to_string();
 
-    // Assign job to a worker entity
     let worker_eid = world.spawn_entity();
     let job_eid = world.spawn_entity();
     let job_val = json!({
@@ -312,6 +244,7 @@ fn job_assignment_is_recorded_and_queryable() {
     let job = world.get_component(job_eid, "Job").unwrap();
     assert_eq!(
         job.get("assigned_to").unwrap().as_u64().unwrap(),
-        worker_eid as u64
+        worker_eid as u64,
+        "Job should be assigned to worker"
     );
 }

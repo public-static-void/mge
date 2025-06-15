@@ -1,28 +1,11 @@
-use engine_core::config::GameConfig;
-use engine_core::ecs::registry::ComponentRegistry;
-use engine_core::ecs::schema::load_schemas_from_dir_with_modes;
-use engine_core::ecs::world::World;
-use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+#[path = "helpers/world.rs"]
+mod world_helper;
 
-fn schema_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../assets/schemas")
-}
+use serde_json::json;
 
 #[test]
 fn test_entities_in_multiple_regions() {
-    let config = GameConfig::load_from_file(
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../game.toml"),
-    )
-    .expect("Failed to load config");
-    let schemas = load_schemas_from_dir_with_modes(schema_dir(), &config.allowed_modes)
-        .expect("Failed to load schemas");
-    let mut registry = ComponentRegistry::new();
-    for (_name, schema) in schemas {
-        registry.register_external_schema(schema);
-    }
-    let registry = Arc::new(Mutex::new(registry));
-    let mut world = World::new(registry);
+    let mut world = world_helper::make_test_world();
 
     // eid1 in both "room_1" and "biome_A"
     let eid1 = world.spawn_entity();
@@ -30,7 +13,7 @@ fn test_entities_in_multiple_regions() {
         .set_component(
             eid1,
             "Region",
-            serde_json::json!({
+            json!({
                 "id": ["room_1", "biome_A"],
                 "kind": "room"
             }),
@@ -43,7 +26,7 @@ fn test_entities_in_multiple_regions() {
         .set_component(
             eid2,
             "Region",
-            serde_json::json!({
+            json!({
                 "id": "room_1",
                 "kind": "room"
             }),
@@ -56,7 +39,7 @@ fn test_entities_in_multiple_regions() {
         .set_component(
             eid3,
             "Region",
-            serde_json::json!({
+            json!({
                 "id": "biome_A",
                 "kind": "biome"
             }),
@@ -65,13 +48,19 @@ fn test_entities_in_multiple_regions() {
 
     // Query all entities in "room_1"
     let entities_room = world.entities_in_region("room_1");
-    assert!(entities_room.contains(&eid1));
-    assert!(entities_room.contains(&eid2));
-    assert!(!entities_room.contains(&eid3));
+    assert!(entities_room.contains(&eid1), "eid1 should be in room_1");
+    assert!(entities_room.contains(&eid2), "eid2 should be in room_1");
+    assert!(
+        !entities_room.contains(&eid3),
+        "eid3 should not be in room_1"
+    );
 
     // Query all entities in "biome_A"
     let entities_biome = world.entities_in_region("biome_A");
-    assert!(entities_biome.contains(&eid1));
-    assert!(!entities_biome.contains(&eid2));
-    assert!(entities_biome.contains(&eid3));
+    assert!(entities_biome.contains(&eid1), "eid1 should be in biome_A");
+    assert!(
+        !entities_biome.contains(&eid2),
+        "eid2 should not be in biome_A"
+    );
+    assert!(entities_biome.contains(&eid3), "eid3 should be in biome_A");
 }

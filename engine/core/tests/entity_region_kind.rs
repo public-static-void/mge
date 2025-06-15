@@ -1,35 +1,18 @@
-use engine_core::config::GameConfig;
-use engine_core::ecs::registry::ComponentRegistry;
-use engine_core::ecs::schema::load_schemas_from_dir_with_modes;
-use engine_core::ecs::world::World;
-use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+#[path = "helpers/world.rs"]
+mod world_helper;
 
-fn schema_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../assets/schemas")
-}
+use serde_json::json;
 
 #[test]
 fn test_entities_by_region_kind() {
-    let config = GameConfig::load_from_file(
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../game.toml"),
-    )
-    .expect("Failed to load config");
-    let schemas = load_schemas_from_dir_with_modes(schema_dir(), &config.allowed_modes)
-        .expect("Failed to load schemas");
-    let mut registry = ComponentRegistry::new();
-    for (_name, schema) in schemas {
-        registry.register_external_schema(schema);
-    }
-    let registry = Arc::new(Mutex::new(registry));
-    let mut world = World::new(registry);
+    let mut world = world_helper::make_test_world();
 
     let eid1 = world.spawn_entity();
     world
         .set_component(
             eid1,
             "Region",
-            serde_json::json!({
+            json!({
                 "id": "room_1",
                 "kind": "room"
             }),
@@ -41,7 +24,7 @@ fn test_entities_by_region_kind() {
         .set_component(
             eid2,
             "Region",
-            serde_json::json!({
+            json!({
                 "id": "stockpile_1",
                 "kind": "stockpile"
             }),
@@ -53,7 +36,7 @@ fn test_entities_by_region_kind() {
         .set_component(
             eid3,
             "Region",
-            serde_json::json!({
+            json!({
                 "id": "room_2",
                 "kind": "room"
             }),
@@ -61,11 +44,20 @@ fn test_entities_by_region_kind() {
         .unwrap();
 
     let room_entities = world.entities_in_region_kind("room");
-    assert!(room_entities.contains(&eid1));
-    assert!(room_entities.contains(&eid3));
-    assert!(!room_entities.contains(&eid2));
+    assert!(room_entities.contains(&eid1), "eid1 should be in room kind");
+    assert!(room_entities.contains(&eid3), "eid3 should be in room kind");
+    assert!(
+        !room_entities.contains(&eid2),
+        "eid2 should not be in room kind"
+    );
 
     let stockpile_entities = world.entities_in_region_kind("stockpile");
-    assert!(stockpile_entities.contains(&eid2));
-    assert!(!stockpile_entities.contains(&eid1));
+    assert!(
+        stockpile_entities.contains(&eid2),
+        "eid2 should be in stockpile kind"
+    );
+    assert!(
+        !stockpile_entities.contains(&eid1),
+        "eid1 should not be in stockpile kind"
+    );
 }

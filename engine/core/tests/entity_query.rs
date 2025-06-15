@@ -1,27 +1,11 @@
+#[path = "helpers/world.rs"]
+mod world_helper;
+
+use serde_json::json;
+
 #[test]
 fn test_get_entities_with_components() {
-    use engine_core::config::GameConfig;
-    use engine_core::ecs::registry::ComponentRegistry;
-    use engine_core::ecs::schema::load_schemas_from_dir_with_modes;
-    use engine_core::ecs::world::World;
-    use serde_json::json;
-    use std::sync::{Arc, Mutex};
-
-    // Load config and all schemas from disk
-    let config = GameConfig::load_from_file(
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../game.toml"),
-    )
-    .expect("Failed to load config");
-    let schemas =
-        load_schemas_from_dir_with_modes("../../engine/assets/schemas", &config.allowed_modes)
-            .unwrap();
-    let mut registry = ComponentRegistry::new();
-    for (_name, schema) in schemas {
-        registry.register_external_schema(schema);
-    }
-    let registry = Arc::new(Mutex::new(registry));
-
-    let mut world = World::new(registry.clone());
+    let mut world = world_helper::make_test_world();
 
     let e1 = world.spawn_entity();
     let e2 = world.spawn_entity();
@@ -51,5 +35,9 @@ fn test_get_entities_with_components() {
         .unwrap();
 
     let both = world.get_entities_with_components(&["Health", "Position"]);
-    assert_eq!(both, vec![e1]);
+    assert_eq!(
+        both,
+        vec![e1],
+        "Only e1 should have both Health and Position"
+    );
 }

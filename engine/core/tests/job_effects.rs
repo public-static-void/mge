@@ -1,12 +1,14 @@
 use engine_core::ecs::world::World;
+use engine_core::systems::job::registry::JobTypeData;
 use serde_json::json;
 
 #[test]
-fn job_effects_are_processed_on_completion() {
+fn test_job_effects_are_processed_on_completion() {
+    // This test needs to manually set up the registry due to custom schemas and effect handlers.
     let mut world = World::new(Default::default());
 
     // Register "Job" component for this test (allow in "colony" mode)
-    let job_schema = serde_json::json!({
+    let job_schema = json!({
         "title": "Job",
         "type": "object",
         "properties": {
@@ -25,7 +27,7 @@ fn job_effects_are_processed_on_completion() {
         .unwrap();
 
     // Register "Terrain" component for this test (allow in "colony" mode)
-    let terrain_schema = serde_json::json!({
+    let terrain_schema = json!({
         "title": "Terrain",
         "type": "object",
         "properties": {
@@ -64,7 +66,7 @@ fn job_effects_are_processed_on_completion() {
         });
 
     // Add a job type with an effect
-    let job_type_data = engine_core::systems::job::registry::JobTypeData {
+    let job_type_data = JobTypeData {
         name: "DigTunnel".to_string(),
         requirements: vec![],
         duration: Some(1.0),
@@ -96,5 +98,8 @@ fn job_effects_are_processed_on_completion() {
     }
 
     let terrain = world.get_component(eid, "Terrain").unwrap();
-    assert_eq!(terrain["type"], "tunnel");
+    assert_eq!(
+        terrain["type"], "tunnel",
+        "Terrain type should be 'tunnel' after job completion"
+    );
 }

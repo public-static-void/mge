@@ -1,11 +1,16 @@
+#[path = "helpers/registry.rs"]
+mod registry;
+
 use engine_core::ecs::ComponentSchema;
 use engine_core::ecs::Health;
 use engine_core::ecs::components::position::PositionComponent;
 use engine_core::ecs::registry::ComponentRegistry;
 use schemars::Schema;
+use serde_json::json;
 
 #[test]
 fn test_component_registration() {
+    // Test registration of a Rust-native component and schema export
     let mut registry = ComponentRegistry::new();
     registry.register_component::<PositionComponent>().unwrap();
     assert!(registry.get_schema::<PositionComponent>().is_some());
@@ -26,6 +31,7 @@ fn test_component_registration() {
 
 #[test]
 fn test_health_component() {
+    // Test registration of the Health component and schema export
     let mut registry = ComponentRegistry::new();
     registry.register_component::<Health>().unwrap();
     assert!(registry.get_schema::<Health>().is_some());
@@ -48,46 +54,66 @@ fn test_health_component() {
 fn test_unregistered_component() {
     use engine_core::ecs::RegistryError;
 
+    // Test error for unregistered component
     let registry = ComponentRegistry::new();
     let result = registry.schema_to_json::<Health>();
 
-    match result {
-        Ok(_) => panic!("Expected an error, but got Ok"),
-        Err(e) => match e {
-            RegistryError::UnregisteredComponent => (),
-            _ => panic!("Expected UnregisteredComponent error, got {:?}", e),
-        },
-    }
+    assert!(
+        matches!(result, Err(RegistryError::UnregisteredComponent)),
+        "Expected UnregisteredComponent error"
+    );
 }
 
 #[test]
 fn test_external_schema_loading() {
     use engine_core::config::GameConfig;
     use engine_core::ecs::registry::ComponentRegistry;
-    use engine_core::ecs::schema::load_schemas_from_dir_with_modes;
     use std::sync::{Arc, Mutex};
 
     let config = GameConfig::load_from_file(
         std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../game.toml"),
     )
     .expect("Failed to load config");
-    let schema_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap() + "/../assets/schemas";
-    let schemas = load_schemas_from_dir_with_modes(&schema_dir, &config.allowed_modes)
-        .expect("Failed to load schemas");
+    let schema_dir = "../../engine/assets/schemas";
+    let schemas = engine_core::ecs::schema::load_schemas_from_dir_with_modes(
+        schema_dir,
+        &config.allowed_modes,
+    )
+    .expect("Failed to load schemas");
     assert!(
         schemas.contains_key("Health"),
         "Health schema should be loaded"
     );
 
     let registry = Arc::new(Mutex::new(ComponentRegistry::default()));
-
     for (_name, schema) in schemas {
         registry.lock().unwrap().register_external_schema(schema);
     }
 
-    // Now you can check that the registry has the schema
+    // Now check that the registry has the schema
     let guard = registry.lock().unwrap();
     assert!(guard.get_schema_by_name("Health").is_some());
+}
+
+#[test]
+fn test_register_external_schema_from_real_file() {
+    use std::sync::{Arc, Mutex};
+
+    // Test registering a schema from a real file
+    let mut registry = ComponentRegistry::new();
+    let schema_json = registry::load_schema_from_assets("health");
+    registry
+        .register_external_schema_from_json(&schema_json)
+        .unwrap();
+
+    let registry = Arc::new(Mutex::new(registry));
+    let guard = registry.lock().unwrap();
+    let schema = guard.get_schema_by_name("Health");
+    assert!(schema.is_some(), "Schema 'Health' not found in registry");
+    assert!(
+        schema.unwrap().modes.contains(&"colony".to_string()),
+        "Health schema should be allowed in colony mode"
+    );
 }
 
 #[test]
@@ -97,7 +123,7 @@ fn test_schema_driven_mode_enforcement() {
     use serde_json::json;
     use std::sync::{Arc, Mutex};
 
-    // Fabricate a schema for "Roguelike::Inventory" only allowed in "roguelike" mode
+    // Test mode enforcement for a custom schema only allowed in "roguelike" mode
     let roguelike_inventory_schema = r#"
     {
       "title": "Roguelike::Inventory",
@@ -146,56 +172,13 @@ fn test_schema_driven_mode_enforcement() {
 }
 
 #[test]
-fn test_register_external_schema_from_json() {
-    use std::sync::{Arc, Mutex};
-
-    let mut registry = ComponentRegistry::new();
-
-    // Example schema JSON string
-    let schema_json = r#"
-    {
-        "title": "MagicPower",
-        "type": "object",
-        "properties": {
-            "mana": { "type": "number", "minimum": 0 }
-        },
-        "required": ["mana"],
-        "modes": ["colony"]
-    }
-    "#;
-
-    let result = registry.register_external_schema_from_json(schema_json);
-    assert!(
-        result.is_ok(),
-        "Schema registration failed: {:?}",
-        result.err()
-    );
-
-    let registry = Arc::new(Mutex::new(registry));
-
-    let guard = registry.lock().unwrap();
-    let schema = guard.get_schema_by_name("MagicPower");
-    assert!(
-        schema.is_some(),
-        "Schema 'MagicPower' not found in registry"
-    );
-
-    // Check modes are correctly set
-    let modes = &schema.unwrap().modes;
-    assert!(
-        modes.contains(&"colony".to_string()),
-        "Mode 'colony' not set"
-    );
-}
-
-#[test]
-fn test_mode_enforcement_for_runtime_registered_schema() {
+fn test_mode_enforcement_for_custom_schema() {
     use engine_core::ecs::world::World;
     use serde_json::json;
     use std::sync::{Arc, Mutex};
 
-    let mut registry = ComponentRegistry::new();
-    let schema_json = r#"
+    // Test mode enforcement for a custom schema
+    let custom_schema = r#"
     {
         "title": "MagicPower",
         "type": "object",
@@ -204,8 +187,10 @@ fn test_mode_enforcement_for_runtime_registered_schema() {
         "modes": ["colony"]
     }
     "#;
+
+    let mut registry = ComponentRegistry::new();
     registry
-        .register_external_schema_from_json(schema_json)
+        .register_external_schema_from_json(custom_schema)
         .unwrap();
     let registry = Arc::new(Mutex::new(registry));
 
@@ -234,8 +219,8 @@ fn test_set_component_validation() {
     use serde_json::json;
     use std::sync::{Arc, Mutex};
 
-    let mut registry = ComponentRegistry::new();
-    let schema_json = r#"
+    // Test schema validation for a custom schema
+    let custom_schema = r#"
     {
         "title": "TestComponent",
         "type": "object",
@@ -246,8 +231,10 @@ fn test_set_component_validation() {
         "modes": ["colony"]
     }
     "#;
+
+    let mut registry = ComponentRegistry::new();
     registry
-        .register_external_schema_from_json(schema_json)
+        .register_external_schema_from_json(custom_schema)
         .unwrap();
     let registry = Arc::new(Mutex::new(registry));
 
@@ -280,6 +267,7 @@ fn test_set_component_validation() {
 
 #[test]
 fn test_register_and_unregister_external_schema() {
+    // Test registering and unregistering a custom schema
     let mut registry = ComponentRegistry::new();
     let schema = ComponentSchema {
         name: "TestComponent".to_string(),
@@ -298,6 +286,7 @@ fn test_register_and_unregister_rust_native_component() {
     use engine_core::ecs::components::position::PositionComponent;
     use engine_core::ecs::registry::ComponentRegistry;
 
+    // Test registering and unregistering a Rust-native component
     let mut registry = ComponentRegistry::new();
 
     // Register component
@@ -315,9 +304,10 @@ fn test_components_for_mode() {
     use engine_core::ecs::registry::ComponentRegistry;
     use schemars::Schema;
 
+    // Test querying components for a specific mode
     let mut registry = ComponentRegistry::new();
 
-    // Register two external components for different modes
+    // Register two custom components for different modes
     registry.register_external_schema(ComponentSchema {
         name: "A".to_string(),
         schema: Schema::default().into(),
@@ -343,9 +333,10 @@ fn test_is_registered() {
     use engine_core::ecs::registry::ComponentRegistry;
     use schemars::Schema;
 
+    // Test checking if a custom component is registered
     let mut registry = ComponentRegistry::new();
 
-    // Register an external component
+    // Register a custom component
     registry.register_external_schema(ComponentSchema {
         name: "Foo".to_string(),
         schema: Schema::default().into(),
@@ -363,6 +354,7 @@ fn test_is_registered_rust_native() {
     use engine_core::ecs::components::position::PositionComponent;
     use engine_core::ecs::registry::ComponentRegistry;
 
+    // Test checking if a Rust-native component is registered
     let mut registry = ComponentRegistry::new();
     assert!(!registry.is_registered(std::any::type_name::<PositionComponent>()));
     registry.register_component::<PositionComponent>().unwrap();

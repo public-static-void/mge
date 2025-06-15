@@ -1,40 +1,14 @@
+#[path = "helpers/plugins.rs"]
+mod plugins_helper;
+use plugins_helper::{plugin_bin_path, test_socket_path};
+
 use engine_core::plugins::manager::PluginManager;
 use engine_core::plugins::subprocess::{PluginRequest, PluginResponse};
 use std::fs;
-use std::path::{Path, PathBuf};
 use std::thread;
 use std::time::Duration;
 
-/// Returns a unique socket path for each test (using the test name)
-fn test_socket_path(suffix: &str) -> String {
-    format!("/tmp/rust_test_plugin_{}.sock", suffix)
-}
-
-/// Returns the absolute path to the plugin binary, robust to test CWD
-fn plugin_bin_path() -> PathBuf {
-    // CARGO_MANIFEST_DIR is .../engine/core
-    // workspace root is two levels up
-    let workspace_root = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .unwrap()
-        .parent()
-        .unwrap();
-    let bin = workspace_root.join("plugins/rust_test_plugin/rust_test_plugin");
-    assert!(
-        bin.exists(),
-        "Plugin binary missing at {:?}. Build it with: cargo run -p xtask -- build-plugins",
-        bin
-    );
-    bin
-}
-
 const TEST_PLUGIN_NAME: &str = "rust_test_plugin";
-
-#[test]
-fn show_cwd() {
-    println!("CWD: {:?}", std::env::current_dir().unwrap());
-    println!("Plugin bin path: {:?}", plugin_bin_path());
-}
 
 #[test]
 fn test_subprocess_plugin_lifecycle() {

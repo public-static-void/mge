@@ -1,29 +1,13 @@
-use engine_core::config::GameConfig;
-use engine_core::ecs::registry::ComponentRegistry;
-use engine_core::ecs::schema::load_schemas_from_dir_with_modes;
-use engine_core::ecs::world::World;
-use engine_core::map::SquareGridMap;
-use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+#[path = "helpers/world.rs"]
+mod world_helper;
+use world_helper::make_test_world;
 
-fn schema_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../assets/schemas")
-}
+use engine_core::map::SquareGridMap;
+use serde_json::json;
 
 #[test]
 fn test_cells_by_region_kind() {
-    let config = GameConfig::load_from_file(
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../game.toml"),
-    )
-    .expect("Failed to load config");
-    let schemas = load_schemas_from_dir_with_modes(schema_dir(), &config.allowed_modes)
-        .expect("Failed to load schemas");
-    let mut registry = ComponentRegistry::new();
-    for (_name, schema) in schemas {
-        registry.register_external_schema(schema);
-    }
-    let registry = Arc::new(Mutex::new(registry));
-    let mut world = World::new(registry);
+    let mut world = make_test_world();
 
     // Setup map cells
     let mut grid = SquareGridMap::new();
@@ -35,17 +19,17 @@ fn test_cells_by_region_kind() {
     // Assign region assignments with kinds
     let cell_assignments = vec![
         (
-            serde_json::json!({"Square": {"x": 0, "y": 0, "z": 0}}),
+            json!({"Square": {"x": 0, "y": 0, "z": 0}}),
             "room_1",
             "room",
         ),
         (
-            serde_json::json!({"Square": {"x": 1, "y": 0, "z": 0}}),
+            json!({"Square": {"x": 1, "y": 0, "z": 0}}),
             "room_1",
             "room",
         ),
         (
-            serde_json::json!({"Square": {"x": 0, "y": 1, "z": 0}}),
+            json!({"Square": {"x": 0, "y": 1, "z": 0}}),
             "stockpile_1",
             "stockpile",
         ),
@@ -57,19 +41,19 @@ fn test_cells_by_region_kind() {
             .set_component(
                 eid,
                 "RegionAssignment",
-                serde_json::json!({"cell": cell, "region_id": region_id, "kind": kind}),
+                json!({"cell": cell, "region_id": region_id, "kind": kind}),
             )
             .unwrap();
     }
 
     // Query cells by region kind "room"
     let room_cells = world.cells_in_region_kind("room");
-    assert!(room_cells.contains(&serde_json::json!({"Square": {"x": 0, "y": 0, "z": 0}})));
-    assert!(room_cells.contains(&serde_json::json!({"Square": {"x": 1, "y": 0, "z": 0}})));
-    assert!(!room_cells.contains(&serde_json::json!({"Square": {"x": 0, "y": 1, "z": 0}})));
+    assert!(room_cells.contains(&json!({"Square": {"x": 0, "y": 0, "z": 0}})));
+    assert!(room_cells.contains(&json!({"Square": {"x": 1, "y": 0, "z": 0}})));
+    assert!(!room_cells.contains(&json!({"Square": {"x": 0, "y": 1, "z": 0}})));
 
     // Query cells by region kind "stockpile"
     let stockpile_cells = world.cells_in_region_kind("stockpile");
-    assert!(stockpile_cells.contains(&serde_json::json!({"Square": {"x": 0, "y": 1, "z": 0}})));
-    assert!(!stockpile_cells.contains(&serde_json::json!({"Square": {"x": 1, "y": 0, "z": 0}})));
+    assert!(stockpile_cells.contains(&json!({"Square": {"x": 0, "y": 1, "z": 0}})));
+    assert!(!stockpile_cells.contains(&json!({"Square": {"x": 1, "y": 0, "z": 0}})));
 }

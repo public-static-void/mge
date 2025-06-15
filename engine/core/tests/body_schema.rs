@@ -1,21 +1,14 @@
+#[path = "helpers/world.rs"]
+mod world_helper;
+
+use serde_json::json;
+
 #[test]
-fn can_register_body_schema_and_assign_body_component() {
-    use engine_core::ecs::registry::ComponentRegistry;
-    use engine_core::ecs::world::World;
-    use serde_json::json;
-    use std::sync::{Arc, Mutex};
-
-    let mut registry = ComponentRegistry::new();
-    let body_schema_json = include_str!("../../assets/schemas/body.json");
-    registry
-        .register_external_schema_from_json(body_schema_json)
-        .unwrap();
-    let registry = Arc::new(Mutex::new(registry));
-
-    let mut world = World::new(registry.clone());
+fn test_register_body_schema_and_assign_body_component() {
+    let mut world = world_helper::make_test_world();
     world.current_mode = "roguelike".to_string();
 
-    // Create a hierarchical body: torso -> left arm -> left hand
+    // Create a hierarchical body
     let eid = world.spawn_entity();
     let body = json!({
         "parts": [
@@ -58,7 +51,6 @@ fn can_register_body_schema_and_assign_body_component() {
     });
     assert!(world.set_component(eid, "Body", body.clone()).is_ok());
 
-    // Query the body component and check the nested structure
     let stored = world.get_component(eid, "Body").unwrap();
     assert_eq!(stored["parts"][0]["name"], "torso");
     assert_eq!(stored["parts"][0]["children"][0]["name"], "left arm");
@@ -69,23 +61,10 @@ fn can_register_body_schema_and_assign_body_component() {
 }
 
 #[test]
-fn can_update_body_part_status_and_equip_item() {
-    use engine_core::ecs::registry::ComponentRegistry;
-    use engine_core::ecs::world::World;
-    use serde_json::json;
-    use std::sync::{Arc, Mutex};
-
-    let mut registry = ComponentRegistry::new();
-    let body_schema_json = include_str!("../../assets/schemas/body.json");
-    registry
-        .register_external_schema_from_json(body_schema_json)
-        .unwrap();
-    let registry = Arc::new(Mutex::new(registry));
-
-    let mut world = World::new(registry.clone());
+fn test_update_body_part_status_and_equip_item() {
+    let mut world = world_helper::make_test_world();
     world.current_mode = "roguelike".to_string();
 
-    // Add a simple body (all required fields present)
     let eid = world.spawn_entity();
     let mut body = json!({
         "parts": [
@@ -116,13 +95,11 @@ fn can_update_body_part_status_and_equip_item() {
     });
     world.set_component(eid, "Body", body.clone()).unwrap();
 
-    // Wound the left arm
     body["parts"][0]["children"][0]["status"] = json!("wounded");
     world.set_component(eid, "Body", body.clone()).unwrap();
     let stored = world.get_component(eid, "Body").unwrap();
     assert_eq!(stored["parts"][0]["children"][0]["status"], "wounded");
 
-    // Equip a ring on the left arm
     body["parts"][0]["children"][0]["equipped"] = json!(["gold ring"]);
     world.set_component(eid, "Body", body.clone()).unwrap();
     let stored = world.get_component(eid, "Body").unwrap();
@@ -133,20 +110,8 @@ fn can_update_body_part_status_and_equip_item() {
 }
 
 #[test]
-fn can_set_and_query_body_part_temperature_and_insulation() {
-    use engine_core::ecs::registry::ComponentRegistry;
-    use engine_core::ecs::world::World;
-    use serde_json::json;
-    use std::sync::{Arc, Mutex};
-
-    let mut registry = ComponentRegistry::new();
-    let body_schema_json = include_str!("../../assets/schemas/body.json");
-    registry
-        .register_external_schema_from_json(body_schema_json)
-        .unwrap();
-    let registry = Arc::new(Mutex::new(registry));
-
-    let mut world = World::new(registry.clone());
+fn test_set_and_query_body_part_temperature_and_insulation() {
+    let mut world = world_helper::make_test_world();
     world.current_mode = "roguelike".to_string();
 
     let eid = world.spawn_entity();

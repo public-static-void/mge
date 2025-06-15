@@ -1,5 +1,5 @@
 use crate::ecs::world::World;
-use crate::systems::job_board::JobBoard;
+use crate::systems::job::job_board::JobBoard;
 use serde_json::Value as JsonValue;
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};

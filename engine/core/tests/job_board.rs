@@ -1,30 +1,12 @@
-use engine_core::config::GameConfig;
-use engine_core::ecs::registry::ComponentRegistry;
-use engine_core::ecs::schema::load_schemas_from_dir_with_modes;
-use engine_core::ecs::world::World;
-use engine_core::systems::job_board::{JobAssignmentResult, JobBoard};
-use serde_json::json;
-use std::sync::{Arc, Mutex};
+#[path = "helpers/world.rs"]
+mod world_helper;
 
-fn make_test_world_with_job_schema() -> World {
-    let config = GameConfig::load_from_file(
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../game.toml"),
-    )
-    .expect("Failed to load config");
-    let schema_dir = "../../engine/assets/schemas";
-    let schemas = load_schemas_from_dir_with_modes(schema_dir, &config.allowed_modes)
-        .expect("Failed to load schemas");
-    let mut registry = ComponentRegistry::new();
-    for (_name, schema) in schemas {
-        registry.register_external_schema(schema);
-    }
-    let registry = Arc::new(Mutex::new(registry));
-    World::new(registry)
-}
+use engine_core::systems::job::job_board::{JobAssignmentResult, JobBoard};
+use serde_json::json;
 
 #[test]
 fn test_job_board_tracks_unassigned_jobs() {
-    let mut world = make_test_world_with_job_schema();
+    let mut world = world_helper::make_test_world();
     let job1 = json!({"job_type": "mine", "status": "pending", "category": "mining"});
     let job2 =
         json!({"job_type": "haul", "status": "pending", "assigned_to": 42, "category": "hauling"});
@@ -42,7 +24,7 @@ fn test_job_board_tracks_unassigned_jobs() {
 
 #[test]
 fn test_job_assignment_claims_job() {
-    let mut world = make_test_world_with_job_schema();
+    let mut world = world_helper::make_test_world();
     let job = json!({"job_type": "build", "status": "pending", "category": "construction"});
     let eid = world.spawn_entity();
     let actor_eid = world.spawn_entity();
@@ -63,7 +45,7 @@ fn test_job_assignment_claims_job() {
 
 #[test]
 fn test_job_assignment_no_jobs_available() {
-    let mut world = make_test_world_with_job_schema();
+    let mut world = world_helper::make_test_world();
     let actor_eid = world.spawn_entity();
 
     let mut board = JobBoard::default();

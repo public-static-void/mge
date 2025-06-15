@@ -2,6 +2,7 @@ use engine_core::ecs::ComponentSchema;
 use engine_core::ecs::registry::ComponentRegistry;
 use schemars::Schema;
 use serde_json::json;
+use std::collections::HashMap;
 
 #[test]
 fn test_update_external_schema_with_data_migration() {
@@ -16,7 +17,7 @@ fn test_update_external_schema_with_data_migration() {
     registry.register_external_schema(schema_v1);
 
     // Simulate world/component storage for migration
-    let mut component_data = std::collections::HashMap::new();
+    let mut component_data = HashMap::new();
     component_data.insert(1u32, json!({ "foo": 1 }));
 
     // Define migration: rename field "foo" to "bar"
@@ -43,4 +44,8 @@ fn test_update_external_schema_with_data_migration() {
     let migrated = component_data.get(&1u32).unwrap();
     assert!(migrated.get("foo").is_none());
     assert_eq!(migrated.get("bar").unwrap(), &json!(1));
+
+    // Optional: assert on modes
+    let updated = registry.get_schema_by_name("MigratingComponent").unwrap();
+    assert_eq!(updated.modes, vec!["colony".to_string()]);
 }
