@@ -1,44 +1,15 @@
-use engine_core::ecs::world::World;
+#[path = "helpers/world.rs"]
+mod world_helper;
+
+use engine_core::systems::job::job_board::{JobAssignmentResult, JobBoard};
 use engine_core::systems::job::resource_reservation::{
     ResourceReservationStatus, ResourceReservationSystem,
 };
-use engine_core::systems::job_board::JobBoard;
 use serde_json::json;
-use std::sync::{Arc, Mutex};
-
-fn setup_world() -> World {
-    let mut registry = engine_core::ecs::registry::ComponentRegistry::default();
-    registry.register_external_schema(engine_core::ecs::schema::ComponentSchema {
-        name: "Agent".to_string(),
-        schema: serde_json::json!({ "type": "object" }),
-        modes: vec!["colony".to_string()],
-    });
-    registry.register_external_schema(engine_core::ecs::schema::ComponentSchema {
-        name: "Job".to_string(),
-        schema: serde_json::json!({ "type": "object" }),
-        modes: vec!["colony".to_string()],
-    });
-    registry.register_external_schema(engine_core::ecs::schema::ComponentSchema {
-        name: "Stockpile".to_string(),
-        schema: serde_json::json!({
-            "type": "object",
-            "properties": {
-                "resources": {
-                    "type": "object",
-                    "additionalProperties": { "type": "number", "minimum": 0 }
-                }
-            },
-            "required": ["resources"]
-        }),
-        modes: vec!["colony".to_string()],
-    });
-    let registry = Arc::new(Mutex::new(registry));
-    World::new(registry)
-}
 
 #[test]
-fn job_is_assigned_only_if_resources_are_available() {
-    let mut world = setup_world();
+fn test_job_is_assigned_only_if_resources_are_available() {
+    let mut world = world_helper::make_test_world();
 
     // Stockpile with 10 wood
     let stockpile_eid = world.spawn_entity();
@@ -87,12 +58,17 @@ fn job_is_assigned_only_if_resources_are_available() {
     let result = job_board.claim_job(agent_eid, &mut world, 0);
     assert_eq!(
         result,
-        engine_core::systems::job_board::JobAssignmentResult::Assigned(job_eid)
+        JobAssignmentResult::Assigned(job_eid),
+        "Job should be assigned if resources are available"
     );
 
     // Resources should be reserved
     let status = reservation_system.check_reservation_status(&world, job_eid);
-    assert_eq!(status, ResourceReservationStatus::Reserved);
+    assert_eq!(
+        status,
+        ResourceReservationStatus::Reserved,
+        "Resources should be reserved after assignment"
+    );
 
     // Try to assign a second, identical job (should fail due to insufficient wood)
     let job2_eid = world.spawn_entity();
@@ -114,7 +90,8 @@ fn job_is_assigned_only_if_resources_are_available() {
     let result2 = job_board.claim_job(agent_eid, &mut world, 1);
     assert_eq!(
         result2,
-        engine_core::systems::job_board::JobAssignmentResult::NoJobsAvailable
+        JobAssignmentResult::NoJobsAvailable,
+        "Second job should not be assigned due to insufficient resources"
     );
 
     // Release reservation (simulate completion)
@@ -126,13 +103,14 @@ fn job_is_assigned_only_if_resources_are_available() {
     let result3 = job_board.claim_job(agent_eid, &mut world, 2);
     assert_eq!(
         result3,
-        engine_core::systems::job_board::JobAssignmentResult::Assigned(job2_eid)
+        JobAssignmentResult::Assigned(job2_eid),
+        "Second job should be assigned after resources are released"
     );
 }
 
 #[test]
-fn job_remains_pending_if_resources_unavailable() {
-    let mut world = setup_world();
+fn test_job_remains_pending_if_resources_unavailable() {
+    let mut world = world_helper::make_test_world();
 
     // Stockpile with 2 stone
     let stockpile_eid = world.spawn_entity();
@@ -164,12 +142,16 @@ fn job_remains_pending_if_resources_unavailable() {
     reservation_system.run(&mut world, None);
 
     let status = reservation_system.check_reservation_status(&world, job_eid);
-    assert_eq!(status, ResourceReservationStatus::WaitingForResources);
+    assert_eq!(
+        status,
+        ResourceReservationStatus::WaitingForResources,
+        "Job should remain pending if resources are unavailable"
+    );
 }
 
 #[test]
-fn resources_are_released_on_job_cancellation() {
-    let mut world = setup_world();
+fn test_resources_are_released_on_job_cancellation() {
+    let mut world = world_helper::make_test_world();
 
     // Stockpile with 8 iron
     let stockpile_eid = world.spawn_entity();
@@ -214,7 +196,8 @@ fn resources_are_released_on_job_cancellation() {
     let result = job_board.claim_job(agent_eid, &mut world, 0);
     assert_eq!(
         result,
-        engine_core::systems::job_board::JobAssignmentResult::Assigned(job_eid)
+        JobAssignmentResult::Assigned(job_eid),
+        "Job should be assigned if resources are available"
     );
 
     // Cancel the job
@@ -227,5 +210,8 @@ fn resources_are_released_on_job_cancellation() {
 
     // Resources should be available again
     let stockpile = world.get_component(stockpile_eid, "Stockpile").unwrap();
-    assert_eq!(stockpile["resources"]["iron"], 8);
+    assert_eq!(
+        stockpile["resources"]["iron"], 8,
+        "Resources should be available again after job cancellation"
+    );
 }

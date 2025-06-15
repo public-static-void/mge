@@ -4,7 +4,7 @@ use std::io::Write;
 use tempfile::TempDir;
 
 #[test]
-fn can_load_and_lookup_job_types_from_json() {
+fn test_can_load_and_lookup_job_types_from_json() {
     // Create a temp directory for job definitions
     let temp_dir = TempDir::new().unwrap();
     let jobs_dir = temp_dir.path();
