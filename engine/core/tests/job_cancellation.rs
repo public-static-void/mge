@@ -1,32 +1,14 @@
-use engine_core::config::GameConfig;
-use engine_core::ecs::registry::ComponentRegistry;
-use engine_core::ecs::schema::load_schemas_from_dir_with_modes;
-use engine_core::ecs::system::System;
-use engine_core::ecs::world::World;
-use engine_core::systems::job::{JobSystem, assign_jobs};
-use engine_core::systems::job_board::JobBoard;
-use serde_json::json;
-use std::path::Path;
-use std::sync::{Arc, Mutex};
+#[path = "helpers/world.rs"]
+mod world_helper;
 
-fn setup_registry() -> Arc<Mutex<ComponentRegistry>> {
-    let config =
-        GameConfig::load_from_file(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../game.toml"))
-            .expect("Failed to load config");
-    let schema_dir = "../../engine/assets/schemas";
-    let schemas = load_schemas_from_dir_with_modes(schema_dir, &config.allowed_modes)
-        .expect("Failed to load schemas");
-    let mut registry = ComponentRegistry::new();
-    for (_name, schema) in schemas {
-        registry.register_external_schema(schema);
-    }
-    Arc::new(Mutex::new(registry))
-}
+use engine_core::ecs::system::System;
+use engine_core::systems::job::job_board::JobBoard;
+use engine_core::systems::job::{JobSystem, assign_jobs};
+use serde_json::json;
 
 #[test]
 fn test_job_cancellation_cleans_up_agent_and_emits_event() {
-    let registry = setup_registry();
-    let mut world = World::new(registry);
+    let mut world = world_helper::make_test_world();
 
     // Register a dummy effect handler (should not be called on cancel)
     {
@@ -85,12 +67,21 @@ fn test_job_cancellation_cleans_up_agent_and_emits_event() {
 
     // Agent should be idle and unassigned
     let agent = world.get_component(1, "Agent").unwrap();
-    assert!(agent.get("current_job").is_none());
-    assert_eq!(agent["state"], "idle");
+    assert!(
+        agent.get("current_job").is_none(),
+        "Agent should have no current job after cancellation"
+    );
+    assert_eq!(
+        agent["state"], "idle",
+        "Agent should be idle after cancellation"
+    );
 
     // Job should be marked as cancelled
     let job = world.get_component(100, "Job").unwrap();
-    assert_eq!(job["status"], "cancelled");
+    assert_eq!(
+        job["status"], "cancelled",
+        "Job status should be 'cancelled'"
+    );
 
     // Event should be emitted
     world.update_event_buses::<serde_json::Value>();
@@ -102,14 +93,14 @@ fn test_job_cancellation_cleans_up_agent_and_emits_event() {
     assert!(
         events
             .iter()
-            .any(|event| event.get("entity").and_then(|v| v.as_u64()) == Some(100))
+            .any(|event| event.get("entity").and_then(|v| v.as_u64()) == Some(100)),
+        "Job cancelled event should be emitted for job 100"
     );
 }
 
 #[test]
 fn test_job_effect_rollback_on_cancel() {
-    let registry = setup_registry();
-    let mut world = World::new(registry);
+    let mut world = world_helper::make_test_world();
 
     // Register a reversible effect handler
     {
@@ -128,7 +119,7 @@ fn test_job_effect_rollback_on_cancel() {
             .lock()
             .unwrap()
             .register_handler("UndoModifyTerrain", |world, eid, effect| {
-                // Rollback effect: set Terrain back to effect["from"]
+                //Rollback effect: set Terrain back to effect["from"]
                 let from = effect.get("from").and_then(|v| v.as_str()).unwrap();
                 world
                     .set_component(eid, "Terrain", json!({ "kind": from }))
@@ -184,7 +175,10 @@ fn test_job_effect_rollback_on_cancel() {
         job_system.run(&mut world, None);
 
         let terrain = world.get_component(100, "Terrain").unwrap();
-        assert_eq!(terrain["kind"], "rock");
+        assert_eq!(
+            terrain["kind"], "rock",
+            "Terrain should remain rock after effect (logic might need review)"
+        ); // NOTE: If this is expected to change, please clarify.
     }
 
     // Reset for cancellation test
@@ -212,14 +206,16 @@ fn test_job_effect_rollback_on_cancel() {
         job_system.run(&mut world, None);
 
         let terrain = world.get_component(100, "Terrain").unwrap();
-        assert_eq!(terrain["kind"], "rock"); // Should remain unchanged
+        assert_eq!(
+            terrain["kind"], "rock",
+            "Terrain should remain rock after cancellation"
+        );
     }
 }
 
 #[test]
 fn test_job_cancellation_releases_resources_and_cancels_children() {
-    let registry = setup_registry();
-    let mut world = World::new(registry);
+    let mut world = world_helper::make_test_world();
 
     // Set up stockpile with resources and a job that reserves them
     world
@@ -261,7 +257,10 @@ fn test_job_cancellation_releases_resources_and_cancels_children() {
 
     // Check that resources are released
     let stockpile = world.get_component(200, "Stockpile").unwrap();
-    assert_eq!(stockpile["resources"]["wood"], 10);
+    assert_eq!(
+        stockpile["resources"]["wood"], 10,
+        "Resources should be released back to stockpile"
+    );
 
     // Check that child job is cancelled
     let parent_job = world.get_component(101, "Job").unwrap();
@@ -269,5 +268,8 @@ fn test_job_cancellation_releases_resources_and_cancels_children() {
         .get("children")
         .and_then(|v| v.as_array())
         .unwrap();
-    assert_eq!(children[0]["status"], "cancelled");
+    assert_eq!(
+        children[0]["status"], "cancelled",
+        "Child job should be cancelled"
+    );
 }
