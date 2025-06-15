@@ -6,7 +6,7 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 #[test]
-fn systems_execute_in_registered_order() {
+fn test_systems_execute_in_registered_order() {
     let registry = Arc::new(Mutex::new(
         engine_core::ecs::registry::ComponentRegistry::new(),
     ));
@@ -47,7 +47,7 @@ fn systems_execute_in_registered_order() {
 }
 
 #[test]
-fn dynamic_systems_are_executed_in_tick() {
+fn test_dynamic_systems_are_executed_in_tick() {
     let registry = Arc::new(Mutex::new(
         engine_core::ecs::registry::ComponentRegistry::new(),
     ));
@@ -67,7 +67,7 @@ fn dynamic_systems_are_executed_in_tick() {
 }
 
 #[test]
-fn systems_can_emit_and_receive_events_in_tick() {
+fn test_systems_can_emit_and_receive_events_in_tick() {
     let registry = Arc::new(Mutex::new(
         engine_core::ecs::registry::ComponentRegistry::new(),
     ));
@@ -118,7 +118,7 @@ fn systems_can_emit_and_receive_events_in_tick() {
 }
 
 #[test]
-fn simulation_tick_increments_turn() {
+fn test_simulation_tick_increments_turn() {
     let registry = Arc::new(Mutex::new(
         engine_core::ecs::registry::ComponentRegistry::new(),
     ));
@@ -129,7 +129,7 @@ fn simulation_tick_increments_turn() {
 }
 
 #[test]
-fn event_driven_tick_system_runs_in_order_and_processes_events() {
+fn test_event_driven_tick_system_runs_in_order_and_processes_events() {
     // Setup world and registry
     let registry = Arc::new(Mutex::new(
         engine_core::ecs::registry::ComponentRegistry::new(),
