@@ -13,13 +13,7 @@ fn test_component_migration() {
     // Perform migration
     let position = PositionComponent::migrate(Version::parse("1.0.0").unwrap(), &data).unwrap();
 
-    if let Position::Square { x, y, .. } = position.pos {
-        assert_eq!(x, 5);
-        assert_eq!(y, 3);
-        // (z as needed)
-    } else {
-        panic!("Expected Position::Square");
-    }
+    assert!(matches!(position.pos, Position::Square { x: 5, y: 3, .. }));
 }
 
 #[test]
@@ -39,13 +33,7 @@ fn test_version_migration() {
 
     // Test migration from v1.0.0
     let pos = PositionComponent::migrate(Version::parse("1.0.0").unwrap(), &data).unwrap();
-    if let Position::Square { x, y, .. } = pos.pos {
-        assert_eq!(x, 5);
-        assert_eq!(y, 3);
-        // (z as needed)
-    } else {
-        panic!("Expected Position::Square");
-    }
+    assert!(matches!(pos.pos, Position::Square { x: 5, y: 3, .. }));
 
     // Test invalid version
     let result = PositionComponent::migrate(Version::parse("3.0.0").unwrap(), &data);
@@ -62,10 +50,5 @@ fn test_macro_generated_migration() {
 
     let data = bson::to_vec(&LegacyPosition { x: 5.0, y: 3.0 }).unwrap();
     let pos = PositionComponent::migrate(Version::parse("1.0.0").unwrap(), &data).unwrap();
-    if let Position::Square { x, y, .. } = pos.pos {
-        assert_eq!(x, 5);
-        assert_eq!(y, 3);
-    } else {
-        panic!("Expected Position::Square");
-    }
+    assert!(matches!(pos.pos, Position::Square { x: 5, y: 3, .. }));
 }

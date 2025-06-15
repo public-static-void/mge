@@ -1,27 +1,12 @@
-use engine_core::config::GameConfig;
-use engine_core::ecs::World;
-use engine_core::ecs::registry::ComponentRegistry;
-use engine_core::ecs::schema::load_schemas_from_dir_with_modes;
+#[path = "helpers/world.rs"]
+mod world_helper;
+
 use engine_core::systems::death_decay::{ProcessDeaths, ProcessDecay};
 use serde_json::json;
-use std::sync::{Arc, Mutex};
 
 #[test]
 fn test_death_replaces_health_with_corpse_and_decay() {
-    let config = GameConfig::load_from_file(
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../game.toml"),
-    )
-    .expect("Failed to load config");
-    let schema_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap() + "/../assets/schemas";
-    let schemas = load_schemas_from_dir_with_modes(&schema_dir, &config.allowed_modes)
-        .expect("Failed to load schemas");
-    let mut registry = ComponentRegistry::new();
-    for (_name, schema) in schemas {
-        registry.register_external_schema(schema);
-    }
-    let registry = Arc::new(Mutex::new(registry));
-    let mut world = World::new(registry.clone());
-
+    let mut world = world_helper::make_test_world();
     world.current_mode = "colony".to_string();
 
     let id = world.spawn_entity();
@@ -61,20 +46,7 @@ fn test_death_replaces_health_with_corpse_and_decay() {
 
 #[test]
 fn test_decay_removes_entity_after_time() {
-    let config = GameConfig::load_from_file(
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../game.toml"),
-    )
-    .expect("Failed to load config");
-    let schema_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap() + "/../assets/schemas";
-    let schemas = load_schemas_from_dir_with_modes(&schema_dir, &config.allowed_modes)
-        .expect("Failed to load schemas");
-    let mut registry = ComponentRegistry::new();
-    for (_name, schema) in schemas {
-        registry.register_external_schema(schema);
-    }
-    let registry = Arc::new(Mutex::new(registry));
-    let mut world = World::new(registry.clone());
-
+    let mut world = world_helper::make_test_world();
     world.current_mode = "colony".to_string();
 
     let id = world.spawn_entity();

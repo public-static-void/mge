@@ -1,28 +1,12 @@
-use engine_core::ecs::world::World;
+#[path = "helpers/effect.rs"]
+mod effect_helper;
+
 use engine_core::systems::job::effect_processor_registry::EffectProcessorRegistry;
 use serde_json::json;
-use std::sync::{Arc, Mutex};
-
-fn setup_world_and_registry() -> (World, Arc<Mutex<EffectProcessorRegistry>>) {
-    let mut registry = engine_core::ecs::registry::ComponentRegistry::default();
-    registry.register_external_schema(engine_core::ecs::schema::ComponentSchema {
-        name: "Marked".to_string(),
-        schema: serde_json::json!({ "type": "object" }),
-        modes: vec!["colony".to_string()],
-    });
-    registry.register_external_schema(engine_core::ecs::schema::ComponentSchema {
-        name: "Scripted".to_string(),
-        schema: serde_json::json!({ "type": "object" }),
-        modes: vec!["colony".to_string()],
-    });
-    let world = World::new(Arc::new(Mutex::new(registry)));
-    let effect_registry = Arc::new(Mutex::new(EffectProcessorRegistry::default()));
-    (world, effect_registry)
-}
 
 #[test]
 fn test_effect_chaining_triggers_another_effect() {
-    let (mut world, effect_registry) = setup_world_and_registry();
+    let (mut world, effect_registry) = effect_helper::setup_world_and_registry();
 
     world.effect_processor_registry = Some(effect_registry.clone());
 
@@ -53,12 +37,12 @@ fn test_effect_chaining_triggers_another_effect() {
     EffectProcessorRegistry::process_effects_arc(&effect_proc, &mut world, eid, &effects);
 
     let marked = world.get_component(eid, "Marked").unwrap();
-    assert_eq!(marked["value"], 42);
+    assert_eq!(marked["value"], 42, "Marked component should have value 42");
 }
 
 #[test]
 fn test_scripted_effect_handler_invoked() {
-    let (mut world, effect_registry) = setup_world_and_registry();
+    let (mut world, effect_registry) = effect_helper::setup_world_and_registry();
 
     world.effect_processor_registry = Some(effect_registry.clone());
 
@@ -83,6 +67,6 @@ fn test_scripted_effect_handler_invoked() {
     EffectProcessorRegistry::process_effects_arc(&effect_proc, &mut world, eid, &effects);
 
     let scripted = world.get_component(eid, "Scripted").unwrap();
-    assert_eq!(scripted["ran"], true);
-    assert_eq!(scripted["param"], "test");
+    assert_eq!(scripted["ran"], true, "Scripted component should have ran=true");
+    assert_eq!(scripted["param"], "test", "Scripted component should have param='test'");
 }
