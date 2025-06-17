@@ -35,6 +35,25 @@
       "type": "integer",
       "default": 0,
       "description": "How many jobs this agent has completed (for fairness/round-robin)."
+    },
+    "move_path": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "Square": {
+            "type": "object",
+            "properties": {
+              "x": { "type": "integer" },
+              "y": { "type": "integer" },
+              "z": { "type": "integer" }
+            },
+            "required": ["x", "y", "z"]
+          }
+        },
+        "required": ["Square"]
+      },
+      "description": "Path (list of positions) the agent will follow to reach a target."
     }
   },
   "required": ["entity_id"]
