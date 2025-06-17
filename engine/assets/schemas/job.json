@@ -14,6 +14,20 @@
       "type": "string",
       "enum": ["pending", "in_progress", "complete", "failed", "cancelled"]
     },
+    "phase": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "en_route",
+        "at_site",
+        "in_progress",
+        "complete",
+        "failed",
+        "cancelled"
+      ],
+      "default": "pending",
+      "description": "Current execution phase of the job"
+    },
     "progress": { "type": "number", "minimum": 0 },
     "assigned_to": {
       "type": "integer",
