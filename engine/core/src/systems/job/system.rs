@@ -163,6 +163,58 @@ impl JobSystem {
             job["status"] = serde_json::json!("in_progress");
         }
 
+        // === Agent movement/phase logic (schema-driven, no Rust struct deserialization) ===
+        let assigned_to = job.get("assigned_to").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
+        let job_target = job.get("target_position").cloned();
+
+        if assigned_to != 0 && job_target.is_some() {
+            let agent_pos_val = world.get_component(assigned_to, "Position");
+            let target_pos_val = job_target.as_ref();
+            if let (Some(agent_pos_val), Some(target_pos_val)) = (agent_pos_val, target_pos_val) {
+                let agent_cell = crate::map::CellKey::from_position(agent_pos_val);
+                let target_cell = crate::map::CellKey::from_position(target_pos_val);
+                if let (Some(agent_cell), Some(target_cell)) = (agent_cell, target_cell) {
+                    if agent_cell != target_cell {
+                        job["phase"] = serde_json::json!("en_route");
+                        let mut agent = world.get_component(assigned_to, "Agent").cloned().unwrap();
+                        let move_path_empty = match agent.get("move_path") {
+                            None => true,
+                            Some(v) => v.as_array().map(|a| a.is_empty()).unwrap_or(true),
+                        };
+                        if move_path_empty {
+                            if let Some(map) = &world.map {
+                                if let Some(pathfinding) = map.find_path(&agent_cell, &target_cell)
+                                {
+                                    let move_path: Vec<serde_json::Value> = pathfinding
+                                        .path
+                                        .into_iter()
+                                        .skip(1)
+                                        .map(|cell| match cell {
+                                            crate::map::CellKey::Square { x, y, z } => {
+                                                serde_json::json!({ "Square": { "x": x, "y": y, "z": z } })
+                                            }
+                                            crate::map::CellKey::Hex { q, r, z } => {
+                                                serde_json::json!({ "Hex": { "q": q, "r": r, "z": z } })
+                                            }
+                                            crate::map::CellKey::Region { ref id } => {
+                                                serde_json::json!({ "Region": { "id": id } })
+                                            }
+                                        })
+                                        .collect();
+                                    agent["move_path"] = serde_json::json!(move_path);
+                                    let _ = world.set_component(assigned_to, "Agent", agent);
+                                }
+                            }
+                        }
+                        // Do not progress job yet
+                        return job;
+                    } else {
+                        job["phase"] = serde_json::json!("at_site");
+                    }
+                }
+            }
+        }
+
         // Handler lookup should always happen here, after status normalization
         let current_status = job
             .get("status")
@@ -207,9 +259,7 @@ impl JobSystem {
                             .get("stamina")
                             .and_then(|v| v.as_f64())
                             .unwrap_or(100.0);
-                        // progress = base * (skill) * (stamina / 100.0)
                         progress_increment = 1.0 * skill * (stamina / 100.0);
-                        // Clamp to minimum progress
                         if progress_increment < 0.1 {
                             progress_increment = 0.1;
                         }
@@ -228,7 +278,6 @@ impl JobSystem {
             }
             job
         } else {
-            // Only set progress to 3.0 if status is complete and progress is unset or less than 3.0
             if current_status == "complete"
                 && job.get("progress").and_then(|v| v.as_f64()).unwrap_or(0.0) < 3.0
             {
@@ -238,7 +287,6 @@ impl JobSystem {
         }
     }
 
-    /// Modular, generic, and extensible effect application and rollback.
     fn process_job_effects(
         world: &mut World,
         job_id: u32,
@@ -253,10 +301,8 @@ impl JobSystem {
             .map(|jt| jt.effects.clone())
             .unwrap_or_else(|| empty.clone());
 
-        // Clone the Arc to avoid borrow checker issues!
         let effect_registry = world.effect_processor_registry.as_ref().unwrap().clone();
 
-        // Get or create the applied_effects array
         let applied_effects = job
             .entry("applied_effects")
             .or_insert_with(|| serde_json::Value::Array(vec![]))
@@ -264,7 +310,6 @@ impl JobSystem {
             .unwrap();
 
         if on_cancel {
-            // Rollback all applied effects
             for idx in applied_effects.iter().filter_map(|v| v.as_u64()) {
                 if let Some(effect) = effects.get(idx as usize) {
                     effect_registry.lock().unwrap().rollback_effects(
@@ -276,7 +321,6 @@ impl JobSystem {
             }
             applied_effects.clear();
         } else {
-            // Apply effects if not yet applied
             for (idx, effect) in effects.iter().enumerate() {
                 if !applied_effects
                     .iter()
@@ -293,7 +337,6 @@ impl JobSystem {
         }
     }
 
-    /// Emit a job event
     pub fn emit_job_event(
         world: &mut crate::ecs::world::World,
         event: &str,
