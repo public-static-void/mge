@@ -249,3 +249,102 @@ fn test_effects_applied_only_on_completion_and_rolled_back_on_cancel() {
         );
     }
 }
+
+#[test]
+fn test_agent_moves_to_job_site_before_progress() {
+    let mut world = world_helper::make_test_world();
+
+    // Set up a 3x3 grid map with all cells and neighbors for pathfinding
+    use engine_core::map::{Map, SquareGridMap};
+    let mut sq_map = SquareGridMap::new();
+    for x in 0..=2 {
+        for y in 0..=2 {
+            sq_map.add_cell(x, y, 0);
+        }
+    }
+    // Add neighbors (4-way connectivity)
+    for x in 0..=2 {
+        for y in 0..=2 {
+            let dirs = [(-1, 0), (1, 0), (0, -1), (0, 1)];
+            for (dx, dy) in dirs {
+                let nx = x + dx;
+                let ny = y + dy;
+                if (0..=2).contains(&nx) && (0..=2).contains(&ny) {
+                    sq_map.add_neighbor((x, y, 0), (nx, ny, 0));
+                }
+            }
+        }
+    }
+    world.map = Some(Map::new(Box::new(sq_map)));
+
+    world
+        .set_component(
+            1,
+            "Position",
+            serde_json::to_value(engine_core::ecs::components::position::PositionComponent {
+                pos: engine_core::ecs::components::position::Position::Square { x: 0, y: 0, z: 0 },
+            })
+            .unwrap(),
+        )
+        .unwrap();
+    world
+        .set_component(
+            1,
+            "Agent",
+            serde_json::json!({
+                "entity_id": 1,
+                "state": "idle"
+            }),
+        )
+        .unwrap();
+    world.entities.push(1);
+
+    world
+        .set_component(
+            100,
+            "Job",
+            serde_json::json!({
+                "id": 100,
+                "job_type": "dig",
+                "status": "pending",
+                "cancelled": false,
+                "priority": 1,
+                "category": "mining",
+                "target_position": {
+                    "pos": {
+                        "Square": { "x": 2, "y": 2, "z": 0 }
+                    }
+                }
+            }),
+        )
+        .unwrap();
+    world.entities.push(100);
+
+    let mut job_board = engine_core::systems::job::job_board::JobBoard::default();
+    job_board.update(&world);
+    engine_core::systems::job::assign_jobs(&mut world, &mut job_board);
+
+    world.register_system(engine_core::systems::job::JobSystem::new());
+    world.register_system(engine_core::systems::movement_system::MovementSystem);
+
+    let mut reached_site = false;
+    for _ in 0..10 {
+        world.run_system("MovementSystem", None).unwrap();
+        world.run_system("JobSystem", None).unwrap();
+
+        let agent_pos_val = world.get_component(1, "Position").unwrap().clone();
+        let agent_pos: engine_core::ecs::components::position::PositionComponent =
+            serde_json::from_value(agent_pos_val).unwrap();
+
+        if agent_pos.pos
+            == (engine_core::ecs::components::position::Position::Square { x: 2, y: 2, z: 0 })
+        {
+            reached_site = true;
+            let job = world.get_component(100, "Job").unwrap();
+            assert_eq!(job.get("phase").unwrap(), "at_site");
+        }
+    }
+    assert!(reached_site, "Agent should reach the job site");
+    let job = world.get_component(100, "Job").unwrap();
+    assert_eq!(job.get("status").unwrap(), "complete");
+}
