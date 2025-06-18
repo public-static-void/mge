@@ -18,6 +18,9 @@
       "type": "string",
       "enum": [
         "pending",
+        "fetching_resources",
+        "delivering_resources",
+        "going_to_site",
         "en_route",
         "at_site",
         "in_progress",
@@ -50,7 +53,7 @@
       },
       "description": "Resources required to start this job"
     },
-    "resource_outputs": {
+    "reserved_resources": {
       "type": "array",
       "items": {
         "type": "object",
@@ -60,7 +63,28 @@
         },
         "required": ["kind", "amount"]
       },
-      "description": "Resources produced by this job"
+      "description": "Resources reserved for this job"
+    },
+    "reserved_stockpile": {
+      "type": "integer",
+      "description": "Stockpile entity ID from which resources are reserved"
+    },
+    "delivered_resources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "kind": { "type": "string" },
+          "amount": { "type": "integer" }
+        },
+        "required": ["kind", "amount"]
+      },
+      "description": "Resources delivered so far"
+    },
+    "delivery_status": {
+      "type": "string",
+      "enum": ["none", "partial", "complete"],
+      "default": "none"
     },
     "children": {
       "type": "array",
@@ -88,6 +112,25 @@
       "type": "integer",
       "default": 0,
       "description": "Game tick when this job was last assigned."
+    },
+    "target_position": {
+      "type": "object",
+      "properties": {
+        "pos": {
+          "type": "object",
+          "properties": {
+            "Square": {
+              "type": "object",
+              "properties": {
+                "x": { "type": "integer" },
+                "y": { "type": "integer" },
+                "z": { "type": "integer" }
+              },
+              "required": ["x", "y", "z"]
+            }
+          }
+        }
+      }
     }
   },
   "required": ["job_type", "status", "category"]

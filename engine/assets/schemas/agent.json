@@ -54,6 +54,18 @@
         "required": ["Square"]
       },
       "description": "Path (list of positions) the agent will follow to reach a target."
+    },
+    "carried_resources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "kind": { "type": "string" },
+          "amount": { "type": "integer" }
+        },
+        "required": ["kind", "amount"]
+      },
+      "description": "Resources currently carried by this agent"
     }
   },
   "required": ["entity_id"]
