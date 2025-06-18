@@ -120,6 +120,24 @@ fn test_register_job_handler_multiple_types() {
         .unwrap();
     world.entities.push(20);
 
+    // Add an agent so jobs can be assigned
+    world
+        .set_component(
+            1,
+            "Agent",
+            json!({
+                "entity_id": 1,
+                "state": "idle"
+            }),
+        )
+        .unwrap();
+    world.entities.push(1);
+
+    // Assign jobs to agent
+    let mut job_board = JobBoard::default();
+    job_board.update(&world);
+    assign_jobs(&mut world, &mut job_board);
+
     // Run the job system
     let mut job_system = JobSystem::new();
     job_system.run(&mut world, None);

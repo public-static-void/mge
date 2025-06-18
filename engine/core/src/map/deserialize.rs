@@ -40,19 +40,45 @@ pub fn map_from_json(value: &Value) -> Option<Map> {
     match topology {
         "square" => {
             let mut map = SquareGridMap::new();
-            for cell in value.get("cells")?.as_array()? {
+            // Collect all cells to a Vec for neighbor inference later
+            let cells = value.get("cells")?.as_array()?;
+            // First add all cells
+            for cell in cells {
                 let x = cell.get("x")?.as_i64()? as i32;
                 let y = cell.get("y")?.as_i64()? as i32;
                 let z = cell.get("z")?.as_i64()? as i32;
                 map.add_cell(x, y, z);
+            }
+            // Then add neighbors (explicit or inferred)
+            for cell in cells {
+                let x = cell.get("x")?.as_i64()? as i32;
+                let y = cell.get("y")?.as_i64()? as i32;
+                let z = cell.get("z")?.as_i64()? as i32;
+
                 if let Some(neighs) = cell.get("neighbors").and_then(|n| n.as_array()) {
+                    // Explicit neighbors
                     for n in neighs {
                         let nx = n.get("x")?.as_i64()? as i32;
                         let ny = n.get("y")?.as_i64()? as i32;
                         let nz = n.get("z")?.as_i64()? as i32;
                         map.add_neighbor((x, y, z), (nx, ny, nz));
                     }
+                } else {
+                    // No explicit neighbors: infer 4-way adjacency
+                    let candidate_neighbors =
+                        [(x + 1, y, z), (x - 1, y, z), (x, y + 1, z), (x, y - 1, z)];
+                    for &(nx, ny, nz) in &candidate_neighbors {
+                        if map.contains(&CellKey::Square {
+                            x: nx,
+                            y: ny,
+                            z: nz,
+                        }) {
+                            map.add_neighbor((x, y, z), (nx, ny, nz));
+                        }
+                    }
                 }
+
+                // Set metadata if present
                 if let Some(meta) = cell.get("metadata") {
                     let key = CellKey::Square { x, y, z };
                     map.set_cell_metadata(&key, meta.clone());
@@ -60,13 +86,26 @@ pub fn map_from_json(value: &Value) -> Option<Map> {
             }
             Some(Map::new(Box::new(map)))
         }
+
+        // For hex topology, similar neighbor inference can be added if desired
         "hex" => {
             let mut map = HexGridMap::new();
-            for cell in value.get("cells")?.as_array()? {
+            let cells = value.get("cells")?.as_array()?;
+
+            // First add all cells
+            for cell in cells {
                 let q = cell.get("q")?.as_i64()? as i32;
                 let r = cell.get("r")?.as_i64()? as i32;
                 let z = cell.get("z")?.as_i64()? as i32;
                 map.add_cell(q, r, z);
+            }
+
+            // Add neighbors (explicit or inferred)
+            for cell in cells {
+                let q = cell.get("q")?.as_i64()? as i32;
+                let r = cell.get("r")?.as_i64()? as i32;
+                let z = cell.get("z")?.as_i64()? as i32;
+
                 if let Some(neighs) = cell.get("neighbors").and_then(|n| n.as_array()) {
                     for n in neighs {
                         let nq = n.get("q")?.as_i64()? as i32;
@@ -74,7 +113,27 @@ pub fn map_from_json(value: &Value) -> Option<Map> {
                         let nz = n.get("z")?.as_i64()? as i32;
                         map.add_neighbor((q, r, z), (nq, nr, nz));
                     }
+                } else {
+                    // Infer neighbors for hex (6 directions)
+                    let candidate_neighbors = [
+                        (q + 1, r, z),
+                        (q - 1, r, z),
+                        (q, r + 1, z),
+                        (q, r - 1, z),
+                        (q + 1, r - 1, z),
+                        (q - 1, r + 1, z),
+                    ];
+                    for &(nq, nr, nz) in &candidate_neighbors {
+                        if map.contains(&CellKey::Hex {
+                            q: nq,
+                            r: nr,
+                            z: nz,
+                        }) {
+                            map.add_neighbor((q, r, z), (nq, nr, nz));
+                        }
+                    }
                 }
+
                 if let Some(meta) = cell.get("metadata") {
                     let key = CellKey::Hex { q, r, z };
                     map.set_cell_metadata(&key, meta.clone());
@@ -82,7 +141,9 @@ pub fn map_from_json(value: &Value) -> Option<Map> {
             }
             Some(Map::new(Box::new(map)))
         }
+
         "region" => {
+            // Neighbors must be explicit for region maps
             let mut map = RegionMap::new();
             for cell in value.get("cells")?.as_array()? {
                 let id = cell.get("id")?.as_str()?.to_string();
@@ -100,6 +161,7 @@ pub fn map_from_json(value: &Value) -> Option<Map> {
             }
             Some(Map::new(Box::new(map)))
         }
+
         _ => None,
     }
 }

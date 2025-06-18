@@ -1,13 +1,17 @@
 pub mod ai;
 pub mod ai_event_reaction_system;
 pub mod builtin_handlers;
+pub mod children;
+pub mod dependencies;
 pub mod effect_processor_registry;
 pub mod job_board;
 pub mod job_handler_registry;
 pub mod job_type;
 pub mod loader;
+pub mod phases;
 pub mod priority_aging;
 pub mod registry;
+pub mod requirements;
 pub mod resource_reservation;
 pub mod system;
 

@@ -1,3 +1,4 @@
+use crate::ecs::system::System;
 use crate::ecs::world::World;
 use serde_json::{Value as JsonValue, json};
 
@@ -169,5 +170,15 @@ impl ResourceReservationSystem {
             let entry = resources.entry(kind.to_string()).or_insert(json!(0));
             *entry = json!(entry.as_i64().unwrap_or(0) - amount);
         }
+    }
+}
+
+impl System for ResourceReservationSystem {
+    fn name(&self) -> &'static str {
+        "ResourceReservationSystem"
+    }
+
+    fn run(&mut self, world: &mut World, lua: Option<&mlua::Lua>) {
+        self.run(world, lua);
     }
 }
