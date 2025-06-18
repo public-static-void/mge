@@ -13,6 +13,13 @@ pub enum JobAssignmentResult {
 }
 
 impl JobBoard {
+    fn requirements_are_empty_or_zero(requirements: &[serde_json::Value]) -> bool {
+        requirements.is_empty()
+            || requirements
+                .iter()
+                .all(|req| req.get("amount").and_then(|a| a.as_i64()).unwrap_or(0) == 0)
+    }
+
     pub fn update(&mut self, world: &World) {
         self.jobs.clear();
         let mut candidates: Vec<(u32, i64, u64, u64)> = Vec::new();
@@ -38,10 +45,11 @@ impl JobBoard {
                 let resource_requirements = job.get("resource_requirements");
                 let has_reservation = job.get("reserved_resources").is_some()
                     && job.get("reserved_stockpile").is_some();
+
                 let requirements_satisfied = resource_requirements.is_none()
                     || resource_requirements
                         .and_then(|v| v.as_array())
-                        .map(|arr| arr.is_empty())
+                        .map(|arr| Self::requirements_are_empty_or_zero(arr))
                         .unwrap_or(true)
                     || has_reservation;
 
@@ -83,7 +91,7 @@ impl JobBoard {
                 let requirements_satisfied = resource_requirements.is_none()
                     || resource_requirements
                         .and_then(|v| v.as_array())
-                        .map(|arr| arr.is_empty())
+                        .map(|arr| Self::requirements_are_empty_or_zero(arr))
                         .unwrap_or(true)
                     || has_reservation;
                 assigned == 0 && status == "pending" && requirements_satisfied
