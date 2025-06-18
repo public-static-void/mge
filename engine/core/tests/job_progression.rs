@@ -10,7 +10,6 @@ use serde_json::json;
 fn test_job_progression_over_ticks() {
     let mut world = world_helper::make_test_world();
 
-    // Agent and job setup
     world
         .set_component(
             1,
@@ -39,12 +38,10 @@ fn test_job_progression_over_ticks() {
         .unwrap();
     world.entities.push(100);
 
-    // Assign job to agent
     let mut job_board = JobBoard::default();
     job_board.update(&world);
     assign_jobs(&mut world, &mut job_board);
 
-    // Run the job system for several ticks, simulating progression
     let mut job_system = JobSystem::new();
     for _ in 0..5 {
         job_system.run(&mut world, None);
@@ -76,7 +73,6 @@ fn test_job_progression_over_ticks() {
 fn test_custom_job_handler_overrides_progression() {
     let mut world = world_helper::make_test_world();
 
-    // Register a custom handler for "instant" job_type
     {
         let registry = world.job_handler_registry.clone();
         registry.lock().unwrap().register_handler(
@@ -118,12 +114,10 @@ fn test_custom_job_handler_overrides_progression() {
         .unwrap();
     world.entities.push(101);
 
-    // Assign job to agent
     let mut job_board = JobBoard::default();
     job_board.update(&world);
     assign_jobs(&mut world, &mut job_board);
 
-    // Run the job system, custom handler should immediately complete the job
     let mut job_system = JobSystem::new();
     job_system.run(&mut world, None);
 
@@ -144,7 +138,6 @@ fn test_custom_job_handler_overrides_progression() {
 fn test_effects_applied_only_on_completion_and_rolled_back_on_cancel() {
     let mut world = world_helper::make_test_world();
 
-    // Register effect handlers
     {
         let registry = world.effect_processor_registry.take().unwrap();
         registry
@@ -168,12 +161,10 @@ fn test_effects_applied_only_on_completion_and_rolled_back_on_cancel() {
         world.effect_processor_registry = Some(registry);
     }
 
-    // Set up initial terrain
     world
         .set_component(200, "Terrain", json!({ "kind": "rock" }))
         .unwrap();
 
-    // Job with an effect
     world
         .set_component(
             200,
@@ -189,7 +180,6 @@ fn test_effects_applied_only_on_completion_and_rolled_back_on_cancel() {
         )
         .unwrap();
 
-    // Register job type with effect
     world.job_types.register_job_type(
         "dig",
         vec![json!({
@@ -199,13 +189,11 @@ fn test_effects_applied_only_on_completion_and_rolled_back_on_cancel() {
         })],
     );
 
-    // Assign and complete job normally: effect should apply
     {
         let mut job_board = JobBoard::default();
         job_board.update(&world);
         assign_jobs(&mut world, &mut job_board);
 
-        // Run system for enough ticks to complete the job
         let mut job_system = JobSystem::new();
         for _ in 0..5 {
             job_system.run(&mut world, None);
@@ -218,7 +206,6 @@ fn test_effects_applied_only_on_completion_and_rolled_back_on_cancel() {
         );
     }
 
-    // Reset for cancellation test
     world
         .set_component(200, "Terrain", json!({ "kind": "rock" }))
         .unwrap();
@@ -237,7 +224,6 @@ fn test_effects_applied_only_on_completion_and_rolled_back_on_cancel() {
         )
         .unwrap();
 
-    // Run system: effect should not apply, and rollback (UndoModifyTerrain) should be called
     {
         let mut job_system = JobSystem::new();
         job_system.run(&mut world, None);
@@ -277,6 +263,7 @@ fn test_agent_moves_to_job_site_before_progress() {
     }
     world.map = Some(Map::new(Box::new(sq_map)));
 
+    // --- Register agent and job BEFORE assignment ---
     world
         .set_component(
             1,
@@ -287,17 +274,21 @@ fn test_agent_moves_to_job_site_before_progress() {
             .unwrap(),
         )
         .unwrap();
+
     world
         .set_component(
             1,
             "Agent",
             serde_json::json!({
                 "entity_id": 1,
-                "state": "idle"
+                "state": "idle",
+                "specializations": [],
+                "job_queue": [],
+                "move_path": [],
+                "carried_resources": []
             }),
         )
         .unwrap();
-    world.entities.push(1);
 
     world
         .set_component(
@@ -307,6 +298,7 @@ fn test_agent_moves_to_job_site_before_progress() {
                 "id": 100,
                 "job_type": "dig",
                 "status": "pending",
+                "phase": "pending",
                 "cancelled": false,
                 "priority": 1,
                 "category": "mining",
@@ -314,21 +306,34 @@ fn test_agent_moves_to_job_site_before_progress() {
                     "pos": {
                         "Square": { "x": 2, "y": 2, "z": 0 }
                     }
-                }
+                },
+                "resource_requirements": [
+                    { "kind": "dirt", "amount": 0 }
+                ]
             }),
         )
         .unwrap();
+
+    world.entities.push(1);
     world.entities.push(100);
 
     let mut job_board = engine_core::systems::job::job_board::JobBoard::default();
     job_board.update(&world);
     engine_core::systems::job::assign_jobs(&mut world, &mut job_board);
 
+    let job = world.get_component(100, "Job").unwrap();
+    let agent = world.get_component(1, "Agent").unwrap();
+    println!("After assignment: job = {:?}", job);
+    println!("After assignment: agent = {:?}", agent);
+
     world.register_system(engine_core::systems::job::JobSystem::new());
     world.register_system(engine_core::systems::movement_system::MovementSystem);
 
     let mut reached_site = false;
-    for _ in 0..10 {
+    let job = world.get_component(100, "Job").unwrap();
+    println!("Job at start: {:?}", job);
+
+    for tick in 0..20 {
         world.run_system("MovementSystem", None).unwrap();
         world.run_system("JobSystem", None).unwrap();
 
@@ -336,12 +341,22 @@ fn test_agent_moves_to_job_site_before_progress() {
         let agent_pos: engine_core::ecs::components::position::PositionComponent =
             serde_json::from_value(agent_pos_val).unwrap();
 
+        let job = world.get_component(100, "Job").unwrap();
+        let agent_val = world.get_component(1, "Agent").unwrap();
+        println!(
+            "Tick {}: agent position: {:?}, move_path: {:?}, job phase: {:?}",
+            tick,
+            agent_pos.pos,
+            agent_val.get("move_path"),
+            job.get("phase")
+        );
+
         if agent_pos.pos
             == (engine_core::ecs::components::position::Position::Square { x: 2, y: 2, z: 0 })
         {
             reached_site = true;
-            let job = world.get_component(100, "Job").unwrap();
             assert_eq!(job.get("phase").unwrap(), "at_site");
+            break;
         }
     }
     assert!(reached_site, "Agent should reach the job site");
