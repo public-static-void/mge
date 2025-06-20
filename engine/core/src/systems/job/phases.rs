@@ -65,6 +65,8 @@ pub fn handle_pending_phase(world: &mut World, eid: u32, mut job: JsonValue) -> 
                                     .collect();
                                 agent["move_path"] = serde_json::json!(move_path);
                                 let _ = world.set_component(assigned_to, "Agent", agent);
+                            } else {
+                                return handle_pathfinding_failure(world, eid, job);
                             }
                         }
                     }
@@ -256,5 +258,23 @@ pub fn handle_delivering_resources_phase(
             }
         }
     }
+    job
+}
+
+fn handle_pathfinding_failure(world: &mut World, _eid: u32, mut job: JsonValue) -> JsonValue {
+    // Mark job as blocked, emit event, unassign agent
+    job["phase"] = serde_json::json!("blocked");
+    job["status"] = serde_json::json!("blocked");
+    if let Some(agent_id) = job.get("assigned_to").and_then(|v| v.as_u64()) {
+        let agent_id = agent_id as u32;
+        if let Some(mut agent) = world.get_component(agent_id, "Agent").cloned() {
+            agent.as_object_mut().unwrap().remove("current_job");
+            agent["state"] = serde_json::json!("idle");
+            let _ = world.set_component(agent_id, "Agent", agent);
+        }
+        job.as_object_mut().unwrap().remove("assigned_to");
+    }
+    // Emit job_blocked event
+    crate::systems::job::system::JobSystem::emit_job_event(world, "job_blocked", &job, None);
     job
 }
