@@ -1,6 +1,6 @@
 use crate::ecs::system::System;
 use crate::ecs::world::World;
-use serde_json::{Value as JsonValue, json};
+use serde_json::Value as JsonValue;
 
 /// Status of resource reservation for a job.
 #[derive(Debug, PartialEq, Eq)]
@@ -57,11 +57,8 @@ impl ResourceReservationSystem {
                 };
 
                 if Self::can_reserve(resources, requirements) {
-                    // Reserve: subtract from available, record in job
-                    Self::reserve(resources, requirements);
-                    world
-                        .set_component(stockpile_eid, "Stockpile", stockpile)
-                        .unwrap();
+                    // Instead of subtracting, just mark reservation on job.
+                    // Do NOT modify the stockpile resources here!
 
                     // Mark reservation on job
                     let mut job = job.clone();
@@ -108,37 +105,7 @@ impl ResourceReservationSystem {
             Some(j) => j.clone(),
             None => return,
         };
-        let reserved = match job.get("reserved_resources").and_then(|v| v.as_array()) {
-            Some(r) => r,
-            None => return,
-        };
-        let stockpile_eid = match job.get("reserved_stockpile").and_then(|v| v.as_u64()) {
-            Some(eid) => eid as u32,
-            None => return,
-        };
-        let mut stockpile = match world.get_component(stockpile_eid, "Stockpile") {
-            Some(s) => s.clone(),
-            None => return,
-        };
-        let resources = match stockpile
-            .get_mut("resources")
-            .and_then(|v| v.as_object_mut())
-        {
-            Some(r) => r,
-            None => return,
-        };
-        // Release: add back the reserved amounts
-        for req in reserved {
-            let kind = req.get("kind").and_then(|v| v.as_str()).unwrap_or("");
-            let amount = req.get("amount").and_then(|v| v.as_i64()).unwrap_or(0);
-            let entry = resources.entry(kind.to_string()).or_insert(json!(0));
-            *entry = json!(entry.as_i64().unwrap_or(0) + amount);
-        }
-        world
-            .set_component(stockpile_eid, "Stockpile", stockpile)
-            .unwrap();
-
-        // Remove reservation markers from job
+        // Only remove reservation markers; do NOT add resources back to stockpile!
         let mut job = job.clone();
         job.as_object_mut().unwrap().remove("reserved_resources");
         job.as_object_mut().unwrap().remove("reserved_stockpile");
@@ -160,16 +127,6 @@ impl ResourceReservationSystem {
             }
         }
         true
-    }
-
-    /// Internal: subtracts reserved amounts from resources.
-    fn reserve(resources: &mut serde_json::Map<String, JsonValue>, requirements: &[JsonValue]) {
-        for req in requirements {
-            let kind = req.get("kind").and_then(|v| v.as_str()).unwrap_or("");
-            let amount = req.get("amount").and_then(|v| v.as_i64()).unwrap_or(0);
-            let entry = resources.entry(kind.to_string()).or_insert(json!(0));
-            *entry = json!(entry.as_i64().unwrap_or(0) - amount);
-        }
     }
 }
 

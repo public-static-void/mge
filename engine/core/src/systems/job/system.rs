@@ -127,6 +127,10 @@ impl JobSystem {
             .get("cancelled")
             .and_then(|v| v.as_bool())
             .unwrap_or(false);
+        let cancelled_cleanup_done = job
+            .get("cancelled_cleanup_done")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
 
         // --- dependency failure ---
         if let Some(dep_fail_status) = dependencies::dependency_failure_status(world, &job) {
@@ -158,8 +162,12 @@ impl JobSystem {
         }
 
         // --- cancelled ---
-        if is_cancelled {
+        if is_cancelled && !cancelled_cleanup_done {
             job["status"] = serde_json::json!("cancelled");
+            crate::systems::job::phases::handle_job_cancellation_cleanup(world, &job);
+            job["cancelled_cleanup_done"] = serde_json::json!(true);
+            // Save job immediately to persist the marker
+            world.set_component(eid, "Job", job.clone()).unwrap();
         }
 
         // --- children jobs ---
