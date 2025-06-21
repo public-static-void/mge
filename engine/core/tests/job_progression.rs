@@ -263,7 +263,7 @@ fn test_agent_moves_to_job_site_before_progress() {
     }
     world.map = Some(Map::new(Box::new(sq_map)));
 
-    // --- Register agent and jo BEFORE assignment ---
+    // --- Register agent and job BEFORE assignment ---
     world
         .set_component(
             1,
