@@ -3,6 +3,12 @@ use crate::systems::job::requirements;
 use serde_json::Value as JsonValue;
 
 pub fn handle_pending_phase(world: &mut World, eid: u32, mut job: JsonValue) -> JsonValue {
+    let status = job.get("status").and_then(|v| v.as_str()).unwrap_or("");
+    let phase = job.get("phase").and_then(|v| v.as_str()).unwrap_or("");
+    if status == "paused" || status == "interrupted" || phase == "paused" || phase == "interrupted"
+    {
+        return job;
+    }
     if job
         .get("cancelled")
         .and_then(|v| v.as_bool())
@@ -104,6 +110,12 @@ pub fn handle_pending_phase(world: &mut World, eid: u32, mut job: JsonValue) -> 
 }
 
 pub fn handle_going_to_site_phase(world: &mut World, _eid: u32, mut job: JsonValue) -> JsonValue {
+    let status = job.get("status").and_then(|v| v.as_str()).unwrap_or("");
+    let phase = job.get("phase").and_then(|v| v.as_str()).unwrap_or("");
+    if status == "paused" || status == "interrupted" || phase == "paused" || phase == "interrupted"
+    {
+        return job;
+    }
     if job
         .get("cancelled")
         .and_then(|v| v.as_bool())
@@ -139,6 +151,12 @@ pub fn handle_fetching_resources_phase(
     _eid: u32,
     mut job: JsonValue,
 ) -> JsonValue {
+    let status = job.get("status").and_then(|v| v.as_str()).unwrap_or("");
+    let phase = job.get("phase").and_then(|v| v.as_str()).unwrap_or("");
+    if status == "paused" || status == "interrupted" || phase == "paused" || phase == "interrupted"
+    {
+        return job;
+    }
     if job
         .get("cancelled")
         .and_then(|v| v.as_bool())
@@ -316,6 +334,12 @@ pub fn handle_delivering_resources_phase(
     _eid: u32,
     mut job: JsonValue,
 ) -> JsonValue {
+    let status = job.get("status").and_then(|v| v.as_str()).unwrap_or("");
+    let phase = job.get("phase").and_then(|v| v.as_str()).unwrap_or("");
+    if status == "paused" || status == "interrupted" || phase == "paused" || phase == "interrupted"
+    {
+        return job;
+    }
     if job
         .get("cancelled")
         .and_then(|v| v.as_bool())

@@ -19,7 +19,9 @@
         "failed",
         "cancelled",
         "blocked",
-        "waiting_for_resources"
+        "waiting_for_resources",
+        "paused",
+        "interrupted"
       ]
     },
     "phase": {
@@ -36,7 +38,9 @@
         "failed",
         "cancelled",
         "blocked",
-        "waiting_for_resources"
+        "waiting_for_resources",
+        "paused",
+        "interrupted"
       ],
       "default": "pending",
       "description": "Current execution phase of the job"

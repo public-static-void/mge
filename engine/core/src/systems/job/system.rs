@@ -222,6 +222,21 @@ impl JobSystem {
             .unwrap_or("")
             .to_string();
 
+        let current_phase = job
+            .get("phase")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+
+        if current_status == "paused"
+            || current_status == "interrupted"
+            || current_phase == "paused"
+            || current_phase == "interrupted"
+        {
+            // Do not progress job if paused or interrupted
+            return job;
+        }
+
         if !matches!(current_status.as_str(), "failed" | "complete" | "cancelled") {
             let assigned_to = job.get("assigned_to").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
             let job_id = job.get("id").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
