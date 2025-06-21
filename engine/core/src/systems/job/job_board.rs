@@ -41,7 +41,6 @@ impl JobBoard {
                     .and_then(|v| v.as_u64())
                     .unwrap_or(0);
 
-                // Only allow jobs with reserved resources (or no requirements) to be assignable
                 let resource_requirements = job.get("resource_requirements");
                 let has_reservation = job.get("reserved_resources").is_some()
                     && job.get("reserved_stockpile").is_some();
@@ -54,7 +53,7 @@ impl JobBoard {
                     || has_reservation;
 
                 if assigned == 0
-                    && status == "pending"
+                    && (status == "pending" || status == "interrupted")
                     && !job
                         .get("blocked")
                         .and_then(|v| v.as_bool())
@@ -65,7 +64,6 @@ impl JobBoard {
                 }
             }
         }
-        // Sort by: priority desc, least assigned, earliest last assigned, entity ID for stability
         candidates.sort_by(|a, b| {
             b.1.cmp(&a.1)
                 .then(a.2.cmp(&b.2))
@@ -94,7 +92,9 @@ impl JobBoard {
                         .map(|arr| Self::requirements_are_empty_or_zero(arr))
                         .unwrap_or(true)
                     || has_reservation;
-                assigned == 0 && status == "pending" && requirements_satisfied
+                assigned == 0
+                    && (status == "pending" || status == "interrupted")
+                    && requirements_satisfied
             } else {
                 false
             }
@@ -102,6 +102,10 @@ impl JobBoard {
             if let Some(job) = world.get_component(job_eid, "Job") {
                 let mut job = job.clone();
                 job["assigned_to"] = JsonValue::from(actor_eid);
+                if job.get("status").and_then(|v| v.as_str()) == Some("interrupted") {
+                    job["status"] = JsonValue::from("in_progress");
+                    job["phase"] = JsonValue::from("in_progress");
+                }
                 job["assignment_count"] = JsonValue::from(
                     job.get("assignment_count")
                         .and_then(|v| v.as_u64())
