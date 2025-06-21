@@ -1,3 +1,7 @@
+//! ECS component schema loader and validator for the Modular Game Engine.
+//!
+//! Handles loading, validating, and registering JSON schemas for ECS components.
+
 use serde::Deserialize;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -5,6 +9,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 /// A component schema loaded from a JSON file.
+///
 /// - `name`: The unique name of the component.
 /// - `schema`: The full JSON schema as a serde_json::Value.
 /// - `modes`: List of game modes this component is valid in.
@@ -23,6 +28,14 @@ pub fn save_schema_to_file(schema: &ComponentSchema, path: &Path) -> anyhow::Res
 }
 
 /// Loads all component schemas from a directory and all subdirectories, optionally validating them.
+///
+/// # Arguments
+/// * `dir` - The directory to search for JSON schema files.
+/// * `validate` - Whether to validate schemas.
+/// * `allowed_modes` - List of allowed game modes.
+///
+/// # Returns
+/// A map from component name to its schema.
 pub fn load_schemas_recursively<P: AsRef<Path>>(
     dir: P,
     validate: bool,
@@ -78,6 +91,13 @@ pub fn load_schemas_recursively<P: AsRef<Path>>(
 
 /// Loads all component schemas from a directory, validating them,
 /// and enforces allowed modes for ECS/gameplay components.
+///
+/// # Arguments
+/// * `dir` - The directory to search for JSON schema files.
+/// * `allowed_modes` - List of allowed game modes.
+///
+/// # Returns
+/// A map from component name to its schema.
 pub fn load_schemas_from_dir_with_modes<P: AsRef<Path>>(
     dir: P,
     allowed_modes: &[String],
