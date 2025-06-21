@@ -1,0 +1,10 @@
+{
+  "title": "Hazard",
+  "type": "object",
+  "properties": {
+    "active": { "type": "boolean" },
+    "slowdown_factor": { "type": "number", "minimum": 0, "maximum": 1 }
+  },
+  "required": ["active", "slowdown_factor"],
+  "modes": ["colony"]
+}
