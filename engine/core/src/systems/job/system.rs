@@ -190,11 +190,6 @@ impl JobSystem {
             return job;
         }
 
-        // --- always set to in_progress if pending ---
-        if job.get("status").and_then(|v| v.as_str()) == Some("pending") {
-            job["status"] = serde_json::json!("in_progress");
-        }
-
         // --- phase transitions ---
         let job = match job.get("phase").and_then(|v| v.as_str()) {
             Some("pending") | None => phases::handle_pending_phase(world, eid, job),
@@ -203,8 +198,11 @@ impl JobSystem {
             Some("delivering_resources") => {
                 phases::handle_delivering_resources_phase(world, eid, job)
             }
+            Some("at_site") => phases::handle_at_site_phase(world, eid, job),
             _ => job,
         };
+        // --- ENSURE JOB IS WRITTEN BACK ---
+        world.set_component(eid, "Job", job.clone()).unwrap();
         // Always run handler/progress logic after phase handling
         self.process_job_progress(world, eid, job_type, job)
     }
@@ -228,16 +226,23 @@ impl JobSystem {
             .unwrap_or("")
             .to_string();
 
-        if current_status == "paused"
-            || current_status == "interrupted"
-            || current_phase == "paused"
-            || current_phase == "interrupted"
+        let mut status = current_status.clone();
+        let phase = current_phase.clone();
+
+        if phase == "in_progress" && status == "pending" {
+            job["status"] = serde_json::json!("in_progress");
+            status = "in_progress".to_string();
+        }
+
+        if status == "paused"
+            || status == "interrupted"
+            || phase == "paused"
+            || phase == "interrupted"
         {
-            // Do not progress job if paused or interrupted
             return job;
         }
 
-        if !matches!(current_status.as_str(), "failed" | "complete" | "cancelled") {
+        if !matches!(status.as_str(), "failed" | "complete" | "cancelled") {
             let assigned_to = job.get("assigned_to").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
             let job_id = job.get("id").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
 
@@ -256,8 +261,8 @@ impl JobSystem {
             }
         }
 
-        if !matches!(current_status.as_str(), "failed" | "complete" | "cancelled") {
-            if current_status == "in_progress" {
+        if !matches!(status.as_str(), "failed" | "complete" | "cancelled") {
+            if status == "in_progress" {
                 let assigned_to =
                     job.get("assigned_to").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
                 let mut progress_increment = 1.0;
@@ -291,7 +296,7 @@ impl JobSystem {
             }
             job
         } else {
-            if current_status == "complete"
+            if status == "complete"
                 && job.get("progress").and_then(|v| v.as_f64()).unwrap_or(0.0) < 3.0
             {
                 job["progress"] = serde_json::json!(3.0);
