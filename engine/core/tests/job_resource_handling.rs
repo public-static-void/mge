@@ -48,6 +48,20 @@ fn test_agent_fetches_and_delivers_resources_for_job() {
             }),
         )
         .unwrap();
+    world
+        .set_component(
+            agent_id,
+            "Inventory",
+            json!({
+                "max_weight": 100.0,
+                "max_slots": 10,
+                "max_volume": 100.0,
+                "weight": 0.0,
+                "slots": [],
+                "volume": 0.0
+            }),
+        )
+        .unwrap();
 
     let stockpile_id = world.spawn_entity();
     world

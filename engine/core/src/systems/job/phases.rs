@@ -1,10 +1,22 @@
 use crate::ecs::world::World;
+use crate::systems::economic::resource::get_resource_unit_properties;
 use crate::systems::job::requirements;
-use serde_json::Value as JsonValue;
+use serde_json::{Value as JsonValue, json};
 
+pub fn handle_at_site_phase(
+    _world: &mut crate::ecs::world::World,
+    _eid: u32,
+    mut job: serde_json::Value,
+) -> serde_json::Value {
+    job["phase"] = serde_json::json!("in_progress");
+    job
+}
+
+/// Handles the "pending" phase of a job, including transitions to fetching_resources or going_to_site.
 pub fn handle_pending_phase(world: &mut World, eid: u32, mut job: JsonValue) -> JsonValue {
     let status = job.get("status").and_then(|v| v.as_str()).unwrap_or("");
     let phase = job.get("phase").and_then(|v| v.as_str()).unwrap_or("");
+
     if status == "paused" || status == "interrupted" || phase == "paused" || phase == "interrupted"
     {
         return job;
@@ -66,21 +78,21 @@ pub fn handle_pending_phase(world: &mut World, eid: u32, mut job: JsonValue) -> 
                         if let Some(map) = &world.map {
                             if let Some(pathfinding) = map.find_path(&agent_cell, &target_cell) {
                                 let move_path: Vec<JsonValue> = pathfinding
-                                    .path
-                                    .into_iter()
-                                    .skip(1)
-                                    .map(|cell| match cell {
-                                        crate::map::CellKey::Square { x, y, z } => {
-                                            serde_json::json!({ "Square": { "x": x, "y": y, "z": z } })
-                                        }
-                                        crate::map::CellKey::Hex { q, r, z } => {
-                                            serde_json::json!({ "Hex": { "q": q, "r": r, "z": z } })
-                                        }
-                                        crate::map::CellKey::Region { ref id } => {
-                                            serde_json::json!({ "Region": { "id": id } })
-                                        }
-                                    })
-                                    .collect();
+                                .path
+                                .into_iter()
+                                .skip(1)
+                                .map(|cell| match cell {
+                                    crate::map::CellKey::Square { x, y, z } => {
+                                        serde_json::json!({ "Square": { "x": x, "y": y, "z": z } })
+                                    }
+                                    crate::map::CellKey::Hex { q, r, z } => {
+                                        serde_json::json!({ "Hex": { "q": q, "r": r, "z": z } })
+                                    }
+                                    crate::map::CellKey::Region { ref id } => {
+                                        serde_json::json!({ "Region": { "id": id } })
+                                    }
+                                })
+                                .collect();
                                 agent["move_path"] = serde_json::json!(move_path);
                                 let _ = world.set_component(assigned_to, "Agent", agent);
                             } else {
@@ -91,7 +103,8 @@ pub fn handle_pending_phase(world: &mut World, eid: u32, mut job: JsonValue) -> 
                     job["phase"] = serde_json::json!("going_to_site");
                     return job;
                 } else {
-                    job["phase"] = serde_json::json!("at_site");
+                    // CHANGE THIS LINE:
+                    job["phase"] = serde_json::json!("in_progress");
                     return job;
                 }
             }
@@ -109,6 +122,7 @@ pub fn handle_pending_phase(world: &mut World, eid: u32, mut job: JsonValue) -> 
     job
 }
 
+/// Handles the "going_to_site" phase of a job, including pathfinding.
 pub fn handle_going_to_site_phase(world: &mut World, _eid: u32, mut job: JsonValue) -> JsonValue {
     let status = job.get("status").and_then(|v| v.as_str()).unwrap_or("");
     let phase = job.get("phase").and_then(|v| v.as_str()).unwrap_or("");
@@ -146,6 +160,7 @@ pub fn handle_going_to_site_phase(world: &mut World, _eid: u32, mut job: JsonVal
     job
 }
 
+/// Handles the "fetching_resources" phase: agent picks up as much as possible from stockpile,
 pub fn handle_fetching_resources_phase(
     world: &mut World,
     _eid: u32,
@@ -236,51 +251,121 @@ pub fn handle_fetching_resources_phase(
                     job["phase"] = serde_json::json!("fetching_resources");
                     return job;
                 } else {
-                    // At stockpile: try to pick up resources
+                    // At stockpile: try to pick up as much as possible
                     let mut agent = world.get_component(assigned_to, "Agent").cloned().unwrap();
                     let mut stockpile = world
                         .get_component(reserved_stockpile.unwrap(), "Stockpile")
                         .cloned()
                         .unwrap();
-                    let stock_resources = stockpile
-                        .get_mut("resources")
-                        .and_then(|v| v.as_object_mut())
-                        .unwrap();
 
-                    // Check if all required resources are present
-                    let mut can_pickup = true;
-                    for req in &requirements {
-                        let kind = req.get("kind").and_then(|v| v.as_str()).unwrap_or("");
-                        let amount = req.get("amount").and_then(|v| v.as_i64()).unwrap_or(0);
-                        let available = stock_resources
-                            .get(kind)
-                            .and_then(|v| v.as_i64())
-                            .unwrap_or(0);
-                        if available < amount {
-                            can_pickup = false;
-                            break;
+                    let mut pickup: Vec<JsonValue> = Vec::new();
+                    let mut any_picked_up = false;
+                    {
+                        let stock_resources = stockpile
+                            .get_mut("resources")
+                            .and_then(|v| v.as_object_mut())
+                            .unwrap();
+
+                        // --- Inventory capacity check ---
+                        let mut max_weight = f64::INFINITY;
+                        let mut max_slots = usize::MAX;
+                        let mut max_volume = f64::INFINITY;
+                        let mut cur_weight = 0.0;
+                        let mut cur_slots = 0;
+                        let mut cur_volume = 0.0;
+                        if let Some(inv) = world.get_component(assigned_to, "Inventory") {
+                            max_weight = inv
+                                .get("max_weight")
+                                .and_then(|v| v.as_f64())
+                                .unwrap_or(f64::INFINITY);
+                            max_slots =
+                                inv.get("max_slots")
+                                    .and_then(|v| v.as_u64())
+                                    .unwrap_or(u64::MAX) as usize;
+                            max_volume = inv
+                                .get("max_volume")
+                                .and_then(|v| v.as_f64())
+                                .unwrap_or(f64::INFINITY);
+                            cur_weight = inv.get("weight").and_then(|v| v.as_f64()).unwrap_or(0.0);
+                            cur_slots = inv
+                                .get("slots")
+                                .and_then(|v| v.as_array())
+                                .map(|a| a.len())
+                                .unwrap_or(0);
+                            cur_volume = inv.get("volume").and_then(|v| v.as_f64()).unwrap_or(0.0);
+                        }
+
+                        for req in &requirements {
+                            let kind = req.get("kind").and_then(|v| v.as_str()).unwrap_or("");
+                            let amount_needed =
+                                req.get("amount").and_then(|v| v.as_i64()).unwrap_or(0);
+
+                            // How much already delivered for this kind?
+                            let delivered_so_far = job
+                                .get("delivered_resources")
+                                .and_then(|arr| arr.as_array())
+                                .and_then(|arr| {
+                                    arr.iter().find(|r| {
+                                        r.get("kind") == Some(&JsonValue::String(kind.to_string()))
+                                    })
+                                })
+                                .and_then(|r| r.get("amount").and_then(|v| v.as_i64()))
+                                .unwrap_or(0);
+
+                            let amount_remaining = amount_needed - delivered_so_far;
+                            if amount_remaining <= 0 {
+                                continue;
+                            }
+
+                            // How much available in stockpile?
+                            let available = stock_resources
+                                .get(kind)
+                                .and_then(|v| v.as_i64())
+                                .unwrap_or(0);
+                            if available <= 0 {
+                                continue;
+                            }
+
+                            let (unit_weight, unit_volume) =
+                                get_resource_unit_properties(world, kind);
+                            let can_carry_by_weight =
+                                ((max_weight - cur_weight) / unit_weight).floor() as i64;
+                            let can_carry_by_volume =
+                                ((max_volume - cur_volume) / unit_volume).floor() as i64;
+                            let can_carry_by_slots = max_slots as i64 - cur_slots as i64;
+
+                            let mut can_carry = amount_remaining.min(available);
+                            can_carry = can_carry.min(can_carry_by_weight);
+                            can_carry = can_carry.min(can_carry_by_volume);
+                            can_carry = can_carry.min(can_carry_by_slots);
+
+                            if can_carry > 0 {
+                                any_picked_up = true;
+                                pickup.push(json!({"kind": kind, "amount": can_carry}));
+                                // Update inventory tracking for next resource kind
+                                cur_weight += unit_weight * can_carry as f64;
+                                cur_volume += unit_volume * can_carry as f64;
+                                cur_slots += 1; // one slot per resource kind
+                                // Subtract from stockpile
+                                let entry =
+                                    stock_resources.entry(kind.to_string()).or_insert(json!(0));
+                                *entry = json!(entry.as_i64().unwrap_or(0) - can_carry);
+                            }
                         }
                     }
-                    if !can_pickup {
-                        job["status"] = serde_json::json!("waiting_for_resources");
+
+                    if !any_picked_up {
+                        // Can't pick up anything (encumbered or nothing available)
+                        job["status"] = json!("waiting_for_resources");
                         return job;
                     }
 
-                    // Subtract resources from stockpile
-                    for req in &requirements {
-                        let kind = req.get("kind").and_then(|v| v.as_str()).unwrap_or("");
-                        let amount = req.get("amount").and_then(|v| v.as_i64()).unwrap_or(0);
-                        let entry = stock_resources
-                            .entry(kind.to_string())
-                            .or_insert(serde_json::json!(0));
-                        *entry = serde_json::json!(entry.as_i64().unwrap_or(0) - amount);
-                    }
                     world
                         .set_component(reserved_stockpile.unwrap(), "Stockpile", stockpile)
                         .unwrap();
 
                     // Give resources to agent
-                    agent["carried_resources"] = serde_json::json!(requirements);
+                    agent["carried_resources"] = json!(pickup);
 
                     // Set move_path to job site after pickup
                     if let Some(target_pos) = job.get("target_position") {
@@ -301,17 +386,17 @@ pub fn handle_fetching_resources_phase(
                                                 .skip(1)
                                                 .map(|cell| match cell {
                                                     crate::map::CellKey::Square { x, y, z } => {
-                                                        serde_json::json!({ "Square": { "x": x, "y": y, "z": z } })
+                                                        json!({ "Square": { "x": x, "y": y, "z": z } })
                                                     }
                                                     crate::map::CellKey::Hex { q, r, z } => {
-                                                        serde_json::json!({ "Hex": { "q": q, "r": r, "z": z } })
+                                                        json!({ "Hex": { "q": q, "r": r, "z": z } })
                                                     }
                                                     crate::map::CellKey::Region { ref id } => {
-                                                        serde_json::json!({ "Region": { "id": id } })
+                                                        json!({ "Region": { "id": id } })
                                                     }
                                                 })
                                                 .collect();
-                                            agent["move_path"] = serde_json::json!(move_path);
+                                            agent["move_path"] = json!(move_path);
                                         }
                                     }
                                 }
@@ -320,7 +405,7 @@ pub fn handle_fetching_resources_phase(
                     }
                     let _ = world.set_component(assigned_to, "Agent", agent);
 
-                    job["phase"] = serde_json::json!("delivering_resources");
+                    job["phase"] = json!("delivering_resources");
                     return job;
                 }
             }
@@ -329,11 +414,12 @@ pub fn handle_fetching_resources_phase(
     job
 }
 
+/// Handles the "delivering_resources" phase: agent delivers carried resources to job site.
 pub fn handle_delivering_resources_phase(
     world: &mut World,
     _eid: u32,
-    mut job: JsonValue,
-) -> JsonValue {
+    mut job: serde_json::Value,
+) -> serde_json::Value {
     let status = job.get("status").and_then(|v| v.as_str()).unwrap_or("");
     let phase = job.get("phase").and_then(|v| v.as_str()).unwrap_or("");
     if status == "paused" || status == "interrupted" || phase == "paused" || phase == "interrupted"
@@ -355,7 +441,7 @@ pub fn handle_delivering_resources_phase(
         return job;
     }
     let assigned_to = job.get("assigned_to").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
-    let _requirements = job
+    let requirements = job
         .get("resource_requirements")
         .and_then(|v| v.as_array())
         .cloned()
@@ -375,7 +461,7 @@ pub fn handle_delivering_resources_phase(
                 if move_path_empty {
                     if let Some(map) = &world.map {
                         if let Some(pathfinding) = map.find_path(&agent_cell, &target_cell) {
-                            let move_path: Vec<JsonValue> = pathfinding
+                            let move_path: Vec<serde_json::Value> = pathfinding
                                 .path
                                 .into_iter()
                                 .skip(1)
@@ -405,10 +491,64 @@ pub fn handle_delivering_resources_phase(
                     .get("carried_resources")
                     .cloned()
                     .unwrap_or(serde_json::json!([]));
-                job["delivered_resources"] = carried.clone();
-                job["phase"] = serde_json::json!("in_progress");
+
+                // Incrementally add carried resources to delivered_resources
+                let delivered = job
+                    .get("delivered_resources")
+                    .and_then(|v| v.as_array())
+                    .cloned()
+                    .unwrap_or_else(Vec::new);
+
+                use std::collections::HashMap;
+                let mut delivered_map: HashMap<String, i64> = HashMap::new();
+                for res in &delivered {
+                    if let (Some(kind), Some(amount)) = (
+                        res.get("kind").and_then(|v| v.as_str()),
+                        res.get("amount").and_then(|v| v.as_i64()),
+                    ) {
+                        delivered_map.insert(kind.to_string(), amount);
+                    }
+                }
+                for res in carried.as_array().unwrap_or(&vec![]) {
+                    if let (Some(kind), Some(amount)) = (
+                        res.get("kind").and_then(|v| v.as_str()),
+                        res.get("amount").and_then(|v| v.as_i64()),
+                    ) {
+                        *delivered_map.entry(kind.to_string()).or_insert(0) += amount;
+                    }
+                }
+                // Rebuild delivered_resources array
+                let mut new_delivered: Vec<serde_json::Value> = Vec::new();
+                for req in &requirements {
+                    if let Some(kind) = req.get("kind").and_then(|v| v.as_str()) {
+                        let amount = delivered_map.get(kind).cloned().unwrap_or(0);
+                        new_delivered.push(serde_json::json!({"kind": kind, "amount": amount}));
+                    }
+                }
+                job["delivered_resources"] = serde_json::Value::Array(new_delivered);
+
+                // Remove resources from agent
                 agent.as_object_mut().unwrap().remove("carried_resources");
                 let _ = world.set_component(assigned_to, "Agent", agent);
+
+                // Check if all requirements are met
+                let mut all_met = true;
+                for req in &requirements {
+                    let kind = req.get("kind").and_then(|v| v.as_str()).unwrap_or("");
+                    let needed = req.get("amount").and_then(|v| v.as_i64()).unwrap_or(0);
+                    let delivered = delivered_map.get(kind).cloned().unwrap_or(0);
+                    if delivered < needed {
+                        all_met = false;
+                        break;
+                    }
+                }
+                if all_met {
+                    job["phase"] = serde_json::json!("in_progress");
+                    job["status"] = serde_json::json!("in_progress"); // <-- FIX: set status!
+                } else {
+                    // Need more deliveries: go back to fetching_resources
+                    job["phase"] = serde_json::json!("fetching_resources");
+                }
                 return job;
             }
         }
@@ -416,6 +556,7 @@ pub fn handle_delivering_resources_phase(
     job
 }
 
+/// Handles cleanup for cancelled jobs (drops carried resources at agent's position).
 pub fn handle_job_cancellation_cleanup(world: &mut World, job: &JsonValue) {
     let assigned_to = job.get("assigned_to").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
     if assigned_to != 0 {

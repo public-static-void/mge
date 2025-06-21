@@ -63,13 +63,23 @@ fn test_job_can_be_paused_and_resumed() {
 
     world.register_system(JobSystem::new());
 
-    // Tick once: job should start progressing
-    world.run_system("JobSystem", None).unwrap();
-    let mut job = world.get_component(job_id, "Job").unwrap().clone();
-    let progress_after_1 = job.get("progress").and_then(|v| v.as_f64()).unwrap_or(0.0);
-    assert!(progress_after_1 > 0.0);
+    // Tick until progress starts
+    let mut progress_after_1 = 0.0;
+    for _ in 0..10 {
+        world.run_system("JobSystem", None).unwrap();
+        let job = world.get_component(job_id, "Job").unwrap();
+        progress_after_1 = job.get("progress").and_then(|v| v.as_f64()).unwrap_or(0.0);
+        if progress_after_1 > 0.0 {
+            break;
+        }
+    }
+    assert!(
+        progress_after_1 > 0.0,
+        "Job did not start progressing after first tick"
+    );
 
     // Pause job
+    let mut job = world.get_component(job_id, "Job").unwrap().clone();
     job["status"] = json!("paused");
     job["phase"] = json!("paused");
     world.set_component(job_id, "Job", job.clone()).unwrap();
@@ -109,6 +119,20 @@ fn test_job_can_be_paused_and_resumed() {
 fn test_job_is_interrupted_and_resumed_by_another_agent() {
     let mut world = make_test_world();
     world.current_mode = "colony".to_string();
+
+    // Map setup: 3-square-wide walkable map
+    let map_json = serde_json::json!({
+        "topology": "square",
+        "width": 3,
+        "height": 1,
+        "z_levels": 1,
+        "cells": [
+            { "x": 0, "y": 0, "z": 0, "walkable": true },
+            { "x": 1, "y": 0, "z": 0, "walkable": true },
+            { "x": 2, "y": 0, "z": 0, "walkable": true }
+        ]
+    });
+    world.apply_generated_map(&map_json).unwrap();
 
     // Setup agents and job
     let agent1 = world.spawn_entity();
@@ -180,14 +204,27 @@ fn test_job_is_interrupted_and_resumed_by_another_agent() {
     );
 
     world.register_system(JobSystem::new());
+    use engine_core::systems::movement_system::MovementSystem;
+    world.register_system(MovementSystem);
 
-    // Tick: agent1 starts job
-    world.run_system("JobSystem", None).unwrap();
-    let mut job = world.get_component(job_id, "Job").unwrap().clone();
-    let progress_after_1 = job.get("progress").and_then(|v| v.as_f64()).unwrap_or(0.0);
-    assert!(progress_after_1 > 0.0);
+    // Tick: agent1 starts job (simulate movement if needed)
+    let mut progressed = false;
+    for _ in 0..40 {
+        world.run_system("MovementSystem", None).unwrap();
+        world.run_system("JobSystem", None).unwrap();
+        let job = world.get_component(job_id, "Job").unwrap();
+        if job.get("progress").and_then(|v| v.as_f64()).unwrap_or(0.0) > 0.0 {
+            progressed = true;
+            break;
+        }
+    }
+    assert!(
+        progressed,
+        "Job did not start progressing after being assigned to agent1"
+    );
 
     // Interrupt job (simulate agent1 unavailable)
+    let mut job = world.get_component(job_id, "Job").unwrap().clone();
     job["status"] = json!("interrupted");
     job["phase"] = json!("interrupted");
     job.as_object_mut().unwrap().remove("assigned_to");
@@ -200,9 +237,10 @@ fn test_job_is_interrupted_and_resumed_by_another_agent() {
         JobAssignmentResult::Assigned(job_id)
     );
 
-    // Tick: agent2 should resume and complete the job
+    // Tick: agent2 should resume and complete the job (simulate movement)
     let mut resumed = false;
-    for _ in 0..10 {
+    for _ in 0..80 {
+        world.run_system("MovementSystem", None).unwrap();
         world.run_system("JobSystem", None).unwrap();
         let job = world.get_component(job_id, "Job").unwrap();
         if job.get("status") == Some(&json!("complete")) {

@@ -1,3 +1,7 @@
+//! ECS world module for the Modular Game Engine.
+//!
+//! Defines the World struct, which holds all entities, components, systems, and loaded assets.
+
 use crate::ecs::registry::ComponentRegistry;
 use crate::ecs::system::SystemRegistry;
 use crate::map::Map;
@@ -22,6 +26,7 @@ pub mod wasm;
 pub type MapPostprocessor = Arc<dyn Fn(&mut World) -> Result<(), String> + Send + Sync>;
 pub type MapValidator = Arc<dyn Fn(&serde_json::Value) -> Result<(), String> + Send + Sync>;
 
+/// Represents the in-memory game world, including all ECS state and loaded assets.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct TimeOfDay {
     pub hour: u8,
@@ -30,11 +35,16 @@ pub struct TimeOfDay {
 
 #[derive(Serialize, Deserialize)]
 pub struct World {
+    /// List of all entity IDs in the world.
     pub entities: Vec<u32>,
+    /// Map from component name to a map of entity IDs to component data.
     pub components: HashMap<String, HashMap<u32, JsonValue>>,
     next_id: u32,
+    /// Current game mode.
     pub current_mode: String,
+    /// Current turn number.
     pub turn: u32,
+    /// Current time of day.
     pub time_of_day: TimeOfDay,
     #[serde(skip)]
     pub registry: Arc<Mutex<ComponentRegistry>>,
@@ -66,9 +76,21 @@ pub struct World {
     pub map_validators: Vec<MapValidator>,
     #[serde(skip)]
     pub ai_event_intents: VecDeque<JsonValue>,
+
+    // --- Asset/data fields ---
+    /// Map from resource kind to resource definition (loaded from assets/resources).
+    #[serde(skip)]
+    pub resource_definitions: HashMap<String, JsonValue>,
+    /// Map from recipe name to recipe definition (loaded from assets/recipes).
+    #[serde(skip)]
+    pub recipes: HashMap<String, JsonValue>,
+    /// Map from job name to job definition (loaded from assets/jobs).
+    #[serde(skip)]
+    pub jobs: HashMap<String, JsonValue>,
 }
 
 impl World {
+    /// Creates a new World with the given component registry.
     pub fn new(registry: Arc<Mutex<ComponentRegistry>>) -> Self {
         World {
             entities: Vec::new(),
@@ -93,6 +115,10 @@ impl World {
             map_postprocessors: Vec::new(),
             map_validators: Vec::new(),
             ai_event_intents: VecDeque::new(),
+            // --- Asset/data fields ---
+            resource_definitions: HashMap::new(),
+            recipes: HashMap::new(),
+            jobs: HashMap::new(),
         }
     }
 }

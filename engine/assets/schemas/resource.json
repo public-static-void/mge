@@ -3,7 +3,9 @@
   "type": "object",
   "properties": {
     "kind": { "type": "string" },
-    "amount": { "type": "number", "minimum": 0 }
+    "amount": { "type": "number", "minimum": 0 },
+    "unit_weight": { "type": "number", "minimum": 0, "default": 1 },
+    "unit_volume": { "type": "number", "minimum": 0, "default": 1 }
   },
   "required": ["kind", "amount"],
   "modes": ["colony"]
