@@ -48,6 +48,21 @@ fn test_agent_fetches_and_delivers_resources_with_failure_and_interruption() {
             }),
         )
         .unwrap();
+    // Add Inventory to the agent for robust pickup logic
+    world
+        .set_component(
+            agent_id,
+            "Inventory",
+            json!({
+                "max_weight": 100.0,
+                "max_slots": 10,
+                "max_volume": 100.0,
+                "weight": 0.0,
+                "slots": [],
+                "volume": 0.0
+            }),
+        )
+        .unwrap();
 
     // Stockpile setup
     let stockpile_id = world.spawn_entity();

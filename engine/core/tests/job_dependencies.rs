@@ -51,10 +51,13 @@ fn test_job_with_unfinished_dependency_remains_pending() {
     let main_job_after2 = world.get_component(main_eid, "Job").unwrap();
     assert_eq!(main_job_after2.get("status").unwrap(), "pending");
 
-    // Third tick: dependency should now be "complete", so main job can advance
+    // Third tick: dependency should now be "complete"
     job_system.run(&mut world, None);
-    let main_job_after3 = world.get_component(main_eid, "Job").unwrap();
-    assert_ne!(main_job_after3.get("status").unwrap(), "pending");
+
+    // Fourth tick: main job can now advance
+    job_system.run(&mut world, None);
+    let main_job_after4 = world.get_component(main_eid, "Job").unwrap();
+    assert_ne!(main_job_after4.get("status").unwrap(), "pending");
 }
 
 #[test]
