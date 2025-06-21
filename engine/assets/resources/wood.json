@@ -1,0 +1,6 @@
+{
+  "kind": "wood",
+  "unit_weight": 1.0,
+  "unit_volume": 1.0,
+  "modes": ["colony"]
+}
