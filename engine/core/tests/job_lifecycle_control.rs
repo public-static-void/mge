@@ -205,7 +205,7 @@ fn test_job_is_interrupted_and_resumed_by_another_agent() {
 
     world.register_system(JobSystem::new());
     use engine_core::systems::movement_system::MovementSystem;
-    world.register_system(MovementSystem::default());
+    world.register_system(MovementSystem);
 
     // Tick: agent1 starts job (simulate movement if needed)
     let mut progressed = false;
