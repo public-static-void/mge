@@ -10,14 +10,19 @@ impl World {
     }
 
     pub fn despawn_entity(&mut self, entity: u32) {
-        for comps in self.components.values_mut() {
-            comps.remove(&entity);
+        for (_comp_name, comps) in self.components.iter_mut() {
+            let _existed = comps.remove(&entity).is_some();
         }
         self.entities.retain(|&id| id != entity);
     }
 
     pub fn entity_exists(&self, entity: u32) -> bool {
-        self.entities.contains(&entity)
+        let in_entities = self.entities.contains(&entity);
+        let in_any_component = self
+            .components
+            .values()
+            .any(|comp_map| comp_map.contains_key(&entity));
+        in_entities || in_any_component
     }
 
     pub fn get_entities(&self) -> Vec<u32> {

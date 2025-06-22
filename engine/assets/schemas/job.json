@@ -106,9 +106,19 @@
       "description": "Subtasks of this job"
     },
     "dependencies": {
-      "type": "array",
-      "items": { "type": "string" },
-      "description": "IDs or references of prerequisite jobs"
+      "description": "Prerequisite jobs or world/entity conditions. Supports AND/OR/NOT/world/entity-state.",
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              { "type": "string" },
+              { "$ref": "#/definitions/DependencyExpr" }
+            ]
+          }
+        },
+        { "$ref": "#/definitions/DependencyExpr" }
+      ]
     },
     "cancelled": { "type": "boolean", "default": false },
     "applied_effects": {
@@ -147,5 +157,57 @@
       }
     }
   },
-  "required": ["job_type", "status", "category"]
+  "required": ["job_type", "status", "category"],
+  "definitions": {
+    "DependencyExpr": {
+      "type": "object",
+      "properties": {
+        "all_of": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              { "type": "string" },
+              { "$ref": "#/definitions/DependencyExpr" }
+            ]
+          }
+        },
+        "any_of": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              { "type": "string" },
+              { "$ref": "#/definitions/DependencyExpr" }
+            ]
+          }
+        },
+        "not": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              { "type": "string" },
+              { "$ref": "#/definitions/DependencyExpr" }
+            ]
+          }
+        },
+        "world_state": {
+          "type": "object",
+          "properties": {
+            "resource": { "type": "string" },
+            "gte": { "type": "number" },
+            "lte": { "type": "number" }
+          }
+        },
+        "entity_state": {
+          "type": "object",
+          "properties": {
+            "entity": { "type": "integer" },
+            "component": { "type": "string" },
+            "field": { "type": "string" },
+            "gte": { "type": "number" },
+            "lte": { "type": "number" }
+          }
+        }
+      }
+    }
+  }
 }

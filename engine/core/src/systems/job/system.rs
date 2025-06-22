@@ -3,6 +3,29 @@ use crate::ecs::world::World;
 use crate::systems::job::{children, dependencies, phases};
 use topo_sort::{SortResults, TopoSort};
 
+fn should_spawn_conditional_child(
+    world: &World,
+    parent_job: &serde_json::Value,
+    spawn_if: &serde_json::Value,
+) -> bool {
+    // Field equality on parent job
+    if let Some(field) = spawn_if.get("field").and_then(|v| v.as_str()) {
+        if let Some(equals) = spawn_if.get("equals") {
+            return parent_job.get(field) == Some(equals);
+        }
+    }
+    // World state condition (reuse dependency logic)
+    if let Some(ws) = spawn_if.get("world_state") {
+        return crate::systems::job::dependencies::evaluate_world_state(world, ws);
+    }
+    // Entity state condition (reuse dependency logic)
+    if let Some(es) = spawn_if.get("entity_state") {
+        return crate::systems::job::dependencies::evaluate_entity_state(world, es);
+    }
+    // Default: false (not satisfied)
+    false
+}
+
 #[derive(Default)]
 pub struct JobSystem;
 
@@ -154,7 +177,9 @@ impl JobSystem {
             }
             return job;
         }
-        if !dependencies::dependencies_complete(world, &job) {
+
+        // --- advanced dependency check ---
+        if !dependencies::dependencies_satisfied(world, &job) {
             if job.get("status").and_then(|v| v.as_str()) != Some("pending") {
                 job["status"] = serde_json::json!("pending");
             }
@@ -317,15 +342,33 @@ impl System for JobSystem {
 
         for &eid in &job_entities {
             let job = world.get_component(eid, "Job").unwrap();
-            let deps: Vec<u32> = job
-                .get("dependencies")
-                .and_then(|v| v.as_array())
-                .map(|arr| {
-                    arr.iter()
-                        .filter_map(|x| x.as_str()?.parse().ok())
-                        .collect()
-                })
-                .unwrap_or_default();
+            // --- ADVANCED DEPENDENCY GRAPH SUPPORT ---
+            // For topo sort, extract all referenced job entity dependencies recursively.
+            fn collect_job_deps(dep: &serde_json::Value, out: &mut Vec<u32>) {
+                if dep.is_string() {
+                    if let Ok(eid) = dep.as_str().unwrap().parse::<u32>() {
+                        out.push(eid);
+                    }
+                } else if dep.is_array() {
+                    for d in dep.as_array().unwrap() {
+                        collect_job_deps(d, out);
+                    }
+                } else if dep.is_object() {
+                    let obj = dep.as_object().unwrap();
+                    for key in &["all_of", "any_of", "not"] {
+                        if let Some(arr) = obj.get(*key) {
+                            for d in arr.as_array().unwrap() {
+                                collect_job_deps(d, out);
+                            }
+                        }
+                    }
+                }
+            }
+
+            let mut deps = Vec::new();
+            if let Some(dep_val) = job.get("dependencies") {
+                collect_job_deps(dep_val, &mut deps);
+            }
             sorter.insert(eid, deps);
         }
 
@@ -351,6 +394,16 @@ impl System for JobSystem {
                 .unwrap_or("default")
                 .to_string();
 
+            // --- Gather conditional_children for later ---
+            let cond_children = if old_status != new_status
+                && matches!(new_status, "complete" | "failed" | "cancelled")
+            {
+                new_job.get("conditional_children").cloned()
+            } else {
+                None
+            };
+
+            // --- Status change handling (may mutate new_job) ---
             if old_status != new_status {
                 if matches!(new_status, "complete" | "failed" | "cancelled") {
                     self.cleanup_agent_on_job_status(world, &new_job);
@@ -377,7 +430,25 @@ impl System for JobSystem {
                     _ => {}
                 }
             }
-            world.set_component(eid, "Job", new_job).unwrap();
+            world.set_component(eid, "Job", new_job.clone()).unwrap();
+
+            // --- CONDITIONAL CHILD JOB SPAWNING (after all mutable borrows) ---
+            if let Some(cond_children) = cond_children.and_then(|v| v.as_array().cloned()) {
+                for entry in cond_children {
+                    let spawn_if = entry
+                        .get("spawn_if")
+                        .cloned()
+                        .unwrap_or_else(|| serde_json::json!({}));
+                    let child_job = entry.get("job").expect("conditional child must have job");
+                    if should_spawn_conditional_child(world, &new_job, &spawn_if) {
+                        let new_child_id = world.spawn_entity();
+                        let mut new_child = child_job.clone();
+                        new_child["id"] = serde_json::json!(new_child_id);
+                        new_child["parent"] = serde_json::json!(eid);
+                        world.set_component(new_child_id, "Job", new_child).unwrap();
+                    }
+                }
+            }
         }
     }
 }
