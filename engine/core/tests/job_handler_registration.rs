@@ -21,24 +21,25 @@ fn test_register_job_handler_api_invokes_handler() {
         },
     );
 
+    let agent_id = world.spawn_entity();
     world
         .set_component(
-            1,
+            agent_id,
             "Agent",
             json!({
-                "entity_id": 1,
+                "entity_id": agent_id,
                 "state": "idle"
             }),
         )
         .unwrap();
-    world.entities.push(1);
 
+    let job_id = world.spawn_entity();
     world
         .set_component(
-            123,
+            job_id,
             "Job",
             json!({
-                "id": 123,
+                "id": job_id,
                 "job_type": "superfast",
                 "status": "pending",
                 "cancelled": false,
@@ -47,7 +48,6 @@ fn test_register_job_handler_api_invokes_handler() {
             }),
         )
         .unwrap();
-    world.entities.push(123);
 
     // Assign job to agent
     let mut job_board = JobBoard::default();
@@ -58,7 +58,7 @@ fn test_register_job_handler_api_invokes_handler() {
     let mut job_system = JobSystem::new();
     job_system.run(&mut world, None);
 
-    let job = world.get_component(123, "Job").unwrap();
+    let job = world.get_component(job_id, "Job").unwrap();
     assert_eq!(job.get("progress").unwrap(), 999.0);
     assert_eq!(job.get("status").unwrap(), "complete");
 }
@@ -88,12 +88,13 @@ fn test_register_job_handler_multiple_types() {
     );
 
     // Add jobs of both types
+    let job_foo_id = world.spawn_entity();
     world
         .set_component(
-            10,
+            job_foo_id,
             "Job",
             json!({
-                "id": 10,
+                "id": job_foo_id,
                 "job_type": "foo",
                 "status": "pending",
                 "cancelled": false,
@@ -102,14 +103,14 @@ fn test_register_job_handler_multiple_types() {
             }),
         )
         .unwrap();
-    world.entities.push(10);
 
+    let job_bar_id = world.spawn_entity();
     world
         .set_component(
-            20,
+            job_bar_id,
             "Job",
             json!({
-                "id": 20,
+                "id": job_bar_id,
                 "job_type": "bar",
                 "status": "pending",
                 "cancelled": false,
@@ -118,20 +119,19 @@ fn test_register_job_handler_multiple_types() {
             }),
         )
         .unwrap();
-    world.entities.push(20);
 
     // Add an agent so jobs can be assigned
+    let agent_id = world.spawn_entity();
     world
         .set_component(
-            1,
+            agent_id,
             "Agent",
             json!({
-                "entity_id": 1,
+                "entity_id": agent_id,
                 "state": "idle"
             }),
         )
         .unwrap();
-    world.entities.push(1);
 
     // Assign jobs to agent
     let mut job_board = JobBoard::default();
@@ -142,8 +142,8 @@ fn test_register_job_handler_multiple_types() {
     let mut job_system = JobSystem::new();
     job_system.run(&mut world, None);
 
-    let job_foo = world.get_component(10, "Job").unwrap();
-    let job_bar = world.get_component(20, "Job").unwrap();
+    let job_foo = world.get_component(job_foo_id, "Job").unwrap();
+    let job_bar = world.get_component(job_bar_id, "Job").unwrap();
     assert_eq!(job_foo.get("progress").unwrap(), 1.0);
     assert_eq!(job_foo.get("status").unwrap(), "complete");
     assert_eq!(job_bar.get("progress").unwrap(), 2.0);

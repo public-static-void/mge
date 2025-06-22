@@ -10,24 +10,25 @@ use serde_json::json;
 fn test_job_progression_over_ticks() {
     let mut world = world_helper::make_test_world();
 
+    let agent_id = world.spawn_entity();
     world
         .set_component(
-            1,
+            agent_id,
             "Agent",
             json!({
-                "entity_id": 1,
+                "entity_id": agent_id,
                 "state": "idle"
             }),
         )
         .unwrap();
-    world.entities.push(1);
 
+    let job_id = world.spawn_entity();
     world
         .set_component(
-            100,
+            job_id,
             "Job",
             json!({
-                "id": 100,
+                "id": job_id,
                 "job_type": "dig",
                 "status": "pending",
                 "cancelled": false,
@@ -36,7 +37,6 @@ fn test_job_progression_over_ticks() {
             }),
         )
         .unwrap();
-    world.entities.push(100);
 
     let mut job_board = JobBoard::default();
     job_board.update(&world);
@@ -45,7 +45,7 @@ fn test_job_progression_over_ticks() {
     let mut job_system = JobSystem::new();
     for _ in 0..5 {
         job_system.run(&mut world, None);
-        let job = world.get_component(100, "Job").unwrap();
+        let job = world.get_component(job_id, "Job").unwrap();
         let progress = job.get("progress").and_then(|v| v.as_f64()).unwrap_or(0.0);
         let status = job.get("status").and_then(|v| v.as_str()).unwrap();
         if progress < 3.0 {
@@ -61,7 +61,7 @@ fn test_job_progression_over_ticks() {
             break;
         }
     }
-    let job = world.get_component(100, "Job").unwrap();
+    let job = world.get_component(job_id, "Job").unwrap();
     assert_eq!(
         job.get("status").unwrap(),
         "complete",
@@ -86,24 +86,25 @@ fn test_custom_job_handler_overrides_progression() {
         );
     }
 
+    let agent_id = world.spawn_entity();
     world
         .set_component(
-            1,
+            agent_id,
             "Agent",
             json!({
-                "entity_id": 1,
+                "entity_id": agent_id,
                 "state": "idle"
             }),
         )
         .unwrap();
-    world.entities.push(1);
 
+    let job_id = world.spawn_entity();
     world
         .set_component(
-            101,
+            job_id,
             "Job",
             json!({
-                "id": 101,
+                "id": job_id,
                 "job_type": "instant",
                 "status": "pending",
                 "cancelled": false,
@@ -112,7 +113,6 @@ fn test_custom_job_handler_overrides_progression() {
             }),
         )
         .unwrap();
-    world.entities.push(101);
 
     let mut job_board = JobBoard::default();
     job_board.update(&world);
@@ -121,7 +121,7 @@ fn test_custom_job_handler_overrides_progression() {
     let mut job_system = JobSystem::new();
     job_system.run(&mut world, None);
 
-    let job = world.get_component(101, "Job").unwrap();
+    let job = world.get_component(job_id, "Job").unwrap();
     assert_eq!(
         job.get("progress").unwrap(),
         42.0,
@@ -161,16 +161,17 @@ fn test_effects_applied_only_on_completion_and_rolled_back_on_cancel() {
         world.effect_processor_registry = Some(registry);
     }
 
+    let terrain_id = world.spawn_entity();
     world
-        .set_component(200, "Terrain", json!({ "kind": "rock" }))
+        .set_component(terrain_id, "Terrain", json!({ "kind": "rock" }))
         .unwrap();
 
     world
         .set_component(
-            200,
+            terrain_id,
             "Job",
             json!({
-                "id": 200,
+                "id": terrain_id,
                 "job_type": "dig",
                 "status": "pending",
                 "cancelled": false,
@@ -199,7 +200,7 @@ fn test_effects_applied_only_on_completion_and_rolled_back_on_cancel() {
             job_system.run(&mut world, None);
         }
 
-        let terrain = world.get_component(200, "Terrain").unwrap();
+        let terrain = world.get_component(terrain_id, "Terrain").unwrap();
         assert_eq!(
             terrain["kind"], "tunnel",
             "Terrain should change to tunnel after job completion"
@@ -207,14 +208,14 @@ fn test_effects_applied_only_on_completion_and_rolled_back_on_cancel() {
     }
 
     world
-        .set_component(200, "Terrain", json!({ "kind": "rock" }))
+        .set_component(terrain_id, "Terrain", json!({ "kind": "rock" }))
         .unwrap();
     world
         .set_component(
-            200,
+            terrain_id,
             "Job",
             json!({
-                "id": 200,
+                "id": terrain_id,
                 "job_type": "dig",
                 "status": "pending",
                 "cancelled": true,
@@ -228,7 +229,7 @@ fn test_effects_applied_only_on_completion_and_rolled_back_on_cancel() {
         let mut job_system = JobSystem::new();
         job_system.run(&mut world, None);
 
-        let terrain = world.get_component(200, "Terrain").unwrap();
+        let terrain = world.get_component(terrain_id, "Terrain").unwrap();
         assert_eq!(
             terrain["kind"], "rock",
             "Terrain should remain rock after job cancellation"
@@ -263,10 +264,13 @@ fn test_agent_moves_to_job_site_before_progress() {
     }
     world.map = Some(Map::new(Box::new(sq_map)));
 
+    let agent_id = world.spawn_entity();
+    let job_id = world.spawn_entity();
+
     // --- Register agent and job BEFORE assignment ---
     world
         .set_component(
-            1,
+            agent_id,
             "Position",
             serde_json::to_value(engine_core::ecs::components::position::PositionComponent {
                 pos: engine_core::ecs::components::position::Position::Square { x: 0, y: 0, z: 0 },
@@ -277,10 +281,10 @@ fn test_agent_moves_to_job_site_before_progress() {
 
     world
         .set_component(
-            1,
+            agent_id,
             "Agent",
             serde_json::json!({
-                "entity_id": 1,
+                "entity_id": agent_id,
                 "state": "idle",
                 "specializations": [],
                 "job_queue": [],
@@ -292,10 +296,10 @@ fn test_agent_moves_to_job_site_before_progress() {
 
     world
         .set_component(
-            100,
+            job_id,
             "Job",
             serde_json::json!({
-                "id": 100,
+                "id": job_id,
                 "job_type": "dig",
                 "status": "pending",
                 "phase": "pending",
@@ -314,9 +318,6 @@ fn test_agent_moves_to_job_site_before_progress() {
         )
         .unwrap();
 
-    world.entities.push(1);
-    world.entities.push(100);
-
     let mut job_board = engine_core::systems::job::job_board::JobBoard::default();
     job_board.update(&world);
     engine_core::systems::job::assign_jobs(&mut world, &mut job_board);
@@ -331,11 +332,11 @@ fn test_agent_moves_to_job_site_before_progress() {
         world.run_system("MovementSystem", None).unwrap();
         world.run_system("JobSystem", None).unwrap();
 
-        let agent_pos_val = world.get_component(1, "Position").unwrap().clone();
+        let agent_pos_val = world.get_component(agent_id, "Position").unwrap().clone();
         let agent_pos: engine_core::ecs::components::position::PositionComponent =
             serde_json::from_value(agent_pos_val).unwrap();
 
-        let job = world.get_component(100, "Job").unwrap();
+        let job = world.get_component(job_id, "Job").unwrap();
 
         if agent_pos.pos
             == (engine_core::ecs::components::position::Position::Square { x: 2, y: 2, z: 0 })
@@ -355,7 +356,7 @@ fn test_agent_moves_to_job_site_before_progress() {
         }
     }
     assert!(reached_site, "Agent should reach the job site");
-    let job = world.get_component(100, "Job").unwrap();
+    let job = world.get_component(job_id, "Job").unwrap();
     assert_eq!(job.get("status").unwrap(), "complete");
 }
 
@@ -371,10 +372,13 @@ fn test_job_blocked_when_path_unreachable() {
     // No neighbor between (0,0,0) and (1,1,0)
     world.map = Some(Map::new(Box::new(sq_map)));
 
+    let agent_id = world.spawn_entity();
+    let job_id = world.spawn_entity();
+
     // Place agent at (0,0,0)
     world
         .set_component(
-            1,
+            agent_id,
             "Position",
             serde_json::to_value(engine_core::ecs::components::position::PositionComponent {
                 pos: engine_core::ecs::components::position::Position::Square { x: 0, y: 0, z: 0 },
@@ -385,10 +389,10 @@ fn test_job_blocked_when_path_unreachable() {
 
     world
         .set_component(
-            1,
+            agent_id,
             "Agent",
             serde_json::json!({
-                "entity_id": 1,
+                "entity_id": agent_id,
                 "state": "idle",
                 "specializations": [],
                 "job_queue": [],
@@ -401,10 +405,10 @@ fn test_job_blocked_when_path_unreachable() {
     // Create a job at unreachable (1,1,0)
     world
         .set_component(
-            100,
+            job_id,
             "Job",
             serde_json::json!({
-                "id": 100,
+                "id": job_id,
                 "job_type": "dig",
                 "status": "pending",
                 "phase": "pending",
@@ -423,9 +427,6 @@ fn test_job_blocked_when_path_unreachable() {
         )
         .unwrap();
 
-    world.entities.push(1);
-    world.entities.push(100);
-
     let mut job_board = engine_core::systems::job::job_board::JobBoard::default();
     job_board.update(&world);
     engine_core::systems::job::assign_jobs(&mut world, &mut job_board);
@@ -437,12 +438,12 @@ fn test_job_blocked_when_path_unreachable() {
         world.run_system("JobSystem", None).unwrap();
     }
 
-    let job = world.get_component(100, "Job").unwrap();
+    let job = world.get_component(job_id, "Job").unwrap();
     assert_eq!(job.get("phase").unwrap(), "blocked");
     assert_eq!(job.get("status").unwrap(), "blocked");
 
     // Agent should be unassigned and idle
-    let agent = world.get_component(1, "Agent").unwrap();
+    let agent = world.get_component(agent_id, "Agent").unwrap();
     assert!(agent.get("current_job").is_none());
     assert_eq!(agent.get("state").unwrap(), "idle");
 
@@ -454,8 +455,8 @@ fn test_job_blocked_when_path_unreachable() {
     let mut reader = engine_core::ecs::event::EventReader::default();
     let events: Vec<_> = reader.read(&*bus.lock().unwrap()).cloned().collect();
     assert!(!events.is_empty(), "No job_blocked events emitted");
-    let found = events
-        .iter()
-        .any(|event: &serde_json::Value| event.get("entity").and_then(|v| v.as_u64()) == Some(100));
+    let found = events.iter().any(|event: &serde_json::Value| {
+        event.get("entity").and_then(|v| v.as_u64()) == Some(job_id as u64)
+    });
     assert!(found, "No job_blocked event for our job");
 }

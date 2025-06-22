@@ -69,7 +69,7 @@ impl World {
                 let mut msgs = vec![first_error.to_string()];
                 msgs.extend(errors.map(|e| e.to_string()));
                 let msg = msgs.join(", ");
-                println!("SCHEMA VALIDATION FAILED: {msg}"); // <--- Add this line
+                println!("SCHEMA VALIDATION FAILED: {msg}");
                 return Err(format!("Schema validation failed: {msg}"));
             }
         }

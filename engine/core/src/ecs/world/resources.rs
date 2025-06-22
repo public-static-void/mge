@@ -56,6 +56,45 @@ impl World {
         Err("Stockpile component not found".to_string())
     }
 
+    /// Returns the total amount of a resource kind across all stockpiles.
+    pub fn get_global_resource_amount(&self, kind: &str) -> f64 {
+        let mut total = 0.0;
+        if let Some(stockpiles) = self.components.get("Stockpile") {
+            for stockpile in stockpiles.values() {
+                if let Some(resources) = stockpile.get("resources").and_then(|v| v.as_object()) {
+                    if let Some(amount) = resources.get(kind).and_then(|v| v.as_f64()) {
+                        total += amount;
+                    }
+                }
+            }
+        }
+        total
+    }
+
+    /// Sets the amount of a resource kind in the first stockpile, or creates a stockpile if none exist.
+    pub fn set_global_resource_amount(&mut self, kind: &str, amount: f64) {
+        // If there is at least one stockpile, set the resource there
+        if let Some(stockpiles) = self.components.get_mut("Stockpile") {
+            if let Some((_eid, stockpile)) = stockpiles.iter_mut().next() {
+                if let Some(obj) = stockpile.as_object_mut() {
+                    let resources = obj
+                        .entry("resources")
+                        .or_insert_with(|| serde_json::json!({}));
+                    if let Some(res_map) = resources.as_object_mut() {
+                        res_map.insert(kind.to_string(), serde_json::json!(amount));
+                        return;
+                    }
+                }
+            }
+        }
+        // If no stockpile exists, create one
+        let eid = self.spawn_entity();
+        let mut res_map = serde_json::Map::new();
+        res_map.insert(kind.to_string(), serde_json::json!(amount));
+        let stockpile = serde_json::json!({ "resources": res_map });
+        self.set_component(eid, "Stockpile", stockpile).unwrap();
+    }
+
     /// Returns a scarcity score for a resource kind (higher = more scarce).
     /// This is a simple example; you can expand it as needed.
     pub fn get_global_resource_scarcity(&self, kind: &str) -> f64 {

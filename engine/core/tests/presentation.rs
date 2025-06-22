@@ -24,7 +24,6 @@ fn test_presentation_system_renders_entities() {
     for schema in schemas.values() {
         registry.register_external_schema(schema.clone());
     }
-    println!("Loaded schemas: {:?}", schemas.keys().collect::<Vec<_>>());
 
     let registry = Arc::new(Mutex::new(registry));
     let mut world = World::new(registry.clone());

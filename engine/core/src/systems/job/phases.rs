@@ -103,7 +103,6 @@ pub fn handle_pending_phase(world: &mut World, eid: u32, mut job: JsonValue) -> 
                     job["phase"] = serde_json::json!("going_to_site");
                     return job;
                 } else {
-                    // CHANGE THIS LINE:
                     job["phase"] = serde_json::json!("in_progress");
                     return job;
                 }

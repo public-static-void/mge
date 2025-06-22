@@ -11,24 +11,25 @@ fn test_job_lifecycle_events_emitted() {
     let mut world = world_helper::make_test_world();
 
     // Agent and job setup
+    let agent_id = world.spawn_entity();
     world
         .set_component(
-            1,
+            agent_id,
             "Agent",
             json!({
-                "entity_id": 1,
+                "entity_id": agent_id,
                 "state": "idle"
             }),
         )
         .unwrap();
-    world.entities.push(1);
 
+    let job_id = world.spawn_entity();
     world
         .set_component(
-            100,
+            job_id,
             "Job",
             json!({
-                "id": 100,
+                "id": job_id,
                 "job_type": "dig",
                 "status": "pending",
                 "cancelled": false,
@@ -37,7 +38,6 @@ fn test_job_lifecycle_events_emitted() {
             }),
         )
         .unwrap();
-    world.entities.push(100);
 
     // Assign job to agent
     let mut job_board = JobBoard::default();
@@ -73,22 +73,22 @@ fn test_job_lifecycle_events_emitted() {
     assert!(
         assigned_events
             .iter()
-            .any(|e| e.get("entity") == Some(&json!(100))),
-        "No job_assigned event for job 100"
+            .any(|e| e.get("entity") == Some(&json!(job_id))),
+        "No job_assigned event for job"
     );
     // Check that job_completed event was emitted
     assert!(
         completed_events
             .iter()
-            .any(|e| e.get("entity") == Some(&json!(100))),
-        "No job_completed event for job 100"
+            .any(|e| e.get("entity") == Some(&json!(job_id))),
+        "No job_completed event for job"
     );
     // Check that at least one progress event was emitted
     assert!(
         progress_events
             .iter()
-            .any(|e| e.get("entity") == Some(&json!(100))),
-        "No job_progressed event for job 100"
+            .any(|e| e.get("entity") == Some(&json!(job_id))),
+        "No job_progressed event for job"
     );
 
     // Check event payloads are rich and consistent
@@ -108,12 +108,13 @@ fn test_job_cancel_and_failure_events() {
     let mut world = world_helper::make_test_world();
 
     // Setup a job that will fail
+    let fail_job_id = world.spawn_entity();
     world
         .set_component(
-            200,
+            fail_job_id,
             "Job",
             json!({
-                "id": 200,
+                "id": fail_job_id,
                 "job_type": "failtest",
                 "status": "pending",
                 "should_fail": true,
@@ -122,15 +123,15 @@ fn test_job_cancel_and_failure_events() {
             }),
         )
         .unwrap();
-    world.entities.push(200);
 
     // Setup a job that will be cancelled
+    let cancel_job_id = world.spawn_entity();
     world
         .set_component(
-            201,
+            cancel_job_id,
             "Job",
             json!({
-                "id": 201,
+                "id": cancel_job_id,
                 "job_type": "dig",
                 "status": "pending",
                 "cancelled": true,
@@ -139,7 +140,6 @@ fn test_job_cancel_and_failure_events() {
             }),
         )
         .unwrap();
-    world.entities.push(201);
 
     let mut failed_events: Vec<serde_json::Value> = Vec::new();
     let mut cancelled_events: Vec<serde_json::Value> = Vec::new();
@@ -158,13 +158,13 @@ fn test_job_cancel_and_failure_events() {
     assert!(
         failed_events
             .iter()
-            .any(|e| e.get("entity") == Some(&json!(200))),
-        "No job_failed event for job 200"
+            .any(|e| e.get("entity") == Some(&json!(fail_job_id))),
+        "No job_failed event for failed job"
     );
     assert!(
         cancelled_events
             .iter()
-            .any(|e| e.get("entity") == Some(&json!(201))),
-        "No job_cancelled event for job 201"
+            .any(|e| e.get("entity") == Some(&json!(cancel_job_id))),
+        "No job_cancelled event for cancelled job"
     );
 }

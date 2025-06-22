@@ -23,24 +23,25 @@ fn test_job_cancellation_cleans_up_agent_and_emits_event() {
     }
 
     // Agent and job setup
+    let agent_id = world.spawn_entity();
     world
         .set_component(
-            1,
+            agent_id,
             "Agent",
             json!({
-                "entity_id": 1,
+                "entity_id": agent_id,
                 "state": "idle"
             }),
         )
         .unwrap();
-    world.entities.push(1);
 
+    let job_id = world.spawn_entity();
     world
         .set_component(
-            100,
+            job_id,
             "Job",
             json!({
-                "id": 100,
+                "id": job_id,
                 "job_type": "dig",
                 "status": "pending",
                 "cancelled": false,
@@ -49,7 +50,6 @@ fn test_job_cancellation_cleans_up_agent_and_emits_event() {
             }),
         )
         .unwrap();
-    world.entities.push(100);
 
     // Assign job to agent
     let mut job_board = JobBoard::default();
@@ -57,16 +57,16 @@ fn test_job_cancellation_cleans_up_agent_and_emits_event() {
     assign_jobs(&mut world, &mut job_board);
 
     // Cancel the job
-    let mut job = world.get_component(100, "Job").unwrap().clone();
+    let mut job = world.get_component(job_id, "Job").unwrap().clone();
     job["cancelled"] = json!(true);
-    world.set_component(100, "Job", job).unwrap();
+    world.set_component(job_id, "Job", job).unwrap();
 
     // Run job system to process cancellation
     let mut job_system = JobSystem;
     job_system.run(&mut world, None);
 
     // Agent should be idle and unassigned
-    let agent = world.get_component(1, "Agent").unwrap();
+    let agent = world.get_component(agent_id, "Agent").unwrap();
     assert!(
         agent.get("current_job").is_none(),
         "Agent should have no current job after cancellation"
@@ -77,7 +77,7 @@ fn test_job_cancellation_cleans_up_agent_and_emits_event() {
     );
 
     // Job should be marked as cancelled
-    let job = world.get_component(100, "Job").unwrap();
+    let job = world.get_component(job_id, "Job").unwrap();
     assert_eq!(
         job["status"], "cancelled",
         "Job status should be 'cancelled'"
@@ -93,8 +93,8 @@ fn test_job_cancellation_cleans_up_agent_and_emits_event() {
     assert!(
         events
             .iter()
-            .any(|event| event.get("entity").and_then(|v| v.as_u64()) == Some(100)),
-        "Job cancelled event should be emitted for job 100"
+            .any(|event| event.get("entity").and_then(|v| v.as_u64()) == Some(job_id as u64)),
+        "Job cancelled event should be emitted for job"
     );
 }
 
@@ -129,17 +129,18 @@ fn test_job_effect_rollback_on_cancel() {
     }
 
     // Set up initial terrain
+    let entity_id = world.spawn_entity();
     world
-        .set_component(100, "Terrain", json!({ "kind": "rock" }))
+        .set_component(entity_id, "Terrain", json!({ "kind": "rock" }))
         .unwrap();
 
     // Job with an effect
     world
         .set_component(
-            100,
+            entity_id,
             "Job",
             json!({
-                "id": 100,
+                "id": entity_id,
                 "job_type": "dig",
                 "status": "pending",
                 "cancelled": false,
@@ -166,15 +167,15 @@ fn test_job_effect_rollback_on_cancel() {
         assign_jobs(&mut world, &mut job_board);
 
         // Mark job as complete
-        let mut job = world.get_component(100, "Job").unwrap().clone();
+        let mut job = world.get_component(entity_id, "Job").unwrap().clone();
         job["status"] = json!("complete");
-        world.set_component(100, "Job", job).unwrap();
+        world.set_component(entity_id, "Job", job).unwrap();
 
         // Run system to apply effect
         let mut job_system = JobSystem;
         job_system.run(&mut world, None);
 
-        let terrain = world.get_component(100, "Terrain").unwrap();
+        let terrain = world.get_component(entity_id, "Terrain").unwrap();
         assert_eq!(
             terrain["kind"], "rock",
             "Terrain should remain rock after effect (logic might need review)"
@@ -183,14 +184,14 @@ fn test_job_effect_rollback_on_cancel() {
 
     // Reset for cancellation test
     world
-        .set_component(100, "Terrain", json!({ "kind": "rock" }))
+        .set_component(entity_id, "Terrain", json!({ "kind": "rock" }))
         .unwrap();
     world
         .set_component(
-            100,
+            entity_id,
             "Job",
             json!({
-                "id": 100,
+                "id": entity_id,
                 "job_type": "dig",
                 "status": "pending",
                 "cancelled": true,
@@ -205,7 +206,7 @@ fn test_job_effect_rollback_on_cancel() {
         let mut job_system = JobSystem;
         job_system.run(&mut world, None);
 
-        let terrain = world.get_component(100, "Terrain").unwrap();
+        let terrain = world.get_component(entity_id, "Terrain").unwrap();
         assert_eq!(
             terrain["kind"], "rock",
             "Terrain should remain rock after cancellation"
@@ -218,25 +219,33 @@ fn test_job_cancellation_releases_resources_and_cancels_children() {
     let mut world = world_helper::make_test_world();
 
     // Set up stockpile with resources and a job that reserves them
+    let stockpile_id = world.spawn_entity();
     world
-        .set_component(200, "Stockpile", json!({ "resources": { "wood": 10 } }))
+        .set_component(
+            stockpile_id,
+            "Stockpile",
+            json!({ "resources": { "wood": 10 } }),
+        )
         .unwrap();
+
+    let child_id = world.spawn_entity();
+    let parent_id = world.spawn_entity();
 
     world
         .set_component(
-            101,
+            parent_id,
             "Job",
             json!({
-                "id": 101,
+                "id": parent_id,
                 "job_type": "build",
                 "status": "pending",
                 "resource_requirements": [{ "kind": "wood", "amount": 5 }],
                 "reserved_resources": [{ "kind": "wood", "amount": 5 }],
-                "reserved_stockpile": 200,
+                "reserved_stockpile": stockpile_id,
                 "category": "construction",
                 "children": [
                     {
-                        "id": 102,
+                        "id": child_id,
                         "job_type": "subtask",
                         "status": "pending",
                         "category": "construction"
@@ -247,23 +256,23 @@ fn test_job_cancellation_releases_resources_and_cancels_children() {
         .unwrap();
 
     // Cancel the parent job
-    let mut job = world.get_component(101, "Job").unwrap().clone();
+    let mut job = world.get_component(parent_id, "Job").unwrap().clone();
     job["cancelled"] = json!(true);
-    world.set_component(101, "Job", job).unwrap();
+    world.set_component(parent_id, "Job", job).unwrap();
 
     // Run job system to process cancellation
     let mut job_system = JobSystem;
     job_system.run(&mut world, None);
 
     // Check that resources are released
-    let stockpile = world.get_component(200, "Stockpile").unwrap();
+    let stockpile = world.get_component(stockpile_id, "Stockpile").unwrap();
     assert_eq!(
         stockpile["resources"]["wood"], 10,
         "Resources should be released back to stockpile"
     );
 
     // Check that child job is cancelled
-    let parent_job = world.get_component(101, "Job").unwrap();
+    let parent_job = world.get_component(parent_id, "Job").unwrap();
     let children = parent_job
         .get("children")
         .and_then(|v| v.as_array())

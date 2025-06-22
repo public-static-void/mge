@@ -86,7 +86,6 @@ fn test_death_event_flow() {
     .expect("Failed to load config");
     let schema_dir =
         std::env::var("CARGO_MANIFEST_DIR").unwrap().to_string() + "/../assets/schemas";
-    println!("Loading schemas from: {}", schema_dir);
     let schemas = load_schemas_from_dir_with_modes(&schema_dir, &config.allowed_modes)
         .unwrap_or_else(|_| panic!("Failed to load schemas from {schema_dir}"));
     {

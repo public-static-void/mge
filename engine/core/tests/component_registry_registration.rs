@@ -16,7 +16,6 @@ fn test_component_registration() {
     assert!(registry.get_schema::<PositionComponent>().is_some());
 
     let json = registry.schema_to_json::<PositionComponent>().unwrap();
-    println!("Position schema: {}", json);
     assert!(
         json.contains("\"x\""),
         "Schema does not contain field 'x':\n{}",
@@ -37,7 +36,6 @@ fn test_health_component() {
     assert!(registry.get_schema::<Health>().is_some());
 
     let json = registry.schema_to_json::<Health>().unwrap();
-    println!("Health schema: {}", json);
     assert!(
         json.contains("\"current\""),
         "Schema does not contain field 'current':\n{}",

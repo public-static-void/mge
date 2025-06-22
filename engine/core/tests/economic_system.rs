@@ -36,36 +36,14 @@ fn test_workshop_produces_resources_using_recipe() {
         )
         .unwrap();
 
-    // Print entities with each component after setup
-    let entities_with_job = world.get_entities_with_component("ProductionJob");
-    println!(
-        "Entities with ProductionJob in test: {:?}",
-        entities_with_job
-    );
-    let entities_with_stockpile = world.get_entities_with_component("Stockpile");
-    println!(
-        "Entities with Stockpile in test: {:?}",
-        entities_with_stockpile
-    );
-
     // Load recipes and create/register the economic system
     let recipe_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap() + "/../assets/recipes";
     let recipes = load_recipes_from_dir(&recipe_dir);
-    println!(
-        "Loaded recipes: {:?}",
-        recipes.iter().map(|r| &r.name).collect::<Vec<_>>()
-    );
     let mut econ_system = EconomicSystem::with_recipes(recipes);
 
     // Run the economic system for 2 ticks
-    for tick in 0..2 {
-        println!("=== Tick {} ===", tick);
+    for _tick in 0..2 {
         econ_system.run(&mut world, None);
-        println!(
-            "Tick: job = {:?}, stockpile = {:?}",
-            world.get_component(workshop, "ProductionJob"),
-            world.get_component(workshop, "Stockpile")
-        );
     }
 
     // After 2 ticks, wood should be reduced by 1, plank increased by 4 (recipe runs once)
