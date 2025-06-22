@@ -185,7 +185,6 @@ fn test_job_system_uses_custom_job_type_logic() {
         reg.register_handler("fast_job", |_world, _agent_id, _job_id, job| {
             let mut job = job.clone();
             let progress = job.get("progress").and_then(|v| v.as_f64()).unwrap_or(0.0) + 10.0;
-            println!("CUSTOM HANDLER: setting progress to {}", progress);
             job["progress"] = serde_json::json!(progress);
             if progress >= 10.0 {
                 job["status"] = serde_json::json!("complete");
@@ -194,7 +193,6 @@ fn test_job_system_uses_custom_job_type_logic() {
             }
             job
         });
-        println!("TEST: Registered handler keys: {:?}", reg.keys());
     }
 
     let eid = world.spawn_entity();
@@ -217,7 +215,6 @@ fn test_job_system_uses_custom_job_type_logic() {
     }
 
     let job = world.get_component(eid, "Job").unwrap();
-    println!("job after ticks: {:?}", job);
 
     assert_eq!(job.get("status").unwrap(), "complete");
     assert!(job.get("progress").unwrap().as_f64().unwrap() >= 10.0);

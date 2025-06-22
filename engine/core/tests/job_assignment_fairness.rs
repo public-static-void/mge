@@ -9,12 +9,13 @@ use serde_json::json;
 fn test_job_assignment_fairness() {
     let mut world = world_helper::make_test_world();
 
+    let job1 = world.spawn_entity();
     world
         .set_component(
-            1,
+            job1,
             "Job",
             json!({
-                "id": 1,
+                "id": job1,
                 "job_type": "dig",
                 "status": "pending",
                 "priority": 10,
@@ -24,14 +25,14 @@ fn test_job_assignment_fairness() {
             }),
         )
         .unwrap();
-    world.entities.push(1);
 
+    let job2 = world.spawn_entity();
     world
         .set_component(
-            2,
+            job2,
             "Job",
             json!({
-                "id": 2,
+                "id": job2,
                 "job_type": "dig",
                 "status": "pending",
                 "priority": 10,
@@ -41,40 +42,39 @@ fn test_job_assignment_fairness() {
             }),
         )
         .unwrap();
-    world.entities.push(2);
 
+    let agent = world.spawn_entity();
     world
         .set_component(
-            100,
+            agent,
             "Agent",
             json!({
-                "entity_id": 100,
+                "entity_id": agent,
                 "state": "idle"
             }),
         )
         .unwrap();
-    world.entities.push(100);
 
     let mut job_board = JobBoard::default();
     job_board.update(&world);
 
-    let result = job_board.claim_job(100, &mut world, 10);
+    let result = job_board.claim_job(agent, &mut world, 10);
     assert_eq!(
         result,
-        JobAssignmentResult::Assigned(2),
+        JobAssignmentResult::Assigned(job2),
         "Job 2 should be assigned for fairness"
     );
-    let job2 = world.get_component(2, "Job").unwrap();
+    let job2_obj = world.get_component(job2, "Job").unwrap();
     assert_eq!(
-        job2["assigned_to"], 100,
-        "Job 2 should be assigned to agent 100"
+        job2_obj["assigned_to"], agent,
+        "Job 2 should be assigned to agent"
     );
     assert_eq!(
-        job2["assignment_count"], 2,
+        job2_obj["assignment_count"], 2,
         "Job 2 assignment count should be incremented"
     );
     assert_eq!(
-        job2["last_assigned_tick"], 10,
+        job2_obj["last_assigned_tick"], 10,
         "Job 2 last assigned tick should be updated"
     );
 }
@@ -83,12 +83,13 @@ fn test_job_assignment_fairness() {
 fn test_job_assignment_dynamic_priority() {
     let mut world = world_helper::make_test_world();
 
+    let job1 = world.spawn_entity();
     world
         .set_component(
-            1,
+            job1,
             "Job",
             json!({
-                "id": 1,
+                "id": job1,
                 "job_type": "dig",
                 "status": "pending",
                 "priority": 5,
@@ -98,14 +99,14 @@ fn test_job_assignment_dynamic_priority() {
             }),
         )
         .unwrap();
-    world.entities.push(1);
 
+    let job2 = world.spawn_entity();
     world
         .set_component(
-            2,
+            job2,
             "Job",
             json!({
-                "id": 2,
+                "id": job2,
                 "job_type": "dig",
                 "status": "pending",
                 "priority": 10,
@@ -115,63 +116,62 @@ fn test_job_assignment_dynamic_priority() {
             }),
         )
         .unwrap();
-    world.entities.push(2);
 
+    let agent = world.spawn_entity();
     world
         .set_component(
-            100,
+            agent,
             "Agent",
             json!({
-                "entity_id": 100,
+                "entity_id": agent,
                 "state": "idle"
             }),
         )
         .unwrap();
-    world.entities.push(100);
 
     let mut job_board = JobBoard::default();
     job_board.update(&world);
 
-    let result = job_board.claim_job(100, &mut world, 1);
+    let result = job_board.claim_job(agent, &mut world, 1);
     assert_eq!(
         result,
-        JobAssignmentResult::Assigned(2),
+        JobAssignmentResult::Assigned(job2),
         "Higher priority job (2) should be assigned first"
     );
 
-    let mut job1 = world.get_component(1, "Job").unwrap().clone();
-    job1["priority"] = json!(20);
-    world.set_component(1, "Job", job1).unwrap();
+    let mut job1_obj = world.get_component(job1, "Job").unwrap().clone();
+    job1_obj["priority"] = json!(20);
+    world.set_component(job1, "Job", job1_obj).unwrap();
 
-    let mut job2 = world.get_component(2, "Job").unwrap().clone();
-    job2.as_object_mut().unwrap().remove("assigned_to");
-    job2["status"] = json!("pending");
-    world.set_component(2, "Job", job2).unwrap();
+    let mut job2_obj = world.get_component(job2, "Job").unwrap().clone();
+    job2_obj.as_object_mut().unwrap().remove("assigned_to");
+    job2_obj["status"] = json!("pending");
+    world.set_component(job2, "Job", job2_obj).unwrap();
 
-    let mut agent = world.get_component(100, "Agent").unwrap().clone();
-    agent.as_object_mut().unwrap().remove("current_job");
-    agent["state"] = json!("idle");
-    world.set_component(100, "Agent", agent).unwrap();
+    let mut agent_obj = world.get_component(agent, "Agent").unwrap().clone();
+    agent_obj.as_object_mut().unwrap().remove("current_job");
+    agent_obj["state"] = json!("idle");
+    world.set_component(agent, "Agent", agent_obj).unwrap();
 
     job_board.update(&world);
 
-    let result = job_board.claim_job(100, &mut world, 2);
+    let result = job_board.claim_job(agent, &mut world, 2);
     assert_eq!(
         result,
-        JobAssignmentResult::Assigned(1),
+        JobAssignmentResult::Assigned(job1),
         "Now job 1 should be assigned due to higher priority"
     );
-    let job1 = world.get_component(1, "Job").unwrap();
+    let job1_obj = world.get_component(job1, "Job").unwrap();
     assert_eq!(
-        job1["assigned_to"], 100,
-        "Job 1 should be assigned to agent 100"
+        job1_obj["assigned_to"], agent,
+        "Job 1 should be assigned to agent"
     );
     assert_eq!(
-        job1["assignment_count"], 1,
+        job1_obj["assignment_count"], 1,
         "Job 1 assignment count should be incremented"
     );
     assert_eq!(
-        job1["last_assigned_tick"], 2,
+        job1_obj["last_assigned_tick"], 2,
         "Job 1 last assigned tick should be updated"
     );
 }
@@ -180,12 +180,13 @@ fn test_job_assignment_dynamic_priority() {
 fn test_job_assignment_persistence() {
     let mut world = world_helper::make_test_world();
 
+    let job1 = world.spawn_entity();
     world
         .set_component(
-            1,
+            job1,
             "Job",
             json!({
-                "id": 1,
+                "id": job1,
                 "job_type": "dig",
                 "status": "pending",
                 "priority": 5,
@@ -195,13 +196,12 @@ fn test_job_assignment_persistence() {
             }),
         )
         .unwrap();
-    world.entities.push(1);
 
     let tmp = tempfile::NamedTempFile::new().unwrap();
     world.save_to_file(tmp.path()).unwrap();
 
     let loaded = World::load_from_file(tmp.path(), world.registry.clone()).unwrap();
-    let job = loaded.get_component(1, "Job").unwrap();
+    let job = loaded.get_component(job1, "Job").unwrap();
     assert_eq!(
         job["assignment_count"], 2,
         "Assignment count should persist after save/load"

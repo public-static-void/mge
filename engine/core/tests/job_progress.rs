@@ -15,38 +15,38 @@ fn test_job_progressed_event_emitted_on_progress_change() {
     let capture = event_helper::setup_event_capture(&mut world, "job_progressed");
 
     // Agent with moderate skill
+    let agent_id = world.spawn_entity();
+    let job_id = world.spawn_entity();
     world
         .set_component(
-            1,
+            agent_id,
             "Agent",
             json!({
-                "entity_id": 1,
+                "entity_id": agent_id,
                 "skills": { "dig": 2.0 },
                 "stamina": 100.0,
                 "state": "working",
-                "current_job": 10
+                "current_job": job_id
             }),
         )
         .unwrap();
-    world.entities.push(1);
 
     // Job assigned to agent
     world
         .set_component(
-            10,
+            job_id,
             "Job",
             json!({
-                "id": 10,
+                "id": job_id,
                 "job_type": "dig",
                 "progress": 0.0,
                 "status": "in_progress",
-                "assigned_to": 1,
+                "assigned_to": agent_id,
                 "category": "mining",
                 "phase": "in_progress"
             }),
         )
         .unwrap();
-    world.entities.push(10);
 
     let mut job_system = JobSystem::new();
 
@@ -62,7 +62,7 @@ fn test_job_progressed_event_emitted_on_progress_change() {
         .expect("No event emitted!");
     assert_eq!(
         event.get("entity").and_then(|v| v.as_u64()).unwrap(),
-        10,
+        job_id as u64,
         "Job entity id should match"
     );
     assert_eq!(
@@ -94,35 +94,35 @@ fn test_job_progressed_event_emitted_for_custom_handler() {
         },
     );
 
+    let agent_id = world.spawn_entity();
+    let job_id = world.spawn_entity();
     world
         .set_component(
-            1,
+            agent_id,
             "Agent",
             json!({
-                "entity_id": 1,
+                "entity_id": agent_id,
                 "state": "working",
-                "current_job": 123
+                "current_job": job_id
             }),
         )
         .unwrap();
-    world.entities.push(1);
 
     world
         .set_component(
-            123,
+            job_id,
             "Job",
             json!({
-                "id": 123,
+                "id": job_id,
                 "job_type": "superfast",
                 "status": "in_progress",
                 "progress": 0.0,
-                "assigned_to": 1,
+                "assigned_to": agent_id,
                 "category": "testing",
                 "phase": "in_progress"
             }),
         )
         .unwrap();
-    world.entities.push(123);
 
     let mut job_system = JobSystem::new();
 
@@ -138,7 +138,7 @@ fn test_job_progressed_event_emitted_for_custom_handler() {
         .expect("No event emitted!");
     assert_eq!(
         event.get("entity").and_then(|v| v.as_u64()).unwrap(),
-        123,
+        job_id as u64,
         "Job entity id should match"
     );
     assert_eq!(

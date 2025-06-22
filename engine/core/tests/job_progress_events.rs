@@ -11,24 +11,25 @@ fn test_job_progressed_event_emitted_on_progress_change() {
     let mut world = world_helper::make_test_world();
 
     // Agent and job setup
+    let agent_id = world.spawn_entity();
+    let job_id = world.spawn_entity();
     world
         .set_component(
-            1,
+            agent_id,
             "Agent",
             json!({
-                "entity_id": 1,
+                "entity_id": agent_id,
                 "state": "idle"
             }),
         )
         .unwrap();
-    world.entities.push(1);
 
     world
         .set_component(
-            100,
+            job_id,
             "Job",
             json!({
-                "id": 100,
+                "id": job_id,
                 "job_type": "dig",
                 "status": "pending",
                 "cancelled": false,
@@ -37,7 +38,6 @@ fn test_job_progressed_event_emitted_on_progress_change() {
             }),
         )
         .unwrap();
-    world.entities.push(100);
 
     // Assign job to agent
     let mut job_board = JobBoard::default();
@@ -64,8 +64,8 @@ fn test_job_progressed_event_emitted_on_progress_change() {
     for event in &all_events {
         assert_eq!(
             event.get("entity").and_then(|v| v.as_u64()),
-            Some(100),
-            "Event should reference job entity 100"
+            Some(job_id as u64),
+            "Event should reference job entity"
         );
         assert!(
             event.get("progress").is_some(),
@@ -108,24 +108,25 @@ fn test_job_progressed_event_emitted_for_custom_handler() {
         },
     );
 
+    let agent_id = world.spawn_entity();
+    let job_id = world.spawn_entity();
     world
         .set_component(
-            2,
+            agent_id,
             "Agent",
             json!({
-                "entity_id": 2,
+                "entity_id": agent_id,
                 "state": "idle"
             }),
         )
         .unwrap();
-    world.entities.push(2);
 
     world
         .set_component(
-            200,
+            job_id,
             "Job",
             json!({
-                "id": 200,
+                "id": job_id,
                 "job_type": "twostep",
                 "status": "pending",
                 "cancelled": false,
@@ -134,7 +135,6 @@ fn test_job_progressed_event_emitted_for_custom_handler() {
             }),
         )
         .unwrap();
-    world.entities.push(200);
 
     // Assign job to agent
     let mut job_board = JobBoard::default();

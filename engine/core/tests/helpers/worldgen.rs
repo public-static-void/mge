@@ -34,10 +34,6 @@ pub fn setup_registry_with_c_plugin() -> WorldgenRegistry {
     }
     let plugin_path = dir.join("plugins/simple_square_plugin/libsimple_square_plugin.so");
 
-    println!("Loading plugin from: {:?}", plugin_path);
-    println!("Plugin path exists: {}", plugin_path.exists());
-    println!("CWD: {:?}", std::env::current_dir().unwrap());
-
     assert!(
         plugin_path.exists(),
         "Plugin .so not found at {:?}. CWD: {:?}",

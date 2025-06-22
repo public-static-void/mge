@@ -299,9 +299,10 @@ fn test_job_progression_affected_by_world_conditions() {
         .unwrap();
 
     // Simulate a hazardous world condition by setting a global resource or flag
+    let hazard_id = world.spawn_entity();
     world
         .set_component(
-            0,
+            hazard_id,
             "Hazard",
             json!({"active": true, "slowdown_factor": 0.25}),
         )
@@ -313,11 +314,14 @@ fn test_job_progression_affected_by_world_conditions() {
         registry
             .lock()
             .unwrap()
-            .register_handler("dig", |world, _agent_id, _job_id, job| {
+            .register_handler("dig", move |world, _agent_id, _job_id, job| {
                 let mut job = job.clone();
                 let mut progress = job.get("progress").and_then(|v| v.as_f64()).unwrap_or(0.0);
-                let hazard = world.get_component(0, "Hazard");
-                let slowdown = hazard
+                // Find any Hazard component (use first found)
+                let slowdown = world
+                    .components
+                    .get("Hazard")
+                    .and_then(|map| map.values().next())
                     .and_then(|hz| hz.get("slowdown_factor").and_then(|v| v.as_f64()))
                     .unwrap_or(1.0);
                 progress += 1.0 * slowdown;

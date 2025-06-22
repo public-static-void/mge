@@ -14,7 +14,6 @@ fn test_effect_chaining_triggers_another_effect() {
         .lock()
         .unwrap()
         .register_handler("spawn", |world, eid, _effect| {
-            println!("Handler 'spawn' called for eid {}", eid);
             let new_effect = json!({"action": "mark", "value": 42});
             let effect_proc = world.effect_processor_registry.as_ref().unwrap().clone();
             EffectProcessorRegistry::process_effects_arc(&effect_proc, world, eid, &[new_effect]);
@@ -24,7 +23,6 @@ fn test_effect_chaining_triggers_another_effect() {
         .lock()
         .unwrap()
         .register_handler("mark", |world, eid, effect| {
-            println!("Handler 'mark' called for eid {}", eid);
             world
                 .set_component(eid, "Marked", json!({"value": effect["value"]}))
                 .unwrap();
@@ -50,7 +48,6 @@ fn test_scripted_effect_handler_invoked() {
         .lock()
         .unwrap()
         .register_handler("scripted", |world, eid, effect| {
-            println!("Handler 'scripted' called for eid {}", eid);
             world
                 .set_component(
                     eid,

@@ -13,12 +13,13 @@ fn test_event_driven_ai_job_enqueue() {
     let mut world = make_test_world();
 
     // Add an agent
+    let agent_id = world.spawn_entity();
     world
         .set_component(
-            1,
+            agent_id,
             "Agent",
             json!({
-                "entity_id": 1,
+                "entity_id": agent_id,
                 "skills": { "production": 5.0 },
                 "preferences": {},
                 "state": "idle",
@@ -26,15 +27,15 @@ fn test_event_driven_ai_job_enqueue() {
             }),
         )
         .unwrap();
-    world.entities.push(1);
 
     // Add a production job for "wood"
+    let job_id = world.spawn_entity();
     world
         .set_component(
-            100,
+            job_id,
             "Job",
             json!({
-                "id": 100,
+                "id": job_id,
                 "job_type": "production",
                 "status": "pending",
                 "priority": 1,
@@ -43,7 +44,6 @@ fn test_event_driven_ai_job_enqueue() {
             }),
         )
         .unwrap();
-    world.entities.push(100);
 
     // Setup AI event subscription
     setup_ai_event_subscriptions(&mut world);
@@ -59,17 +59,17 @@ fn test_event_driven_ai_job_enqueue() {
     system.run(&mut world, None);
 
     // Agent's job queue should now contain the production job for wood
-    let agent = world.get_component(1, "Agent").unwrap();
+    let agent = world.get_component(agent_id, "Agent").unwrap();
     let queue = agent.get("job_queue").unwrap().as_array().unwrap();
-    assert!(queue.iter().any(|v| v.as_u64() == Some(100)));
+    assert!(queue.iter().any(|v| v.as_u64() == Some(job_id as u64)));
 
     // Now assign jobs
     let mut job_board = JobBoard::default();
     job_board.update(&world);
     assign_jobs(&mut world, &mut job_board);
 
-    let agent = world.get_component(1, "Agent").unwrap();
-    assert_eq!(agent["current_job"], 100);
+    let agent = world.get_component(agent_id, "Agent").unwrap();
+    assert_eq!(agent["current_job"], job_id);
     assert_eq!(agent["state"], "working");
 }
 
@@ -78,12 +78,13 @@ fn test_event_intent_queue_handles_multiple_events() {
     let mut world = make_test_world();
 
     // Add an agent
+    let agent_id = world.spawn_entity();
     world
         .set_component(
-            2,
+            agent_id,
             "Agent",
             json!({
-                "entity_id": 2,
+                "entity_id": agent_id,
                 "skills": { "production": 5.0 },
                 "preferences": {},
                 "state": "idle",
@@ -91,15 +92,15 @@ fn test_event_intent_queue_handles_multiple_events() {
             }),
         )
         .unwrap();
-    world.entities.push(2);
 
     // Add two production jobs
+    let job_id1 = world.spawn_entity();
     world
         .set_component(
-            200,
+            job_id1,
             "Job",
             json!({
-                "id": 200,
+                "id": job_id1,
                 "job_type": "production",
                 "status": "pending",
                 "priority": 1,
@@ -108,14 +109,14 @@ fn test_event_intent_queue_handles_multiple_events() {
             }),
         )
         .unwrap();
-    world.entities.push(200);
 
+    let job_id2 = world.spawn_entity();
     world
         .set_component(
-            201,
+            job_id2,
             "Job",
             json!({
-                "id": 201,
+                "id": job_id2,
                 "job_type": "production",
                 "status": "pending",
                 "priority": 1,
@@ -124,7 +125,6 @@ fn test_event_intent_queue_handles_multiple_events() {
             }),
         )
         .unwrap();
-    world.entities.push(201);
 
     // Setup AI event subscription
     setup_ai_event_subscriptions(&mut world);
@@ -143,8 +143,8 @@ fn test_event_intent_queue_handles_multiple_events() {
     system.run(&mut world, None);
 
     // Agent's job queue should now contain both jobs
-    let agent = world.get_component(2, "Agent").unwrap();
+    let agent = world.get_component(agent_id, "Agent").unwrap();
     let queue = agent.get("job_queue").unwrap().as_array().unwrap();
-    assert!(queue.iter().any(|v| v.as_u64() == Some(200)));
-    assert!(queue.iter().any(|v| v.as_u64() == Some(201)));
+    assert!(queue.iter().any(|v| v.as_u64() == Some(job_id1 as u64)));
+    assert!(queue.iter().any(|v| v.as_u64() == Some(job_id2 as u64)));
 }
