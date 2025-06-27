@@ -1,6 +1,6 @@
 use crate::ecs::world::World;
+use crate::systems::job::job_type::{JobLogicKind, JobTypeData, JobTypeRegistry};
 use crate::systems::job::loader::load_job_types_from_dir;
-use crate::systems::job::registry::{JobLogic, JobTypeData, JobTypeRegistry};
 use std::path::Path;
 
 /// Registers all native job handlers for job types found in the given directory.
@@ -19,7 +19,7 @@ pub fn register_builtin_job_handlers(
         // Look up logic in the provided registry
         let logic_opt = job_type_registry.get_logic(&job_type_name);
 
-        if let Some(JobLogic::Native(_logic_fn)) = logic_opt {
+        if let Some(JobLogicKind::Native(_logic_fn)) = logic_opt {
             world.job_handler_registry.lock().unwrap().register_handler(
                 &job_type_name,
                 move |world, _agent_id, job_id, _data| {
@@ -28,9 +28,9 @@ pub fn register_builtin_job_handlers(
                         job.get("progress").and_then(|v| v.as_f64()).unwrap_or(0.0) + 1.0;
                     job["progress"] = serde_json::json!(progress);
                     if progress >= 3.0 {
-                        job["status"] = serde_json::json!("complete");
+                        job["state"] = serde_json::json!("complete");
                     } else {
-                        job["status"] = serde_json::json!("in_progress");
+                        job["state"] = serde_json::json!("in_progress");
                     }
                     // Do NOT mutate world here, just return the job value
                     job

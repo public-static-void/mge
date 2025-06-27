@@ -10,9 +10,9 @@ pub fn dependencies_satisfied(world: &World, job: &JsonValue) -> bool {
     }
 }
 
-fn is_forbidden_status(job: &serde_json::Value) -> bool {
+fn is_forbidden_state(job: &serde_json::Value) -> bool {
     matches!(
-        job.get("status").and_then(|v| v.as_str()),
+        job.get("state").and_then(|v| v.as_str()),
         Some("complete") | Some("failed") | Some("cancelled")
     )
 }
@@ -25,12 +25,12 @@ fn evaluate_dependency_expr(world: &World, dep: &JsonValue, in_not: bool) -> boo
         if let Ok(eid) = dep_eid.parse::<u32>() {
             if let Some(dep_job) = world.get_component(eid, "Job") {
                 if in_not {
-                    // For NOT, forbidden statuses block satisfaction
-                    return !is_forbidden_status(dep_job);
+                    // For NOT, forbidden state block satisfaction
+                    return !is_forbidden_state(dep_job);
                 } else {
                     // For direct dep, only "complete" is satisfied
                     return dep_job
-                        .get("status")
+                        .get("state")
                         .map(|s| s == "complete")
                         .unwrap_or(false);
                 }
@@ -72,7 +72,7 @@ fn evaluate_dependency_expr(world: &World, dep: &JsonValue, in_not: bool) -> boo
                     let dep_eid = d.as_str().unwrap();
                     if let Ok(eid) = dep_eid.parse::<u32>() {
                         if let Some(dep_job) = world.get_component(eid, "Job") {
-                            return is_forbidden_status(dep_job);
+                            return is_forbidden_state(dep_job);
                         }
                         // If job doesn't exist, NOT is satisfied for this dep
                         return false;
@@ -142,27 +142,27 @@ pub fn evaluate_entity_state(world: &World, es: &JsonValue) -> bool {
 }
 
 /// Returns Some("failed") or Some("cancelled") if any dependency has failed or been cancelled, otherwise None.
-pub fn dependency_failure_status(world: &World, job: &JsonValue) -> Option<&'static str> {
+pub fn dependency_failure_state(world: &World, job: &JsonValue) -> Option<&'static str> {
     match job.get("dependencies") {
         None => None,
-        Some(dep) => find_failure_status(world, dep),
+        Some(dep) => find_failure_state(world, dep),
     }
 }
 
-/// Recursively checks for dependency failure/cancelled status.
-/// NOTE: NOT clauses do NOT propagate failure/cancelled status from their referenced jobs.
-fn find_failure_status(world: &World, dep: &serde_json::Value) -> Option<&'static str> {
+/// Recursively checks for dependency failure/cancelled state.
+/// NOTE: NOT clauses do NOT propagate failure/cancelled state from their referenced jobs.
+fn find_failure_state(world: &World, dep: &serde_json::Value) -> Option<&'static str> {
     if dep.is_string() {
         let dep_eid = dep.as_str().unwrap();
         if let Ok(eid) = dep_eid.parse::<u32>() {
             // Only propagate failure if entity exists
             if world.entity_exists(eid) {
                 if let Some(dep_job) = world.get_component(eid, "Job") {
-                    let status = dep_job.get("status").and_then(|v| v.as_str()).unwrap_or("");
-                    if status == "failed" {
+                    let state = dep_job.get("state").and_then(|v| v.as_str()).unwrap_or("");
+                    if state == "failed" {
                         return Some("failed");
                     }
-                    if status == "cancelled" {
+                    if state == "cancelled" {
                         return Some("cancelled");
                     }
                 }
@@ -173,23 +173,23 @@ fn find_failure_status(world: &World, dep: &serde_json::Value) -> Option<&'stati
     }
     if dep.is_array() {
         for d in dep.as_array().unwrap() {
-            if let Some(status) = find_failure_status(world, d) {
-                return Some(status);
+            if let Some(state) = find_failure_state(world, d) {
+                return Some(state);
             }
         }
         return None;
     }
     if dep.is_object() {
         let obj = dep.as_object().unwrap();
-        // NOT: do NOT propagate failure/cancelled status from referenced jobs
+        // NOT: do NOT propagate failure/cancelled state from referenced jobs
         if obj.get("not").is_some() {
             return None;
         }
         for key in &["all_of", "any_of"] {
             if let Some(arr) = obj.get(*key) {
                 for d in arr.as_array().unwrap() {
-                    if let Some(status) = find_failure_status(world, d) {
-                        return Some(status);
+                    if let Some(state) = find_failure_state(world, d) {
+                        return Some(state);
                     }
                 }
             }

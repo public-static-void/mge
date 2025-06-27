@@ -31,7 +31,7 @@ impl ResourceReservationSystem {
                 None => continue,
             };
 
-            if job.get("status").and_then(|v| v.as_str()) != Some("pending") {
+            if job.get("state").and_then(|v| v.as_str()) != Some("pending") {
                 continue;
             }
 

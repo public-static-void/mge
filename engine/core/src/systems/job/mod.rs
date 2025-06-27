@@ -1,24 +1,37 @@
+//! Job system module root.
+//!
+//! This module organizes all job-related logic, handlers, operations, and registries.
+//! Submodules are grouped by concern for clarity and extensibility.
+
 pub mod ai;
 pub mod ai_event_reaction_system;
+pub mod board;
 pub mod builtin_handlers;
 pub mod children;
 pub mod dependencies;
-pub mod effect_processor_registry;
-pub mod job_board;
-pub mod job_handler_registry;
-pub mod job_type;
+mod job_type;
 pub mod loader;
-pub mod phases;
-pub mod priority_aging;
+pub mod ops;
 pub mod registry;
 pub mod requirements;
 pub mod resource_reservation;
+pub mod state_utils;
+pub mod states;
 pub mod system;
 
-pub use ai::{assign_jobs, setup_ai_event_subscriptions};
+// Re-export the most commonly used public APIs for external use.
+pub use ai::*;
 pub use ai_event_reaction_system::AiEventReactionSystem;
-pub use builtin_handlers::register_builtin_job_handlers;
-pub use job_type::{JobEffect, JobType};
-pub use loader::load_job_types_from_dir;
-pub use registry::{JobFn, JobLogic, JobTypeData, JobTypeRegistry};
+pub use board::*;
+pub use builtin_handlers::*;
+pub use children::*;
+pub use dependencies::*;
+pub use job_type::{JobEffect, JobLogicKind, JobTypeData, JobTypeRegistry};
+pub use loader::*;
+pub use ops::*;
+pub use registry::*;
+pub use requirements::*;
+pub use resource_reservation::*;
+pub use state_utils::*;
+pub use states::*;
 pub use system::JobSystem;
