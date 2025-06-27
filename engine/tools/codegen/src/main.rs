@@ -170,9 +170,7 @@ fn generate_lua_stub(schema: &serde_json::Value) -> String {
         .unwrap();
     let properties = schema.get("properties").unwrap().as_object().unwrap();
 
-    let mut out = format!(
-        "--- {title}Component type stub\n---@class {title}Component\n"
-    );
+    let mut out = format!("--- {title}Component type stub\n---@class {title}Component\n");
     for (field, prop) in properties.iter() {
         if field == "pos" && prop.get("oneOf").is_some() {
             out.push_str("---@field pos Position\n\n---@class Position\n");
@@ -219,9 +217,8 @@ fn generate_python_stub(schema: &serde_json::Value) -> String {
         .unwrap();
     let properties = schema.get("properties").unwrap().as_object().unwrap();
 
-    let mut out = format!(
-        "# {title}Component type stub\nfrom typing import Optional, TypedDict, Union\n\n"
-    );
+    let mut out =
+        format!("# {title}Component type stub\nfrom typing import Optional, TypedDict, Union\n\n");
     let mut union_types = Vec::new();
     let mut union_names = Vec::new();
 

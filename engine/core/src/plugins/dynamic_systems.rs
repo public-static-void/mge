@@ -80,9 +80,9 @@ impl DynamicSystemRegistry {
 
         match sorter.into_vec_nodes() {
             SortResults::Full(order) => Ok(order),
-            SortResults::Partial(cycle) => Err(format!(
-                "Cycle detected in system dependencies: {cycle:?}"
-            )),
+            SortResults::Partial(cycle) => {
+                Err(format!("Cycle detected in system dependencies: {cycle:?}"))
+            }
         }
     }
 

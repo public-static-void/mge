@@ -30,9 +30,7 @@ fn find_config_path() -> PathBuf {
 pub fn register_plugins() {
     let config_path = find_config_path();
     let config = GameConfig::load_from_file(&config_path).unwrap_or_else(|_| {
-        panic!(
-            "Failed to load config for plugin registration: {config_path:?}"
-        )
+        panic!("Failed to load config for plugin registration: {config_path:?}")
     });
 
     let mut engine_api = EngineApi {

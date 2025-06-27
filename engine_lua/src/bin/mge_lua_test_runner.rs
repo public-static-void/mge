@@ -259,9 +259,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let old_path: String = package.get("path")?;
         let tests_dir = lua_tests_dir();
         let tests_dir_str = tests_dir.to_str().unwrap();
-        let new_path = format!(
-            "{tests_dir_str}/?.lua;{tests_dir_str}/?.lua;{old_path}"
-        );
+        let new_path = format!("{tests_dir_str}/?.lua;{tests_dir_str}/?.lua;{old_path}");
         package.set("path", new_path)?;
 
         // Prepare Lua code: require the module and call only the test function
