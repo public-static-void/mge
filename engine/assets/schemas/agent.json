@@ -5,37 +5,62 @@
   "modes": ["colony", "roguelike"],
   "properties": {
     "entity_id": { "type": "integer" },
+
     "specializations": {
       "type": "array",
       "items": { "type": "string" },
-      "description": "List of job categories this agent specializes in"
+      "description": "List of job categories this agent specializes in",
+      "default": []
     },
+
     "skills": {
       "type": "object",
-      "additionalProperties": { "type": "number" }
+      "additionalProperties": { "type": "number" },
+      "default": {}
     },
+
     "preferences": {
       "type": "object",
-      "additionalProperties": { "type": "number" }
+      "additionalProperties": { "type": "number" },
+      "default": {}
     },
-    "current_job": { "type": "integer" },
+
+    "current_job": {
+      "type": ["integer", "null"],
+      "default": null
+    },
+
     "job_queue": {
       "type": "array",
       "items": { "type": "integer" },
-      "description": "Queue of job entity IDs"
+      "description": "Queue of job entity IDs",
+      "default": []
     },
-    "stamina": { "type": "number", "default": 100 },
-    "morale": { "type": "number", "default": 100 },
+
+    "stamina": {
+      "type": "number",
+      "default": 100,
+      "description": "Stamina points"
+    },
+
+    "morale": {
+      "type": "number",
+      "default": 100,
+      "description": "Morale points"
+    },
+
     "state": {
       "type": "string",
       "enum": ["idle", "working", "resting", "unavailable"],
       "default": "idle"
     },
+
     "jobs_completed": {
       "type": "integer",
       "default": 0,
       "description": "How many jobs this agent has completed (for fairness/round-robin)."
     },
+
     "move_path": {
       "type": "array",
       "items": {
@@ -53,8 +78,10 @@
         },
         "required": ["Square"]
       },
-      "description": "Path (list of positions) the agent will follow to reach a target."
+      "description": "Path (list of positions) the agent will follow to reach a target.",
+      "default": []
     },
+
     "carried_resources": {
       "type": "array",
       "items": {
@@ -65,7 +92,8 @@
         },
         "required": ["kind", "amount"]
       },
-      "description": "Resources currently carried by this agent"
+      "description": "Resources currently carried by this agent",
+      "default": []
     }
   },
   "required": ["entity_id"]
