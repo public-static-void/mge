@@ -21,7 +21,7 @@ fn test_schema_to_c_header_generation() {
     assert!(status.success(), "Codegen tool failed");
 
     // Read generated C header file
-    let generated_c_path = format!("{}/position.h", out_dir);
+    let generated_c_path = format!("{out_dir}/position.h");
     let generated =
         fs::read_to_string(&generated_c_path).expect("Failed to read generated C header file");
     let expected =

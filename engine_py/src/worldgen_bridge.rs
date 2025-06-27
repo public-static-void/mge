@@ -62,7 +62,7 @@ pub fn invoke_worldgen_plugin<'py>(
     let registry = GLOBAL_WORLDGEN_REGISTRY.lock().unwrap();
     let result = registry
         .invoke(&name, &params)
-        .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("{:?}", e)))?;
+        .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("{e:?}")))?;
     Ok(serde_pyobject::to_pyobject(py, &result)?.into())
 }
 

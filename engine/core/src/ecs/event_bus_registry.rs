@@ -146,7 +146,7 @@ impl EventBusRegistry {
             .iter()
             .map(|((type_id, name), _)| {
                 (
-                    format!("{:?}", type_id), // Or use a registry of type_name if you maintain one
+                    format!("{type_id:?}"), // Or use a registry of type_name if you maintain one
                     name.clone(),
                 )
             })

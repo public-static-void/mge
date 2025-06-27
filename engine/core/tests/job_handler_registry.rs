@@ -96,8 +96,7 @@ fn test_data_driven_registration() {
                 .unwrap()
                 .get(job_type)
                 .is_some(),
-            "Handler for job type '{}' was not registered",
-            job_type
+            "Handler for job type '{job_type}' was not registered"
         );
     }
 }

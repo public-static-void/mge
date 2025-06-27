@@ -18,13 +18,11 @@ fn test_component_registration() {
     let json = registry.schema_to_json::<PositionComponent>().unwrap();
     assert!(
         json.contains("\"x\""),
-        "Schema does not contain field 'x':\n{}",
-        json
+        "Schema does not contain field 'x':\n{json}"
     );
     assert!(
         json.contains("Position"),
-        "Schema does not mention 'Position':\n{}",
-        json
+        "Schema does not mention 'Position':\n{json}"
     );
 }
 
@@ -38,13 +36,11 @@ fn test_health_component() {
     let json = registry.schema_to_json::<Health>().unwrap();
     assert!(
         json.contains("\"current\""),
-        "Schema does not contain field 'current':\n{}",
-        json
+        "Schema does not contain field 'current':\n{json}"
     );
     assert!(
         json.contains("\"max\""),
-        "Schema does not contain field 'max':\n{}",
-        json
+        "Schema does not contain field 'max':\n{json}"
     );
 }
 

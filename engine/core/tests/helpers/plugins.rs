@@ -13,12 +13,11 @@ pub fn plugin_bin_path() -> PathBuf {
     let bin = workspace_root.join("plugins/rust_test_plugin/rust_test_plugin");
     assert!(
         bin.exists(),
-        "Plugin binary missing at {:?}. Build it with: cargo run -p xtask -- build-plugins",
-        bin
+        "Plugin binary missing at {bin:?}. Build it with: cargo run -p xtask -- build-plugins"
     );
     bin
 }
 
 pub fn test_socket_path(suffix: &str) -> String {
-    format!("/tmp/rust_test_plugin_{}.sock", suffix)
+    format!("/tmp/rust_test_plugin_{suffix}.sock")
 }

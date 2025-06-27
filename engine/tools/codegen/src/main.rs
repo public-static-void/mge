@@ -40,31 +40,31 @@ fn main() {
         match lang.as_str() {
             "rust" => {
                 let rust_code = generate_rust_component(&schema);
-                let out_path = Path::new(output_dir).join(format!("{}.rs", file_stem));
+                let out_path = Path::new(output_dir).join(format!("{file_stem}.rs"));
                 fs::write(out_path, rust_code).expect("Failed to write Rust output file");
             }
             "lua" => {
                 let lua_code = generate_lua_stub(&schema);
-                let out_path = Path::new(output_dir).join(format!("{}.lua", file_stem));
+                let out_path = Path::new(output_dir).join(format!("{file_stem}.lua"));
                 fs::write(out_path, lua_code).expect("Failed to write Lua output file");
             }
             "python" => {
                 let py_code = generate_python_stub(&schema);
-                let out_path = Path::new(output_dir).join(format!("{}.py", file_stem));
+                let out_path = Path::new(output_dir).join(format!("{file_stem}.py"));
                 fs::write(out_path, py_code).expect("Failed to write Python output file");
             }
             "c" => {
                 let c_code = generate_c_header(&schema);
-                let out_path = Path::new(output_dir).join(format!("{}.h", file_stem));
+                let out_path = Path::new(output_dir).join(format!("{file_stem}.h"));
                 fs::write(out_path, c_code).expect("Failed to write C header output file");
             }
             "md" => {
                 let md_doc = generate_markdown_doc(&schema, schema_path);
-                let out_path = Path::new(output_dir).join(format!("{}.md", file_stem));
+                let out_path = Path::new(output_dir).join(format!("{file_stem}.md"));
                 fs::write(out_path, md_doc).expect("Failed to write Markdown output file");
             }
             other => {
-                eprintln!("Unknown language: {}", other);
+                eprintln!("Unknown language: {other}");
                 std::process::exit(1);
             }
         }
@@ -94,7 +94,7 @@ fn generate_rust_component(schema: &serde_json::Value) -> String {
             for variant in prop.get("oneOf").unwrap().as_array().unwrap() {
                 let variant_obj = variant.get("properties").unwrap().as_object().unwrap();
                 for (variant_name, variant_schema) in variant_obj.iter() {
-                    enums.push_str(&format!("    {} {{ ", variant_name));
+                    enums.push_str(&format!("    {variant_name} {{ "));
                     let fields_obj = variant_schema
                         .get("properties")
                         .unwrap()
@@ -107,7 +107,7 @@ fn generate_rust_component(schema: &serde_json::Value) -> String {
                             Some("string") => "String",
                             _ => "i32",
                         };
-                        variant_fields.push(format!("{}: {}", f, ty));
+                        variant_fields.push(format!("{f}: {ty}"));
                     }
                     enums.push_str(&variant_fields.join(", "));
                     enums.push_str(" },\n");
@@ -122,7 +122,7 @@ fn generate_rust_component(schema: &serde_json::Value) -> String {
                 Some("string") => "String",
                 _ => "i32",
             };
-            fields.push_str(&format!("    pub {}: {},\n", field, ty));
+            fields.push_str(&format!("    pub {field}: {ty},\n"));
         }
     }
 
@@ -157,10 +157,7 @@ impl Component for {title}Component {{
         ))
     }}
 }}
-"#,
-        title = title,
-        enums = enums,
-        fields = fields
+"#
     )
 }
 
@@ -174,8 +171,7 @@ fn generate_lua_stub(schema: &serde_json::Value) -> String {
     let properties = schema.get("properties").unwrap().as_object().unwrap();
 
     let mut out = format!(
-        "--- {}Component type stub\n---@class {}Component\n",
-        title, title
+        "--- {title}Component type stub\n---@class {title}Component\n"
     );
     for (field, prop) in properties.iter() {
         if field == "pos" && prop.get("oneOf").is_some() {
@@ -183,7 +179,7 @@ fn generate_lua_stub(schema: &serde_json::Value) -> String {
             for variant in prop.get("oneOf").unwrap().as_array().unwrap() {
                 let variant_obj = variant.get("properties").unwrap().as_object().unwrap();
                 for (variant_name, variant_schema) in variant_obj.iter() {
-                    out.push_str(&format!("---@field {}? {{ ", variant_name));
+                    out.push_str(&format!("---@field {variant_name}? {{ "));
                     let fields_obj = variant_schema
                         .get("properties")
                         .unwrap()
@@ -196,7 +192,7 @@ fn generate_lua_stub(schema: &serde_json::Value) -> String {
                             Some("string") => "string",
                             _ => "any",
                         };
-                        variant_fields.push(format!("{}: {}", f, ty));
+                        variant_fields.push(format!("{f}: {ty}"));
                     }
                     out.push_str(&variant_fields.join(", "));
                     out.push_str(" }\n");
@@ -208,7 +204,7 @@ fn generate_lua_stub(schema: &serde_json::Value) -> String {
                 Some("string") => "string",
                 _ => "any",
             };
-            out.push_str(&format!("---@field {} {}\n", field, ty));
+            out.push_str(&format!("---@field {field} {ty}\n"));
         }
     }
     out
@@ -224,8 +220,7 @@ fn generate_python_stub(schema: &serde_json::Value) -> String {
     let properties = schema.get("properties").unwrap().as_object().unwrap();
 
     let mut out = format!(
-        "# {}Component type stub\nfrom typing import Optional, TypedDict, Union\n\n",
-        title
+        "# {title}Component type stub\nfrom typing import Optional, TypedDict, Union\n\n"
     );
     let mut union_types = Vec::new();
     let mut union_names = Vec::new();
@@ -236,7 +231,7 @@ fn generate_python_stub(schema: &serde_json::Value) -> String {
                 let variant_obj = variant.get("properties").unwrap().as_object().unwrap();
                 for (variant_name, variant_schema) in variant_obj.iter() {
                     union_names.push(variant_name.clone());
-                    out.push_str(&format!("class {}(TypedDict):\n", variant_name));
+                    out.push_str(&format!("class {variant_name}(TypedDict):\n"));
                     let fields_obj = variant_schema
                         .get("properties")
                         .unwrap()
@@ -248,7 +243,7 @@ fn generate_python_stub(schema: &serde_json::Value) -> String {
                             Some("string") => "str",
                             _ => "any",
                         };
-                        out.push_str(&format!("    {}: {}\n", f, ty));
+                        out.push_str(&format!("    {f}: {ty}\n"));
                     }
                     out.push('\n');
                 }
@@ -256,8 +251,7 @@ fn generate_python_stub(schema: &serde_json::Value) -> String {
             union_types.push(format!("Position = Union[{}]\n", union_names.join(", ")));
             out.push_str(&union_types.join(""));
             out.push_str(&format!(
-                "\nclass {}Component(TypedDict):\n    pos: Position\n",
-                title
+                "\nclass {title}Component(TypedDict):\n    pos: Position\n"
             ));
         } else {
             let ty = match prop.get("type").and_then(|t| t.as_str()) {
@@ -266,8 +260,7 @@ fn generate_python_stub(schema: &serde_json::Value) -> String {
                 _ => "any",
             };
             out.push_str(&format!(
-                "class {}Component(TypedDict):\n    {}: {}\n",
-                title, field, ty
+                "class {title}Component(TypedDict):\n    {field}: {ty}\n"
             ));
         }
     }
@@ -283,8 +276,7 @@ fn generate_c_header(schema: &serde_json::Value) -> String {
         .unwrap();
     let guard = format!("{}_COMPONENT_H", title.to_uppercase());
     let mut out = format!(
-        "// AUTO-GENERATED FILE: DO NOT EDIT!\n// Schema: {}Component\n\n#ifndef {}\n#define {}\n\n#include <stdint.h>\n\n",
-        title, guard, guard
+        "// AUTO-GENERATED FILE: DO NOT EDIT!\n// Schema: {title}Component\n\n#ifndef {guard}\n#define {guard}\n\n#include <stdint.h>\n\n"
     );
 
     let properties = schema.get("properties").unwrap().as_object().unwrap();
@@ -325,7 +317,7 @@ fn generate_c_header(schema: &serde_json::Value) -> String {
             out.push_str("typedef struct {\n  Position pos;\n} PositionComponent;\n\n");
         }
     }
-    out.push_str(&format!("#endif // {}\n", guard));
+    out.push_str(&format!("#endif // {guard}\n"));
     out
 }
 
@@ -338,7 +330,7 @@ fn generate_markdown_doc(schema: &serde_json::Value, schema_path: &str) -> Strin
         .unwrap()
         .as_str()
         .unwrap();
-    let mut out = format!("# {}Component\n\n", title);
+    let mut out = format!("# {title}Component\n\n");
     out.push_str("**Kind:** Component\n");
     out.push_str(&format!(
         "**Source schema:** `{}`\n\n",
@@ -383,12 +375,12 @@ fn generate_markdown_doc(schema: &serde_json::Value, schema_path: &str) -> Strin
     if has_description {
         out.push_str("| Name | Type     | Description                                               |\n| ---- | -------- | --------------------------------------------------------- |\n");
         for (field, typ, desc) in &rows {
-            out.push_str(&format!("| {:<4} | {:<8} | {:<57} |\n", field, typ, desc));
+            out.push_str(&format!("| {field:<4} | {typ:<8} | {desc:<57} |\n"));
         }
     } else {
         out.push_str("| Name | Type     |\n| ---- | -------- |\n");
         for (field, typ, _) in &rows {
-            out.push_str(&format!("| {:<4} | {:<8} |\n", field, typ));
+            out.push_str(&format!("| {field:<4} | {typ:<8} |\n"));
         }
     }
 
@@ -406,7 +398,7 @@ fn generate_markdown_doc(schema: &serde_json::Value, schema_path: &str) -> Strin
                         out.push('\n');
                     }
                     first = false;
-                    out.push_str(&format!("- **{}**:\n\n", variant_name));
+                    out.push_str(&format!("- **{variant_name}**:\n\n"));
                     let fields_obj = variant_schema
                         .get("properties")
                         .unwrap()
@@ -419,7 +411,7 @@ fn generate_markdown_doc(schema: &serde_json::Value, schema_path: &str) -> Strin
                             Some(other) => other,
                             None => "unknown",
                         };
-                        out.push_str(&format!("  - `{}` ({})\n", f, ty));
+                        out.push_str(&format!("  - `{f}` ({ty})\n"));
                     }
                 }
             }

@@ -80,8 +80,7 @@ fn test_job_progressed_event_emitted_on_progress_change() {
         let progress = event.get("progress").and_then(|v| v.as_f64()).unwrap();
         assert!(
             !seen.contains(&progress),
-            "Duplicate progress event for value {}",
-            progress
+            "Duplicate progress event for value {progress}"
         );
         seen.push(progress);
     }

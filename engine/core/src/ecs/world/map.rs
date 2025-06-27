@@ -45,10 +45,10 @@ impl World {
         map_json: &serde_json::Value,
     ) -> Result<(), String> {
         for validator in &self.map_validators {
-            validator(map_json).map_err(|e| format!("Map validator failed: {}", e))?;
+            validator(map_json).map_err(|e| format!("Map validator failed: {e}"))?;
         }
         self.apply_generated_map(map_json)
-            .map_err(|e| format!("Apply map failed: {}", e))?;
+            .map_err(|e| format!("Apply map failed: {e}"))?;
         Ok(())
     }
 

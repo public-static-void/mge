@@ -130,7 +130,7 @@ fn test_register_and_invoke_cabi_worldgen_plugin() {
         load_plugin_and_register_worldgen(plugin_path, &mut engine_api, world, &mut registry)
     };
     if let Err(e) = &result {
-        eprintln!("Failed to load plugin: {}", e);
+        eprintln!("Failed to load plugin: {e}");
     }
     assert!(result.is_ok(), "Plugin should load successfully");
 
@@ -283,8 +283,7 @@ fn test_worldgen_plugin_schema_validation() {
     let err = result.err().unwrap().to_string();
     assert!(
         err.contains("Map schema validation failed"),
-        "Error should mention schema validation: {}",
-        err
+        "Error should mention schema validation: {err}"
     );
 }
 

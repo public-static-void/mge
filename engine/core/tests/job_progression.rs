@@ -370,8 +370,7 @@ fn test_agent_moves_to_job_site_before_progress() {
             let state = job.get("state").unwrap().as_str().unwrap();
             assert!(
                 state == "at_site" || state == "in_progress" || state == "complete",
-                "Job state should be at_site/in_progress/complete after agent arrives, got {}",
-                state
+                "Job state should be at_site/in_progress/complete after agent arrives, got {state}"
             );
         }
         if job.get("state") == Some(&serde_json::json!("complete")) {

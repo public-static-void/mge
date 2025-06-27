@@ -120,7 +120,6 @@ fn test_independent_systems_run_in_registration_order() {
     let run_order = order.lock().unwrap().clone();
     assert!(
         run_order == vec!["X", "Y"] || run_order == vec!["Y", "X"],
-        "Order was: {:?}, expected [\"X\", \"Y\"] or [\"Y\", \"X\"]",
-        run_order
+        "Order was: {run_order:?}, expected [\"X\", \"Y\"] or [\"Y\", \"X\"]"
     );
 }

@@ -117,7 +117,7 @@ fn test_agent_fetches_and_delivers_resources_with_failure_and_interruption() {
     job_board.update(&world);
     match job_board.claim_job(agent_id, &mut world, 0) {
         JobAssignmentResult::Assigned(_) => (),
-        other => panic!("Job assignment failed: {:?}", other),
+        other => panic!("Job assignment failed: {other:?}"),
     }
     world.run_system("JobSystem", None).unwrap();
 
@@ -215,7 +215,7 @@ fn test_agent_fetches_and_delivers_resources_with_failure_and_interruption() {
     job_board.update(&world);
     match job_board.claim_job(agent_id, &mut world, 0) {
         JobAssignmentResult::Assigned(_) => (),
-        other => panic!("Job assignment failed: {:?}", other),
+        other => panic!("Job assignment failed: {other:?}"),
     }
     world.run_system("JobSystem", None).unwrap();
 

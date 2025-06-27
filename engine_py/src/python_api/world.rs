@@ -45,8 +45,7 @@ impl PyWorld {
         let schemas =
             load_schemas_from_dir_with_modes(&schema_path, &allowed_modes).map_err(|e| {
                 pyo3::exceptions::PyValueError::new_err(format!(
-                    "Failed to load schemas from {:?}: {e}",
-                    schema_path
+                    "Failed to load schemas from {schema_path:?}: {e}"
                 ))
             })?;
 

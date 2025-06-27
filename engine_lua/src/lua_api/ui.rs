@@ -193,7 +193,7 @@ pub fn register_ui_api(lua: &Lua, globals: &Table) -> LuaResult<()> {
         lua.create_function(
             |lua, (widget_id, event_name, func): (u64, String, LuaFunction)| {
                 let callbacks: Table = lua.globals().get::<Table>("_ui_callbacks")?;
-                let key = format!("{}_{}", widget_id, event_name);
+                let key = format!("{widget_id}_{event_name}");
                 callbacks.set(key, func)?;
                 Ok(true)
             },
@@ -204,7 +204,7 @@ pub fn register_ui_api(lua: &Lua, globals: &Table) -> LuaResult<()> {
         "remove_callback",
         lua.create_function(|lua, (widget_id, event_name): (u64, String)| {
             let callbacks: Table = lua.globals().get::<Table>("_ui_callbacks")?;
-            let key = format!("{}_{}", widget_id, event_name);
+            let key = format!("{widget_id}_{event_name}");
             callbacks.set(key, mlua::Value::Nil)?;
             Ok(true)
         })?,
@@ -246,7 +246,7 @@ pub fn register_ui_api(lua: &Lua, globals: &Table) -> LuaResult<()> {
                 if let Some(widget) = registry.get_mut(&widget_id) {
                     widget.handle_event(&event);
                     let callbacks: Table = lua.globals().get::<Table>("_ui_callbacks")?;
-                    let key = format!("{}_{}", widget_id, event_name);
+                    let key = format!("{widget_id}_{event_name}");
                     if let Some(cb) = callbacks.get::<Option<LuaFunction>>(key)? {
                         let _ = cb.call::<()>((widget_id,));
                     }

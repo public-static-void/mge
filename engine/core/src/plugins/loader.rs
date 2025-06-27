@@ -315,7 +315,7 @@ pub fn resolve_plugin_load_order(
         }
     }
     if !missing.is_empty() {
-        return Err(format!("Missing dependencies: {:?}", missing));
+        return Err(format!("Missing dependencies: {missing:?}"));
     }
 
     // 2. Build topo_sort graph
@@ -377,8 +377,7 @@ pub unsafe fn load_native_plugins_from_config_threadsafe(
             let abs_path = workspace_root.join(plugin_path);
             if !abs_path.exists() {
                 return Err(format!(
-                    "Plugin not found: {} (resolved as {:?})",
-                    plugin_path, abs_path
+                    "Plugin not found: {plugin_path} (resolved as {abs_path:?})"
                 ));
             }
             unsafe {
@@ -424,8 +423,7 @@ pub unsafe fn load_native_plugins_from_config(
             let abs_path = workspace_root.join(plugin_path);
             if !abs_path.exists() {
                 return Err(format!(
-                    "Plugin not found: {} (resolved as {:?})",
-                    plugin_path, abs_path
+                    "Plugin not found: {plugin_path} (resolved as {abs_path:?})"
                 ));
             }
             unsafe {

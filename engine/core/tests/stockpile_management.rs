@@ -33,7 +33,7 @@ fn test_add_and_remove_stockpile_resources() {
             "resources": { "wood": 10, "stone": 5 }
         }),
     );
-    assert!(res.is_ok(), "Failed to add stockpile: {:?}", res);
+    assert!(res.is_ok(), "Failed to add stockpile: {res:?}");
 
     // Add 3 food
     let res = world.modify_stockpile_resource(entity, "food", 3.0);

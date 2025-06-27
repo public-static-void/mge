@@ -169,8 +169,7 @@ where
             func.call(args)
         } else {
             Err(mlua::Error::RuntimeError(format!(
-                "Lua job handler not found for job type: {}",
-                job_type
+                "Lua job handler not found for job type: {job_type}"
             )))
         }
     })

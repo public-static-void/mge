@@ -22,7 +22,7 @@ fn test_schema_to_lua_and_python_stub_generation() {
     assert!(status.success(), "Codegen tool failed");
 
     // Read generated Lua file
-    let generated_lua_path = format!("{}/position.lua", out_dir);
+    let generated_lua_path = format!("{out_dir}/position.lua");
     let generated_lua =
         fs::read_to_string(&generated_lua_path).expect("Failed to read generated Lua file");
     let expected_lua =
@@ -33,7 +33,7 @@ fn test_schema_to_lua_and_python_stub_generation() {
     );
 
     // Read generated Python file
-    let generated_py_path = format!("{}/position.py", out_dir);
+    let generated_py_path = format!("{out_dir}/position.py");
     let generated_py =
         fs::read_to_string(&generated_py_path).expect("Failed to read generated Python file");
     let expected_py =

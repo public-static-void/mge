@@ -22,7 +22,7 @@ fn main() {
     };
 
     if let Err(e) = result {
-        eprintln!("Error: {}", e);
+        eprintln!("Error: {e}");
         exit(1);
     }
 }
@@ -34,7 +34,7 @@ fn build_and_deploy_plugins() -> Result<(), Box<dyn Error>> {
         "linux" => ("so", "lib"),
         "macos" => ("dylib", "lib"),
         "windows" => ("dll", ""),
-        _ => panic!("Unsupported OS: {}", target_os),
+        _ => panic!("Unsupported OS: {target_os}"),
     };
 
     let workspace_target_dir = Path::new("target/release");
@@ -63,7 +63,7 @@ fn build_and_deploy_plugins() -> Result<(), Box<dyn Error>> {
         }
 
         // Deploy dynamic library
-        let dylib_name = format!("{}{}.{}", lib_prefix, crate_package_name, dylib_ext);
+        let dylib_name = format!("{lib_prefix}{crate_package_name}.{dylib_ext}");
         let dest_dylib = crate_path.join(&dylib_name);
         let built_dylib = workspace_target_dir.join(&dylib_name);
         if built_dylib.exists() {
@@ -78,7 +78,7 @@ fn build_and_deploy_plugins() -> Result<(), Box<dyn Error>> {
             let deps_dir = workspace_target_dir.join("deps");
             let found = fs::read_dir(&deps_dir)?.filter_map(|e| e.ok()).find(|e| {
                 let fname = e.file_name().to_string_lossy().to_string();
-                fname.starts_with(&format!("{}{}", lib_prefix, crate_package_name))
+                fname.starts_with(&format!("{lib_prefix}{crate_package_name}"))
                     && fname.ends_with(dylib_ext)
             });
             if let Some(entry) = found {
@@ -102,7 +102,7 @@ fn build_and_deploy_plugins() -> Result<(), Box<dyn Error>> {
 
         // Deploy binary executable (if it exists)
         let bin_name = if target_os == "windows" {
-            format!("{}.exe", crate_package_name)
+            format!("{crate_package_name}.exe")
         } else {
             crate_package_name.clone()
         };
@@ -116,7 +116,7 @@ fn build_and_deploy_plugins() -> Result<(), Box<dyn Error>> {
             let deps_dir = workspace_target_dir.join("deps");
             let found = fs::read_dir(&deps_dir)?.filter_map(|e| e.ok()).find(|e| {
                 let fname = e.file_name().to_string_lossy().to_string();
-                fname == bin_name || fname.starts_with(&format!("{}-", bin_name))
+                fname == bin_name || fname.starts_with(&format!("{bin_name}-"))
             });
             if let Some(entry) = found {
                 let built_bin = entry.path();
@@ -167,7 +167,7 @@ fn build_c_plugins() -> Result<(), Box<dyn Error>> {
         if c_files.len() == 1 {
             let c_file = &c_files[0];
             let base = c_file.file_stem().unwrap().to_str().unwrap();
-            let out_lib = path.join(format!("lib{}.so", base));
+            let out_lib = path.join(format!("lib{base}.so"));
             println!("Compiling {} -> {}", c_file.display(), out_lib.display());
 
             // Build gcc command with all include paths

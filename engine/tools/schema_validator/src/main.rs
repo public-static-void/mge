@@ -94,7 +94,7 @@ fn check_file(path: &PathBuf, allowed_modes: &[String]) -> Result<(), String> {
 }
 
 fn print_summary(checked: usize, failed: usize) {
-    println!("Checked {} files, {} errors.", checked, failed);
+    println!("Checked {checked} files, {failed} errors.");
 }
 
 // --- Load allowed_modes from game.toml ---

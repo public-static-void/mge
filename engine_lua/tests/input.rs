@@ -41,7 +41,7 @@ fn lua_get_user_input_returns_mocked_value() {
     let lua_tests_dir_str = lua_tests_dir.to_str().unwrap();
     let package: mlua::Table = engine.lua.globals().get("package").unwrap();
     let old_path: String = package.get("path").unwrap();
-    let new_path = format!("{}/?.lua;{}", lua_tests_dir_str, old_path);
+    let new_path = format!("{lua_tests_dir_str}/?.lua;{old_path}");
     package.set("path", new_path).unwrap();
 
     let script_path = lua_tests_dir.join("test_input.lua");

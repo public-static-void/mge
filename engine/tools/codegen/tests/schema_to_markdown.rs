@@ -66,7 +66,7 @@ fn test_schema_to_markdown_doc_generation() {
     assert!(status.success(), "Codegen tool failed");
 
     // Read and normalize generated and expected Markdown files
-    let generated_md_path = format!("{}/position.md", out_dir);
+    let generated_md_path = format!("{out_dir}/position.md");
     let generated =
         fs::read_to_string(&generated_md_path).expect("Failed to read generated Markdown file");
     let expected =

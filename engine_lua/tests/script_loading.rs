@@ -16,8 +16,7 @@ fn test_scriptengine_loads_lua_script_from_file() {
     let schema_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../engine/assets/schemas");
     assert!(
         schema_dir.exists(),
-        "Schema directory does not exist: {:?}",
-        schema_dir
+        "Schema directory does not exist: {schema_dir:?}"
     );
 
     for entry in std::fs::read_dir(&schema_dir).unwrap() {
@@ -61,8 +60,7 @@ fn test_cli_executes_lua_script_file() {
 
     assert!(
         script_path.exists(),
-        "Lua script file does not exist: {:?}",
-        script_path
+        "Lua script file does not exist: {script_path:?}"
     );
 
     // Find workspace root and config path
@@ -73,8 +71,7 @@ fn test_cli_executes_lua_script_file() {
     let config_path = workspace_root.join("game.toml");
     assert!(
         config_path.exists(),
-        "Config file does not exist: {:?}",
-        config_path
+        "Config file does not exist: {config_path:?}"
     );
 
     let output = Command::new("cargo")

@@ -65,21 +65,20 @@ fn main() {
 
     // --- Mod loading mode ---
     if let Some(mod_name) = mod_name {
-        let mod_dir = format!("mods/{}", mod_name);
+        let mod_dir = format!("mods/{mod_name}");
 
         // Load engine schemas first
         let schema_dir = find_schema_dir();
         if !schema_dir.exists() {
             eprintln!(
-                "Schema directory does not exist: {:?}\n\
-                Set MGE_SCHEMA_DIR or check your workspace structure.",
-                schema_dir
+                "Schema directory does not exist: {schema_dir:?}\n\
+                Set MGE_SCHEMA_DIR or check your workspace structure."
             );
             std::process::exit(1);
         }
         let config_file = find_config_file();
         let config = GameConfig::load_from_file(&config_file)
-            .unwrap_or_else(|e| panic!("Failed to load config from {:?}: {:?}", config_file, e));
+            .unwrap_or_else(|e| panic!("Failed to load config from {config_file:?}: {e:?}"));
         let engine_schemas = engine_core::ecs::schema::load_schemas_from_dir_with_modes(
             &schema_dir,
             &config.allowed_modes,
@@ -111,7 +110,7 @@ fn main() {
         .expect("Failed to load native plugins from config");
 
         // Read mod manifest and parse mode if present
-        let manifest_path = format!("{}/mod.json", mod_dir);
+        let manifest_path = format!("{mod_dir}/mod.json");
         let manifest: Option<serde_json::Value> = fs::read_to_string(&manifest_path)
             .ok()
             .and_then(|data| serde_json::from_str(&data).ok());
@@ -136,7 +135,7 @@ fn main() {
             .expect("Failed to register ECS API");
 
         if let Err(e) = load_mod(&mod_dir, world_rc.clone(), &mut engine) {
-            eprintln!("Failed to load mod: {}", e);
+            eprintln!("Failed to load mod: {e}");
             std::process::exit(1);
         }
         return;
@@ -145,22 +144,21 @@ fn main() {
     // --- Script/demo/test mode ---
     if let Some(script_path) = script_path {
         let script = fs::read_to_string(&script_path).unwrap_or_else(|_| {
-            eprintln!("Failed to read Lua script file: {}", script_path);
+            eprintln!("Failed to read Lua script file: {script_path}");
             std::process::exit(1);
         });
 
         let schema_dir = find_schema_dir();
         if !schema_dir.exists() {
             eprintln!(
-                "Schema directory does not exist: {:?}\n\
-                Set MGE_SCHEMA_DIR or check your workspace structure.",
-                schema_dir
+                "Schema directory does not exist: {schema_dir:?}\n\
+                Set MGE_SCHEMA_DIR or check your workspace structure."
             );
             std::process::exit(1);
         }
         let config_file = find_config_file();
         let config = GameConfig::load_from_file(&config_file)
-            .unwrap_or_else(|e| panic!("Failed to load config from {:?}: {:?}", config_file, e));
+            .unwrap_or_else(|e| panic!("Failed to load config from {config_file:?}: {e:?}"));
         let schemas = engine_core::ecs::schema::load_schemas_from_dir_with_modes(
             &schema_dir,
             &config.allowed_modes,
@@ -202,7 +200,7 @@ fn main() {
         engine.set_lua_args(script_args);
 
         if let Err(e) = engine.run_script(&script) {
-            eprintln!("Lua error: {:?}", e);
+            eprintln!("Lua error: {e:?}");
             std::process::exit(1);
         }
         return;

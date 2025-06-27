@@ -23,7 +23,7 @@ fn test_workshop_produces_resources_using_recipe() {
     // Add a workshop entity with a stockpile and a production job referencing a recipe
     let workshop = world.spawn_entity();
     let result = world.set_component(workshop, "Stockpile", json!({"resources": { "wood": 3 }}));
-    assert!(result.is_ok(), "Failed to add Stockpile: {:?}", result);
+    assert!(result.is_ok(), "Failed to add Stockpile: {result:?}");
     world
         .set_component(
             workshop,

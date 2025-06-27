@@ -11,14 +11,14 @@ pub fn load_mod<S: ModScriptEngine>(
     engine: &mut S,
 ) -> anyhow::Result<()> {
     // Load the mod manifest (mod.json)
-    let manifest_path = format!("{}/mod.json", mod_dir);
+    let manifest_path = format!("{mod_dir}/mod.json");
     let manifest_data = std::fs::read_to_string(&manifest_path)
         .map_err(|e| anyhow::anyhow!("Failed to read mod manifest: {}", e))?;
     let manifest: serde_json::Value = serde_json::from_str(&manifest_data)
         .map_err(|e| anyhow::anyhow!("Failed to parse mod manifest: {}", e))?;
 
     // Load schemas using the unified loader
-    let schema_dir = format!("{}/schemas", mod_dir);
+    let schema_dir = format!("{mod_dir}/schemas");
     let allowed_modes = load_allowed_modes()?;
     let schemas = load_schemas_from_dir_with_modes(&schema_dir, &allowed_modes)
         .map_err(|e| anyhow::anyhow!("Failed to load schemas: {}", e))?;
@@ -33,7 +33,7 @@ pub fn load_mod<S: ModScriptEngine>(
 
     // Load and run the main system script (assume manifest has "main_script" field)
     if let Some(main_script) = manifest.get("main_script").and_then(|v| v.as_str()) {
-        let script_path = format!("{}/{}", mod_dir, main_script);
+        let script_path = format!("{mod_dir}/{main_script}");
         let script = std::fs::read_to_string(&script_path)
             .map_err(|e| anyhow::anyhow!("Failed to read main script: {}", e))?;
         if let Err(e) = engine.run_script(&script) {
