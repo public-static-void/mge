@@ -9,7 +9,9 @@ use engine_core::systems::death_decay::{ProcessDeaths, ProcessDecay};
 use engine_core::systems::economic::{EconomicSystem, load_recipes_from_dir};
 use engine_core::systems::equipment_logic::EquipmentLogicSystem;
 use engine_core::systems::inventory::InventoryConstraintSystem;
-use engine_core::systems::job::{JobSystem, JobTypeRegistry, load_job_types_from_dir};
+use engine_core::systems::job::{
+    JobLogicKind, JobSystem, JobTypeRegistry, load_job_types_from_dir,
+};
 use engine_lua::ScriptEngine;
 use gag::BufferRedirect;
 use regex::Regex;
@@ -234,7 +236,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let job_types = load_job_types_from_dir(jobs_dir().to_str().unwrap());
         let mut job_registry = JobTypeRegistry::default();
         for job in job_types {
-            job_registry.register_data_job(job);
+            job_registry.register(job, JobLogicKind::Native(|_, _, _, job| job.clone()));
         }
         let job_system = JobSystem::new();
         world.borrow_mut().register_system(job_system);

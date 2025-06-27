@@ -6,6 +6,10 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
+thread_local! {
+    static LUA_JOB_HANDLERS: RefCell<HashMap<String, RegistryKey>> = RefCell::new(HashMap::new());
+}
+
 pub fn register_system_functions(
     lua: Rc<Lua>,
     globals: &Table,
@@ -126,7 +130,8 @@ pub fn register_system_functions(
     let get_job_types = lua.create_function(move |_, ()| {
         let world = world_for_job_types.borrow();
         let job_types = world.job_types.job_type_names();
-        Ok(job_types)
+        let job_types_owned: Vec<String> = job_types.into_iter().map(|s| s.to_string()).collect();
+        Ok(job_types_owned)
     })?;
     globals.set("get_job_types", get_job_types)?;
 
@@ -136,11 +141,37 @@ pub fn register_system_functions(
     let register_job_type =
         lua.create_function_mut(move |_, (name, func): (String, Function)| {
             let key = lua_clone.create_registry_value(func)?;
+            LUA_JOB_HANDLERS.with(|handlers| {
+                handlers.borrow_mut().insert(name.clone(), key);
+            });
             let mut world = world_for_jobs.borrow_mut();
-            world.job_types.register_lua(&name, key);
+            world.job_types.register_lua(&name, name.clone());
             Ok(())
         })?;
     globals.set("register_job_type", register_job_type)?;
 
     Ok(())
+}
+
+/// Call a Lua job handler by job type name.
+/// Returns an error if the handler is not registered.
+pub fn call_lua_job_handler<A>(
+    lua: &mlua::Lua,
+    job_type: &str,
+    args: A,
+) -> mlua::Result<mlua::MultiValue>
+where
+    A: mlua::IntoLuaMulti,
+{
+    LUA_JOB_HANDLERS.with(|handlers| {
+        if let Some(key) = handlers.borrow().get(job_type) {
+            let func: mlua::Function = lua.registry_value(key)?;
+            func.call(args)
+        } else {
+            Err(mlua::Error::RuntimeError(format!(
+                "Lua job handler not found for job type: {}",
+                job_type
+            )))
+        }
+    })
 }

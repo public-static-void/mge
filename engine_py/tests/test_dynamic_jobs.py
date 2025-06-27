@@ -4,17 +4,17 @@ def test_dynamic_job_registration(make_world):
 
     # Register a custom job type in Python
     def test_job_logic(job, progress):
-        if job["status"] == "pending":
-            job["status"] = "in_progress"
+        if job["state"] == "pending":
+            job["state"] = "in_progress"
             job["progress"] = 0
-        elif job["status"] == "in_progress":
+        elif job["state"] == "in_progress":
             job["progress"] = job.get("progress", 0) + 1
             if job["progress"] >= 2:
-                job["status"] = "complete"
+                job["state"] = "complete"
         return job
 
     world.register_job_type("TestJob", test_job_logic)
-    world.assign_job(eid, "TestJob", category="testing")
+    world.assign_job(eid, "TestJob", category="testing", state="pending")
 
     # Run the job system a few times
     for _ in range(4):
@@ -22,7 +22,7 @@ def test_dynamic_job_registration(make_world):
 
     # Check that the job is marked complete
     job = world.get_component(eid, "Job")
-    assert job["status"] == "complete"
+    assert job["state"] == "complete"
 
 
 def test_dynamic_system_registration(make_world):
