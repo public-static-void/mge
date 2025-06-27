@@ -26,7 +26,7 @@ fn test_can_load_and_lookup_job_types_from_json() {
     let registry = JobTypeRegistry::load_from_dir(jobs_dir).unwrap();
 
     // Lookup the job type by name (case-insensitive, normalized)
-    let dig = registry.get_data("DigTUnnel").expect("job type exists");
+    let dig = registry.get_data("DigTunnel").expect("job type exists");
     assert_eq!(dig.name, "DigTunnel");
     assert_eq!(dig.duration, Some(5.0));
     assert_eq!(dig.requirements, vec!["Tool:Pickaxe"]);

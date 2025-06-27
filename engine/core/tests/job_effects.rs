@@ -1,5 +1,5 @@
 use engine_core::ecs::world::World;
-use engine_core::systems::job::registry::JobTypeData;
+use engine_core::systems::job::{JobLogicKind, JobTypeData};
 use serde_json::json;
 
 #[test]
@@ -13,10 +13,10 @@ fn test_job_effects_are_processed_on_completion() {
         "type": "object",
         "properties": {
             "job_type": { "type": "string" },
-            "status": { "type": "string" },
+            "state": { "type": "string" },
             "progress": { "type": "number" }
         },
-        "required": ["job_type", "status", "progress"],
+        "required": ["job_type", "state", "progress"],
         "modes": ["colony"]
     });
     world
@@ -70,13 +70,16 @@ fn test_job_effects_are_processed_on_completion() {
         name: "DigTunnel".to_string(),
         requirements: vec![],
         duration: Some(1.0),
-        effects: vec![json!({
+        effects: vec![serde_json::json!({
             "action": "ModifyTerrain",
             "from": "rock",
             "to": "tunnel"
         })],
     };
-    world.job_types.register_data_job(job_type_data);
+    world.job_types.register(
+        job_type_data,
+        JobLogicKind::Native(|_, _, _, job| job.clone()),
+    );
 
     // Create an entity and assign the job
     let eid = world.spawn_entity();
@@ -86,7 +89,7 @@ fn test_job_effects_are_processed_on_completion() {
             "Job",
             json!({
                 "job_type": "DigTunnel",
-                "status": "pending",
+                "state": "pending",
                 "progress": 0.0
             }),
         )

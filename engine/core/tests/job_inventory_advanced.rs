@@ -102,8 +102,7 @@ fn test_agent_makes_multiple_trips_for_large_job() {
             json!({
                 "id": job_id,
                 "job_type": "build",
-                "status": "pending",
-                "phase": "pending",
+                "state": "pending",
                 "category": "construction",
                 "target_position": {
                     "pos": { "Square": { "x": 2, "y": 0, "z": 0 } }
@@ -145,10 +144,10 @@ fn test_agent_makes_multiple_trips_for_large_job() {
                 }
             }
         }
-        if job.get("phase") == Some(&json!("delivering_resources")) {
+        if job.get("state") == Some(&json!("delivering_resources")) {
             trips += 1;
         }
-        if job.get("status") == Some(&json!("complete")) {
+        if job.get("state") == Some(&json!("complete")) {
             completed = true;
             break;
         }
@@ -177,8 +176,7 @@ fn test_agent_makes_multiple_trips_for_large_job() {
             json!({
                 "id": job_id2,
                 "job_type": "build",
-                "status": "pending",
-                "phase": "pending",
+                "state": "pending",
                 "category": "construction",
                 "target_position": {
                     "pos": { "Square": { "x": 2, "y": 0, "z": 0 } }
@@ -221,10 +219,10 @@ fn test_agent_makes_multiple_trips_for_large_job() {
                 }
             }
         }
-        if job.get("phase") == Some(&json!("delivering_resources")) {
+        if job.get("state") == Some(&json!("delivering_resources")) {
             trips2 += 1;
         }
-        if job.get("status") == Some(&json!("complete")) {
+        if job.get("state") == Some(&json!("complete")) {
             completed2 = true;
             break;
         }

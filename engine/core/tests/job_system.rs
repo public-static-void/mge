@@ -16,7 +16,7 @@ fn test_register_job_schema_and_assign_job_component() {
         "id": eid,
         "job_type": "haul_resource",
         "target": 42,
-        "status": "pending",
+        "state": "pending",
         "progress": 0.0,
         "category": "hauling"
     });
@@ -24,7 +24,7 @@ fn test_register_job_schema_and_assign_job_component() {
 
     let job = world.get_component(eid, "Job").unwrap();
     assert_eq!(job.get("job_type").unwrap(), "haul_resource");
-    assert_eq!(job.get("status").unwrap(), "pending");
+    assert_eq!(job.get("state").unwrap(), "pending");
 }
 
 #[test]
@@ -36,7 +36,7 @@ fn test_query_entities_with_job_component() {
     let job_val = json!({
         "id": eid,
         "job_type": "build_structure",
-        "status": "pending",
+        "state": "pending",
         "category": "construction"
     });
     world.set_component(eid, "Job", job_val.clone()).unwrap();
@@ -54,7 +54,7 @@ fn test_job_system_advances_progress_and_completes_job() {
     let job_val = json!({
         "id": eid,
         "job_type": "test_job",
-        "status": "pending",
+        "state": "pending",
         "progress": 0.0,
         "category": "testing"
     });
@@ -67,7 +67,7 @@ fn test_job_system_advances_progress_and_completes_job() {
     }
 
     let job = world.get_component(eid, "Job").unwrap();
-    assert_eq!(job.get("status").unwrap(), "complete");
+    assert_eq!(job.get("state").unwrap(), "complete");
     assert!(job.get("progress").unwrap().as_f64().unwrap() >= 3.0);
 }
 
@@ -80,7 +80,7 @@ fn test_job_system_emits_event_on_completion() {
     let job_val = json!({
         "id": eid,
         "job_type": "test_job",
-        "status": "pending",
+        "state": "pending",
         "progress": 0.0,
         "category": "testing"
     });
@@ -116,7 +116,7 @@ fn test_job_system_emits_event_on_failure() {
     let job_val = json!({
         "id": eid,
         "job_type": "test_job",
-        "status": "pending",
+        "state": "pending",
         "progress": 0.0,
         "should_fail": true,
         "category": "testing"
@@ -187,9 +187,9 @@ fn test_job_system_uses_custom_job_type_logic() {
             let progress = job.get("progress").and_then(|v| v.as_f64()).unwrap_or(0.0) + 10.0;
             job["progress"] = serde_json::json!(progress);
             if progress >= 10.0 {
-                job["status"] = serde_json::json!("complete");
+                job["state"] = serde_json::json!("complete");
             } else {
-                job["status"] = serde_json::json!("in_progress");
+                job["state"] = serde_json::json!("in_progress");
             }
             job
         });
@@ -199,7 +199,7 @@ fn test_job_system_uses_custom_job_type_logic() {
     let job_val = json!({
         "id": eid,
         "job_type": "fast_job",
-        "status": "pending",
+        "state": "pending",
         "progress": 0.0,
         "resource_requirements": [],
         "resource_outputs": [],
@@ -216,7 +216,7 @@ fn test_job_system_uses_custom_job_type_logic() {
 
     let job = world.get_component(eid, "Job").unwrap();
 
-    assert_eq!(job.get("status").unwrap(), "complete");
+    assert_eq!(job.get("state").unwrap(), "complete");
     assert!(job.get("progress").unwrap().as_f64().unwrap() >= 10.0);
 }
 
@@ -230,7 +230,7 @@ fn test_job_assignment_is_recorded_and_queryable() {
     let job_val = json!({
         "id": job_eid,
         "job_type": "dig_tunnel",
-        "status": "pending",
+        "state": "pending",
         "assigned_to": worker_eid,
         "category": "mining"
     });

@@ -30,7 +30,7 @@ fn test_job_is_assigned_only_if_resources_are_available() {
             json!({
                 "id": job_eid,
                 "job_type": "build",
-                "status": "pending",
+                "state": "pending",
                 "resource_requirements": [{ "kind": "wood", "amount": 5 }],
                 "category": "construction"
             }),
@@ -79,7 +79,7 @@ fn test_job_is_assigned_only_if_resources_are_available() {
             json!({
                 "id": job2_eid,
                 "job_type": "build",
-                "status": "pending",
+                "state": "pending",
                 "resource_requirements": [{ "kind": "wood", "amount": 5 }],
                 "category": "construction"
             }),
@@ -131,7 +131,7 @@ fn test_job_remains_pending_if_resources_unavailable() {
             json!({
                 "id": job_eid,
                 "job_type": "build",
-                "status": "pending",
+                "state": "pending",
                 "resource_requirements": [{ "kind": "stone", "amount": 3 }],
                 "category": "construction"
             }),
@@ -172,7 +172,7 @@ fn test_resources_are_released_on_job_cancellation() {
             json!({
                 "id": job_eid,
                 "job_type": "forge",
-                "status": "pending",
+                "state": "pending",
                 "resource_requirements": [{ "kind": "iron", "amount": 8 }],
                 "category": "construction"
             }),
@@ -202,7 +202,7 @@ fn test_resources_are_released_on_job_cancellation() {
 
     // Cancel the job
     let mut job = world.get_component(job_eid, "Job").unwrap().clone();
-    job["status"] = json!("cancelled");
+    job["state"] = json!("cancelled");
     world.set_component(job_eid, "Job", job).unwrap();
 
     // Release reservation

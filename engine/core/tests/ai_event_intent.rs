@@ -1,7 +1,5 @@
 use engine_core::systems::job::job_board::JobBoard;
-use engine_core::systems::job::{
-    ai_event_reaction_system::AiEventReactionSystem, assign_jobs, setup_ai_event_subscriptions,
-};
+use engine_core::systems::job::{AiEventReactionSystem, assign_jobs, setup_ai_event_subscriptions};
 use serde_json::json;
 
 #[path = "helpers/world.rs"]
@@ -37,7 +35,7 @@ fn test_event_driven_ai_job_enqueue() {
             json!({
                 "id": job_id,
                 "job_type": "production",
-                "status": "pending",
+                "state": "pending",
                 "priority": 1,
                 "resource_outputs": [ { "kind": "wood", "amount": 10 } ],
                 "category": "production"
@@ -102,7 +100,7 @@ fn test_event_intent_queue_handles_multiple_events() {
             json!({
                 "id": job_id1,
                 "job_type": "production",
-                "status": "pending",
+                "state": "pending",
                 "priority": 1,
                 "resource_outputs": [ { "kind": "stone", "amount": 5 } ],
                 "category": "production"
@@ -118,7 +116,7 @@ fn test_event_intent_queue_handles_multiple_events() {
             json!({
                 "id": job_id2,
                 "job_type": "production",
-                "status": "pending",
+                "state": "pending",
                 "priority": 1,
                 "resource_outputs": [ { "kind": "wood", "amount": 5 } ],
                 "category": "production"
@@ -135,7 +133,7 @@ fn test_event_intent_queue_handles_multiple_events() {
         .push_back(json!({ "kind": "wood", "amount": 0 }));
     world
         .ai_event_intents
-        .push_back(json!({ "kind": "stone", "amount": 0 }));
+        .push_back(json!({"kind": "stone", "amount": 0 }));
 
     // Run the AI event reaction system
     let mut system = AiEventReactionSystem;

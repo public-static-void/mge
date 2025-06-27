@@ -45,6 +45,15 @@ fn test_missing_job_handler() {
     assert!(registry.lock().unwrap().get("nonexistent_job").is_none());
 }
 
+fn dummy_handler(
+    _world: &mut engine_core::World,
+    _agent_id: u32,
+    _job_id: u32,
+    _data: &serde_json::Value,
+) -> serde_json::Value {
+    serde_json::json!(null)
+}
+
 #[test]
 fn test_data_driven_registration() {
     use engine_core::systems::job::registry::JobTypeRegistry;
@@ -74,11 +83,8 @@ fn test_data_driven_registration() {
 
     // Register dummy native logic for both job types
     let mut job_type_registry = JobTypeRegistry::default();
-    job_type_registry.register_native(
-        "production",
-        Box::new(|_data, _progress| serde_json::json!(null)),
-    );
-    job_type_registry.register_native("haul", Box::new(|_data, _progress| serde_json::json!(null)));
+    job_type_registry.register_native("production", dummy_handler);
+    job_type_registry.register_native("haul", dummy_handler);
 
     register_builtin_job_handlers(&mut world, &job_type_registry, jobs_dir);
 

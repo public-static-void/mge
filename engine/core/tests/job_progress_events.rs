@@ -31,7 +31,7 @@ fn test_job_progressed_event_emitted_on_progress_change() {
             json!({
                 "id": job_id,
                 "job_type": "dig",
-                "status": "pending",
+                "state": "pending",
                 "cancelled": false,
                 "priority": 1,
                 "category": "mining"
@@ -71,7 +71,7 @@ fn test_job_progressed_event_emitted_on_progress_change() {
             event.get("progress").is_some(),
             "Event should have progress"
         );
-        assert!(event.get("status").is_some(), "Event should have status");
+        assert!(event.get("state").is_some(), "Event should have state");
     }
 
     // There should be no duplicate events for the same progress value
@@ -99,10 +99,10 @@ fn test_job_progressed_event_emitted_for_custom_handler() {
             let progress = job.get("progress").and_then(|v| v.as_f64()).unwrap_or(0.0);
             if progress < 1.0 {
                 job["progress"] = serde_json::json!(1.0);
-                job["status"] = serde_json::json!("in_progress");
+                job["state"] = serde_json::json!("in_progress");
             } else {
                 job["progress"] = serde_json::json!(2.0);
-                job["status"] = serde_json::json!("complete");
+                job["state"] = serde_json::json!("complete");
             }
             job
         },
@@ -128,7 +128,7 @@ fn test_job_progressed_event_emitted_for_custom_handler() {
             json!({
                 "id": job_id,
                 "job_type": "twostep",
-                "status": "pending",
+                "state": "pending",
                 "cancelled": false,
                 "priority": 1,
                 "category": "testing"

@@ -32,7 +32,7 @@ fn test_agent_state_and_job_completion() {
             json!({
                 "id": job_id,
                 "job_type": "dig",
-                "status": "pending",
+                "state": "pending",
                 "priority": 1,
                 "category": "mining"
             }),
@@ -59,7 +59,7 @@ fn test_agent_state_and_job_completion() {
     for _ in 0..5 {
         job_system.run(&mut world, None);
         let job = world.get_component(job_id, "Job").unwrap();
-        if job["status"] == "complete" {
+        if job["state"] == "complete" {
             break;
         }
     }
@@ -102,7 +102,7 @@ fn test_job_preemption_and_reassignment() {
             json!({
                 "id": job100,
                 "job_type": "dig",
-                "status": "pending",
+                "state": "pending",
                 "priority": 1,
                 "category": "mining"
             }),
@@ -137,7 +137,7 @@ fn test_job_preemption_and_reassignment() {
             json!({
                 "id": job200,
                 "job_type": "dig",
-                "status":"pending",
+                "state":"pending",
                 "priority": 10,
                 "category": "mining"
             }),
@@ -168,13 +168,13 @@ fn test_job_preemption_and_reassignment() {
             job100_obj.get("assigned_to").is_none(),
             "Job 100 should be unassigned"
         );
-        assert_eq!(job100_obj["status"], "pending", "Job 100 should be pending");
+        assert_eq!(job100_obj["state"], "pending", "Job 100 should be pending");
     }
 
     // Simulate job 200 completion and agent becoming idle
     {
         let mut job = world.get_component(job200, "Job").unwrap().clone();
-        job["status"] = json!("complete");
+        job["state"] = json!("complete");
         world.set_component(job200, "Job", job).unwrap();
     }
 

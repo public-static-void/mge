@@ -94,8 +94,7 @@ fn test_agent_fetches_and_delivers_resources_with_failure_and_interruption() {
             json!({
                 "id": job_id,
                 "job_type": "build",
-                "status": "pending",
-                "phase": "pending",
+                "state": "pending",
                 "category": "construction",
                 "target_position": {
                     "pos": { "Square": { "x": 2, "y": 0, "z": 0 } }
@@ -122,10 +121,10 @@ fn test_agent_fetches_and_delivers_resources_with_failure_and_interruption() {
     }
     world.run_system("JobSystem", None).unwrap();
 
-    // Confirm job phase is fetching_resources
+    // Confirm job state is fetching_resources
     {
         let job = world.get_component(job_id, "Job").unwrap();
-        assert_eq!(job["phase"], "fetching_resources");
+        assert_eq!(job["state"], "fetching_resources");
         assert_eq!(job["reserved_stockpile"], stockpile_id);
     }
 
@@ -138,7 +137,7 @@ fn test_agent_fetches_and_delivers_resources_with_failure_and_interruption() {
         let agent = world.get_component(agent_id, "Agent").unwrap();
         let job = world.get_component(job_id, "Job").unwrap();
 
-        if job.get("phase") == Some(&json!("delivering_resources")) {
+        if job.get("state") == Some(&json!("delivering_resources")) {
             let carried = agent.get("carried_resources").unwrap().as_array().unwrap();
             assert_eq!(carried[0]["kind"], "wood");
             assert_eq!(carried[0]["amount"], 2);
@@ -156,7 +155,7 @@ fn test_agent_fetches_and_delivers_resources_with_failure_and_interruption() {
 
         let job = world.get_component(job_id, "Job").unwrap();
 
-        if job.get("phase") == Some(&json!("in_progress")) {
+        if job.get("state") == Some(&json!("in_progress")) {
             let delivered_res = job.get("delivered_resources").unwrap().as_array().unwrap();
             assert_eq!(delivered_res[0]["kind"], "wood");
             assert_eq!(delivered_res[0]["amount"], 2);
@@ -171,7 +170,7 @@ fn test_agent_fetches_and_delivers_resources_with_failure_and_interruption() {
     for _tick in 0..10 {
         world.run_system("JobSystem", None).unwrap();
         let job = world.get_component(job_id, "Job").unwrap();
-        if job.get("status") == Some(&json!("complete")) {
+        if job.get("state") == Some(&json!("complete")) {
             completed = true;
             break;
         }
@@ -189,8 +188,7 @@ fn test_agent_fetches_and_delivers_resources_with_failure_and_interruption() {
             json!({
                 "id": job_id2,
                 "job_type": "build",
-                "status": "pending",
-                "phase": "pending",
+                "state": "pending",
                 "category": "construction",
                 "target_position": {
                     "pos": { "Square": { "x": 2, "y": 0, "z": 0 } }
@@ -230,7 +228,7 @@ fn test_agent_fetches_and_delivers_resources_with_failure_and_interruption() {
         let agent = world.get_component(agent_id, "Agent").unwrap();
         let job = world.get_component(job_id2, "Job").unwrap();
 
-        if job.get("phase") == Some(&json!("delivering_resources")) {
+        if job.get("state") == Some(&json!("delivering_resources")) {
             let carried = agent.get("carried_resources").unwrap().as_array().unwrap();
             assert_eq!(carried[0]["kind"], "wood");
             assert_eq!(carried[0]["amount"], 2);

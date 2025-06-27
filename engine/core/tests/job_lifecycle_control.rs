@@ -42,8 +42,7 @@ fn test_job_can_be_paused_and_resumed() {
             json!({
                 "id": job_id,
                 "job_type": "dig",
-                "status": "pending",
-                "phase": "pending",
+                "state": "pending",
                 "category": "mining",
                 "target_position": {
                     "pos": { "Square": { "x": 0, "y": 0, "z": 0 } }
@@ -80,8 +79,7 @@ fn test_job_can_be_paused_and_resumed() {
 
     // Pause job
     let mut job = world.get_component(job_id, "Job").unwrap().clone();
-    job["status"] = json!("paused");
-    job["phase"] = json!("paused");
+    job["state"] = json!("paused");
     world.set_component(job_id, "Job", job.clone()).unwrap();
 
     // Tick: progress should not advance
@@ -97,8 +95,7 @@ fn test_job_can_be_paused_and_resumed() {
 
     // Resume job
     let mut job = job.clone();
-    job["status"] = json!("in_progress");
-    job["phase"] = json!("in_progress");
+    job["state"] = json!("in_progress");
     world.set_component(job_id, "Job", job).unwrap();
 
     // Tick: progress should resume
@@ -106,7 +103,7 @@ fn test_job_can_be_paused_and_resumed() {
     for _ in 0..10 {
         world.run_system("JobSystem", None).unwrap();
         let job = world.get_component(job_id, "Job").unwrap();
-        if job.get("status") == Some(&json!("complete")) {
+        if job.get("state") == Some(&json!("complete")) {
             resumed = true;
             break;
         }
@@ -184,8 +181,7 @@ fn test_job_is_interrupted_and_resumed_by_another_agent() {
             json!({
                 "id": job_id,
                 "job_type": "dig",
-                "status": "pending",
-                "phase": "pending",
+                "state": "pending",
                 "category": "mining",
                 "target_position": {
                     "pos": { "Square": { "x": 2, "y": 0, "z": 0 } }
@@ -225,8 +221,7 @@ fn test_job_is_interrupted_and_resumed_by_another_agent() {
 
     // Interrupt job (simulate agent1 unavailable)
     let mut job = world.get_component(job_id, "Job").unwrap().clone();
-    job["status"] = json!("interrupted");
-    job["phase"] = json!("interrupted");
+    job["state"] = json!("interrupted");
     job.as_object_mut().unwrap().remove("assigned_to");
     world.set_component(job_id, "Job", job.clone()).unwrap();
 
@@ -243,7 +238,7 @@ fn test_job_is_interrupted_and_resumed_by_another_agent() {
         world.run_system("MovementSystem", None).unwrap();
         world.run_system("JobSystem", None).unwrap();
         let job = world.get_component(job_id, "Job").unwrap();
-        if job.get("status") == Some(&json!("complete")) {
+        if job.get("state") == Some(&json!("complete")) {
             resumed = true;
             break;
         }
@@ -287,8 +282,7 @@ fn test_job_progression_affected_by_world_conditions() {
             json!({
                 "id": job_id,
                 "job_type": "dig",
-                "status": "pending",
-                "phase": "pending",
+                "state": "pending",
                 "category": "mining",
                 "target_position": {
                     "pos": { "Square": { "x": 0, "y": 0, "z": 0 } }
@@ -327,9 +321,9 @@ fn test_job_progression_affected_by_world_conditions() {
                 progress += 1.0 * slowdown;
                 job["progress"] = json!(progress);
                 if progress >= 3.0 {
-                    job["status"] = json!("complete");
+                    job["state"] = json!("complete");
                 } else {
-                    job["status"] = json!("in_progress");
+                    job["state"] = json!("in_progress");
                 }
                 job
             });
@@ -343,7 +337,7 @@ fn test_job_progression_affected_by_world_conditions() {
         world.run_system("JobSystem", None).unwrap();
         ticks += 1;
         let job = world.get_component(job_id, "Job").unwrap();
-        if job.get("status") == Some(&json!("complete")) {
+        if job.get("state") == Some(&json!("complete")) {
             break;
         }
         assert!(ticks < 20, "Job did not complete in reasonable time");

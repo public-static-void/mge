@@ -17,7 +17,7 @@ fn test_job_assignment_fairness() {
             json!({
                 "id": job1,
                 "job_type": "dig",
-                "status": "pending",
+                "state": "pending",
                 "priority": 10,
                 "assignment_count": 3,
                 "last_assigned_tick": 5,
@@ -34,7 +34,7 @@ fn test_job_assignment_fairness() {
             json!({
                 "id": job2,
                 "job_type": "dig",
-                "status": "pending",
+                "state": "pending",
                 "priority": 10,
                 "assignment_count": 1,
                 "last_assigned_tick": 2,
@@ -91,7 +91,7 @@ fn test_job_assignment_dynamic_priority() {
             json!({
                 "id": job1,
                 "job_type": "dig",
-                "status": "pending",
+                "state": "pending",
                 "priority": 5,
                 "assignment_count": 0,
                 "last_assigned_tick": 0,
@@ -108,7 +108,7 @@ fn test_job_assignment_dynamic_priority() {
             json!({
                 "id": job2,
                 "job_type": "dig",
-                "status": "pending",
+                "state": "pending",
                 "priority": 10,
                 "assignment_count": 0,
                 "last_assigned_tick": 0,
@@ -145,7 +145,7 @@ fn test_job_assignment_dynamic_priority() {
 
     let mut job2_obj = world.get_component(job2, "Job").unwrap().clone();
     job2_obj.as_object_mut().unwrap().remove("assigned_to");
-    job2_obj["status"] = json!("pending");
+    job2_obj["state"] = json!("pending");
     world.set_component(job2, "Job", job2_obj).unwrap();
 
     let mut agent_obj = world.get_component(agent, "Agent").unwrap().clone();
@@ -188,7 +188,7 @@ fn test_job_assignment_persistence() {
             json!({
                 "id": job1,
                 "job_type": "dig",
-                "status": "pending",
+                "state": "pending",
                 "priority": 5,
                 "assignment_count": 2,
                 "last_assigned_tick": 42,

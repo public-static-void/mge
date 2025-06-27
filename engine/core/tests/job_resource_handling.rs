@@ -91,8 +91,7 @@ fn test_agent_fetches_and_delivers_resources_for_job() {
             json!({
                 "id": job_id,
                 "job_type": "build",
-                "status": "pending",
-                "phase": "pending",
+                "state": "pending",
                 "category": "construction",
                 "target_position": {
                     "pos": { "Square": { "x": 2, "y": 0, "z": 0 } }
@@ -109,7 +108,7 @@ fn test_agent_fetches_and_delivers_resources_for_job() {
     world.register_system(JobSystem::new());
     world.register_system(MovementSystem);
 
-    // Tick 1: Reservation should occur, job assigned, phase set to fetching_resources
+    // Tick 1: Reservation should occur, job assigned, state set to fetching_resources
     world.run_system("ResourceReservationSystem", None).unwrap();
 
     // Assign the job using JobBoard logic
@@ -120,62 +119,48 @@ fn test_agent_fetches_and_delivers_resources_for_job() {
     world.run_system("JobSystem", None).unwrap();
 
     let job = world.get_component(job_id, "Job").unwrap();
-    assert_eq!(job["phase"], "fetching_resources");
+    assert_eq!(job["state"], "fetching_resources");
     assert_eq!(job["reserved_stockpile"], stockpile_id);
 
     // Tick 2: Agent starts moving toward stockpile
     world.run_system("MovementSystem", None).unwrap();
-    world.run_system("JobSystem", None).unwrap();
-
-    // Tick 3: Agent arrives at stockpile
-    world.run_system("MovementSystem", None).unwrap();
-    world.run_system("JobSystem", None).unwrap();
-
     let agent_pos = world.get_component(agent_id, "Position").unwrap();
     let pos = agent_pos.get("pos").unwrap().get("Square").unwrap();
     assert_eq!(pos["x"], 1);
     assert_eq!(pos["y"], 0);
 
-    // Tick 4: Agent picks up wood, phase set to delivering_resources
     world.run_system("JobSystem", None).unwrap();
+
+    // Tick 3: Agent picks up wood, state set to delivering_resources
+    // (No movement needed, agent is at stockpile)
     let agent = world.get_component(agent_id, "Agent").unwrap();
     let carried = agent.get("carried_resources").unwrap().as_array().unwrap();
     assert_eq!(carried[0]["kind"], "wood");
     assert_eq!(carried[0]["amount"], 5);
 
     let job = world.get_component(job_id, "Job").unwrap();
-    assert_eq!(job["phase"], "delivering_resources");
+    assert_eq!(job["state"], "delivering_resources");
 
-    // Tick 5: Agent moves to job site
+    // Tick 4: Agent moves to job site
     world.run_system("MovementSystem", None).unwrap();
+    let agent_pos = world.get_component(agent_id, "Position").unwrap();
+    let pos = agent_pos.get("pos").unwrap().get("Square").unwrap();
+    assert_eq!(pos["x"], 2);
+    assert_eq!(pos["y"], 0);
+
     world.run_system("JobSystem", None).unwrap();
 
-    // Tick 6: Agent arrives at job site
-    world.run_system("MovementSystem", None).unwrap();
-    world.run_system("JobSystem", None).unwrap();
-
-    let agent_pos = world
-        .get_component(agent_id, "Position")
-        .unwrap()
-        .get("pos")
-        .unwrap()
-        .get("Square")
-        .unwrap();
-    assert_eq!(agent_pos["x"], 2);
-    assert_eq!(agent_pos["y"], 0);
-
-    // Tick 7: Agent delivers wood, job phase becomes in_progress
-    world.run_system("JobSystem", None).unwrap();
+    // Tick 5: Agent delivers wood, job state becomes in_progress
     let job = world.get_component(job_id, "Job").unwrap();
-    assert_eq!(job["phase"], "in_progress");
+    assert_eq!(job["state"], "in_progress");
     let delivered = job.get("delivered_resources").unwrap().as_array().unwrap();
     assert_eq!(delivered[0]["kind"], "wood");
     assert_eq!(delivered[0]["amount"], 5);
 
-    // Tick 8+: Job progresses and completes as normal
+    // Tick 6+: Job progresses and completes as normal
     for _ in 0..5 {
         world.run_system("JobSystem", None).unwrap();
     }
     let job = world.get_component(job_id, "Job").unwrap();
-    assert_eq!(job["status"], "complete");
+    assert_eq!(job["state"], "complete");
 }

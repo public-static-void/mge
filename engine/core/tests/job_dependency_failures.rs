@@ -17,7 +17,7 @@ fn test_job_with_failed_dependency_fails() {
             "Job",
             json!({
                 "job_type": "dig",
-                "status": "failed",
+                "state": "failed",
                 "category": "mining"
             }),
         )
@@ -29,7 +29,7 @@ fn test_job_with_failed_dependency_fails() {
             "Job",
             json!({
                 "job_type": "build",
-                "status": "pending",
+                "state": "pending",
                 "dependencies": [dep_eid.to_string()],
                 "category": "construction"
             }),
@@ -41,7 +41,7 @@ fn test_job_with_failed_dependency_fails() {
 
     let main_job_after = world.get_component(main_eid, "Job").unwrap();
     assert_eq!(
-        main_job_after.get("status").unwrap(),
+        main_job_after.get("state").unwrap(),
         "failed",
         "Main job should fail when dependency fails"
     );
@@ -59,7 +59,7 @@ fn test_job_with_cancelled_dependency_cancels() {
             "Job",
             json!({
                 "job_type": "dig",
-                "status": "cancelled",
+                "state": "cancelled",
                 "category": "mining"
             }),
         )
@@ -71,7 +71,7 @@ fn test_job_with_cancelled_dependency_cancels() {
             "Job",
             json!({
                 "job_type": "build",
-                "status": "pending",
+                "state": "pending",
                 "dependencies": [dep_eid.to_string()],
                 "category": "construction"
             }),
@@ -83,7 +83,7 @@ fn test_job_with_cancelled_dependency_cancels() {
 
     let main_job_after = world.get_component(main_eid, "Job").unwrap();
     assert_eq!(
-        main_job_after.get("status").unwrap(),
+        main_job_after.get("state").unwrap(),
         "cancelled",
         "Main job should cancel when dependency is cancelled"
     );
@@ -101,7 +101,7 @@ fn test_job_spawns_child_on_dependency_failure() {
             "Job",
             json!({
                 "job_type": "dig",
-                "status": "failed",
+                "state": "failed",
                 "category": "mining"
             }),
         )
@@ -113,12 +113,12 @@ fn test_job_spawns_child_on_dependency_failure() {
             "Job",
             json!({
                 "job_type": "build",
-                "status": "pending",
+                "state": "pending",
                 "dependencies": [dep_eid.to_string()],
                 "category": "construction",
                 "on_dependency_failed_spawn": [{
                     "job_type": "notify",
-                    "status": "pending",
+                    "state": "pending",
                     "category": "notification"
                 }]
             }),
@@ -130,7 +130,7 @@ fn test_job_spawns_child_on_dependency_failure() {
 
     let main_job_after = world.get_component(main_eid, "Job").unwrap();
     assert_eq!(
-        main_job_after.get("status").unwrap(),
+        main_job_after.get("state").unwrap(),
         "failed",
         "Main job should fail when dependency fails"
     );
@@ -145,7 +145,7 @@ fn test_job_spawns_child_on_dependency_failure() {
         "Child job should be of type 'notify'"
     );
     assert_eq!(
-        children[0].get("status").unwrap(),
+        children[0].get("state").unwrap(),
         "pending",
         "Child job should be pending"
     );

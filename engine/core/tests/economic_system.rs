@@ -31,7 +31,7 @@ fn test_workshop_produces_resources_using_recipe() {
             json!({
                 "recipe": "wood_plank",
                 "progress": 0,
-                "status": "pending"
+                "state": "pending"
             }),
         )
         .unwrap();

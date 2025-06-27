@@ -19,7 +19,7 @@ fn test_high_priority_job_is_assigned_first() {
             json!({
                 "id": high_eid,
                 "job_type": "urgent",
-                "status": "pending",
+                "state": "pending",
                 "priority": 100,
                 "creation_tick": 0,
                 "category": "priority"
@@ -34,7 +34,7 @@ fn test_high_priority_job_is_assigned_first() {
             json!({
                 "id": low_eid,
                 "job_type": "background",
-                "status": "pending",
+                "state": "pending",
                 "priority": 1,
                 "creation_tick": 0,
                 "category": "background"
@@ -74,7 +74,7 @@ fn test_low_priority_job_is_assigned_after_aging() {
             json!({
                 "id": high_eid,
                 "job_type": "urgent",
-                "status": "pending",
+                "state": "pending",
                 "priority": 100,
                 "creation_tick": 0,
                 "category": "priority"
@@ -89,7 +89,7 @@ fn test_low_priority_job_is_assigned_after_aging() {
             json!({
                 "id": low_eid,
                 "job_type": "background",
-                "status": "pending",
+                "state": "pending",
                 "priority": 1,
                 "creation_tick": 0,
                 "category": "background"
@@ -113,7 +113,7 @@ fn test_low_priority_job_is_assigned_after_aging() {
     let result = job_board.claim_job(agent_eid, &mut world, 0);
     assert_eq!(result, JobAssignmentResult::Assigned(high_eid));
     let mut job = world.get_component(high_eid, "Job").unwrap().clone();
-    job["status"] = json!("complete");
+    job["state"] = json!("complete");
     world.set_component(high_eid, "Job", job).unwrap();
     let mut agent = world.get_component(agent_eid, "Agent").unwrap().clone();
     agent["state"] = json!("idle");
@@ -147,7 +147,7 @@ fn test_job_priority_can_be_bumped_by_world_event() {
             json!({
                 "id": job_eid,
                 "job_type": "critical",
-                "status": "pending",
+                "state": "pending",
                 "priority": 10,
                 "creation_tick": 0,
                 "category": "critical"
@@ -211,7 +211,7 @@ fn test_jobs_get_priority_boost_on_resource_shortage_event() {
             json!({
                 "id": wood_job_eid,
                 "job_type": "build",
-                "status": "pending",
+                "state": "pending",
                 "priority": 1,
                 "resource_requirements": [{ "kind": "wood", "amount": 5 }],
                 "creation_tick": 0,
@@ -228,7 +228,7 @@ fn test_jobs_get_priority_boost_on_resource_shortage_event() {
             json!({
                 "id": stone_job_eid,
                 "job_type": "build",
-                "status": "pending",
+                "state": "pending",
                 "priority": 1,
                 "resource_requirements": [{ "kind": "stone", "amount": 5 }],
                 "creation_tick": 0,
