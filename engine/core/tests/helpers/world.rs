@@ -16,10 +16,10 @@ pub fn make_test_world() -> World {
 fn setup_registry_from_config() -> Arc<Mutex<ComponentRegistry>> {
     let config_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../game.toml");
     let config = GameConfig::load_from_file(&config_path)
-        .unwrap_or_else(|_| panic!("Failed to load config from {:?}", config_path));
+        .unwrap_or_else(|_| panic!("Failed to load config from {config_path:?}"));
     let schema_dir = "../../engine/assets/schemas";
     let schemas = load_schemas_from_dir_with_modes(schema_dir, &config.allowed_modes)
-        .unwrap_or_else(|_| panic!("Failed to load schemas from {:?}", schema_dir));
+        .unwrap_or_else(|_| panic!("Failed to load schemas from {schema_dir:?}"));
     let mut registry = ComponentRegistry::new();
     for (_name, schema) in schemas {
         registry.register_external_schema(schema);

@@ -40,10 +40,9 @@ fn test_job_progressed_event_emitted_on_progress_change() {
                 "id": job_id,
                 "job_type": "dig",
                 "progress": 0.0,
-                "status": "in_progress",
+                "state": "in_progress",
                 "assigned_to": agent_id,
                 "category": "mining",
-                "phase": "in_progress"
             }),
         )
         .unwrap();
@@ -89,7 +88,7 @@ fn test_job_progressed_event_emitted_for_custom_handler() {
         |_world, _agent_id, _job_id, job: &serde_json::Value| {
             let mut job = job.clone();
             job["progress"] = serde_json::json!(999.0);
-            job["status"] = serde_json::json!("complete");
+            job["state"] = serde_json::json!("complete");
             job
         },
     );
@@ -115,11 +114,10 @@ fn test_job_progressed_event_emitted_for_custom_handler() {
             json!({
                 "id": job_id,
                 "job_type": "superfast",
-                "status": "in_progress",
+                "state": "in_progress",
                 "progress": 0.0,
                 "assigned_to": agent_id,
                 "category": "testing",
-                "phase": "in_progress"
             }),
         )
         .unwrap();

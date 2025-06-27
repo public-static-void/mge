@@ -9,7 +9,9 @@ use engine_core::systems::death_decay::{ProcessDeaths, ProcessDecay};
 use engine_core::systems::economic::{EconomicSystem, load_recipes_from_dir};
 use engine_core::systems::equipment_logic::EquipmentLogicSystem;
 use engine_core::systems::inventory::InventoryConstraintSystem;
-use engine_core::systems::job::{JobSystem, JobTypeRegistry, load_job_types_from_dir};
+use engine_core::systems::job::{
+    JobLogicKind, JobSystem, JobTypeRegistry, load_job_types_from_dir,
+};
 use engine_lua::ScriptEngine;
 use gag::BufferRedirect;
 use regex::Regex;
@@ -28,12 +30,12 @@ const COLOR_RED: &str = "\x1b[31m";
 const COLOR_CYAN: &str = "\x1b[36m";
 
 fn color(c: &str, s: &str) -> String {
-    format!("{}{}{}", c, s, COLOR_RESET)
+    format!("{c}{s}{COLOR_RESET}")
 }
 
 fn indent_lines(s: &str) -> String {
     s.lines()
-        .map(|l| format!("  {}", l))
+        .map(|l| format!("  {l}"))
         .collect::<Vec<_>>()
         .join("\n")
 }
@@ -155,7 +157,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .expect("Failed to load C plugin");
             }
         } else {
-            panic!("C plugin not found at {:?}", plugin_path);
+            panic!("C plugin not found at {plugin_path:?}");
         }
     }
 
@@ -176,7 +178,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
 
         total += 1;
-        let testname = format!("{}.{}", modname, fname);
+        let testname = format!("{modname}.{fname}");
 
         // Print the RUN line before any test output
         println!("{}{}", color(COLOR_CYAN, "[RUN]    "), testname);
@@ -234,7 +236,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let job_types = load_job_types_from_dir(jobs_dir().to_str().unwrap());
         let mut job_registry = JobTypeRegistry::default();
         for job in job_types {
-            job_registry.register_data_job(job);
+            job_registry.register(job, JobLogicKind::Native(|_, _, _, job| job.clone()));
         }
         let job_system = JobSystem::new();
         world.borrow_mut().register_system(job_system);
@@ -257,20 +259,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let old_path: String = package.get("path")?;
         let tests_dir = lua_tests_dir();
         let tests_dir_str = tests_dir.to_str().unwrap();
-        let new_path = format!(
-            "{}/?.lua;{}/?.lua;{}",
-            tests_dir_str, tests_dir_str, old_path
-        );
+        let new_path = format!("{tests_dir_str}/?.lua;{tests_dir_str}/?.lua;{old_path}");
         package.set("path", new_path)?;
 
         // Prepare Lua code: require the module and call only the test function
         let script = format!(
             r#"
-            local mod = require("{mod}");
-            mod["{func}"]();
-            "#,
-            mod = modname,
-            func = fname
+            local mod = require("{modname}");
+            mod["{fname}"]();
+            "#
         );
 
         // --- Capture stdout/stderr for this test only during test execution ---
@@ -314,7 +311,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let err_str = match &e {
                     mlua::Error::RuntimeError(msg) => msg.clone(),
                     mlua::Error::SyntaxError { message, .. } => message.clone(),
-                    _ => format!("{:?}", e),
+                    _ => format!("{e:?}"),
                 };
                 // Print error and stacktrace indented
                 println!("{}", indent_lines(&err_str));
@@ -325,7 +322,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     println!("{}", color(COLOR_CYAN, &"-".repeat(60)));
-    println!("{} tests run, {} failed", total, failed);
+    println!("{total} tests run, {failed} failed");
 
     if failed > 0 {
         println!("{}", color(COLOR_RED, "\nFailed tests:"));

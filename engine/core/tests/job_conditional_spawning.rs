@@ -20,7 +20,7 @@ fn test_conditional_child_spawn_on_failure() {
             json!({
                 "id": dep_id,
                 "job_type": "dep",
-                "status": "failed",
+                "state": "failed",
                 "priority": 1,
                 "category": "test"
             }),
@@ -36,16 +36,16 @@ fn test_conditional_child_spawn_on_failure() {
             json!({
                 "id": parent_id,
                 "job_type": "main",
-                "status": "pending",
+                "state": "pending",
                 "priority": 1,
                 "category": "test",
                 "dependencies": [dep_id.to_string()],  // <-- FIX: use string, not integer
                 "conditional_children": [
                     {
-                        "spawn_if": { "field": "status", "equals": "failed" },
+                        "spawn_if": { "field": "state", "equals": "failed" },
                         "job": {
                             "job_type": "repair",
-                            "status": "pending",
+                            "state": "pending",
                             "priority": 1,
                             "category": "test"
                         }
@@ -91,7 +91,7 @@ fn test_conditional_child_spawn_on_failure() {
     );
     let child = world.get_component(spawned_jobs[0], "Job").unwrap();
     assert_eq!(child["job_type"], "repair");
-    assert_eq!(child["status"], "pending");
+    assert_eq!(child["state"], "pending");
 }
 
 /// Test: Conditional child job is spawned when world state matches.
@@ -110,7 +110,7 @@ fn test_conditional_child_spawn_on_world_state() {
             json!({
                 "id": parent_id,
                 "job_type": "main",
-                "status": "pending",
+                "state": "pending",
                 "priority": 1,
                 "category": "test",
                 "conditional_children": [
@@ -118,7 +118,7 @@ fn test_conditional_child_spawn_on_world_state() {
                         "spawn_if": { "world_state": { "resource": "food", "lte": 10.0 } },
                         "job": {
                             "job_type": "gather_food",
-                            "status": "pending",
+                            "state": "pending",
                             "priority": 1,
                             "category": "test"
                         }
@@ -163,8 +163,8 @@ fn test_conditional_child_spawn_on_world_state() {
     let child = world.get_component(spawned_jobs[0], "Job").unwrap();
     assert_eq!(child["job_type"], "gather_food");
     assert!(
-        child["status"] == "pending" || child["status"] == "in_progress",
-        "Child job status should be 'pending' or 'in_progress', got {:?}",
-        child["status"]
+        child["state"] == "pending" || child["state"] == "in_progress",
+        "Child job state should be 'pending' or 'in_progress', got {:?}",
+        child["state"]
     );
 }

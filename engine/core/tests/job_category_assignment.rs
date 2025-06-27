@@ -51,7 +51,7 @@ fn test_agent_prefers_job_matching_specialization_category() {
                 "id": job1_eid,
                 "job_type": "move_items",
                 "category": "hauling",
-                "status": "pending"
+                "state": "pending"
             }),
         )
         .unwrap();
@@ -66,7 +66,7 @@ fn test_agent_prefers_job_matching_specialization_category() {
                 "id": job2_eid,
                 "job_type": "build_wall",
                 "category": "construction",
-                "status": "pending"
+                "state": "pending"
             }),
         )
         .unwrap();
@@ -81,7 +81,7 @@ fn test_agent_prefers_job_matching_specialization_category() {
                 "id": job3_eid,
                 "job_type": "make_tools",
                 "category": "crafting",
-                "status": "pending"
+                "state": "pending"
             }),
         )
         .unwrap();

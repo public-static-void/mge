@@ -22,7 +22,7 @@ fn test_job_with_unfinished_dependency_remains_pending() {
             "Job",
             json!({
                 "job_type": "dig",
-                "status": "pending",
+                "state": "pending",
                 "category": "mining"
             }),
         )
@@ -34,7 +34,7 @@ fn test_job_with_unfinished_dependency_remains_pending() {
             "Job",
             json!({
                 "job_type": "build",
-                "status": "pending",
+                "state": "pending",
                 "dependencies": [dep_eid.to_string()],
                 "category": "construction"
             }),
@@ -46,17 +46,17 @@ fn test_job_with_unfinished_dependency_remains_pending() {
     job_system.run(&mut world, None);
 
     let main_job_after = world.get_component(main_eid, "Job").unwrap();
-    assert_eq!(main_job_after.get("status").unwrap(), "pending");
+    assert_eq!(main_job_after.get("state").unwrap(), "pending");
 
     job_system.run(&mut world, None);
     let main_job_after2 = world.get_component(main_eid, "Job").unwrap();
-    assert_eq!(main_job_after2.get("status").unwrap(), "pending");
+    assert_eq!(main_job_after2.get("state").unwrap(), "pending");
 
     job_system.run(&mut world, None);
 
     job_system.run(&mut world, None);
     let main_job_after4 = world.get_component(main_eid, "Job").unwrap();
-    assert_ne!(main_job_after4.get("status").unwrap(), "pending");
+    assert_ne!(main_job_after4.get("state").unwrap(), "pending");
 }
 
 /// Tests that a job with a completed dependency can start.
@@ -72,7 +72,7 @@ fn test_job_with_completed_dependency_can_start() {
             "Job",
             json!({
                 "job_type": "dig",
-                "status": "complete",
+                "state": "complete",
                 "category": "mining"
             }),
         )
@@ -84,7 +84,7 @@ fn test_job_with_completed_dependency_can_start() {
             "Job",
             json!({
                 "job_type": "build",
-                "status": "pending",
+                "state": "pending",
                 "dependencies": [dep_eid.to_string()],
                 "category": "construction"
             }),
@@ -95,7 +95,7 @@ fn test_job_with_completed_dependency_can_start() {
     job_system.run(&mut world, None);
 
     let main_job_after = world.get_component(main_eid, "Job").unwrap();
-    assert_ne!(main_job_after.get("status").unwrap(), "pending");
+    assert_ne!(main_job_after.get("state").unwrap(), "pending");
 }
 
 /// Tests that a job with AND dependencies can start when all are complete.
@@ -110,14 +110,14 @@ fn test_job_with_and_dependencies() {
         .set_component(
             dep1,
             "Job",
-            json!({"status":"complete","job_type":"a","category":"test"}),
+            json!({"state":"complete","job_type":"a","category":"test"}),
         )
         .unwrap();
     world
         .set_component(
             dep2,
             "Job",
-            json!({"status":"complete","job_type":"b","category":"test"}),
+            json!({"state":"complete","job_type":"b","category":"test"}),
         )
         .unwrap();
     world
@@ -126,7 +126,7 @@ fn test_job_with_and_dependencies() {
             "Job",
             json!({
                 "job_type":"main",
-                "status":"pending",
+                "state":"pending",
                 "category":"test",
                 "dependencies": { "all_of": [dep1.to_string(), dep2.to_string()] }
             }),
@@ -137,7 +137,7 @@ fn test_job_with_and_dependencies() {
     job_system.run(&mut world, None);
 
     let main_job = world.get_component(main, "Job").unwrap();
-    assert_ne!(main_job.get("status").unwrap(), "pending");
+    assert_ne!(main_job.get("state").unwrap(), "pending");
 }
 
 /// Tests that a job with OR dependencies can start when any is complete.
@@ -152,14 +152,14 @@ fn test_job_with_or_dependencies() {
         .set_component(
             dep1,
             "Job",
-            json!({"status":"failed","job_type":"a","category":"test"}),
+            json!({"state":"failed","job_type":"a","category":"test"}),
         )
         .unwrap();
     world
         .set_component(
             dep2,
             "Job",
-            json!({"status":"complete","job_type":"b","category":"test"}),
+            json!({"state":"complete","job_type":"b","category":"test"}),
         )
         .unwrap();
     world
@@ -168,7 +168,7 @@ fn test_job_with_or_dependencies() {
             "Job",
             json!({
                 "job_type":"main",
-                "status":"pending",
+                "state":"pending",
                 "category":"test",
                 "dependencies": { "any_of": [dep1.to_string(), dep2.to_string()] }
             }),
@@ -179,7 +179,7 @@ fn test_job_with_or_dependencies() {
     job_system.run(&mut world, None);
 
     let main_job = world.get_component(main, "Job").unwrap();
-    assert_ne!(main_job.get("status").unwrap(), "pending");
+    assert_ne!(main_job.get("state").unwrap(), "pending");
 }
 
 /// Tests that a job with a NOT dependency does not start if the dependency is failed,
@@ -194,7 +194,7 @@ fn test_job_with_not_dependency() {
         .set_component(
             dep1,
             "Job",
-            json!({"status":"failed","job_type":"a","category":"test"}),
+            json!({"state":"failed","job_type":"a","category":"test"}),
         )
         .unwrap();
     world
@@ -203,7 +203,7 @@ fn test_job_with_not_dependency() {
             "Job",
             json!({
                 "job_type":"main",
-                "status":"pending",
+                "state":"pending",
                 "category":"test",
                 "dependencies": { "not": [dep1.to_string()] }
             }),
@@ -214,14 +214,14 @@ fn test_job_with_not_dependency() {
     job_system.run(&mut world, None);
 
     let main_job = world.get_component(main, "Job").unwrap();
-    assert_eq!(main_job.get("status").unwrap(), "pending");
+    assert_eq!(main_job.get("state").unwrap(), "pending");
 
     // Now remove dep1 (simulate dep1 never existed)
     world.despawn_entity(dep1);
 
     job_system.run(&mut world, None);
     let main_job = world.get_component(main, "Job").unwrap();
-    assert_ne!(main_job.get("status").unwrap(), "pending");
+    assert_ne!(main_job.get("state").unwrap(), "pending");
 }
 
 /// Tests that a job with a world state dependency remains pending until the resource is available.
@@ -244,7 +244,7 @@ fn test_job_with_world_state_dependency() {
             "Job",
             json!({
                 "job_type":"main",
-                "status":"pending",
+                "state":"pending",
                 "category":"test",
                 "dependencies": [
                     { "world_state": { "resource": "water", "gte": 10.0 } }
@@ -256,12 +256,12 @@ fn test_job_with_world_state_dependency() {
     let mut job_system = JobSystem::new();
     job_system.run(&mut world, None);
     let main_job = world.get_component(main, "Job").unwrap();
-    assert_eq!(main_job.get("status").unwrap(), "pending");
+    assert_eq!(main_job.get("state").unwrap(), "pending");
 
     world.set_global_resource("water", 10.0);
     job_system.run(&mut world, None);
     let main_job = world.get_component(main, "Job").unwrap();
-    assert_ne!(main_job.get("status").unwrap(), "pending");
+    assert_ne!(main_job.get("state").unwrap(), "pending");
 }
 
 /// Tests that a job with an entity state dependency remains pending until the condition is met.
@@ -277,7 +277,7 @@ fn test_job_with_entity_state_dependency() {
 
     world.set_component(main, "Job", json!({
         "job_type":"main",
-        "status":"pending",
+        "state":"pending",
         "category":"test",
         "dependencies": [
             { "entity_state": { "entity": entity, "component": "Health", "field": "current", "gte": 10 } }
@@ -288,12 +288,12 @@ fn test_job_with_entity_state_dependency() {
     job_system.run(&mut world, None);
 
     let main_job = world.get_component(main, "Job").unwrap();
-    assert_eq!(main_job.get("status").unwrap(), "pending");
+    assert_eq!(main_job.get("state").unwrap(), "pending");
 
     world
         .set_component(entity, "Health", json!({"current": 10.0, "max": 10.0}))
         .unwrap();
     job_system.run(&mut world, None);
     let main_job = world.get_component(main, "Job").unwrap();
-    assert_ne!(main_job.get("status").unwrap(), "pending");
+    assert_ne!(main_job.get("state").unwrap(), "pending");
 }

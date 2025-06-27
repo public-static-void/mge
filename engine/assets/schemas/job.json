@@ -9,22 +9,8 @@
       "type": "string",
       "description": "Job category, e.g. hauling, construction, crafting"
     },
-    "target": { "type": "integer" },
-    "status": {
-      "type": "string",
-      "enum": [
-        "pending",
-        "in_progress",
-        "complete",
-        "failed",
-        "cancelled",
-        "blocked",
-        "waiting_for_resources",
-        "paused",
-        "interrupted"
-      ]
-    },
-    "phase": {
+    "target": { "type": ["integer", "null"] },
+    "state": {
       "type": "string",
       "enum": [
         "pending",
@@ -47,7 +33,7 @@
     },
     "progress": { "type": "number", "minimum": 0 },
     "assigned_to": {
-      "type": "integer",
+      "type": ["integer", "null"],
       "description": "Entity ID assigned to this job"
     },
     "priority": {
@@ -80,7 +66,7 @@
       "description": "Resources reserved for this job"
     },
     "reserved_stockpile": {
-      "type": "integer",
+      "type": ["integer", "null"],
       "description": "Stockpile entity ID from which resources are reserved"
     },
     "delivered_resources": {
@@ -120,7 +106,6 @@
         { "$ref": "#/definitions/DependencyExpr" }
       ]
     },
-    "cancelled": { "type": "boolean", "default": false },
     "applied_effects": {
       "type": "array",
       "items": { "type": "integer" },
@@ -138,7 +123,7 @@
       "description": "Game tick when this job was last assigned."
     },
     "target_position": {
-      "type": "object",
+      "type": ["object", "null"],
       "properties": {
         "pos": {
           "type": "object",
@@ -157,7 +142,7 @@
       }
     }
   },
-  "required": ["job_type", "status", "category"],
+  "required": ["job_type", "state", "category"],
   "definitions": {
     "DependencyExpr": {
       "type": "object",

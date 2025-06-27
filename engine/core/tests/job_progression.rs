@@ -3,7 +3,7 @@ mod world_helper;
 
 use engine_core::ecs::system::System;
 use engine_core::systems::job::job_board::JobBoard;
-use engine_core::systems::job::{JobSystem, assign_jobs};
+use engine_core::systems::job::{JobSystem, JobTypeData, assign_jobs};
 use serde_json::json;
 
 #[test]
@@ -11,6 +11,17 @@ fn test_job_progression_over_ticks() {
     let mut world = world_helper::make_test_world();
 
     let agent_id = world.spawn_entity();
+
+    world
+        .set_component(
+            agent_id,
+            "Position",
+            serde_json::json!({
+                "pos": { "Square": { "x": 0, "y": 0, "z": 0 } }
+            }),
+        )
+        .unwrap();
+
     world
         .set_component(
             agent_id,
@@ -30,10 +41,11 @@ fn test_job_progression_over_ticks() {
             json!({
                 "id": job_id,
                 "job_type": "dig",
-                "status": "pending",
+                "state": "pending",
                 "cancelled": false,
                 "priority": 1,
-                "category": "mining"
+                "category": "mining",
+                "target_position": { "pos": { "Square": { "x": 0, "y": 0, "z": 0 } } }
             }),
         )
         .unwrap();
@@ -47,15 +59,15 @@ fn test_job_progression_over_ticks() {
         job_system.run(&mut world, None);
         let job = world.get_component(job_id, "Job").unwrap();
         let progress = job.get("progress").and_then(|v| v.as_f64()).unwrap_or(0.0);
-        let status = job.get("status").and_then(|v| v.as_str()).unwrap();
+        let state = job.get("state").and_then(|v| v.as_str()).unwrap();
         if progress < 3.0 {
             assert_eq!(
-                status, "in_progress",
+                state, "in_progress",
                 "Job should be in progress while progress < 3.0"
             );
         } else {
             assert_eq!(
-                status, "complete",
+                state, "complete",
                 "Job should be complete when progress >= 3.0"
             );
             break;
@@ -63,7 +75,7 @@ fn test_job_progression_over_ticks() {
     }
     let job = world.get_component(job_id, "Job").unwrap();
     assert_eq!(
-        job.get("status").unwrap(),
+        job.get("state").unwrap(),
         "complete",
         "Job should be complete after progression"
     );
@@ -80,7 +92,7 @@ fn test_custom_job_handler_overrides_progression() {
             |_world, _agent_id, _job_id, job: &serde_json::Value| {
                 let mut job = job.clone();
                 job["progress"] = serde_json::json!(42.0);
-                job["status"] = serde_json::json!("complete");
+                job["state"] = serde_json::json!("complete");
                 job
             },
         );
@@ -106,7 +118,7 @@ fn test_custom_job_handler_overrides_progression() {
             json!({
                 "id": job_id,
                 "job_type": "instant",
-                "status": "pending",
+                "state": "pending",
                 "cancelled": false,
                 "priority": 1,
                 "category": "testing"
@@ -128,9 +140,9 @@ fn test_custom_job_handler_overrides_progression() {
         "Progress should be set by custom handler"
     );
     assert_eq!(
-        job.get("status").unwrap(),
+        job.get("state").unwrap(),
         "complete",
-        "Status should be set by custom handler"
+        "state should be set by custom handler"
     );
 }
 
@@ -173,7 +185,7 @@ fn test_effects_applied_only_on_completion_and_rolled_back_on_cancel() {
             json!({
                 "id": terrain_id,
                 "job_type": "dig",
-                "status": "pending",
+                "state": "pending",
                 "cancelled": false,
                 "priority": 1,
                 "category": "mining"
@@ -181,14 +193,16 @@ fn test_effects_applied_only_on_completion_and_rolled_back_on_cancel() {
         )
         .unwrap();
 
-    world.job_types.register_job_type(
-        "dig",
-        vec![json!({
+    world.job_types.register_job_type(JobTypeData {
+        name: "dig".to_string(),
+        requirements: vec![],
+        duration: None,
+        effects: vec![serde_json::json!({
             "action": "ModifyTerrain",
             "from": "rock",
             "to": "tunnel"
         })],
-    );
+    });
 
     {
         let mut job_board = JobBoard::default();
@@ -217,7 +231,7 @@ fn test_effects_applied_only_on_completion_and_rolled_back_on_cancel() {
             json!({
                 "id": terrain_id,
                 "job_type": "dig",
-                "status": "pending",
+                "state": "pending",
                 "cancelled": true,
                 "priority": 1,
                 "category": "mining"
@@ -300,9 +314,8 @@ fn test_agent_moves_to_job_site_before_progress() {
             "Job",
             serde_json::json!({
                 "id": job_id,
-                "job_type": "dig",
-                "status": "pending",
-                "phase": "pending",
+                "job_type":"dig",
+                "state": "pending",
                 "cancelled": false,
                 "priority": 1,
                 "category": "mining",
@@ -317,6 +330,17 @@ fn test_agent_moves_to_job_site_before_progress() {
             }),
         )
         .unwrap();
+
+    world.job_types.register_job_type(JobTypeData {
+        name: "dig".to_string(),
+        requirements: vec![],
+        duration: None,
+        effects: vec![serde_json::json!({
+            "action": "ModifyTerrain",
+            "from": "rock",
+            "to": "tunnel"
+        })],
+    });
 
     let mut job_board = engine_core::systems::job::job_board::JobBoard::default();
     job_board.update(&world);
@@ -342,22 +366,21 @@ fn test_agent_moves_to_job_site_before_progress() {
             == (engine_core::ecs::components::position::Position::Square { x: 2, y: 2, z: 0 })
         {
             reached_site = true;
-            // At the site, phase should be "at_site" or "in_progress" or "complete"
-            let phase = job.get("phase").unwrap().as_str().unwrap();
+            // At the site, state should be "at_site" or "in_progress" or "complete"
+            let state = job.get("state").unwrap().as_str().unwrap();
             assert!(
-                phase == "at_site" || phase == "in_progress" || phase == "complete",
-                "Job phase should be at_site/in_progress/complete after agent arrives, got {}",
-                phase
+                state == "at_site" || state == "in_progress" || state == "complete",
+                "Job state should be at_site/in_progress/complete after agent arrives, got {state}"
             );
         }
-        if job.get("status") == Some(&serde_json::json!("complete")) {
+        if job.get("state") == Some(&serde_json::json!("complete")) {
             _completed = true;
             break;
         }
     }
     assert!(reached_site, "Agent should reach the job site");
     let job = world.get_component(job_id, "Job").unwrap();
-    assert_eq!(job.get("status").unwrap(), "complete");
+    assert_eq!(job.get("state").unwrap(), "complete");
 }
 
 #[test]
@@ -410,8 +433,7 @@ fn test_job_blocked_when_path_unreachable() {
             serde_json::json!({
                 "id": job_id,
                 "job_type": "dig",
-                "status": "pending",
-                "phase": "pending",
+                "state": "pending",
                 "cancelled": false,
                 "priority": 1,
                 "category": "mining",
@@ -427,6 +449,17 @@ fn test_job_blocked_when_path_unreachable() {
         )
         .unwrap();
 
+    world.job_types.register_job_type(JobTypeData {
+        name: "dig".to_string(),
+        requirements: vec![],
+        duration: None,
+        effects: vec![serde_json::json!({
+            "action": "ModifyTerrain",
+            "from": "rock",
+            "to": "tunnel"
+        })],
+    });
+
     let mut job_board = engine_core::systems::job::job_board::JobBoard::default();
     job_board.update(&world);
     engine_core::systems::job::assign_jobs(&mut world, &mut job_board);
@@ -439,8 +472,7 @@ fn test_job_blocked_when_path_unreachable() {
     }
 
     let job = world.get_component(job_id, "Job").unwrap();
-    assert_eq!(job.get("phase").unwrap(), "blocked");
-    assert_eq!(job.get("status").unwrap(), "blocked");
+    assert_eq!(job.get("state").unwrap(), "blocked");
 
     // Agent should be unassigned and idle
     let agent = world.get_component(agent_id, "Agent").unwrap();

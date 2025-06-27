@@ -121,7 +121,7 @@ fn main() {
 
         system.render_map(&world, &viewport);
 
-        println!("Camera position: ({}, {})", x, y);
+        println!("Camera position: ({x}, {y})");
         println!("Use WASD to move camera, q to quit:");
         let mut buf = [0; 1];
         io::stdin().read_exact(&mut buf).unwrap();

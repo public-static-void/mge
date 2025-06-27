@@ -105,7 +105,7 @@ impl WasmScriptEngine {
         let func = self
             .instance
             .get_func(&mut *store_guard, func_name)
-            .with_context(|| format!("Exported function '{}' not found", func_name))?;
+            .with_context(|| format!("Exported function '{func_name}' not found"))?;
 
         let ty = func.ty(&mut *store_guard);
         if ty.params().len() != args.len() {

@@ -65,7 +65,7 @@ fn test_ai_job_assignment_priority_and_state() {
             "Job",
             json!({
                 "job_type": "dig",
-                "status": "pending",
+                "state": "pending",
                 "priority": 1,
                 "category": "mining"
             }),
@@ -80,7 +80,7 @@ fn test_ai_job_assignment_priority_and_state() {
             "Job",
             json!({
                 "job_type": "build",
-                "status": "pending",
+                "state": "pending",
                 "priority": 5,
                 "category": "construction"
             }),
@@ -95,7 +95,7 @@ fn test_ai_job_assignment_priority_and_state() {
             "Job",
             json!({
                 "job_type": "dig",
-                "status": "pending",
+                "state": "pending",
                 "priority": 10,
                 "category": "construction"
             }),
@@ -170,7 +170,7 @@ fn test_agent_job_queue_and_resource_aware_assignment() {
             json!({
                 "id": job100,
                 "job_type": "dig",
-                "status": "pending",
+                "state": "pending",
                 "priority": 1,
                 "category": "mining"
             }),
@@ -185,7 +185,7 @@ fn test_agent_job_queue_and_resource_aware_assignment() {
             json!({
                 "id": job200,
                 "job_type": "build",
-                "status": "pending",
+                "state": "pending",
                 "priority": 1,
                 "resource_outputs": [ { "kind": "wood", "amount": 5 } ],
                 "category": "construction"
@@ -210,7 +210,7 @@ fn test_agent_job_queue_and_resource_aware_assignment() {
 
     // Simulate job 100 completion
     let mut job = world.get_component(job100, "Job").unwrap().clone();
-    job["status"] = json!("complete");
+    job["state"] = json!("complete");
     world.set_component(job100, "Job", job).unwrap();
 
     let mut agent_obj = world.get_component(agent, "Agent").unwrap().clone();
@@ -250,7 +250,7 @@ fn test_job_preemption_by_higher_priority() {
             "Job",
             json!({
                 "job_type": "dig",
-                "status": "pending",
+                "state": "pending",
                 "priority": 1,
                 "category": "mining"
             }),
@@ -268,7 +268,7 @@ fn test_job_preemption_by_higher_priority() {
 
     // Simulate job 100 in progress
     let mut job = world.get_component(job100, "Job").unwrap().clone();
-    job["status"] = json!("in_progress");
+    job["state"] = json!("in_progress");
     world.set_component(job100, "Job", job).unwrap();
 
     // Now, add a higher-priority job
@@ -279,7 +279,7 @@ fn test_job_preemption_by_higher_priority() {
             "Job",
             json!({
                 "job_type": "build",
-                "status": "pending",
+                "state": "pending",
                 "priority": 10,
                 "category": "construction"
             }),
@@ -333,7 +333,7 @@ fn test_agent_abandons_job_if_blocked() {
             "Job",
             json!({
                 "job_type": "dig",
-                "status": "in_progress",
+                "state": "in_progress",
                 "assigned_to": agent,
                 "blocked": true,
                 "category": "mining"
@@ -392,7 +392,7 @@ fn test_dynamic_priority_update_affects_assignment() {
             "Job",
             json!({
                 "job_type": "dig",
-                "status": "pending",
+                "state": "pending",
                 "priority": 1,
                 "category": "mining"
             }),
@@ -406,7 +406,7 @@ fn test_dynamic_priority_update_affects_assignment() {
             "Job",
             json!({
                 "job_type": "build",
-                "status": "pending",
+                "state": "pending",
                 "priority": 5,
                 "category": "construction"
             }),

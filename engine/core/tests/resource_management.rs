@@ -34,7 +34,7 @@ fn test_add_and_remove_resource() {
             "amount": 10
         }),
     );
-    assert!(res.is_ok(), "Failed to add resource: {:?}", res);
+    assert!(res.is_ok(), "Failed to add resource: {res:?}");
 
     // Check resource amount
     let resource = world.get_component(entity, "Resource").unwrap();
@@ -42,7 +42,7 @@ fn test_add_and_remove_resource() {
 
     // Remove 5 wood (simulate partial consumption)
     let res = world.modify_resource_amount(entity, "wood", -5.0);
-    assert!(res.is_ok(), "Failed to remove resource: {:?}", res);
+    assert!(res.is_ok(), "Failed to remove resource: {res:?}");
 
     let resource = world.get_component(entity, "Resource").unwrap();
     assert_eq!(resource["amount"], 5.0);

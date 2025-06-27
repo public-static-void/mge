@@ -45,8 +45,7 @@ impl PyWorld {
         let schemas =
             load_schemas_from_dir_with_modes(&schema_path, &allowed_modes).map_err(|e| {
                 pyo3::exceptions::PyValueError::new_err(format!(
-                    "Failed to load schemas from {:?}: {e}",
-                    schema_path
+                    "Failed to load schemas from {schema_path:?}: {e}"
                 ))
             })?;
 
@@ -309,18 +308,17 @@ impl PyWorld {
             .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
     }
 
-    fn register_job_type(&self, _py: Python, name: String, callback: Py<PyAny>) {
+    fn register_job_type(&self, _py: Python, name: String, _callback: Py<PyAny>) {
+        fn py_job_handler(
+            _world: &mut engine_core::World,
+            _agent_id: u32,
+            _job_id: u32,
+            _data: &serde_json::Value,
+        ) -> serde_json::Value {
+            serde_json::json!(null)
+        }
         let mut world = self.inner.borrow_mut();
-        world.job_types.register_native(
-            &name,
-            Box::new(move |old_job, progress| {
-                Python::with_gil(|py| {
-                    let job_obj = serde_pyobject::to_pyobject(py, old_job).unwrap();
-                    let result = callback.call1(py, (job_obj, progress)).unwrap();
-                    serde_pyobject::from_pyobject(result.bind(py).clone()).unwrap()
-                })
-            }),
-        );
+        world.job_types.register_native(&name, py_job_handler);
     }
 
     fn get_stockpile_resources(&self, entity_id: u32) -> PyResult<Option<PyObject>> {
@@ -348,7 +346,12 @@ impl PyWorld {
     /// Returns a list of all registered job type names.
     fn get_job_types(&self) -> PyResult<Vec<String>> {
         let world = self.inner.borrow();
-        Ok(world.job_types.job_type_names())
+        Ok(world
+            .job_types
+            .job_type_names()
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect())
     }
 
     // ---- MAP/CAMERA/TOPOLOGY ----

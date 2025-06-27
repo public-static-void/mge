@@ -16,10 +16,10 @@ lazy_static::lazy_static! {
                                 // Normalize key to lowercase for case-insensitive lookup
                                 map.insert(stem.to_ascii_lowercase(), schema);
                             } else {
-                                eprintln!("Failed to parse schema: {:?}", path);
+                                eprintln!("Failed to parse schema: {path:?}");
                             }
                         } else {
-                            eprintln!("Failed to read schema file: {:?}", path);
+                            eprintln!("Failed to read schema file: {path:?}");
                         }
                     }
                 }

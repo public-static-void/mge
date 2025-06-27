@@ -6,6 +6,6 @@ use std::path::Path;
 pub fn load_schema_from_assets(name: &str) -> String {
     let path = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../engine/assets/schemas")
-        .join(format!("{}.json", name));
-    fs::read_to_string(&path).unwrap_or_else(|_| panic!("Failed to read schema file: {:?}", path))
+        .join(format!("{name}.json"));
+    fs::read_to_string(&path).unwrap_or_else(|_| panic!("Failed to read schema file: {path:?}"))
 }

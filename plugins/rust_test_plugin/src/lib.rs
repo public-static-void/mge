@@ -67,10 +67,7 @@ unsafe extern "C" fn init(api: *mut EngineApi, world: *mut c_void) -> c_int {
     let pos_json = CString::new(r#"{"x": 10.0, "y": 42.0}"#).unwrap();
     let comp_name = CString::new("Position").unwrap();
     let result = (api.set_component)(world, entity, comp_name.as_ptr(), pos_json.as_ptr());
-    println!(
-        "[RUST PLUGIN] Initialized: spawned entity {} with Position",
-        entity
-    );
+    println!("[RUST PLUGIN] Initialized: spawned entity {entity} with Position");
     result
 }
 
@@ -79,7 +76,7 @@ unsafe extern "C" fn shutdown() {
 }
 
 unsafe extern "C" fn update(dt: c_float) {
-    println!("[RUST PLUGIN] Update called with dt={}", dt);
+    println!("[RUST PLUGIN] Update called with dt={dt}");
 }
 
 unsafe extern "C" fn hot_reload(old_state: *mut c_void) -> *mut c_void {

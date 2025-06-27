@@ -331,7 +331,7 @@ impl UiApi {
                     w.boxed_clone(),
                 )) as Box<dyn UiWidget + Send>
             } else {
-                panic!("Widget with id {} not found after custom ctor", id);
+                panic!("Widget with id {id} not found after custom ctor");
             }
         };
 

@@ -11,11 +11,11 @@ use std::fs;
 pub fn validate_map_schema(map_json: &Value) -> Result<(), String> {
     let schema_path = format!("{}/../assets/schemas/map.json", env!("CARGO_MANIFEST_DIR"));
     let schema_str = fs::read_to_string(&schema_path)
-        .map_err(|e| format!("Failed to read map schema at {}: {}", schema_path, e))?;
+        .map_err(|e| format!("Failed to read map schema at {schema_path}: {e}"))?;
     let schema_json: Value = serde_json::from_str(&schema_str)
-        .map_err(|e| format!("Failed to parse map schema: {}", e))?;
+        .map_err(|e| format!("Failed to parse map schema: {e}"))?;
     let validator = jsonschema::validator_for(&schema_json)
-        .map_err(|e| format!("Failed to compile map schema: {}", e))?;
+        .map_err(|e| format!("Failed to compile map schema: {e}"))?;
     let errors: Vec<String> = validator
         .iter_errors(map_json)
         .map(|e| e.to_string())
@@ -33,7 +33,7 @@ pub fn validate_map_schema(map_json: &Value) -> Result<(), String> {
 /// Convert a JSON map to a Map object
 pub fn map_from_json(value: &Value) -> Option<Map> {
     if let Err(e) = validate_map_schema(value) {
-        eprintln!("Map schema validation failed: {}", e);
+        eprintln!("Map schema validation failed: {e}");
         return None;
     }
     let topology = value.get("topology")?.as_str()?;

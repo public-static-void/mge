@@ -41,7 +41,7 @@ fn test_subprocess_plugin_lifecycle() {
         PluginResponse::CommandResult { result } => {
             assert_eq!(result["echo"]["foo"], 42);
         }
-        _ => panic!("Unexpected response: {:?}", resp),
+        _ => panic!("Unexpected response: {resp:?}"),
     }
 
     let resp = manager

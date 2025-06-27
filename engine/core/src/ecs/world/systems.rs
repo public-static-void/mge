@@ -61,7 +61,7 @@ impl World {
             self.systems.register_system_boxed(name.to_string(), system);
             Ok(())
         } else {
-            Err(format!("System '{}' not found", name))
+            Err(format!("System '{name}' not found"))
         }
     }
 

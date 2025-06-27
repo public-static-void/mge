@@ -45,10 +45,9 @@ fn compute_job_utility(agent: &JsonValue, job: &JsonValue, world: &World) -> f64
         }
     }
 
-    // Add a bonus if the agent specializes in this job's category
     let specialization_bonus =
         if !job_category.is_empty() && specializations.contains(&job_category) {
-            1000.0 // Large enough to always prefer category match
+            1000.0
         } else {
             0.0
         };
@@ -57,11 +56,14 @@ fn compute_job_utility(agent: &JsonValue, job: &JsonValue, world: &World) -> f64
 }
 
 pub fn assign_jobs(world: &mut World, job_board: &mut JobBoard) {
-    let agent_ids: Vec<u32> = world
+    let mut agent_ids: Vec<u32> = world
         .components
         .get("Agent")
         .map(|map| map.keys().copied().collect())
         .unwrap_or_default();
+    agent_ids.sort();
+
+    job_board.update(world);
 
     let mut jobs_to_remove: Vec<u32> = Vec::new();
 
@@ -81,15 +83,18 @@ pub fn assign_jobs(world: &mut World, job_board: &mut JobBoard) {
                 .and_then(|v| v.as_array())
                 .cloned()
                 .unwrap_or_default();
-            let current_job = agent
-                .get("current_job")
-                .and_then(|v| v.as_u64())
-                .map(|v| v as u32);
+            let current_job = agent.get("current_job").and_then(|v| {
+                if v.is_null() {
+                    None
+                } else {
+                    v.as_u64().map(|v| v as u32)
+                }
+            });
             let has_current_job = current_job.is_some();
             (agent_state, agent_queue, has_current_job, current_job)
         };
 
-        // --- Abandon blocked job logic ---
+        let mut became_idle_this_tick = false;
         if let Some(job_eid) = current_job_eid {
             if let Some(job) = world.get_component(job_eid, "Job") {
                 if job
@@ -97,12 +102,11 @@ pub fn assign_jobs(world: &mut World, job_board: &mut JobBoard) {
                     .and_then(|v| v.as_bool())
                     .unwrap_or(false)
                 {
-                    // Unassign agent from job
                     let mut job = job.clone();
                     job.as_object_mut().unwrap().remove("assigned_to");
+                    job["state"] = serde_json::json!("pending");
                     world.set_component(job_eid, "Job", job).unwrap();
 
-                    // Unassign job from agent
                     if let Some(agent_entry) =
                         world.components.get("Agent").and_then(|m| m.get(agent_id))
                     {
@@ -111,18 +115,18 @@ pub fn assign_jobs(world: &mut World, job_board: &mut JobBoard) {
                         agent_obj["state"] = serde_json::json!("idle");
                         world.set_component(*agent_id, "Agent", agent_obj).unwrap();
                     }
-                    // After abandoning, treat as idle for this tick
                     agent_state = "idle".to_string();
                     has_current_job = false;
                     current_job_eid = None;
+                    became_idle_this_tick = true;
                 }
             }
         }
 
-        // --- Preemption logic ---
+        let mut preempted_this_tick = false;
         if agent_state == "working" && has_current_job {
-            let current_job_eid = current_job_eid.unwrap();
-            let current_job = world.get_component(current_job_eid, "Job");
+            let current_job_eid_val = current_job_eid.unwrap();
+            let current_job = world.get_component(current_job_eid_val, "Job");
             let current_priority = current_job
                 .and_then(|job| job.get("priority").and_then(|v| v.as_i64()))
                 .unwrap_or(0);
@@ -132,9 +136,7 @@ pub fn assign_jobs(world: &mut World, job_board: &mut JobBoard) {
                 .and_then(|m| m.get(agent_id))
                 .unwrap();
 
-            job_board.update(world);
-
-            // Find the best available job for this agent
+            // Only consider jobs that haven't already been assigned this tick
             let mut best_job = None;
             let mut best_utility = f64::MIN;
             let mut best_priority = None;
@@ -145,7 +147,6 @@ pub fn assign_jobs(world: &mut World, job_board: &mut JobBoard) {
                 };
                 let priority = job.get("priority").and_then(|v| v.as_i64()).unwrap_or(0);
                 let utility = compute_job_utility(agent, job, world);
-                // Only consider jobs with higher priority than current
                 if (priority > current_priority)
                     && (utility > best_utility
                         || (utility == best_utility && Some(priority) > best_priority))
@@ -157,32 +158,30 @@ pub fn assign_jobs(world: &mut World, job_board: &mut JobBoard) {
             }
 
             if let Some((new_job_eid, _priority)) = best_job {
-                // Unassign agent from current job
-                if let Some(mut job) = world.get_component(current_job_eid, "Job").cloned() {
+                if let Some(mut job) = world.get_component(current_job_eid_val, "Job").cloned() {
                     job.as_object_mut().unwrap().remove("assigned_to");
-                    job["status"] = serde_json::json!("pending");
-                    world.set_component(current_job_eid, "Job", job).unwrap();
+                    job["state"] = serde_json::json!("pending");
+                    world
+                        .set_component(current_job_eid_val, "Job", job)
+                        .unwrap();
                 }
-                // Push preempted job back to agent's queue
                 if let Some(agent_entry) =
                     world.components.get("Agent").and_then(|m| m.get(agent_id))
                 {
                     let mut agent_obj = agent_entry.clone();
-                    // Insert at front or back depending on desired behavior (here: front)
                     let mut queue = agent_obj
                         .get("job_queue")
                         .and_then(|v| v.as_array().cloned())
                         .unwrap_or_default();
-                    queue.insert(0, serde_json::json!(current_job_eid));
+                    queue.insert(0, serde_json::json!(current_job_eid_val));
                     agent_obj["job_queue"] = serde_json::json!(queue);
                     world.set_component(*agent_id, "Agent", agent_obj).unwrap();
                 }
-                // Assign agent to new job
                 if let Some(mut job) = world.get_component(new_job_eid, "Job").cloned() {
                     job["assigned_to"] = serde_json::json!(*agent_id);
+                    job["state"] = serde_json::json!("in_progress");
                     world.set_component(new_job_eid, "Job", job).unwrap();
                 }
-                // Update agent
                 if let Some(agent_entry) =
                     world.components.get("Agent").and_then(|m| m.get(agent_id))
                 {
@@ -192,11 +191,27 @@ pub fn assign_jobs(world: &mut World, job_board: &mut JobBoard) {
                     world.set_component(*agent_id, "Agent", agent_obj).unwrap();
                 }
                 jobs_to_remove.push(new_job_eid);
-                continue; // Preemption done, skip to next agent
+                job_board.jobs.retain(|eid| *eid != new_job_eid);
+                preempted_this_tick = true;
             }
         }
 
-        // Only assign jobs to idle agents
+        if became_idle_this_tick || preempted_this_tick {
+            let agent = match world.components.get("Agent").and_then(|m| m.get(agent_id)) {
+                Some(agent) => agent,
+                None => continue,
+            };
+            agent_state = agent
+                .get("state")
+                .and_then(|v| v.as_str())
+                .unwrap_or("idle")
+                .to_string();
+            has_current_job = agent.get("current_job").and_then(|v| v.as_u64()).is_some();
+            if preempted_this_tick {
+                continue;
+            }
+        }
+
         if agent_state != "idle" {
             continue;
         }
@@ -213,9 +228,10 @@ pub fn assign_jobs(world: &mut World, job_board: &mut JobBoard) {
                     }
                 };
                 if let Some(job) = world.get_component(next_job_eid, "Job") {
-                    if job.get("status").and_then(|v| v.as_str()) == Some("pending") {
+                    if job.get("state").and_then(|v| v.as_str()) == Some("pending") {
                         assigned_job = Some(next_job_eid);
                         jobs_to_remove.push(next_job_eid);
+                        job_board.jobs.retain(|eid| *eid != next_job_eid);
                         new_queue.remove(0);
                         break;
                     } else {
@@ -228,8 +244,6 @@ pub fn assign_jobs(world: &mut World, job_board: &mut JobBoard) {
         }
 
         if assigned_job.is_none() && !has_current_job {
-            job_board.update(world);
-
             let mut best_job = None;
             let mut best_utility = f64::MIN;
             let mut best_priority = None;
@@ -257,16 +271,15 @@ pub fn assign_jobs(world: &mut World, job_board: &mut JobBoard) {
             if let Some((job_eid, _priority)) = best_job {
                 assigned_job = Some(job_eid);
                 jobs_to_remove.push(job_eid);
+                job_board.jobs.retain(|eid| *eid != job_eid);
             }
         }
 
-        // Now do all mutations
         if let Some(job_eid) = assigned_job {
             if let Some(mut job) = world.get_component(job_eid, "Job").cloned() {
                 job["assigned_to"] = serde_json::json!(*agent_id);
                 world.set_component(job_eid, "Job", job.clone()).unwrap();
 
-                // Emit job_assigned event
                 crate::systems::job::system::JobSystem::emit_job_event(
                     world,
                     "job_assigned",
@@ -284,7 +297,19 @@ pub fn assign_jobs(world: &mut World, job_board: &mut JobBoard) {
         }
     }
 
-    job_board.jobs.retain(|eid| !jobs_to_remove.contains(eid));
+    for agent_id in &agent_ids {
+        if let Some(agent_entry) = world.components.get("Agent").and_then(|m| m.get(agent_id)) {
+            let mut agent_obj = agent_entry.clone();
+            let has_job = agent_obj
+                .get("current_job")
+                .and_then(|v| v.as_u64())
+                .is_some();
+            if !has_job && agent_obj.get("current_job").is_some() {
+                agent_obj.as_object_mut().unwrap().remove("current_job");
+                world.set_component(*agent_id, "Agent", agent_obj).unwrap();
+            }
+        }
+    }
 }
 
 pub fn setup_ai_event_subscriptions(world: &mut World) {

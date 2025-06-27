@@ -86,7 +86,7 @@ impl SystemRegistry {
         match sorter.into_vec_nodes() {
             SortResults::Full(order) => order,
             SortResults::Partial(cycle) => {
-                panic!("Cycle detected in system dependencies: {:?}", cycle);
+                panic!("Cycle detected in system dependencies: {cycle:?}");
             }
         }
     }

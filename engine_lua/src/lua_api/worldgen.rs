@@ -62,7 +62,7 @@ pub fn register_worldgen_api(
             let result = registry_for_invoke
                 .borrow()
                 .invoke(&name, &params_json)
-                .map_err(|e| mlua::Error::external(format!("{:?}", e)))?;
+                .map_err(|e| mlua::Error::external(format!("{e:?}")))?;
             json_to_lua_table(&lua_rc, &result)
         })?
     };

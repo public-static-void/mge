@@ -186,7 +186,7 @@ impl World {
         } else {
             if let Err(e) = self.registry.lock().unwrap().update_external_schema(schema) {
                 // Handle or log the error as appropriate
-                eprintln!("Failed to update schema: {:?}", e);
+                eprintln!("Failed to update schema: {e:?}");
             }
             Ok(())
         }

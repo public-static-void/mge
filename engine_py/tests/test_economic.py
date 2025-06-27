@@ -5,7 +5,7 @@ def test_economic_helpers(make_world):
     world.set_component(eid, "ProductionJob", {
         "recipe": "wood_plank",
         "progress": 0,
-        "status": "pending"
+        "state": "pending"
     })
 
     # Test get_stockpile_resources
@@ -17,7 +17,7 @@ def test_economic_helpers(make_world):
     job = world.get_production_job(eid)
     assert job is not None
     assert job["recipe"] == "wood_plank"
-    assert job["status"] == "pending"
+    assert job["state"] == "pending"
 
     # Remove and test None
     world.remove_component(eid, "Stockpile")

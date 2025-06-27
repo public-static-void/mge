@@ -19,7 +19,7 @@ fn test_schema_to_rust_component_generation() {
     assert!(status.success(), "Codegen tool failed");
 
     // Read generated Rust file
-    let generated_rust_path = format!("{}/position.rs", out_dir);
+    let generated_rust_path = format!("{out_dir}/position.rs");
     let generated =
         fs::read_to_string(&generated_rust_path).expect("Failed to read generated Rust file");
 

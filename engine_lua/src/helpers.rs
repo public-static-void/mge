@@ -87,7 +87,7 @@ pub fn lua_error_msg(lua: &Lua, msg: &str) -> LuaError {
 }
 
 pub fn lua_error_from_any<E: std::fmt::Display>(lua: &mlua::Lua, err: E) -> mlua::Error {
-    luaunit_style_error(lua, &format!("{}", err))
+    luaunit_style_error(lua, &format!("{err}"))
 }
 
 /// Returns true if the table has the global array metatable (`array_mt`).

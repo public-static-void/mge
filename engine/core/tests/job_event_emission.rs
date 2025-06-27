@@ -31,7 +31,7 @@ fn test_job_lifecycle_events_emitted() {
             json!({
                 "id": job_id,
                 "job_type": "dig",
-                "status": "pending",
+                "state": "pending",
                 "cancelled": false,
                 "priority": 1,
                 "category": "mining"
@@ -99,7 +99,7 @@ fn test_job_lifecycle_events_emitted() {
     {
         assert!(event.get("entity").is_some());
         assert!(event.get("job_type").is_some());
-        assert!(event.get("status").is_some());
+        assert!(event.get("state").is_some());
     }
 }
 
@@ -116,7 +116,7 @@ fn test_job_cancel_and_failure_events() {
             json!({
                 "id": fail_job_id,
                 "job_type": "failtest",
-                "status": "pending",
+                "state": "pending",
                 "should_fail": true,
                 "priority": 1,
                 "category": "testing"
@@ -133,7 +133,7 @@ fn test_job_cancel_and_failure_events() {
             json!({
                 "id": cancel_job_id,
                 "job_type": "dig",
-                "status": "pending",
+                "state": "pending",
                 "cancelled": true,
                 "priority": 1,
                 "category": "mining"

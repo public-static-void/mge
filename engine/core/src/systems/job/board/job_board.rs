@@ -26,7 +26,7 @@ impl JobBoard {
         for eid in world.get_entities_with_component("Job") {
             if let Some(job) = world.get_component(eid, "Job") {
                 let assigned = job.get("assigned_to").and_then(|v| v.as_u64()).unwrap_or(0);
-                let status = job.get("status").and_then(|v| v.as_str()).unwrap_or("");
+                let state = job.get("state").and_then(|v| v.as_str()).unwrap_or("");
                 let priority = job
                     .get("effective_priority")
                     .and_then(|v| v.as_i64())
@@ -53,7 +53,7 @@ impl JobBoard {
                     || has_reservation;
 
                 if assigned == 0
-                    && (status == "pending" || status == "interrupted")
+                    && (state == "pending" || state == "interrupted")
                     && !job
                         .get("blocked")
                         .and_then(|v| v.as_bool())
@@ -82,7 +82,7 @@ impl JobBoard {
         if let Some(&job_eid) = self.jobs.iter().find(|&&eid| {
             if let Some(job) = world.get_component(eid, "Job") {
                 let assigned = job.get("assigned_to").and_then(|v| v.as_u64()).unwrap_or(0);
-                let status = job.get("status").and_then(|v| v.as_str()).unwrap_or("");
+                let state = job.get("state").and_then(|v| v.as_str()).unwrap_or("");
                 let resource_requirements = job.get("resource_requirements");
                 let has_reservation = job.get("reserved_resources").is_some()
                     && job.get("reserved_stockpile").is_some();
@@ -93,7 +93,7 @@ impl JobBoard {
                         .unwrap_or(true)
                     || has_reservation;
                 assigned == 0
-                    && (status == "pending" || status == "interrupted")
+                    && (state == "pending" || state == "interrupted")
                     && requirements_satisfied
             } else {
                 false
@@ -102,9 +102,9 @@ impl JobBoard {
             if let Some(job) = world.get_component(job_eid, "Job") {
                 let mut job = job.clone();
                 job["assigned_to"] = JsonValue::from(actor_eid);
-                if job.get("status").and_then(|v| v.as_str()) == Some("interrupted") {
-                    job["status"] = JsonValue::from("in_progress");
-                    job["phase"] = JsonValue::from("in_progress");
+                // If the job was interrupted, reset to pending so it goes through the assignment pipeline
+                if job.get("state").and_then(|v| v.as_str()) == Some("interrupted") {
+                    job["state"] = JsonValue::from("pending");
                 }
                 job["assignment_count"] = JsonValue::from(
                     job.get("assignment_count")

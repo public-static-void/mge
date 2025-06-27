@@ -1,7 +1,7 @@
 def test_job_completion(make_world):
     world = make_world()
     eid = world.spawn_entity()
-    world.assign_job(eid, "test_job", category="testing")
+    world.assign_job(eid, "test_job", category="testing", state="pending")
     found = False
     for _ in range(12):  # enough ticks to guarantee completion
         world.run_native_system("JobSystem")
@@ -19,7 +19,7 @@ def test_get_job_types(make_world):
 
     # Register a custom job type if needed for the test
     def dummy_job_logic(job, progress):
-        job["status"] = "complete"
+        job["state"] = "complete"
         return job
 
     world.register_job_type("DummyJob", dummy_job_logic)

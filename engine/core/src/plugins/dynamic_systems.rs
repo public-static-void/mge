@@ -46,7 +46,7 @@ impl DynamicSystemRegistry {
         dependencies: Vec<String>,
     ) -> Result<(), String> {
         if !self.systems.contains_key(name) {
-            return Err(format!("System '{}' not found", name));
+            return Err(format!("System '{name}' not found"));
         }
         self.dependencies.insert(name.to_string(), dependencies);
         Ok(())
@@ -80,10 +80,9 @@ impl DynamicSystemRegistry {
 
         match sorter.into_vec_nodes() {
             SortResults::Full(order) => Ok(order),
-            SortResults::Partial(cycle) => Err(format!(
-                "Cycle detected in system dependencies: {:?}",
-                cycle
-            )),
+            SortResults::Partial(cycle) => {
+                Err(format!("Cycle detected in system dependencies: {cycle:?}"))
+            }
         }
     }
 
@@ -103,7 +102,7 @@ impl DynamicSystemRegistry {
             (system)(Rc::clone(&world), delta_time);
             Ok(())
         } else {
-            Err(format!("System '{}' not found", name))
+            Err(format!("System '{name}' not found"))
         }
     }
 

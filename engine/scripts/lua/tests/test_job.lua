@@ -2,7 +2,7 @@ local assert = require("assert")
 
 local function test_job_completion_event()
 	local eid = spawn_entity()
-	assign_job(eid, "test_job", { should_fail = false, category = "testing" })
+	assign_job(eid, "test_job", { should_fail = false, category = "testing", state = "pending" })
 	local found = false
 	for i = 1, 12 do
 		run_native_system("JobSystem")

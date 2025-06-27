@@ -16,7 +16,7 @@ fn test_register_job_handler_api_invokes_handler() {
         |_world, _agent_id, _job_id, job: &serde_json::Value| {
             let mut job = job.clone();
             job["progress"] = serde_json::json!(999.0);
-            job["status"] = serde_json::json!("complete");
+            job["state"] = serde_json::json!("complete");
             job
         },
     );
@@ -41,7 +41,7 @@ fn test_register_job_handler_api_invokes_handler() {
             json!({
                 "id": job_id,
                 "job_type": "superfast",
-                "status": "pending",
+                "state": "pending",
                 "cancelled": false,
                 "priority": 1,
                 "category": "testing"
@@ -60,7 +60,7 @@ fn test_register_job_handler_api_invokes_handler() {
 
     let job = world.get_component(job_id, "Job").unwrap();
     assert_eq!(job.get("progress").unwrap(), 999.0);
-    assert_eq!(job.get("status").unwrap(), "complete");
+    assert_eq!(job.get("state").unwrap(), "complete");
 }
 
 #[test]
@@ -73,7 +73,7 @@ fn test_register_job_handler_multiple_types() {
         |_world, _agent_id, _job_id, job: &serde_json::Value| {
             let mut job = job.clone();
             job["progress"] = serde_json::json!(1.0);
-            job["status"] = serde_json::json!("complete");
+            job["state"] = serde_json::json!("complete");
             job
         },
     );
@@ -82,7 +82,7 @@ fn test_register_job_handler_multiple_types() {
         |_world, _agent_id, _job_id, job: &serde_json::Value| {
             let mut job = job.clone();
             job["progress"] = serde_json::json!(2.0);
-            job["status"] = serde_json::json!("complete");
+            job["state"] = serde_json::json!("complete");
             job
         },
     );
@@ -96,7 +96,7 @@ fn test_register_job_handler_multiple_types() {
             json!({
                 "id": job_foo_id,
                 "job_type": "foo",
-                "status": "pending",
+                "state": "pending",
                 "cancelled": false,
                 "priority": 1,
                 "category": "foo"
@@ -112,7 +112,7 @@ fn test_register_job_handler_multiple_types() {
             json!({
                 "id": job_bar_id,
                 "job_type": "bar",
-                "status": "pending",
+                "state": "pending",
                 "cancelled": false,
                 "priority": 1,
                 "category": "bar"
@@ -145,7 +145,7 @@ fn test_register_job_handler_multiple_types() {
     let job_foo = world.get_component(job_foo_id, "Job").unwrap();
     let job_bar = world.get_component(job_bar_id, "Job").unwrap();
     assert_eq!(job_foo.get("progress").unwrap(), 1.0);
-    assert_eq!(job_foo.get("status").unwrap(), "complete");
+    assert_eq!(job_foo.get("state").unwrap(), "complete");
     assert_eq!(job_bar.get("progress").unwrap(), 2.0);
-    assert_eq!(job_bar.get("status").unwrap(), "complete");
+    assert_eq!(job_bar.get("state").unwrap(), "complete");
 }

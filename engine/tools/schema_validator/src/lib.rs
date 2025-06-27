@@ -17,7 +17,7 @@ pub fn validate_schema(schema_json: &str, allowed_modes: &[String]) -> Result<()
             if let Some(min) = prop.get("minimum").and_then(|v| v.as_f64()) {
                 if let Some(max) = prop.get("maximum").and_then(|v| v.as_f64()) {
                     if min > max {
-                        return Err(format!("Property '{}' has minimum > maximum", prop_name));
+                        return Err(format!("Property '{prop_name}' has minimum > maximum"));
                     }
                 }
             }
@@ -29,7 +29,7 @@ pub fn validate_schema(schema_json: &str, allowed_modes: &[String]) -> Result<()
         for mode in modes {
             if let Some(mode_str) = mode.as_str() {
                 if !allowed_modes.iter().any(|m| m == mode_str) {
-                    return Err(format!("Unknown mode '{}'", mode_str));
+                    return Err(format!("Unknown mode '{mode_str}'"));
                 }
             }
         }

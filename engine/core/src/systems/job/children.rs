@@ -2,7 +2,7 @@ use crate::ecs::world::World;
 use crate::systems::job::JobSystem;
 use serde_json::Value as JsonValue;
 
-/// Processes all child jobs of a parent job, updating their status and propagating cancellation if needed.
+/// Processes all child jobs of a parent job, updating their states and propagating cancellation if needed.
 /// Returns a tuple: (updated children array, all_children_complete: bool)
 pub fn process_job_children(
     job_system: &JobSystem,
@@ -21,11 +21,11 @@ pub fn process_job_children(
         let processed = job_system.process_job(world, lua, eid, child.take());
         if is_cancelled {
             *child = processed;
-            child["status"] = JsonValue::from("cancelled");
+            child["state"] = JsonValue::from("cancelled");
         } else {
             *child = processed;
         }
-        if child.get("status").and_then(|v| v.as_str()) != Some("complete") {
+        if child.get("state").and_then(|v| v.as_str()) != Some("complete") {
             all_children_complete = false;
         }
     }

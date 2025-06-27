@@ -3,7 +3,7 @@ mod world_helper;
 
 use engine_core::ecs::system::System;
 use engine_core::systems::job::job_board::JobBoard;
-use engine_core::systems::job::{JobSystem, assign_jobs};
+use engine_core::systems::job::{JobSystem, JobTypeData, assign_jobs};
 use serde_json::json;
 
 #[test]
@@ -43,7 +43,7 @@ fn test_job_cancellation_cleans_up_agent_and_emits_event() {
             json!({
                 "id": job_id,
                 "job_type": "dig",
-                "status": "pending",
+                "state": "pending",
                 "cancelled": false,
                 "priority": 1,
                 "category": "mining"
@@ -78,10 +78,7 @@ fn test_job_cancellation_cleans_up_agent_and_emits_event() {
 
     // Job should be marked as cancelled
     let job = world.get_component(job_id, "Job").unwrap();
-    assert_eq!(
-        job["status"], "cancelled",
-        "Job status should be 'cancelled'"
-    );
+    assert_eq!(job["state"], "cancelled", "Job state should be 'cancelled'");
 
     // Event should be emitted
     world.update_event_buses::<serde_json::Value>();
@@ -142,7 +139,7 @@ fn test_job_effect_rollback_on_cancel() {
             json!({
                 "id": entity_id,
                 "job_type": "dig",
-                "status": "pending",
+                "state": "pending",
                 "cancelled": false,
                 "priority": 1,
                 "category": "mining"
@@ -151,14 +148,16 @@ fn test_job_effect_rollback_on_cancel() {
         .unwrap();
 
     // Simulate job type registry with effect
-    world.job_types.register_job_type(
-        "dig",
-        vec![json!({
+    world.job_types.register_job_type(JobTypeData {
+        name: "dig".to_string(),
+        requirements: vec![],
+        duration: None,
+        effects: vec![serde_json::json!({
             "action": "ModifyTerrain",
             "from": "rock",
             "to": "tunnel"
         })],
-    );
+    });
 
     // Assign and complete job normally: effect should apply
     {
@@ -168,7 +167,7 @@ fn test_job_effect_rollback_on_cancel() {
 
         // Mark job as complete
         let mut job = world.get_component(entity_id, "Job").unwrap().clone();
-        job["status"] = json!("complete");
+        job["state"] = json!("complete");
         world.set_component(entity_id, "Job", job).unwrap();
 
         // Run system to apply effect
@@ -193,7 +192,7 @@ fn test_job_effect_rollback_on_cancel() {
             json!({
                 "id": entity_id,
                 "job_type": "dig",
-                "status": "pending",
+                "state": "pending",
                 "cancelled": true,
                 "priority": 1,
                 "category": "mining"
@@ -238,7 +237,7 @@ fn test_job_cancellation_releases_resources_and_cancels_children() {
             json!({
                 "id": parent_id,
                 "job_type": "build",
-                "status": "pending",
+                "state": "pending",
                 "resource_requirements": [{ "kind": "wood", "amount": 5 }],
                 "reserved_resources": [{ "kind": "wood", "amount": 5 }],
                 "reserved_stockpile": stockpile_id,
@@ -247,7 +246,7 @@ fn test_job_cancellation_releases_resources_and_cancels_children() {
                     {
                         "id": child_id,
                         "job_type": "subtask",
-                        "status": "pending",
+                        "state": "pending",
                         "category": "construction"
                     }
                 ]
@@ -278,7 +277,7 @@ fn test_job_cancellation_releases_resources_and_cancels_children() {
         .and_then(|v| v.as_array())
         .unwrap();
     assert_eq!(
-        children[0]["status"], "cancelled",
+        children[0]["state"], "cancelled",
         "Child job should be cancelled"
     );
 }

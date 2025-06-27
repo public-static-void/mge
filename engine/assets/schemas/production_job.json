@@ -4,8 +4,8 @@
   "properties": {
     "recipe": { "type": "string" },
     "progress": { "type": "integer" },
-    "status": { "type": "string" }
+    "state": { "type": "string" }
   },
-  "required": ["recipe", "progress", "status"],
+  "required": ["recipe", "progress", "state"],
   "modes": ["colony"]
 }

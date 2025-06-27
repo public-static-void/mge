@@ -44,7 +44,7 @@ impl ScriptEngine {
                         }
                         out.push_str(&v.to_string()?);
                     }
-                    println!("{}", out);
+                    println!("{out}");
                     Ok(())
                 })
                 .expect("Failed to create print function");
@@ -54,13 +54,10 @@ impl ScriptEngine {
 
             let require_json = lua
                 .create_function(|lua, path: String| {
-                    let json_str = std::fs::read_to_string(&path).map_err(|e| {
-                        mlua::Error::external(format!("Failed to read file: {}", e))
-                    })?;
-                    let json_val: serde_json::Value =
-                        serde_json::from_str(&json_str).map_err(|e| {
-                            mlua::Error::external(format!("Failed to parse JSON: {}", e))
-                        })?;
+                    let json_str = std::fs::read_to_string(&path)
+                        .map_err(|e| mlua::Error::external(format!("Failed to read file: {e}")))?;
+                    let json_val: serde_json::Value = serde_json::from_str(&json_str)
+                        .map_err(|e| mlua::Error::external(format!("Failed to parse JSON: {e}")))?;
                     crate::helpers::json_to_lua_table(lua, &json_val)
                 })
                 .expect("Failed to create require_json function");

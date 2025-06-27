@@ -6,7 +6,7 @@ function test_economic_helpers()
 	set_component(eid, "ProductionJob", {
 		recipe = "wood_plank",
 		progress = 0,
-		status = "pending",
+		state = "pending",
 	})
 
 	-- Test helper: get_stockpile_resources
@@ -18,7 +18,7 @@ function test_economic_helpers()
 	local job = get_production_job(eid)
 	assert.not_nil(job, "get_production_job should return a table")
 	assert.equals(job.recipe, "wood_plank", "Job recipe should be wood_plank")
-	assert.equals(job.status, "pending", "Job status should be pending")
+	assert.equals(job.state, "pending", "Job state should be pending")
 
 	-- Remove and test nil
 	remove_component(eid, "Stockpile")
