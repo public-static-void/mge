@@ -37,7 +37,7 @@ pub unsafe fn load_plugin<P: AsRef<Path>>(
 
     let init_result = unsafe { (vtable_ref.init)(engine_api as *mut _, world) };
     if init_result != 0 {
-        return Err(format!("Plugin init failed with code {}", init_result));
+        return Err(format!("Plugin init failed with code {init_result}"));
     }
 
     Ok(())
@@ -65,7 +65,7 @@ pub unsafe fn load_plugin_and_register_worldgen_threadsafe<P: AsRef<Path>>(
 
     let init_result = unsafe { (vtable_ref.init)(engine_api as *mut _, world) };
     if init_result != 0 {
-        return Err(format!("Plugin init failed with code {}", init_result));
+        return Err(format!("Plugin init failed with code {init_result}"));
     }
 
     // --- Worldgen registration ---
@@ -134,7 +134,7 @@ pub unsafe fn load_plugin_and_register_worldgen<P: AsRef<Path>>(
 
     let init_result = unsafe { (vtable_ref.init)(engine_api as *mut _, world) };
     if init_result != 0 {
-        return Err(format!("Plugin init failed with code {}", init_result));
+        return Err(format!("Plugin init failed with code {init_result}"));
     }
 
     // --- Worldgen registration ---
@@ -203,7 +203,7 @@ pub unsafe fn load_plugin_and_register_systems<P: AsRef<Path>>(
 
     let init_result = unsafe { (vtable_ref.init)(engine_api as *mut _, world) };
     if init_result != 0 {
-        return Err(format!("Plugin init failed with code {}", init_result));
+        return Err(format!("Plugin init failed with code {init_result}"));
     }
 
     // Register systems if available
@@ -288,7 +288,7 @@ pub unsafe fn load_plugin_with_manifest<P: AsRef<Path>>(
 
     let init_result = unsafe { (vtable_ref.init)(engine_api as *mut _, world) };
     if init_result != 0 {
-        return Err(format!("Plugin init failed with code {}", init_result));
+        return Err(format!("Plugin init failed with code {init_result}"));
     }
 
     Ok(())

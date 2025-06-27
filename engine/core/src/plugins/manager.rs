@@ -20,7 +20,7 @@ impl PluginManager {
         socket_path: &str,
     ) -> Result<(), String> {
         if self.plugins.contains_key(&name) {
-            return Err(format!("Plugin '{}' already running", name));
+            return Err(format!("Plugin '{name}' already running"));
         }
         let subprocess = PluginSubprocess::spawn(bin_path, socket_path)?;
         self.plugins.insert(name, subprocess);

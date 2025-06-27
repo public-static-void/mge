@@ -356,7 +356,7 @@ impl System for JobSystem {
         let sorted_eids = match sorter.into_vec_nodes() {
             SortResults::Full(order) => order,
             SortResults::Partial(cycle) => {
-                panic!("Cycle detected in job dependencies: {:?}", cycle);
+                panic!("Cycle detected in job dependencies: {cycle:?}");
             }
         };
 

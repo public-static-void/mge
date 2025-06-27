@@ -80,7 +80,7 @@ impl EffectProcessorRegistry {
                         .get("action")
                         .and_then(|v| v.as_str())
                         .and_then(|action| {
-                            let undo_action = format!("Undo{}", action);
+                            let undo_action = format!("Undo{action}");
                             registry
                                 .undo_handlers
                                 .get(&undo_action)
@@ -122,7 +122,7 @@ impl EffectProcessorRegistry {
                     .get("action")
                     .and_then(|v| v.as_str())
                     .and_then(|action| {
-                        let undo_action = format!("Undo{}", action);
+                        let undo_action = format!("Undo{action}");
                         self.undo_handlers
                             .get(&undo_action)
                             .map(|handler| (Arc::clone(handler), effect.clone()))
