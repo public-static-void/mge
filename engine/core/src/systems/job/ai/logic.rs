@@ -280,7 +280,7 @@ pub fn assign_jobs(world: &mut World, job_board: &mut JobBoard) {
                 job["assigned_to"] = serde_json::json!(*agent_id);
                 world.set_component(job_eid, "Job", job.clone()).unwrap();
 
-                crate::systems::job::system::JobSystem::emit_job_event(
+                crate::systems::job::system::events::emit_job_event(
                     world,
                     "job_assigned",
                     &job,

@@ -1,9 +1,8 @@
 //! Job type loader for loading job definitions from disk.
 
+use crate::systems::job::registry::JobTypeData;
 use std::fs;
 use std::path::Path;
-
-use super::registry::JobTypeData;
 
 /// Loads all job types from the given directory, supporting JSON, YAML, and TOML formats.
 pub fn load_job_types_from_dir<P: AsRef<Path>>(dir: P) -> Vec<JobTypeData> {

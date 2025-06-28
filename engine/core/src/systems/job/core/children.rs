@@ -1,11 +1,9 @@
 use crate::ecs::world::World;
-use crate::systems::job::JobSystem;
 use serde_json::Value as JsonValue;
 
 /// Processes all child jobs of a parent job, updating their states and propagating cancellation if needed.
 /// Returns a tuple: (updated children array, all_children_complete: bool)
 pub fn process_job_children(
-    job_system: &JobSystem,
     world: &mut World,
     lua: Option<&mlua::Lua>,
     eid: u32,
@@ -18,7 +16,8 @@ pub fn process_job_children(
         .unwrap_or_default();
     let mut all_children_complete = true;
     for child in &mut children {
-        let processed = job_system.process_job(world, lua, eid, child.take());
+        let processed =
+            crate::systems::job::system::process::process_job(world, lua, eid, child.take());
         if is_cancelled {
             *child = processed;
             child["state"] = JsonValue::from("cancelled");

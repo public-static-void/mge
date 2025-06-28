@@ -107,7 +107,7 @@ impl JobTypeRegistry {
         dir: P,
     ) -> Result<Self, Box<dyn std::error::Error>> {
         let mut registry = JobTypeRegistry::new();
-        let job_types = crate::systems::job::loader::load_job_types_from_dir(dir);
+        let job_types = crate::systems::job::types::loader::load_job_types_from_dir(dir);
         for job in job_types {
             // By default, register with a no-op native handler.
             registry.register(job, JobLogicKind::Native(|_, _, _, job| job.clone()));

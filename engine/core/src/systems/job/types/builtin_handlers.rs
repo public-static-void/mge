@@ -1,6 +1,6 @@
 use crate::ecs::world::World;
-use crate::systems::job::job_type::{JobLogicKind, JobTypeData, JobTypeRegistry};
-use crate::systems::job::loader::load_job_types_from_dir;
+use crate::systems::job::types::job_type::{JobLogicKind, JobTypeData, JobTypeRegistry};
+use crate::systems::job::types::loader::load_job_types_from_dir;
 use std::path::Path;
 
 /// Registers all native job handlers for job types found in the given directory.

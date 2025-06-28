@@ -1,10 +1,10 @@
 //! Handler for the "pending" job state.
 
 use crate::ecs::world::World;
+use crate::systems::job::core::requirements;
 use crate::systems::job::movement_ops;
-use crate::systems::job::requirements;
-use crate::systems::job::state_utils;
 use crate::systems::job::states::helpers::*;
+use crate::systems::job::states::transitions;
 use serde_json::{Value as JsonValue, json};
 
 /// Handles the "pending" state of a job, including transitions to fetching_resources or going_to_site.
@@ -53,7 +53,7 @@ pub fn handle_pending_state(world: &mut World, eid: u32, mut job: JsonValue) -> 
             let agent_cell = crate::map::CellKey::from_position(agent_pos);
             let target_cell = crate::map::CellKey::from_position(target_pos);
             if let (Some(agent_cell), Some(target_cell)) = (agent_cell, target_cell) {
-                if state_utils::transition_if_at_site(&agent_cell, &target_cell, &mut job) {
+                if transitions::transition_if_at_site(&agent_cell, &target_cell, &mut job) {
                     return job;
                 } else {
                     if let Some(map) = &world.map {
