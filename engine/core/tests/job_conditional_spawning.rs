@@ -40,7 +40,7 @@ fn test_conditional_child_spawn_on_failure() {
                 "state": "pending",
                 "priority": 1,
                 "category": "test",
-                "dependencies": [dep_id.to_string()],  // <-- FIX: use string, not integer
+                "dependencies": [dep_id.to_string()],
                 "conditional_children": [
                     {
                         "spawn_if": { "field": "state", "equals": "failed" },

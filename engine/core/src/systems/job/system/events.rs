@@ -23,6 +23,14 @@ pub fn job_event_logger() -> Arc<EventLogger<JsonValue>> {
 }
 
 /// Emits a job-related event to the world's event system and logs it.
+/// The event payload includes the following fields (if present in the job):
+/// - entity: The job's ID, if present in the job as "id"
+/// - job_type: The job's type
+/// - state: The job's state
+/// - progress: The job's progress
+/// - assigned_to: The entity assigned to the job
+/// - priority: The job's priority
+/// - Any extra fields passed in the extra map
 pub fn emit_job_event(
     world: &mut World,
     event: &str,
@@ -44,6 +52,9 @@ pub fn emit_job_event(
     }
     if let Some(assigned_to) = job.get("assigned_to") {
         payload.insert("assigned_to".to_string(), assigned_to.clone());
+    }
+    if let Some(priority) = job.get("priority") {
+        payload.insert("priority".to_string(), priority.clone());
     }
     if let Some(extra) = extra {
         for (k, v) in extra {
