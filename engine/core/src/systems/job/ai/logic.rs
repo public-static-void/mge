@@ -136,7 +136,6 @@ pub fn assign_jobs(world: &mut World, job_board: &mut JobBoard) {
                 .and_then(|m| m.get(agent_id))
                 .unwrap();
 
-            // Only consider jobs that haven't already been assigned this tick
             let mut best_job = None;
             let mut best_utility = f64::MIN;
             let mut best_priority = None;
@@ -243,32 +242,9 @@ pub fn assign_jobs(world: &mut World, job_board: &mut JobBoard) {
             }
         }
 
+        // Assign jobs in the order of job_board.jobs if no queue and no current job.
         if assigned_job.is_none() && !has_current_job {
-            let mut best_job = None;
-            let mut best_utility = f64::MIN;
-            let mut best_priority = None;
-            for &job_eid in &job_board.jobs {
-                let job = match world.get_component(job_eid, "Job") {
-                    Some(j) => j,
-                    None => continue,
-                };
-                let priority = job.get("priority").and_then(|v| v.as_i64()).unwrap_or(0);
-                let agent = world
-                    .components
-                    .get("Agent")
-                    .and_then(|m| m.get(agent_id))
-                    .unwrap();
-                let utility = compute_job_utility(agent, job, world);
-                if utility > best_utility
-                    || (utility == best_utility && Some(priority) > best_priority)
-                {
-                    best_utility = utility;
-                    best_priority = Some(priority);
-                    best_job = Some((job_eid, priority));
-                }
-            }
-
-            if let Some((job_eid, _priority)) = best_job {
+            if let Some(&job_eid) = job_board.jobs.first() {
                 assigned_job = Some(job_eid);
                 jobs_to_remove.push(job_eid);
                 job_board.jobs.retain(|eid| *eid != job_eid);
