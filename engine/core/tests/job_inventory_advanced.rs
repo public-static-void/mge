@@ -13,6 +13,7 @@ use world_helper::make_test_world;
 
 #[test]
 fn test_agent_makes_multiple_trips_for_large_job() {
+engine_core::systems::job::system::events::init_job_event_logger();
     let mut world = make_test_world();
     world.current_mode = "colony".to_string();
 

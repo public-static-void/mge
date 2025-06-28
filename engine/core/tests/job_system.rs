@@ -47,6 +47,7 @@ fn test_query_entities_with_job_component() {
 
 #[test]
 fn test_job_system_advances_progress_and_completes_job() {
+    engine_core::systems::job::system::events::init_job_event_logger();
     let mut world = world_helper::make_test_world();
     world.current_mode = "colony".to_string();
 
@@ -73,6 +74,7 @@ fn test_job_system_advances_progress_and_completes_job() {
 
 #[test]
 fn test_job_system_emits_event_on_completion() {
+    engine_core::systems::job::system::events::init_job_event_logger();
     let mut world = world_helper::make_test_world();
     world.current_mode = "colony".to_string();
 
@@ -109,6 +111,7 @@ fn test_job_system_emits_event_on_completion() {
 
 #[test]
 fn test_job_system_emits_event_on_failure() {
+    engine_core::systems::job::system::events::init_job_event_logger();
     let mut world = world_helper::make_test_world();
     world.current_mode = "colony".to_string();
 
@@ -145,6 +148,7 @@ fn test_job_system_emits_event_on_failure() {
 
 #[test]
 fn test_job_system_uses_custom_job_type_logic() {
+    engine_core::systems::job::system::events::init_job_event_logger();
     use engine_core::ecs::ComponentSchema;
     use engine_core::ecs::registry::ComponentRegistry;
     use serde_json::Value;

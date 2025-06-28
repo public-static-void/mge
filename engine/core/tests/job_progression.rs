@@ -8,6 +8,7 @@ use serde_json::json;
 
 #[test]
 fn test_job_progression_over_ticks() {
+    engine_core::systems::job::system::events::init_job_event_logger();
     let mut world = world_helper::make_test_world();
 
     let agent_id = world.spawn_entity();
@@ -83,6 +84,7 @@ fn test_job_progression_over_ticks() {
 
 #[test]
 fn test_custom_job_handler_overrides_progression() {
+    engine_core::systems::job::system::events::init_job_event_logger();
     let mut world = world_helper::make_test_world();
 
     {
@@ -148,6 +150,7 @@ fn test_custom_job_handler_overrides_progression() {
 
 #[test]
 fn test_effects_applied_only_on_completion_and_rolled_back_on_cancel() {
+    engine_core::systems::job::system::events::init_job_event_logger();
     let mut world = world_helper::make_test_world();
 
     {
@@ -253,6 +256,7 @@ fn test_effects_applied_only_on_completion_and_rolled_back_on_cancel() {
 
 #[test]
 fn test_agent_moves_to_job_site_before_progress() {
+    engine_core::systems::job::system::events::init_job_event_logger();
     let mut world = world_helper::make_test_world();
 
     // Set up a 3x3 grid map with all cells and neighbors for pathfinding
@@ -385,6 +389,7 @@ fn test_agent_moves_to_job_site_before_progress() {
 
 #[test]
 fn test_job_blocked_when_path_unreachable() {
+    engine_core::systems::job::system::events::init_job_event_logger();
     let mut world = world_helper::make_test_world();
 
     // Set up a 2x2 grid map with no path between (0,0,0) and (1,1,0)

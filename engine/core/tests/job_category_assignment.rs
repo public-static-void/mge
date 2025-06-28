@@ -7,6 +7,7 @@ use serde_json::json;
 
 #[test]
 fn test_agent_prefers_job_matching_specialization_category() {
+    engine_core::systems::job::system::events::init_job_event_logger();
     let mut world = world_helper::make_test_world();
 
     // Agent 1 specializes in hauling

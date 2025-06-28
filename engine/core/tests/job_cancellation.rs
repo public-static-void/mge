@@ -8,6 +8,7 @@ use serde_json::json;
 
 #[test]
 fn test_job_cancellation_cleans_up_agent_and_emits_event() {
+    engine_core::systems::job::system::events::init_job_event_logger();
     let mut world = world_helper::make_test_world();
 
     // Register a dummy effect handler (should not be called on cancel)
@@ -97,6 +98,7 @@ fn test_job_cancellation_cleans_up_agent_and_emits_event() {
 
 #[test]
 fn test_job_effect_rollback_on_cancel() {
+    engine_core::systems::job::system::events::init_job_event_logger();
     let mut world = world_helper::make_test_world();
 
     // Register a reversible effect handler
@@ -215,6 +217,7 @@ fn test_job_effect_rollback_on_cancel() {
 
 #[test]
 fn test_job_cancellation_releases_resources_and_cancels_children() {
+    engine_core::systems::job::system::events::init_job_event_logger();
     let mut world = world_helper::make_test_world();
 
     // Set up stockpile with resources and a job that reserves them

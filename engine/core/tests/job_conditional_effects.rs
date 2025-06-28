@@ -6,6 +6,7 @@ use serde_json::json;
 
 #[test]
 fn test_job_effect_with_world_state_condition() {
+    engine_core::systems::job::system::events::init_job_event_logger();
     let mut world = world_helper::make_test_world();
 
     // Register the JobSystem

@@ -9,6 +9,7 @@ use serde_json::json;
 
 #[test]
 fn test_job_progressed_event_emitted_on_progress_change() {
+    engine_core::systems::job::system::events::init_job_event_logger();
     let mut world = world_helper::make_test_world();
 
     // Set up event capture for job_progressed
@@ -77,6 +78,7 @@ fn test_job_progressed_event_emitted_on_progress_change() {
 
 #[test]
 fn test_job_progressed_event_emitted_for_custom_handler() {
+    engine_core::systems::job::system::events::init_job_event_logger();
     let mut world = world_helper::make_test_world();
 
     // Set up event capture for job_progressed

@@ -9,6 +9,7 @@ use serde_json::json;
 /// Test: Conditional child job is spawned when parent job fails.
 #[test]
 fn test_conditional_child_spawn_on_failure() {
+    engine_core::systems::job::system::events::init_job_event_logger();
     let mut world = world_helper::make_test_world();
 
     // Create a dependency job that has failed
@@ -97,6 +98,7 @@ fn test_conditional_child_spawn_on_failure() {
 /// Test: Conditional child job is spawned when world state matches.
 #[test]
 fn test_conditional_child_spawn_on_world_state() {
+    engine_core::systems::job::system::events::init_job_event_logger();
     let mut world = world_helper::make_test_world();
 
     world.set_global_resource_amount("food", 5.0);

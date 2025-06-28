@@ -8,6 +8,7 @@ use serde_json::json;
 
 #[test]
 fn test_agent_state_and_job_completion() {
+    engine_core::systems::job::system::events::init_job_event_logger();
     let mut world = world_helper::make_test_world();
 
     let agent_id = world.spawn_entity();
@@ -77,6 +78,7 @@ fn test_agent_state_and_job_completion() {
 
 #[test]
 fn test_job_preemption_and_reassignment() {
+    engine_core::systems::job::system::events::init_job_event_logger();
     let mut world = world_helper::make_test_world();
 
     let agent_id = world.spawn_entity();

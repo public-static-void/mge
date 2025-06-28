@@ -8,6 +8,7 @@ use serde_json::json;
 
 #[test]
 fn test_register_job_handler_api_invokes_handler() {
+    engine_core::systems::job::system::events::init_job_event_logger();
     let mut world = world_helper::make_test_world();
 
     // Register a custom handler for "superfast" job_type
@@ -65,6 +66,7 @@ fn test_register_job_handler_api_invokes_handler() {
 
 #[test]
 fn test_register_job_handler_multiple_types() {
+    engine_core::systems::job::system::events::init_job_event_logger();
     let mut world = world_helper::make_test_world();
 
     // Register handlers for two types
