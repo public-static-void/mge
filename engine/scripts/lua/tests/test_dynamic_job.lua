@@ -1,6 +1,7 @@
 local assert = require("assert")
 
 local function test_dynamic_job_type_registration()
+	init_job_event_logger()
 	set_mode("colony")
 	local eid = spawn_entity()
 	register_job_type("LuaJob", function(job, progress)
