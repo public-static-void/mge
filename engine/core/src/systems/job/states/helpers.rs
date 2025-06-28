@@ -21,6 +21,17 @@ pub fn try_handle_cancellation(world: &mut World, job: &mut JsonValue) -> bool {
             .and_then(|v| v.as_bool())
             .unwrap_or(false)
     {
+        let job_type = job
+            .get("job_type")
+            .and_then(|v| v.as_str())
+            .unwrap_or("default")
+            .to_string();
+        let job_id = job.get("id").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
+        if let Some(obj) = job.as_object_mut() {
+            crate::systems::job::system::JobSystem::process_job_effects(
+                world, job_id, &job_type, obj, true, // on_cancel = true triggers rollback
+            );
+        }
         handle_job_cancellation_cleanup(world, job);
         job["state"] = serde_json::json!("cancelled");
         job["cancelled_cleanup_done"] = serde_json::json!(true);

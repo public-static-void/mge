@@ -48,7 +48,7 @@ impl JobSystem {
         }
     }
 
-    fn process_job_effects(
+    pub fn process_job_effects(
         world: &mut World,
         job_id: u32,
         job_type: &str,
@@ -64,39 +64,87 @@ impl JobSystem {
 
         let effect_registry = world.effect_processor_registry.as_ref().unwrap().clone();
 
-        let applied_effects = job
-            .entry("applied_effects")
-            .or_insert_with(|| serde_json::Value::Array(vec![]))
-            .as_array_mut()
-            .unwrap();
+        // Extract applied_effects BEFORE mutable borrow
+        let mut applied_effect_indices = job
+            .get("applied_effects")
+            .and_then(|v| v.as_array())
+            .cloned()
+            .unwrap_or_else(Vec::new);
 
-        if on_cancel {
-            for idx in applied_effects.iter().filter_map(|v| v.as_u64()) {
-                if let Some(effect) = effects.get(idx as usize) {
-                    let effect_value = serde_json::to_value(effect.clone()).unwrap();
-                    effect_registry.lock().unwrap().rollback_effects(
-                        world,
-                        job_id,
-                        &[effect_value],
-                    );
-                }
-            }
-            applied_effects.clear();
-        } else {
-            for (idx, effect) in effects.iter().enumerate() {
-                if !applied_effects
-                    .iter()
-                    .any(|v| v.as_u64() == Some(idx as u64))
-                {
-                    let effect_value = serde_json::to_value(effect.clone()).unwrap();
-                    effect_registry
-                        .lock()
-                        .unwrap()
-                        .process_effects(world, job_id, &[effect_value]);
-                    applied_effects.push(serde_json::Value::from(idx as u64));
+        use crate::systems::job::dependencies::{evaluate_entity_state, evaluate_world_state};
+
+        fn process_effect_and_chains(
+            effect_registry: &std::sync::Arc<std::sync::Mutex<crate::systems::job::registry::effect_processor_registry::EffectProcessorRegistry>>,
+            world: &mut World,
+            job_id: u32,
+            effect: &serde_json::Value,
+        ) {
+            effect_registry.lock().unwrap().process_effects(
+                world,
+                job_id,
+                std::slice::from_ref(effect),
+            );
+            if let Some(chained) = effect.get("effects").and_then(|v| v.as_array()) {
+                for chained_effect in chained {
+                    process_effect_and_chains(effect_registry, world, job_id, chained_effect);
                 }
             }
         }
+
+        if on_cancel {
+            for idx in &applied_effect_indices {
+                if let Some(effect_idx) = idx.as_u64() {
+                    if let Some(effect) = effects.get(effect_idx as usize) {
+                        let effect_value = serde_json::to_value(effect.clone()).unwrap();
+                        effect_registry.lock().unwrap().rollback_effects(
+                            world,
+                            job_id,
+                            &[effect_value],
+                        );
+                    }
+                }
+            }
+            applied_effect_indices.clear();
+        } else {
+            // --- Incremental: Apply only one effect per tick ---
+            let mut next_effect_idx = None;
+            for (idx, effect) in effects.iter().enumerate() {
+                let already_applied = applied_effect_indices
+                    .iter()
+                    .any(|v| v.as_u64() == Some(idx as u64));
+                if already_applied {
+                    continue;
+                }
+                let should_apply = match effect.get("condition") {
+                    None => true,
+                    Some(cond) => {
+                        if let Some(ws) = cond.get("world_state") {
+                            evaluate_world_state(world, ws)
+                        } else if let Some(es) = cond.get("entity_state") {
+                            evaluate_entity_state(world, es)
+                        } else {
+                            false
+                        }
+                    }
+                };
+                if !should_apply {
+                    continue;
+                }
+                next_effect_idx = Some(idx);
+                break;
+            }
+            if let Some(idx) = next_effect_idx {
+                let effect = &effects[idx];
+                let effect_value = serde_json::to_value(effect.clone()).unwrap();
+                process_effect_and_chains(&effect_registry, world, job_id, &effect_value);
+                applied_effect_indices.push(serde_json::Value::from(idx as u64));
+            }
+        }
+
+        job.insert(
+            "applied_effects".to_string(),
+            serde_json::Value::Array(applied_effect_indices),
+        );
     }
 
     pub fn emit_job_event(
@@ -151,6 +199,24 @@ impl JobSystem {
             .get("cancelled_cleanup_done")
             .and_then(|v| v.as_bool())
             .unwrap_or(false);
+
+        // If job is assigned to an agent, but agent does not exist, interrupt and rollback
+        if let Some(agent_id) = job.get("assigned_to").and_then(|v| v.as_u64()) {
+            let agent_id = agent_id as u32;
+            if world.get_component(agent_id, "Agent").is_none() {
+                // Mark as interrupted, rollback all applied effects
+                job["state"] = serde_json::json!("interrupted");
+                let job_id = job.get("id").and_then(|v| v.as_u64()).unwrap_or(eid as u64) as u32;
+                if let Some(obj) = job.as_object_mut() {
+                    Self::process_job_effects(world, job_id, &job_type, obj, true);
+                }
+                // Optionally: cleanup agent assignment fields
+                job.as_object_mut().unwrap().remove("assigned_to");
+                // Save and return immediately
+                world.set_component(eid, "Job", job.clone()).unwrap();
+                return job;
+            }
+        }
 
         if let Some(dep_fail_state) = dependencies::dependency_failure_state(world, &job) {
             job["state"] = serde_json::json!(dep_fail_state);
@@ -229,7 +295,7 @@ impl JobSystem {
     ) -> serde_json::Value {
         let state = job.get("state").and_then(|v| v.as_str()).unwrap_or("");
 
-        // --- Custom handler always takes priority ---
+        // Custom handler always takes priority
         if !matches!(state, "failed" | "complete" | "cancelled") {
             let assigned_to = job.get("assigned_to").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
             let job_id = job.get("id").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
@@ -254,6 +320,17 @@ impl JobSystem {
             "delivering_resources" => states::handle_delivering_resources_state(world, eid, job),
             "at_site" => states::handle_at_site_state(world, eid, job),
             "in_progress" => {
+                // Extract job_type_str before mut borrow
+                let job_type_str = job
+                    .get("job_type")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("default")
+                    .to_string();
+                let job_id = job.get("id").and_then(|v| v.as_u64()).unwrap_or(eid as u64) as u32;
+                if let Some(obj) = job.as_object_mut() {
+                    JobSystem::process_job_effects(world, job_id, &job_type_str, obj, false);
+                }
+
                 let assigned_to =
                     job.get("assigned_to").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
 
@@ -360,7 +437,7 @@ impl System for JobSystem {
             }
         };
 
-        for eid in sorted_eids {
+        for eid in sorted_eids.iter().copied() {
             let old_job = world.get_component(eid, "Job").unwrap().clone();
             let mut new_job = self.process_job(world, lua, eid, old_job.clone());
             let old_state = old_job
@@ -424,6 +501,34 @@ impl System for JobSystem {
                         new_child["id"] = serde_json::json!(new_child_id);
                         new_child["parent"] = serde_json::json!(eid);
                         world.set_component(new_child_id, "Job", new_child).unwrap();
+                    }
+                }
+            }
+        }
+
+        let mut terminal_jobs = Vec::new();
+        for &eid in &job_entities {
+            if let Some(job) = world.get_component(eid, "Job") {
+                let job_type = job
+                    .get("job_type")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("default")
+                    .to_string();
+                let state = job.get("state").and_then(|v| v.as_str()).unwrap_or("");
+                terminal_jobs.push((eid, job_type, state.to_string()));
+            }
+        }
+        for (eid, job_type, state) in terminal_jobs {
+            if let Some(mut job_obj) = world.get_component(eid, "Job").cloned() {
+                if let Some(obj) = job_obj.as_object_mut() {
+                    match state.as_str() {
+                        "failed" | "cancelled" => {
+                            JobSystem::process_job_effects(world, eid, &job_type, obj, true);
+                        }
+                        "complete" => {
+                            JobSystem::process_job_effects(world, eid, &job_type, obj, false);
+                        }
+                        _ => {}
                     }
                 }
             }
