@@ -79,8 +79,9 @@ impl<E: Clone + Serialize + for<'de> Deserialize<'de> + Send + Sync + 'static> E
     }
 }
 
-
-impl<E: Clone + Serialize + for<'de> Deserialize<'de> + Send + Sync + 'static> Default for EventLogger<E> {
+impl<E: Clone + Serialize + for<'de> Deserialize<'de> + Send + Sync + 'static> Default
+    for EventLogger<E>
+{
     fn default() -> Self {
         Self::new()
     }

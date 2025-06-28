@@ -1,5 +1,5 @@
 use engine_core::systems::job::job_board::JobBoard;
-use engine_core::systems::job::{assign_jobs, setup_ai_event_subscriptions, AiEventReactionSystem};
+use engine_core::systems::job::{AiEventReactionSystem, assign_jobs, setup_ai_event_subscriptions};
 use serde_json::json;
 
 #[path = "helpers/world.rs"]
