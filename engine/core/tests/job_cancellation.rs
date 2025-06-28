@@ -176,9 +176,9 @@ fn test_job_effect_rollback_on_cancel() {
 
         let terrain = world.get_component(entity_id, "Terrain").unwrap();
         assert_eq!(
-            terrain["kind"], "rock",
-            "Terrain should remain rock after effect (logic might need review)"
-        ); // NOTE: If this is expected to change, please clarify.
+            terrain["kind"], "tunnel",
+            "Terrain should be tunnel after effect"
+        );
     }
 
     // Reset for cancellation test
