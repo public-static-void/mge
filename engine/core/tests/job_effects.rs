@@ -4,6 +4,7 @@ use serde_json::json;
 
 #[test]
 fn test_job_effects_are_processed_on_completion() {
+    engine_core::systems::job::system::events::init_job_event_logger();
     // This test needs to manually set up the registry due to custom schemas and effect handlers.
     let mut world = World::new(Default::default());
 

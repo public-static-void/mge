@@ -6,6 +6,7 @@ use serde_json::json;
 
 #[test]
 fn test_partial_effect_rollback_on_cancel_and_interruption() {
+    engine_core::systems::job::system::events::init_job_event_logger();
     let mut world = world_helper::make_test_world();
 
     // Register minimal schemas for test components in "colony" mode

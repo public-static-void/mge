@@ -8,6 +8,7 @@ use serde_json::json;
 
 #[test]
 fn test_job_lifecycle_events_emitted() {
+    engine_core::systems::job::system::events::init_job_event_logger();
     let mut world = world_helper::make_test_world();
 
     // Agent and job setup
@@ -105,6 +106,7 @@ fn test_job_lifecycle_events_emitted() {
 
 #[test]
 fn test_job_cancel_and_failure_events() {
+    engine_core::systems::job::system::events::init_job_event_logger();
     let mut world = world_helper::make_test_world();
 
     // Setup a job that will fail

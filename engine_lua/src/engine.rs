@@ -14,6 +14,11 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
+fn lua_init_job_event_logger(_lua: &mlua::Lua, _args: mlua::Value) -> mlua::Result<mlua::Value> {
+    engine_core::systems::job::system::events::init_job_event_logger();
+    Ok(mlua::Value::Nil)
+}
+
 pub struct ScriptEngine {
     pub lua: Rc<Lua>,
     input_provider: Arc<Mutex<Box<dyn InputProvider + Send + Sync>>>,
@@ -64,6 +69,13 @@ impl ScriptEngine {
             globals
                 .set("require_json", require_json)
                 .expect("Failed to set require_json function");
+
+            let init_job_event_logger = lua
+                .create_function(lua_init_job_event_logger)
+                .expect("Failed to create init_job_event_logger function");
+            globals
+                .set("init_job_event_logger", init_job_event_logger)
+                .expect("Failed to set init_job_event_logger global");
 
             // Expose array metatable for marking tables as arrays
             let array_mt = lua

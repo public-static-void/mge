@@ -7,6 +7,7 @@ use serde_json::json;
 
 #[test]
 fn test_job_with_failed_dependency_fails() {
+    engine_core::systems::job::system::events::init_job_event_logger();
     let mut world = world_helper::make_test_world();
     let dep_eid = world.spawn_entity();
     let main_eid = world.spawn_entity();
@@ -49,6 +50,7 @@ fn test_job_with_failed_dependency_fails() {
 
 #[test]
 fn test_job_with_cancelled_dependency_cancels() {
+    engine_core::systems::job::system::events::init_job_event_logger();
     let mut world = world_helper::make_test_world();
     let dep_eid = world.spawn_entity();
     let main_eid = world.spawn_entity();
@@ -91,6 +93,7 @@ fn test_job_with_cancelled_dependency_cancels() {
 
 #[test]
 fn test_job_spawns_child_on_dependency_failure() {
+    engine_core::systems::job::system::events::init_job_event_logger();
     let mut world = world_helper::make_test_world();
     let dep_eid = world.spawn_entity();
     let main_eid = world.spawn_entity();

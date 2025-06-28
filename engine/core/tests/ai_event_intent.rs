@@ -8,6 +8,7 @@ use world_helper::make_test_world;
 
 #[test]
 fn test_event_driven_ai_job_enqueue() {
+    engine_core::systems::job::system::events::init_job_event_logger();
     let mut world = make_test_world();
 
     // Add an agent
@@ -73,6 +74,7 @@ fn test_event_driven_ai_job_enqueue() {
 
 #[test]
 fn test_event_intent_queue_handles_multiple_events() {
+    engine_core::systems::job::system::events::init_job_event_logger();
     let mut world = make_test_world();
 
     // Add an agent

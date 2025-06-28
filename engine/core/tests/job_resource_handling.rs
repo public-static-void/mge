@@ -10,6 +10,7 @@ use world_helper::make_test_world;
 
 #[test]
 fn test_agent_fetches_and_delivers_resources_for_job() {
+    engine_core::systems::job::system::events::init_job_event_logger();
     let mut world = make_test_world();
     world.current_mode = "colony".to_string();
 

@@ -12,6 +12,7 @@ use serde_json::json;
 /// Tests that a job with an unfinished dependency remains pending.
 #[test]
 fn test_job_with_unfinished_dependency_remains_pending() {
+    engine_core::systems::job::system::events::init_job_event_logger();
     let mut world = world_helper::make_test_world();
     let dep_eid = world.spawn_entity();
     let main_eid = world.spawn_entity();
@@ -62,6 +63,7 @@ fn test_job_with_unfinished_dependency_remains_pending() {
 /// Tests that a job with a completed dependency can start.
 #[test]
 fn test_job_with_completed_dependency_can_start() {
+    engine_core::systems::job::system::events::init_job_event_logger();
     let mut world = world_helper::make_test_world();
     let dep_eid = world.spawn_entity();
     let main_eid = world.spawn_entity();
@@ -101,6 +103,7 @@ fn test_job_with_completed_dependency_can_start() {
 /// Tests that a job with AND dependencies can start when all are complete.
 #[test]
 fn test_job_with_and_dependencies() {
+    engine_core::systems::job::system::events::init_job_event_logger();
     let mut world = world_helper::make_test_world();
     let dep1 = world.spawn_entity();
     let dep2 = world.spawn_entity();
@@ -143,6 +146,7 @@ fn test_job_with_and_dependencies() {
 /// Tests that a job with OR dependencies can start when any is complete.
 #[test]
 fn test_job_with_or_dependencies() {
+    engine_core::systems::job::system::events::init_job_event_logger();
     let mut world = world_helper::make_test_world();
     let dep1 = world.spawn_entity();
     let dep2 = world.spawn_entity();
@@ -186,6 +190,7 @@ fn test_job_with_or_dependencies() {
 /// and does start after the dependency is despawned.
 #[test]
 fn test_job_with_not_dependency() {
+    engine_core::systems::job::system::events::init_job_event_logger();
     let mut world = world_helper::make_test_world();
     let dep1 = world.spawn_entity();
     let main = world.spawn_entity();
@@ -227,6 +232,7 @@ fn test_job_with_not_dependency() {
 /// Tests that a job with a world state dependency remains pending until the resource is available.
 #[test]
 fn test_job_with_world_state_dependency() {
+    engine_core::systems::job::system::events::init_job_event_logger();
     let mut world = world_helper::make_test_world();
 
     let stockpile = world.spawn_entity();
@@ -267,6 +273,7 @@ fn test_job_with_world_state_dependency() {
 /// Tests that a job with an entity state dependency remains pending until the condition is met.
 #[test]
 fn test_job_with_entity_state_dependency() {
+    engine_core::systems::job::system::events::init_job_event_logger();
     let mut world = world_helper::make_test_world();
     let entity = world.spawn_entity();
     let main = world.spawn_entity();

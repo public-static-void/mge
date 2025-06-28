@@ -7,6 +7,7 @@ use serde_json::json;
 
 #[test]
 fn test_ai_job_assignment_priority_and_state() {
+    engine_core::systems::job::system::events::init_job_event_logger();
     let mut world = world_helper::make_test_world();
 
     // Agent 1: idle, high dig skill
@@ -136,6 +137,7 @@ fn test_ai_job_assignment_priority_and_state() {
 
 #[test]
 fn test_agent_job_queue_and_resource_aware_assignment() {
+    engine_core::systems::job::system::events::init_job_event_logger();
     let mut world = world_helper::make_test_world();
 
     let stockpile = world.spawn_entity();
@@ -226,6 +228,7 @@ fn test_agent_job_queue_and_resource_aware_assignment() {
 
 #[test]
 fn test_job_preemption_by_higher_priority() {
+    engine_core::systems::job::system::events::init_job_event_logger();
     let mut world = world_helper::make_test_world();
 
     // Agent: idle, can do both jobs
@@ -308,6 +311,7 @@ fn test_job_preemption_by_higher_priority() {
 
 #[test]
 fn test_agent_abandons_job_if_blocked() {
+    engine_core::systems::job::system::events::init_job_event_logger();
     let mut world = world_helper::make_test_world();
 
     // Agent: working on job 100
@@ -368,6 +372,7 @@ fn test_agent_abandons_job_if_blocked() {
 
 #[test]
 fn test_dynamic_priority_update_affects_assignment() {
+    engine_core::systems::job::system::events::init_job_event_logger();
     let mut world = world_helper::make_test_world();
 
     // Agent: idle, can do both jobs

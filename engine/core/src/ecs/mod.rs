@@ -9,6 +9,7 @@ pub mod registry;
 pub mod schema;
 pub use schema::ComponentSchema;
 pub mod event_bus_registry;
+pub mod event_logger;
 pub mod system;
 pub mod world;
 pub use components::{Health, Position};

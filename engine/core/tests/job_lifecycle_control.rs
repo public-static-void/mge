@@ -9,6 +9,7 @@ use world_helper::make_test_world;
 /// Test pausing and resuming a job: progress halts while paused and continues after resume.
 #[test]
 fn test_job_can_be_paused_and_resumed() {
+    engine_core::systems::job::system::events::init_job_event_logger();
     let mut world = make_test_world();
     world.current_mode = "colony".to_string();
 
@@ -114,6 +115,7 @@ fn test_job_can_be_paused_and_resumed() {
 /// Test that an interrupted job can be resumed by another agent.
 #[test]
 fn test_job_is_interrupted_and_resumed_by_another_agent() {
+    engine_core::systems::job::system::events::init_job_event_logger();
     let mut world = make_test_world();
     world.current_mode = "colony".to_string();
 
@@ -249,6 +251,7 @@ fn test_job_is_interrupted_and_resumed_by_another_agent() {
 /// Test that world conditions affect job progress (e.g., "hazard" slows progress).
 #[test]
 fn test_job_progression_affected_by_world_conditions() {
+    engine_core::systems::job::system::events::init_job_event_logger();
     let mut world = make_test_world();
     world.current_mode = "colony".to_string();
 

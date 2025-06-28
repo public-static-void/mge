@@ -1,5 +1,6 @@
 pub mod api;
 mod event_bus;
+mod job_logger;
 mod plugin_init;
 pub mod python_api;
 mod system_bridge;
@@ -25,5 +26,6 @@ fn engine_py(_py: Python, m: &Bound<'_, pyo3::types::PyModule>) -> PyResult<()> 
     m.add_function(wrap_pyfunction!(register_worldgen_validator, m)?)?;
     m.add_function(wrap_pyfunction!(register_worldgen_postprocessor, m)?)?;
     m.add_class::<UiApi>()?;
+    m.add_function(wrap_pyfunction!(job_logger::py_init_job_event_logger, m)?)?;
     Ok(())
 }
