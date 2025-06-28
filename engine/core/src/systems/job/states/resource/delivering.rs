@@ -3,8 +3,8 @@
 use crate::ecs::world::World;
 use crate::systems::job::movement_ops;
 use crate::systems::job::resource_ops;
-use crate::systems::job::state_utils;
 use crate::systems::job::states::helpers::*;
+use crate::systems::job::states::transitions;
 use serde_json::{Value as JsonValue, json};
 
 /// Handles the "delivering_resources" state: agent delivers carried resources to job site.
@@ -63,7 +63,7 @@ pub fn handle_delivering_resources_state(
                 let _ = world.set_component(assigned_to, "Agent", agent);
 
                 // Check if all requirements are met
-                if state_utils::are_requirements_met(
+                if transitions::are_requirements_met(
                     &requirements,
                     job["delivered_resources"].as_array().unwrap(),
                 ) {

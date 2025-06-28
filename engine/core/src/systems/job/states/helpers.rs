@@ -28,7 +28,7 @@ pub fn try_handle_cancellation(world: &mut World, job: &mut JsonValue) -> bool {
             .to_string();
         let job_id = job.get("id").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
         if let Some(obj) = job.as_object_mut() {
-            crate::systems::job::system::JobSystem::process_job_effects(
+            crate::systems::job::system::effects::process_job_effects(
                 world, job_id, &job_type, obj, true, // on_cancel = true triggers rollback
             );
         }
@@ -96,6 +96,6 @@ pub fn handle_pathfinding_failure(world: &mut World, _eid: u32, mut job: JsonVal
         }
         job.as_object_mut().unwrap().remove("assigned_to");
     }
-    crate::systems::job::system::JobSystem::emit_job_event(world, "job_blocked", &job, None);
+    crate::systems::job::system::events::emit_job_event(world, "job_blocked", &job, None);
     job
 }
