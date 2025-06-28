@@ -9,6 +9,11 @@
       "type": "string",
       "description": "Job category, e.g. hauling, construction, crafting"
     },
+    "created_at": {
+      "type": "integer",
+      "description": "Game tick or timestamp when this job was created. Used for FIFO/LIFO scheduling.",
+      "default": 0
+    },
     "target": { "type": ["integer", "null"] },
     "state": {
       "type": "string",
