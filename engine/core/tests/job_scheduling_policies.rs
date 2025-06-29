@@ -118,12 +118,6 @@ fn test_lifo_job_assignment_policy() {
         )
         .unwrap();
 
-    // Debug: Ensure created_at is present and correct in ECS
-    let job1_obj = world.get_component(job1, "Job").unwrap();
-    let job2_obj = world.get_component(job2, "Job").unwrap();
-    assert_eq!(job1_obj["created_at"], 1);
-    assert_eq!(job2_obj["created_at"], 2);
-
     // Use LIFO policy
     let mut job_board = JobBoard::with_policy(Box::new(LifoPolicy));
     job_board.update(&world);

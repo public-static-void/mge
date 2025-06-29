@@ -27,5 +27,8 @@ pub use focus_grid::FocusGrid;
 
 pub mod dynamic;
 
+pub mod event_log;
+pub use event_log::EventLogWidget;
+
 /// A node in the UI tree: any widget as a boxed trait object.
 pub type UiNode = Box<dyn UiWidget + Send>;
