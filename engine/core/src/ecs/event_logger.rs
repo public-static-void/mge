@@ -77,6 +77,38 @@ impl<E: Clone + Serialize + for<'de> Deserialize<'de> + Send + Sync + 'static> E
             f(event);
         }
     }
+
+    /// Query events with a predicate.
+    pub fn query_events<F>(&self, predicate: F) -> Vec<LoggedEvent<E>>
+    where
+        F: Fn(&LoggedEvent<E>) -> bool,
+    {
+        self.events
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|e| predicate(e))
+            .cloned()
+            .collect()
+    }
+
+    /// Get all events of a specific type.
+    pub fn get_events_by_type(&self, event_type: &str) -> Vec<LoggedEvent<E>> {
+        self.query_events(|e| e.event_type == event_type)
+    }
+
+    /// Get all events since a specific timestamp.
+    pub fn get_events_since(&self, timestamp: u128) -> Vec<LoggedEvent<E>> {
+        self.query_events(|e| e.timestamp >= timestamp)
+    }
+
+    /// Get all events matching a payload predicate.
+    pub fn get_events_where<F>(&self, predicate: F) -> Vec<LoggedEvent<E>>
+    where
+        F: Fn(&E) -> bool,
+    {
+        self.query_events(|e| predicate(&e.payload))
+    }
 }
 
 impl<E: Clone + Serialize + for<'de> Deserialize<'de> + Send + Sync + 'static> Default
