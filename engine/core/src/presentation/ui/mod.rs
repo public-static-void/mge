@@ -19,14 +19,13 @@ pub use widget::Button;
 pub use widget::Checkbox;
 pub use widget::ContextMenu;
 pub use widget::Dropdown;
+pub use widget::EventLogWidget;
 pub use widget::Label;
 pub use widget::TextInput;
 pub use widget::UiNode;
 pub use widget::UiWidget;
 pub use widget::WidgetId;
 
-/// Registers all UI widgets with the factory.
-/// Call this once at engine startup before loading any UI from data or script.
 pub fn register_all_widgets() {
     widget::button::register_button_widget();
     widget::label::register_label_widget();
