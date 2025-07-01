@@ -18,6 +18,7 @@ local function test_dynamic_job_type_registration()
 	assign_job(eid, "LuaJob", { category = "testing", state = "pending" })
 	for i = 1, 4 do
 		run_native_system("JobSystem")
+		tick()
 	end
 	local job = get_component(eid, "Job")
 	assert.equals(job.state, "complete", "Job should be complete")

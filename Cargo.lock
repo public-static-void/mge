@@ -700,6 +700,7 @@ dependencies = [
  "gag",
  "lazy_static",
  "mlua",
+ "once_cell",
  "regex",
  "serde_json",
  "tempfile",
