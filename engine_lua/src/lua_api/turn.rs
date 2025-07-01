@@ -9,8 +9,11 @@ use std::rc::Rc;
 pub fn register_turn_api(lua: &Lua, globals: &Table, world: Rc<RefCell<World>>) -> LuaResult<()> {
     // tick()
     let world_tick = world.clone();
+    let lua_ref = lua.clone();
+    let world_ref = world.clone();
     let tick = lua.create_function_mut(move |_, ()| {
         World::tick(Rc::clone(&world_tick));
+        crate::system_bridge::process_lua_job_calls(&lua_ref, &world_ref);
         Ok(())
     })?;
     globals.set("tick", tick)?;

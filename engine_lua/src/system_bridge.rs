@@ -1,22 +1,39 @@
 use crate::helpers::{json_to_lua_table, lua_error_from_any, lua_error_msg, lua_table_to_json};
 use engine_core::ecs::world::World;
-use mlua::{Function, Lua, RegistryKey, Result as LuaResult, Table};
+use mlua::{Function, Lua, LuaSerdeExt, RegistryKey, Result as LuaResult, Table};
+use once_cell::sync::Lazy;
 use serde_json::Value as JsonValue;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
+// Thread-local registry of Lua job handlers keyed by job type.
 thread_local! {
     static LUA_JOB_HANDLERS: RefCell<HashMap<String, RegistryKey>> = RefCell::new(HashMap::new());
 }
 
+/// Struct representing a queued Lua job handler call.
+#[derive(Clone)]
+pub struct LuaJobCall {
+    pub job_type: String,
+    pub entity: u32,
+    pub assigned_to: u32,
+    pub job_id: u32,
+    pub job: serde_json::Value,
+}
+
+/// Global queue for pending Lua job handler calls.
+pub static LUA_JOB_CALL_QUEUE: Lazy<Arc<Mutex<Vec<LuaJobCall>>>> =
+    Lazy::new(|| Arc::new(Mutex::new(Vec::new())));
+
+/// Registers all system functions and Lua bridge APIs.
 pub fn register_system_functions(
     lua: Rc<Lua>,
     globals: &Table,
     world: Rc<RefCell<World>>,
     lua_systems: Rc<RefCell<HashMap<String, RegistryKey>>>,
 ) -> LuaResult<()> {
-    // register_system
     let lua_systems_outer = Rc::clone(&lua_systems);
     let world_rc = world.clone();
     let lua_outer = lua.clone();
@@ -59,7 +76,6 @@ pub fn register_system_functions(
     )?;
     globals.set("register_system", register_system)?;
 
-    // run_system
     let lua_systems_ref = Rc::clone(&lua_systems);
     let run_system = lua.create_function_mut(move |lua, name: String| {
         let systems = lua_systems_ref.borrow();
@@ -73,7 +89,6 @@ pub fn register_system_functions(
     })?;
     globals.set("run_system", run_system)?;
 
-    // run_native_system
     let world_native_run = world.clone();
     let lua_for_native = lua.clone();
     let run_native_system = lua.create_function_mut(move |_, name: String| {
@@ -84,7 +99,6 @@ pub fn register_system_functions(
     })?;
     globals.set("run_native_system", run_native_system)?;
 
-    // assign_job(entity, job_type, fields)
     let world_assign_job = world.clone();
     let assign_job = {
         lua.create_function_mut(
@@ -93,7 +107,7 @@ pub fn register_system_functions(
                 let mut job_val = serde_json::json!({
                     "id": entity,
                     "job_type": job_type,
-                    "status": "pending",
+                    "state": "pending",
                     "progress": 0.0
                 });
                 if let Some(tbl) = fields {
@@ -112,7 +126,6 @@ pub fn register_system_functions(
     }?;
     globals.set("assign_job", assign_job)?;
 
-    // poll_ecs_event
     let world_take_events = world.clone();
     let poll_ecs_event = lua.create_function_mut(move |lua, event_type: String| {
         let mut world = world_take_events.borrow_mut();
@@ -125,7 +138,6 @@ pub fn register_system_functions(
     })?;
     globals.set("poll_ecs_event", poll_ecs_event)?;
 
-    // get_job_types
     let world_for_job_types = world.clone();
     let get_job_types = lua.create_function(move |_, ()| {
         let world = world_for_job_types.borrow();
@@ -135,7 +147,6 @@ pub fn register_system_functions(
     })?;
     globals.set("get_job_types", get_job_types)?;
 
-    // register_job_type
     let world_for_jobs = world.clone();
     let lua_clone = lua.clone();
     let register_job_type =
@@ -146,6 +157,21 @@ pub fn register_system_functions(
             });
             let mut world = world_for_jobs.borrow_mut();
             world.job_types.register_lua(&name, name.clone());
+
+            let job_type_name = name.clone();
+            world.register_job_handler(&name, move |_world, assigned_to, job_id, job| {
+                let entity = job.get("id").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
+                let call = LuaJobCall {
+                    job_type: job_type_name.clone(),
+                    entity,
+                    assigned_to,
+                    job_id,
+                    job: job.clone(),
+                };
+                LUA_JOB_CALL_QUEUE.lock().unwrap().push(call);
+                job.clone()
+            });
+
             Ok(())
         })?;
     globals.set("register_job_type", register_job_type)?;
@@ -153,7 +179,34 @@ pub fn register_system_functions(
     Ok(())
 }
 
-/// Call a Lua job handler by job type name.
+/// Processes all queued Lua job handler calls.
+/// This must be called on the main thread, typically once per tick after ECS/job system runs.
+pub fn process_lua_job_calls(lua: &Lua, world: &Rc<RefCell<World>>) {
+    let mut queue = LUA_JOB_CALL_QUEUE.lock().unwrap();
+    while let Some(call) = queue.pop() {
+        LUA_JOB_HANDLERS.with(|handlers| {
+            if let Some(key) = handlers.borrow().get(&call.job_type) {
+                let func: Function = lua.registry_value(key).expect("Invalid Lua registry key");
+                let job_table = json_to_lua_table(lua, &call.job).unwrap();
+                let progress_json = call.job.get("progress").cloned().unwrap_or_default();
+                let progress_lua = lua.to_value(&progress_json).unwrap();
+                let result = func.call::<mlua::Value>((job_table, progress_lua)).unwrap();
+                let updated_job = match result {
+                    mlua::Value::Table(table) => {
+                        crate::helpers::lua_table_to_json(lua, &table, None).unwrap()
+                    }
+                    _ => panic!("Lua job handler must return a table"),
+                };
+                let mut world_ref = world.borrow_mut();
+                world_ref
+                    .set_component(call.entity, "Job", updated_job)
+                    .unwrap();
+            }
+        });
+    }
+}
+
+/// Calls a Lua job handler by job type name.
 /// Returns an error if the handler is not registered.
 pub fn call_lua_job_handler<A>(
     lua: &mlua::Lua,
