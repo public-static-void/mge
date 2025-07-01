@@ -71,19 +71,19 @@ impl System for EconomicSystem {
         let entities = world.get_entities_with_component("ProductionJob");
         for eid in entities {
             let mut job = world.get_component(eid, "ProductionJob").unwrap().clone();
-            let status = job
-                .get("status")
+            let state = job
+                .get("state")
                 .and_then(|v| v.as_str())
                 .unwrap_or("pending");
 
             // Only skip if complete; process pending and in_progress
-            if status == "complete" {
+            if state == "complete" {
                 continue;
             }
 
             // Allow pending jobs to start
-            if status == "pending" {
-                job["status"] = json!("in_progress");
+            if state == "pending" {
+                job["state"] = json!("in_progress");
             }
 
             let recipe_name = job.get("recipe").and_then(|v| v.as_str()).unwrap();
@@ -105,12 +105,12 @@ impl System for EconomicSystem {
 
                 if progress >= recipe.duration {
                     Self::produce_outputs(stock_map, &recipe.outputs);
-                    job["status"] = json!("complete");
+                    job["state"] = json!("complete");
                 } else {
-                    job["status"] = json!("in_progress");
+                    job["state"] = json!("in_progress");
                 }
             } else {
-                job["status"] = json!("waiting_for_inputs");
+                job["state"] = json!("waiting_for_inputs");
             }
 
             world.set_component(eid, "ProductionJob", job).unwrap();
