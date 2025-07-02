@@ -1,5 +1,4 @@
 import pytest
-import engine_py
 
 def test_register_and_invoke_map_postprocessor(make_world):
     world = make_world()

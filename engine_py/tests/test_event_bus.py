@@ -1,7 +1,5 @@
 import json
 
-import pytest
-
 
 def test_event_bus_send_and_poll(make_world):
     world = make_world()

@@ -1,5 +1,6 @@
 pub mod api;
 mod event_bus;
+pub mod job_bridge;
 mod job_logger;
 mod plugin_init;
 pub mod python_api;

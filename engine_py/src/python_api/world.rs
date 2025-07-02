@@ -1,3 +1,4 @@
+use crate::job_bridge::{PY_JOB_HANDLER_REGISTRY, py_job_handler};
 use crate::python_api::body::BodyApi;
 use crate::python_api::component::ComponentApi;
 use crate::python_api::death_decay::DeathDecayApi;
@@ -15,6 +16,7 @@ use engine_core::ecs::world::World;
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict};
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::rc::Rc;
 
 #[pyclass(unsendable, subclass)]
@@ -23,6 +25,7 @@ pub struct PyWorld {
     pub systems: Rc<SystemBridge>,
     pub map_postprocessors: RefCell<Vec<Py<PyAny>>>,
     pub map_validators: RefCell<Vec<Py<PyAny>>>,
+    pub job_handlers: RefCell<HashMap<String, Py<PyAny>>>,
 }
 
 #[pymethods]
@@ -71,6 +74,7 @@ impl PyWorld {
             }),
             map_postprocessors: RefCell::new(Vec::new()),
             map_validators: RefCell::new(Vec::new()),
+            job_handlers: RefCell::new(HashMap::new()),
         })
     }
 
@@ -292,7 +296,7 @@ impl PyWorld {
         let mut job_val = serde_json::json!({
             "id": entity_id,
             "job_type": job_type,
-            "status": "pending",
+            "state": "pending",
             "progress": 0.0
         });
         if let Some(kwargs) = kwargs {
@@ -308,17 +312,29 @@ impl PyWorld {
             .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
     }
 
-    fn register_job_type(&self, _py: Python, name: String, _callback: Py<PyAny>) {
-        fn py_job_handler(
-            _world: &mut engine_core::World,
-            _agent_id: u32,
-            _job_id: u32,
-            _data: &serde_json::Value,
-        ) -> serde_json::Value {
-            serde_json::json!(null)
-        }
+    fn register_job_type(&self, py: Python, name: String, callback: Py<PyAny>) {
+        // Register the Python callback in the static registry for FFI access
+        PY_JOB_HANDLER_REGISTRY
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .insert(name.clone(), callback.clone_ref(py));
+
+        // Register the handler in the ECS job handler registry so it is actually called
+        let registry = self.inner.borrow().job_handler_registry.clone();
+        registry.lock().unwrap().register_handler(
+            &name,
+            move |world, agent_id, job_id, job_data| {
+                py_job_handler(world, agent_id, job_id, job_data)
+            },
+        );
+
+        // Optionally, also register in job_types for introspection
         let mut world = self.inner.borrow_mut();
-        world.job_types.register_native(&name, py_job_handler);
+        world
+            .job_types
+            .register_native(&name, |_world, _agent_id, _job_id, job_data| {
+                job_data.clone()
+            });
     }
 
     fn get_stockpile_resources(&self, entity_id: u32) -> PyResult<Option<PyObject>> {
