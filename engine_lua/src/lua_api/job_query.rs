@@ -1,0 +1,91 @@
+//! Job Query API: list, get, and filter jobs from Lua.
+
+use crate::helpers::json_to_lua_table;
+use engine_core::ecs::world::World;
+use mlua::{Lua, Result as LuaResult, Table, Value};
+use std::cell::RefCell;
+use std::rc::Rc;
+
+pub fn register_job_query_api(
+    lua: &Lua,
+    globals: &Table,
+    world: Rc<RefCell<World>>,
+) -> LuaResult<()> {
+    // list_jobs()
+    let world_list = world.clone();
+    let list_jobs = lua.create_function(move |lua, ()| {
+        let world = world_list.borrow();
+        let mut jobs = Vec::new();
+        if let Some(job_map) = world.components.get("Job") {
+            for (eid, comp) in job_map.iter() {
+                let mut job = comp.clone();
+                job["id"] = serde_json::json!(eid);
+                jobs.push(json_to_lua_table(lua, &job)?);
+            }
+        }
+        lua.create_sequence_from(jobs)
+    })?;
+    globals.set("list_jobs", list_jobs)?;
+
+    // get_job(job_id)
+    let world_get = world.clone();
+    let get_job = lua.create_function(move |lua, job_id: u32| {
+        let world = world_get.borrow();
+        if let Some(job) = world.get_component(job_id, "Job") {
+            let mut job = job.clone();
+            job["id"] = serde_json::json!(job_id);
+            json_to_lua_table(lua, &job)
+        } else {
+            Ok(Value::Nil)
+        }
+    })?;
+    globals.set("get_job", get_job)?;
+
+    // find_jobs({state=..., job_type=..., assigned_to=..., category=...})
+    let world_find = world.clone();
+    let find_jobs = lua.create_function(move |lua, filter: Option<Table>| {
+        let world = world_find.borrow();
+        let (state, job_type, assigned_to, category) = if let Some(filter) = filter {
+            (
+                filter.get::<Option<String>>("state")?,
+                filter.get::<Option<String>>("job_type")?,
+                filter.get::<Option<u32>>("assigned_to")?,
+                filter.get::<Option<String>>("category")?,
+            )
+        } else {
+            (None, None, None, None)
+        };
+        let mut jobs = Vec::new();
+        if let Some(job_map) = world.components.get("Job") {
+            for (eid, comp) in job_map.iter() {
+                let mut job = comp.clone();
+                if let Some(ref s) = state {
+                    if job.get("state").and_then(|v| v.as_str()) != Some(s) {
+                        continue;
+                    }
+                }
+                if let Some(ref jt) = job_type {
+                    if job.get("job_type").and_then(|v| v.as_str()) != Some(jt) {
+                        continue;
+                    }
+                }
+                if let Some(aid) = assigned_to {
+                    if job.get("assigned_to").and_then(|v| v.as_u64()) != Some(aid as u64) {
+                        continue;
+                    }
+                }
+                if let Some(ref cat) = category {
+                    if job.get("category").and_then(|v| v.as_str()) != Some(cat) {
+                        continue;
+                    }
+                }
+                job["id"] = serde_json::json!(eid);
+                jobs.push(json_to_lua_table(lua, &job)?);
+            }
+        }
+        lua.create_sequence_from(jobs)
+    })?;
+    globals.set("find_jobs", find_jobs)?;
+
+    Ok(())
+}

@@ -6,6 +6,7 @@ use crate::python_api::economic::EconomicApi;
 use crate::python_api::entity::EntityApi;
 use crate::python_api::equipment::EquipmentApi;
 use crate::python_api::inventory::InventoryApi;
+use crate::python_api::job_query::JobQueryApi;
 use crate::python_api::mode::ModeApi;
 use crate::python_api::region::RegionApi;
 use crate::python_api::save_load::SaveLoadApi;
@@ -335,6 +336,26 @@ impl PyWorld {
             .register_native(&name, |_world, _agent_id, _job_id, job_data| {
                 job_data.clone()
             });
+    }
+
+    fn list_jobs(&self, py: pyo3::Python) -> pyo3::PyResult<pyo3::PyObject> {
+        JobQueryApi::list_jobs(self, py)
+    }
+
+    fn get_job(&self, py: pyo3::Python, job_id: u32) -> pyo3::PyResult<pyo3::PyObject> {
+        JobQueryApi::get_job(self, py, job_id)
+    }
+
+    #[pyo3(signature = (state=None, job_type=None, assigned_to=None, category=None))]
+    fn find_jobs(
+        &self,
+        py: Python<'_>,
+        state: Option<String>,
+        job_type: Option<String>,
+        assigned_to: Option<u32>,
+        category: Option<String>,
+    ) -> PyResult<PyObject> {
+        JobQueryApi::find_jobs(self, py, state, job_type, assigned_to, category)
     }
 
     fn get_stockpile_resources(&self, entity_id: u32) -> PyResult<Option<PyObject>> {

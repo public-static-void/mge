@@ -2,6 +2,7 @@ use super::event_bus::register_event_bus_and_globals;
 use super::input::{InputProvider, StdinInput};
 use super::lua_api::register_all_api_functions;
 use super::system_bridge::register_system_functions;
+use crate::lua_api::job_query::register_job_query_api;
 use crate::lua_api::world::register_world_api;
 use crate::lua_api::worldgen::register_worldgen_api;
 use engine_core::ecs::world::World;
@@ -139,6 +140,8 @@ impl ScriptEngine {
             Arc::clone(&self.input_provider),
             Rc::clone(&self.worldgen_registry),
         )?;
+
+        register_job_query_api(&self.lua, &globals, world.clone())?;
 
         Ok(())
     }
