@@ -110,7 +110,7 @@ pub fn register_job_query_api(
         let mut world = world_advance.borrow_mut();
         let job = world
             .get_component(job_id, "Job")
-            .ok_or_else(|| mlua::Error::external(format!("No job with id {}", job_id)))?
+            .ok_or_else(|| mlua::Error::external(format!("No job with id {job_id}")))?
             .clone();
         let new_job =
             engine_core::systems::job::system::process::process_job(&mut world, None, job_id, job);
