@@ -474,6 +474,25 @@ impl PyWorld {
         JobQueryApi::cancel_job(self, job_id)
     }
 
+    /// Advance the state machine of a single job by its job_id.
+    fn advance_job_state(&self, job_id: u32) -> PyResult<()> {
+        let mut world = self.inner.borrow_mut();
+        let job = match world.get_component(job_id, "Job") {
+            Some(job) => job.clone(),
+            None => {
+                return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                    "No job with id {job_id}"
+                )));
+            }
+        };
+        let new_job =
+            engine_core::systems::job::system::process::process_job(&mut world, None, job_id, job);
+        world.set_component(job_id, "Job", new_job).map_err(|e| {
+            pyo3::exceptions::PyValueError::new_err(format!("Failed to set job: {e}"))
+        })?;
+        Ok(())
+    }
+
     // ---- MAP/CAMERA/TOPOLOGY ----
 
     fn get_map_topology_type(&self) -> String {

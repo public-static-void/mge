@@ -104,5 +104,22 @@ pub fn register_job_query_api(
     })?;
     globals.set("find_jobs", find_jobs)?;
 
+    // advance_job_state(job_id)
+    let world_advance = world.clone();
+    let advance_job_state = lua.create_function(move |_, job_id: u32| {
+        let mut world = world_advance.borrow_mut();
+        let job = world
+            .get_component(job_id, "Job")
+            .ok_or_else(|| mlua::Error::external(format!("No job with id {}", job_id)))?
+            .clone();
+        let new_job =
+            engine_core::systems::job::system::process::process_job(&mut world, None, job_id, job);
+        world
+            .set_component(job_id, "Job", new_job)
+            .map_err(|e| mlua::Error::external(format!("Failed to set job: {e}")))?;
+        Ok(())
+    })?;
+    globals.set("advance_job_state", advance_job_state)?;
+
     Ok(())
 }
