@@ -2,8 +2,10 @@ use super::PyWorld;
 use pyo3::prelude::*;
 use serde_json::json;
 
+/// JobQueryApi provides job querying and mutation for scripting.
 pub trait JobQueryApi {
-    fn list_jobs(&self, py: Python<'_>) -> PyResult<PyObject>;
+    /// List jobs. If `include_terminal` is true, include jobs in terminal states ("complete", "failed", "cancelled").
+    fn list_jobs(&self, py: Python<'_>, include_terminal: Option<bool>) -> PyResult<PyObject>;
     fn get_job(&self, py: Python<'_>, job_id: u32) -> PyResult<PyObject>;
     fn find_jobs(
         &self,
@@ -19,16 +21,23 @@ pub trait JobQueryApi {
         job_id: u32,
         kwargs: Option<&Bound<'_, pyo3::types::PyDict>>,
     ) -> PyResult<()>;
+    fn cancel_job(&self, job_id: u32) -> PyResult<()>;
 }
 
 impl JobQueryApi for PyWorld {
-    fn list_jobs(&self, py: Python<'_>) -> PyResult<PyObject> {
+    fn list_jobs(&self, py: Python<'_>, include_terminal: Option<bool>) -> PyResult<PyObject> {
         let world = self.inner.borrow();
         let mut jobs = Vec::new();
         if let Some(job_map) = world.components.get("Job") {
             for (eid, comp) in job_map.iter() {
                 let mut job = comp.clone();
                 job["id"] = json!(eid);
+                let state = job.get("state").and_then(|v| v.as_str());
+                let is_terminal =
+                    matches!(state, Some("complete") | Some("failed") | Some("cancelled"));
+                if !include_terminal.unwrap_or(false) && is_terminal {
+                    continue;
+                }
                 jobs.push(job);
             }
         }
@@ -114,6 +123,18 @@ impl JobQueryApi for PyWorld {
                     }
                 }
             }
+            world
+                .set_component(job_id, "Job", job)
+                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
+        } else {
+            Err(pyo3::exceptions::PyKeyError::new_err("Job not found"))
+        }
+    }
+
+    fn cancel_job(&self, job_id: u32) -> PyResult<()> {
+        let mut world = self.inner.borrow_mut();
+        if let Some(mut job) = world.get_component(job_id, "Job").cloned() {
+            job["cancelled"] = serde_json::json!(true);
             world
                 .set_component(job_id, "Job", job)
                 .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))

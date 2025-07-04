@@ -20,6 +20,8 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
+/// The main Python-side wrapper for the ECS world.
+/// Exposes all core ECS, component, job, inventory, region, and system APIs.
 #[pyclass(unsendable, subclass)]
 pub struct PyWorld {
     pub inner: Rc<RefCell<World>>,
@@ -31,6 +33,7 @@ pub struct PyWorld {
 
 #[pymethods]
 impl PyWorld {
+    /// Create a new world, optionally loading schemas from a custom directory.
     #[new]
     #[pyo3(signature = (schema_dir=None))]
     fn new(schema_dir: Option<String>) -> PyResult<Self> {
@@ -80,32 +83,48 @@ impl PyWorld {
     }
 
     // ---- ENTITY ----
+
+    /// Spawn a new entity and return its ID.
     fn spawn_entity(&self) -> u32 {
         EntityApi::spawn_entity(self)
     }
+
+    /// Despawn (remove) an entity by ID.
     fn despawn_entity(&self, entity_id: u32) {
         EntityApi::despawn_entity(self, entity_id)
     }
+
+    /// Get a list of all entity IDs.
     fn get_entities(&self) -> PyResult<Vec<u32>> {
         EntityApi::get_entities(self)
     }
+
+    /// Count entities with a given type string.
     fn count_entities_with_type(&self, type_str: String) -> usize {
         EntityApi::count_entities_with_type(self, type_str)
     }
+
+    /// Check if an entity is alive.
     fn is_entity_alive(&self, entity_id: u32) -> bool {
         EntityApi::is_entity_alive(self, entity_id)
     }
+
+    /// Move an entity by delta x and y.
     fn move_entity(&self, entity_id: u32, dx: f32, dy: f32) {
         EntityApi::move_entity(self, entity_id, dx, dy)
     }
+
+    /// Apply damage to an entity.
     fn damage_entity(&self, entity_id: u32, amount: f32) {
         EntityApi::damage_entity(self, entity_id, amount)
     }
 
     // ---- COMPONENT ----
+
     fn set_component(&self, entity_id: u32, name: String, value: Bound<'_, PyAny>) -> PyResult<()> {
         ComponentApi::set_component(self, entity_id, name, value)
     }
+
     fn get_component(
         &self,
         py: Python<'_>,
@@ -114,32 +133,41 @@ impl PyWorld {
     ) -> PyResult<Option<PyObject>> {
         ComponentApi::get_component(self, py, entity_id, name)
     }
+
     fn remove_component(&self, entity_id: u32, name: String) -> PyResult<()> {
         ComponentApi::remove_component(self, entity_id, name)
     }
+
     fn get_entities_with_component(&self, name: String) -> PyResult<Vec<u32>> {
         ComponentApi::get_entities_with_component(self, name)
     }
+
     fn get_entities_with_components(&self, names: Vec<String>) -> Vec<u32> {
         ComponentApi::get_entities_with_components(self, names)
     }
+
     fn list_components(&self) -> Vec<String> {
         ComponentApi::list_components(self)
     }
+
     fn get_component_schema(&self, name: String) -> PyResult<PyObject> {
         ComponentApi::get_component_schema(self, name)
     }
 
     // ---- INVENTORY ----
+
     fn get_inventory(&self, py: Python<'_>, entity_id: u32) -> PyResult<Option<PyObject>> {
         InventoryApi::get_inventory(self, py, entity_id)
     }
+
     fn set_inventory(&self, entity_id: u32, value: Bound<'_, PyAny>) -> PyResult<()> {
         InventoryApi::set_inventory(self, entity_id, value)
     }
+
     fn add_item_to_inventory(&self, entity_id: u32, item_id: String) -> PyResult<()> {
         InventoryApi::add_item_to_inventory(self, entity_id, item_id)
     }
+
     fn remove_item_from_inventory(
         &self,
         py: Python<'_>,
@@ -150,29 +178,37 @@ impl PyWorld {
     }
 
     // ---- EQUIPMENT ----
+
     fn get_equipment(&self, py: Python<'_>, entity_id: u32) -> PyResult<PyObject> {
         EquipmentApi::get_equipment(self, py, entity_id)
     }
+
     fn equip_item(&self, entity_id: u32, item_id: String, slot: String) -> PyResult<()> {
         EquipmentApi::equip_item(self, entity_id, item_id, slot)
     }
+
     fn unequip_item(&self, entity_id: u32, slot: String) -> PyResult<()> {
         EquipmentApi::unequip_item(self, entity_id, slot)
     }
 
     // ---- BODY ----
+
     fn get_body(&self, py: Python<'_>, entity_id: u32) -> PyResult<Option<PyObject>> {
         BodyApi::get_body(self, py, entity_id)
     }
+
     fn set_body(&self, entity_id: u32, value: Bound<'_, PyAny>) -> PyResult<()> {
         BodyApi::set_body(self, entity_id, value)
     }
+
     fn add_body_part(&self, entity_id: u32, part: Bound<'_, PyAny>) -> PyResult<()> {
         BodyApi::add_body_part(self, entity_id, part)
     }
+
     fn remove_body_part(&self, entity_id: u32, part_name: String) -> PyResult<()> {
         BodyApi::remove_body_part(self, entity_id, part_name)
     }
+
     fn get_body_part(
         &self,
         py: Python<'_>,
@@ -183,52 +219,64 @@ impl PyWorld {
     }
 
     // ---- REGION ----
+
     fn get_entities_in_region(&self, region_id: String) -> Vec<u32> {
         RegionApi::get_entities_in_region(self, region_id)
     }
+
     fn get_entities_in_region_kind(&self, kind: String) -> Vec<u32> {
         RegionApi::get_entities_in_region_kind(self, kind)
     }
+
     fn get_cells_in_region(&self, py: Python, region_id: String) -> PyResult<PyObject> {
         RegionApi::get_cells_in_region(self, py, region_id)
     }
+
     fn get_cells_in_region_kind(&self, py: Python, kind: String) -> PyResult<PyObject> {
         RegionApi::get_cells_in_region_kind(self, py, kind)
     }
 
     // ---- MISC ----
+
     fn tick(&self) {
         TurnApi::tick(self)
     }
+
     fn get_turn(&self) -> u32 {
         TurnApi::get_turn(self)
     }
+
     fn set_mode(&self, mode: String) {
         ModeApi::set_mode(self, mode)
     }
+
     fn get_mode(&self) -> String {
         ModeApi::get_mode(self)
     }
+
     fn get_available_modes(&self) -> Vec<String> {
         ModeApi::get_available_modes(self)
     }
+
     fn process_deaths(&self) {
         DeathDecayApi::process_deaths(self)
     }
+
     fn process_decay(&self) {
         DeathDecayApi::process_decay(self)
     }
+
     fn modify_stockpile_resource(&self, entity_id: u32, kind: String, delta: f64) -> PyResult<()> {
         EconomicApi::modify_stockpile_resource(self, entity_id, kind, delta)
     }
+
     fn save_to_file(&self, path: String) -> PyResult<()> {
         SaveLoadApi::save_to_file(self, path)
     }
+
     fn load_from_file(&mut self, path: String) -> PyResult<()> {
         SaveLoadApi::load_from_file(self, path)
     }
-
-    // ---- ADDITIONAL METHODS ----
 
     /// Add a cell to the map (utility for tests/scripts)
     fn add_cell(&self, x: i32, y: i32, z: i32) {
@@ -245,12 +293,15 @@ impl PyWorld {
     }
 
     // ---- SYSTEM REGISTRATION/BRIDGE ----
+
     fn register_system(&self, py: Python, name: String, callback: Py<PyAny>) -> PyResult<()> {
         self.systems.register_system(py, name, callback)
     }
+
     fn run_system(&self, py: Python, name: String) -> PyResult<()> {
         self.systems.run_system(py, name)
     }
+
     fn run_native_system(&self, name: String) -> PyResult<()> {
         let mut world = self.inner.borrow_mut();
         world
@@ -259,12 +310,15 @@ impl PyWorld {
     }
 
     // ---- EVENT BUS ----
+
     fn send_event(&self, event_type: String, payload: String) -> PyResult<()> {
         crate::event_bus::send_event(event_type, payload)
     }
+
     fn poll_event(&self, py: Python, event_type: String) -> PyResult<Vec<PyObject>> {
         crate::event_bus::poll_event(py, event_type)
     }
+
     fn poll_ecs_event(&self, py: Python, event_type: String) -> PyResult<Vec<PyObject>> {
         let mut world = self.inner.borrow_mut();
         let events = world.take_events(&event_type);
@@ -273,11 +327,13 @@ impl PyWorld {
             .map(|e| serde_pyobject::to_pyobject(py, &e).unwrap().into())
             .collect())
     }
+
     fn update_event_buses(&self) {
         crate::event_bus::update_event_buses()
     }
 
     // ---- USER INPUT ----
+
     fn get_user_input(&self, py: Python, prompt: String) -> PyResult<String> {
         let builtins = py.import("builtins")?;
         let input_func = builtins.getattr("input")?;
@@ -286,6 +342,7 @@ impl PyWorld {
     }
 
     // ---- JOB SYSTEM ----
+
     #[pyo3(signature = (entity_id, job_type, **kwargs))]
     fn assign_job(
         &self,
@@ -313,14 +370,13 @@ impl PyWorld {
             .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
     }
 
+    /// Register a new job type with a Python callback.
     fn register_job_type(&self, py: Python, name: String, callback: Py<PyAny>) {
-        // Register the Python callback in the static registry for FFI access
         PY_JOB_HANDLER_REGISTRY
             .lock()
             .unwrap_or_else(|e| e.into_inner())
             .insert(name.clone(), callback.clone_ref(py));
 
-        // Register the handler in the ECS job handler registry so it is actually called
         let registry = self.inner.borrow().job_handler_registry.clone();
         registry.lock().unwrap().register_handler(
             &name,
@@ -329,7 +385,6 @@ impl PyWorld {
             },
         );
 
-        // Optionally, also register in job_types for introspection
         let mut world = self.inner.borrow_mut();
         world
             .job_types
@@ -338,14 +393,25 @@ impl PyWorld {
             });
     }
 
-    fn list_jobs(&self, py: pyo3::Python) -> pyo3::PyResult<pyo3::PyObject> {
-        JobQueryApi::list_jobs(self, py)
+    /// List jobs in the world.
+    ///
+    /// By default, only active jobs are returned (not in "complete", "failed", or "cancelled" state).
+    /// Pass `include_terminal=True` to also include terminal jobs for introspection/analytics.
+    #[pyo3(signature = (include_terminal = false))]
+    fn list_jobs(
+        &self,
+        py: pyo3::Python,
+        include_terminal: bool,
+    ) -> pyo3::PyResult<pyo3::PyObject> {
+        JobQueryApi::list_jobs(self, py, Some(include_terminal))
     }
 
+    /// Get a job by ID.
     fn get_job(&self, py: pyo3::Python, job_id: u32) -> pyo3::PyResult<pyo3::PyObject> {
         JobQueryApi::get_job(self, py, job_id)
     }
 
+    /// Find jobs with optional filters.
     #[pyo3(signature = (state=None, job_type=None, assigned_to=None, category=None))]
     fn find_jobs(
         &self,
@@ -404,7 +470,12 @@ impl PyWorld {
         JobQueryApi::update_job(self, job_id, kwargs)
     }
 
+    fn cancel_job(&self, job_id: u32) -> PyResult<()> {
+        JobQueryApi::cancel_job(self, job_id)
+    }
+
     // ---- MAP/CAMERA/TOPOLOGY ----
+
     fn get_map_topology_type(&self) -> String {
         let world = self.inner.borrow();
         world
@@ -503,7 +574,6 @@ impl PyWorld {
     fn apply_generated_map<'py>(slf: Bound<'py, Self>, map: Bound<'py, PyAny>) -> PyResult<()> {
         let map_json: serde_json::Value = pythonize::depythonize(&map)?;
 
-        // Run all validators first, fail fast on error
         {
             let slf_borrow = slf.borrow();
             let validators = slf_borrow.map_validators.borrow();
@@ -519,7 +589,6 @@ impl PyWorld {
             }
         }
 
-        // Apply map
         {
             let slf_borrow = slf.borrow();
             let mut world = slf_borrow.inner.borrow_mut();
@@ -528,7 +597,6 @@ impl PyWorld {
                 .map_err(pyo3::exceptions::PyValueError::new_err)?;
         }
 
-        // Run postprocessors
         {
             let slf_borrow = slf.borrow();
             let postprocessors = slf_borrow.map_postprocessors.borrow();
