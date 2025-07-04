@@ -13,6 +13,12 @@ pub trait JobQueryApi {
         assigned_to: Option<u32>,
         category: Option<String>,
     ) -> PyResult<PyObject>;
+    fn set_job_field(&self, job_id: u32, field: &str, value: &Bound<'_, PyAny>) -> PyResult<()>;
+    fn update_job(
+        &self,
+        job_id: u32,
+        kwargs: Option<&Bound<'_, pyo3::types::PyDict>>,
+    ) -> PyResult<()>;
 }
 
 impl JobQueryApi for PyWorld {
@@ -78,5 +84,41 @@ impl JobQueryApi for PyWorld {
             }
         }
         Ok(serde_pyobject::to_pyobject(py, &jobs)?.into())
+    }
+
+    fn set_job_field(&self, job_id: u32, field: &str, value: &Bound<'_, PyAny>) -> PyResult<()> {
+        let mut world = self.inner.borrow_mut();
+        if let Some(mut job) = world.get_component(job_id, "Job").cloned() {
+            let val: serde_json::Value = pythonize::depythonize(value)?;
+            job[field] = val;
+            world
+                .set_component(job_id, "Job", job)
+                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
+        } else {
+            Err(pyo3::exceptions::PyKeyError::new_err("Job not found"))
+        }
+    }
+
+    fn update_job(
+        &self,
+        job_id: u32,
+        kwargs: Option<&Bound<'_, pyo3::types::PyDict>>,
+    ) -> PyResult<()> {
+        let mut world = self.inner.borrow_mut();
+        if let Some(mut job) = world.get_component(job_id, "Job").cloned() {
+            if let Some(kwargs) = kwargs {
+                let extra: serde_json::Value = pythonize::depythonize(kwargs)?;
+                if let Some(obj) = extra.as_object() {
+                    for (k, v) in obj {
+                        job[k] = v.clone();
+                    }
+                }
+            }
+            world
+                .set_component(job_id, "Job", job)
+                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
+        } else {
+            Err(pyo3::exceptions::PyKeyError::new_err("Job not found"))
+        }
     }
 }
