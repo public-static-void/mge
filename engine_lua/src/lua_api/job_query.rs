@@ -6,20 +6,37 @@ use mlua::{Lua, Result as LuaResult, Table, Value};
 use std::cell::RefCell;
 use std::rc::Rc;
 
+/// Registers job query functions in Lua:
+///   - list_jobs([opts]): returns only active jobs by default;
+///     pass {include_terminal=true} to include completed/cancelled/failed jobs.
+///   - get_job(job_id): returns job by id or nil.
+///   - find_jobs({filters}): advanced query.
 pub fn register_job_query_api(
     lua: &Lua,
     globals: &Table,
     world: Rc<RefCell<World>>,
 ) -> LuaResult<()> {
-    // list_jobs()
+    // list_jobs([opts])
     let world_list = world.clone();
-    let list_jobs = lua.create_function(move |lua, ()| {
+    let list_jobs = lua.create_function(move |lua, opts: Option<Table>| {
+        let include_terminal = opts
+            .as_ref()
+            .and_then(|t| t.get::<Option<bool>>("include_terminal").ok())
+            .flatten()
+            .unwrap_or(false);
+
         let world = world_list.borrow();
         let mut jobs = Vec::new();
         if let Some(job_map) = world.components.get("Job") {
             for (eid, comp) in job_map.iter() {
                 let mut job = comp.clone();
                 job["id"] = serde_json::json!(eid);
+                let state = job.get("state").and_then(|v| v.as_str());
+                let is_terminal =
+                    matches!(state, Some("complete") | Some("failed") | Some("cancelled"));
+                if !include_terminal && is_terminal {
+                    continue;
+                }
                 jobs.push(json_to_lua_table(lua, &job)?);
             }
         }
