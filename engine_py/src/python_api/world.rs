@@ -391,6 +391,19 @@ impl PyWorld {
             .collect())
     }
 
+    fn set_job_field(&self, job_id: u32, field: String, value: Bound<'_, PyAny>) -> PyResult<()> {
+        JobQueryApi::set_job_field(self, job_id, &field, &value)
+    }
+
+    #[pyo3(signature = (job_id, **kwargs))]
+    fn update_job(
+        &self,
+        job_id: u32,
+        kwargs: Option<&Bound<'_, pyo3::types::PyDict>>,
+    ) -> PyResult<()> {
+        JobQueryApi::update_job(self, job_id, kwargs)
+    }
+
     // ---- MAP/CAMERA/TOPOLOGY ----
     fn get_map_topology_type(&self) -> String {
         let world = self.inner.borrow();

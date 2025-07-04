@@ -9,6 +9,7 @@ pub mod entity;
 pub mod equipment;
 pub mod input;
 pub mod inventory;
+pub mod job_mutation;
 pub mod job_query;
 pub mod map;
 pub mod mode;
