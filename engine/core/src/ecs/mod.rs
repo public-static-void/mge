@@ -8,6 +8,7 @@ pub mod event;
 pub mod registry;
 pub mod schema;
 pub use schema::ComponentSchema;
+pub mod assets;
 pub mod event_bus_registry;
 pub mod event_logger;
 pub mod system;
