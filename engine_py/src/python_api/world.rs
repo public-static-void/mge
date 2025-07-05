@@ -493,6 +493,64 @@ impl PyWorld {
         Ok(())
     }
 
+    /// Get the children array (list of job objects) for a job by ID.
+    fn get_job_children(&self, py: pyo3::Python, job_id: u32) -> pyo3::PyResult<pyo3::PyObject> {
+        let world = self.inner.borrow();
+        let job = world.get_component(job_id, "Job").ok_or_else(|| {
+            pyo3::exceptions::PyKeyError::new_err(format!("No job with id {job_id}"))
+        })?;
+        let children = job
+            .get("children")
+            .cloned()
+            .unwrap_or_else(|| serde_json::json!([]));
+        Ok(serde_pyobject::to_pyobject(py, &children)?.into())
+    }
+
+    /// Set the children array (list of job objects) for a job by ID.
+    fn set_job_children(&self, job_id: u32, children: Bound<'_, PyAny>) -> PyResult<()> {
+        let children_json: serde_json::Value = serde_pyobject::from_pyobject(children)?;
+        let mut world = self.inner.borrow_mut();
+        let mut job = world.get_component(job_id, "Job").cloned().ok_or_else(|| {
+            pyo3::exceptions::PyKeyError::new_err(format!("No job with id {job_id}"))
+        })?;
+        job["children"] = children_json;
+        world.set_component(job_id, "Job", job).map_err(|e| {
+            pyo3::exceptions::PyValueError::new_err(format!("Failed to set job: {e}"))
+        })?;
+        Ok(())
+    }
+
+    /// Get the dependencies field for a job by ID.
+    fn get_job_dependencies(
+        &self,
+        py: pyo3::Python,
+        job_id: u32,
+    ) -> pyo3::PyResult<pyo3::PyObject> {
+        let world = self.inner.borrow();
+        let job = world.get_component(job_id, "Job").ok_or_else(|| {
+            pyo3::exceptions::PyKeyError::new_err(format!("No job with id {job_id}"))
+        })?;
+        let deps = job
+            .get("dependencies")
+            .cloned()
+            .unwrap_or(serde_json::Value::Null);
+        Ok(serde_pyobject::to_pyobject(py, &deps)?.into())
+    }
+
+    /// Set the dependencies field for a job by ID.
+    fn set_job_dependencies(&self, job_id: u32, dependencies: Bound<'_, PyAny>) -> PyResult<()> {
+        let deps_json: serde_json::Value = serde_pyobject::from_pyobject(dependencies)?;
+        let mut world = self.inner.borrow_mut();
+        let mut job = world.get_component(job_id, "Job").cloned().ok_or_else(|| {
+            pyo3::exceptions::PyKeyError::new_err(format!("No job with id {job_id}"))
+        })?;
+        job["dependencies"] = deps_json;
+        world.set_component(job_id, "Job", job).map_err(|e| {
+            pyo3::exceptions::PyValueError::new_err(format!("Failed to set job: {e}"))
+        })?;
+        Ok(())
+    }
+
     // ---- MAP/CAMERA/TOPOLOGY ----
 
     fn get_map_topology_type(&self) -> String {
