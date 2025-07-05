@@ -78,4 +78,19 @@ function assert.table_equals(tbl1, tbl2, msg)
 	end
 end
 
+function assert.contains(expected, tbl, msg)
+	if type(tbl) ~= "table" then
+		error((msg or "") .. "\nassertion failed: value is not a table (got " .. type(tbl) .. ")", 2)
+	end
+	for _, v in pairs(tbl) do
+		if v == expected then
+			return true
+		end
+	end
+	error(
+		(msg or "") .. ("\nassertion failed: table does not contain expected value: %s"):format(tostring(expected)),
+		2
+	)
+end
+
 return assert

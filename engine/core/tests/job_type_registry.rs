@@ -1,3 +1,8 @@
+#[path = "helpers/job_type.rs"]
+mod job_type_helper;
+#[path = "helpers/world.rs"]
+mod world_helper;
+
 use engine_core::systems::job::JobTypeRegistry;
 use std::fs::File;
 use std::io::Write;
@@ -31,6 +36,26 @@ fn test_can_load_and_lookup_job_types_from_json() {
     assert_eq!(dig.duration, Some(5.0));
     assert_eq!(dig.requirements, vec!["Tool:Pickaxe"]);
     assert_eq!(dig.effects.len(), 1);
+    assert_eq!(dig.effects[0]["action"], "ModifyTerrain");
+    assert_eq!(dig.effects[0]["from"], "rock");
+    assert_eq!(dig.effects[0]["to"], "tunnel");
+}
+
+#[test]
+fn test_job_type_asset_is_registered() {
+    let mut world = world_helper::make_test_world();
+
+    // Load the real job type JSON from disk (e.g., DigTunnel)
+    let job_type = job_type_helper::load_job_type_from_assets("dig_tunnel");
+    world.job_types.register_job_type(job_type);
+
+    let dig = world
+        .job_types
+        .get_data("DigTunnel")
+        .expect("DigTunnel should be registered");
+    assert_eq!(dig.name, "DigTunnel");
+    assert_eq!(dig.requirements, vec!["Tool:Pickaxe"]);
+    assert_eq!(dig.duration, Some(5.0));
     assert_eq!(dig.effects[0]["action"], "ModifyTerrain");
     assert_eq!(dig.effects[0]["from"], "rock");
     assert_eq!(dig.effects[0]["to"], "tunnel");

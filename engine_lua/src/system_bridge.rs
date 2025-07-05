@@ -176,6 +176,21 @@ pub fn register_system_functions(
         })?;
     globals.set("register_job_type", register_job_type)?;
 
+    let world_for_job_type_metadata = world.clone();
+    let get_job_type_metadata = lua.create_function(move |lua, name: String| {
+        let world = world_for_job_type_metadata.borrow();
+        if let Some(data) = world.job_types.get_data(&name) {
+            // Serialize JobTypeData to JSON, then convert to Lua table
+            let json = serde_json::to_value(data).map_err(|e| {
+                mlua::Error::external(format!("Failed to serialize JobTypeData: {e}"))
+            })?;
+            crate::helpers::json_to_lua_table(lua, &json)
+        } else {
+            Ok(mlua::Value::Nil)
+        }
+    })?;
+    globals.set("get_job_type_metadata", get_job_type_metadata)?;
+
     Ok(())
 }
 

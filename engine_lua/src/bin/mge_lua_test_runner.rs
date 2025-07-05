@@ -238,6 +238,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         for job in job_types {
             job_registry.register(job, JobLogicKind::Native(|_, _, _, job| job.clone()));
         }
+        world.borrow_mut().job_types = job_registry;
         let job_system = JobSystem::new();
         world.borrow_mut().register_system(job_system);
 
