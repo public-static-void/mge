@@ -121,5 +121,71 @@ pub fn register_job_query_api(
     })?;
     globals.set("advance_job_state", advance_job_state)?;
 
+    // get_job_children(job_id)
+    let world_get = world.clone();
+    let get_job_children = lua.create_function(move |lua, job_id: u32| {
+        let world = world_get.borrow();
+        let job = world
+            .get_component(job_id, "Job")
+            .ok_or_else(|| mlua::Error::external(format!("No job with id {job_id}")))?;
+        let children = job
+            .get("children")
+            .cloned()
+            .unwrap_or_else(|| serde_json::json!([]));
+        crate::helpers::json_to_lua_table(lua, &children)
+    })?;
+    globals.set("get_job_children", get_job_children)?;
+
+    // set_job_children(job_id, children)
+    let world_set = world.clone();
+    let set_job_children =
+        lua.create_function_mut(move |lua, (job_id, children): (u32, mlua::Value)| {
+            let children_json = crate::helpers::lua_value_to_json(lua, children, None)?;
+            let mut world = world_set.borrow_mut();
+            let mut job = world
+                .get_component(job_id, "Job")
+                .cloned()
+                .ok_or_else(|| mlua::Error::external(format!("No job with id {job_id}")))?;
+            job["children"] = children_json;
+            world
+                .set_component(job_id, "Job", job)
+                .map_err(|e| mlua::Error::external(format!("Failed to set job: {e}")))?;
+            Ok(())
+        })?;
+    globals.set("set_job_children", set_job_children)?;
+
+    // get_job_dependencies(job_id)
+    let world_get_deps = world.clone();
+    let get_job_dependencies = lua.create_function(move |lua, job_id: u32| {
+        let world = world_get_deps.borrow();
+        let job = world
+            .get_component(job_id, "Job")
+            .ok_or_else(|| mlua::Error::external(format!("No job with id {job_id}")))?;
+        let deps = job
+            .get("dependencies")
+            .cloned()
+            .unwrap_or(serde_json::Value::Null);
+        crate::helpers::json_to_lua_table(lua, &deps)
+    })?;
+    globals.set("get_job_dependencies", get_job_dependencies)?;
+
+    // set_job_dependencies(job_id, deps)
+    let world_set_deps = world.clone();
+    let set_job_dependencies =
+        lua.create_function_mut(move |lua, (job_id, deps): (u32, mlua::Value)| {
+            let deps_json = crate::helpers::lua_value_to_json(lua, deps, None)?;
+            let mut world = world_set_deps.borrow_mut();
+            let mut job = world
+                .get_component(job_id, "Job")
+                .cloned()
+                .ok_or_else(|| mlua::Error::external(format!("No job with id {job_id}")))?;
+            job["dependencies"] = deps_json;
+            world
+                .set_component(job_id, "Job", job)
+                .map_err(|e| mlua::Error::external(format!("Failed to set job: {e}")))?;
+            Ok(())
+        })?;
+    globals.set("set_job_dependencies", set_job_dependencies)?;
+
     Ok(())
 }
