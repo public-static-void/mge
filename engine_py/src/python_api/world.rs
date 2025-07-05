@@ -14,6 +14,7 @@ use crate::python_api::time_of_day::TimeOfDayApi;
 use crate::python_api::turn::TurnApi;
 use crate::system_bridge::SystemBridge;
 use engine_core::ecs::world::World;
+use engine_core::systems::job::types::loader::load_job_types_from_dir;
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict};
 use std::cell::RefCell;
@@ -62,6 +63,13 @@ impl PyWorld {
         }
 
         let mut world = World::new(std::sync::Arc::new(std::sync::Mutex::new(registry)));
+
+        // Load and register job types from assets
+        let jobs_dir = schema_path.parent().unwrap().join("jobs");
+        let job_types = load_job_types_from_dir(jobs_dir);
+        for job_type in job_types {
+            world.job_types.register_job_type(job_type);
+        }
 
         // Always initialize a map for the world (so add_cell and movement will work)
         let grid = engine_core::map::SquareGridMap::new();
@@ -455,6 +463,17 @@ impl PyWorld {
             .into_iter()
             .map(|s| s.to_string())
             .collect())
+    }
+
+    /// Get the metadata for a job type by name.
+    /// Returns the job type data as a Python dict, or None if not found.
+    fn get_job_type_metadata(&self, py: pyo3::Python, name: String) -> PyResult<Option<PyObject>> {
+        let world = self.inner.borrow();
+        if let Some(data) = world.job_types.get_data(&name) {
+            Ok(Some(serde_pyobject::to_pyobject(py, data)?.into()))
+        } else {
+            Ok(None)
+        }
     }
 
     fn set_job_field(&self, job_id: u32, field: String, value: Bound<'_, PyAny>) -> PyResult<()> {
