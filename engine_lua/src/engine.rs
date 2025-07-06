@@ -3,6 +3,7 @@ use super::lua_api::register_all_api_functions;
 use crate::lua_api::event_bus::register_event_bus_api;
 use crate::lua_api::job_board::register_job_board_api;
 use crate::lua_api::job_cancel::register_job_cancel_api;
+use crate::lua_api::job_events::register_job_event_api;
 use crate::lua_api::job_mutation::register_job_mutation_api;
 use crate::lua_api::job_query::register_job_query_api;
 use crate::lua_api::job_system::register_job_system_api;
@@ -150,6 +151,7 @@ impl ScriptEngine {
         register_job_query_api(&self.lua, &globals, world.clone())?;
         register_job_mutation_api(&self.lua, &globals, world.clone())?;
         register_job_cancel_api(&self.lua, &globals, world.clone())?;
+        register_job_event_api(&self.lua, &globals, world.clone())?;
 
         Ok(())
     }

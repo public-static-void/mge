@@ -12,6 +12,7 @@ pub mod input;
 pub mod inventory;
 pub mod job_board;
 pub mod job_cancel;
+pub mod job_events;
 pub mod job_mutation;
 pub mod job_query;
 pub mod job_system;
