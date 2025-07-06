@@ -6,6 +6,9 @@ pub trait SchedulingPolicy: Send + Sync {
     /// Given a slice of (eid, priority, assignment_count, last_assigned_tick, created_at),
     /// sort the candidates in-place according to the policy.
     fn sort_candidates(&self, candidates: &mut Vec<(u32, i64, u64, u64, u64)>);
+
+    /// Returns the name of the policy.
+    fn name(&self) -> &'static str;
 }
 
 /// Priority-based scheduling (descending priority, then assignment count, then tick, then eid).
@@ -19,6 +22,9 @@ impl SchedulingPolicy for PriorityPolicy {
                 .then(a.0.cmp(&b.0))
         });
     }
+    fn name(&self) -> &'static str {
+        "priority"
+    }
 }
 
 /// FIFO: First-In, First-Out (oldest job first by created_at).
@@ -26,6 +32,9 @@ pub struct FifoPolicy;
 impl SchedulingPolicy for FifoPolicy {
     fn sort_candidates(&self, candidates: &mut Vec<(u32, i64, u64, u64, u64)>) {
         candidates.sort_by(|a, b| a.4.cmp(&b.4).then(a.0.cmp(&b.0)));
+    }
+    fn name(&self) -> &'static str {
+        "fifo"
     }
 }
 
@@ -35,11 +44,23 @@ impl SchedulingPolicy for LifoPolicy {
     fn sort_candidates(&self, candidates: &mut Vec<(u32, i64, u64, u64, u64)>) {
         candidates.sort_by(|a, b| b.4.cmp(&a.4).then(b.0.cmp(&a.0)));
     }
+    fn name(&self) -> &'static str {
+        "lifo"
+    }
 }
 
 pub struct JobBoard {
     pub jobs: Vec<u32>, // entity IDs of unassigned jobs, sorted by policy
     policy: Box<dyn SchedulingPolicy>,
+}
+
+/// Struct for job board metadata, suitable for scripting bridges.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+pub struct JobBoardEntry {
+    pub eid: u32,
+    pub priority: i64,
+    pub state: String,
+    // Add more fields as needed (assignment_count, created_at, etc.)
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -177,6 +198,59 @@ impl JobBoard {
             JobAssignmentResult::Assigned(job_eid)
         } else {
             JobAssignmentResult::NoJobsAvailable
+        }
+    }
+
+    /// Returns a vector of JobBoardEntry for all jobs currently on the board.
+    pub fn jobs_with_metadata(&self, world: &World) -> Vec<JobBoardEntry> {
+        self.jobs
+            .iter()
+            .filter_map(|&eid| {
+                world.get_component(eid, "Job").map(|job| JobBoardEntry {
+                    eid,
+                    priority: job.get("priority").and_then(|v| v.as_i64()).unwrap_or(0),
+                    state: job
+                        .get("state")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string(),
+                })
+            })
+            .collect()
+    }
+
+    /// Returns the current policy as a string.
+    pub fn get_policy_name(&self) -> &str {
+        self.policy.name()
+    }
+
+    /// Sets the scheduling policy by string name.
+    pub fn set_policy(&mut self, policy: &str) -> Result<(), String> {
+        self.policy = match policy {
+            "priority" => Box::new(PriorityPolicy),
+            "fifo" => Box::new(FifoPolicy),
+            "lifo" => Box::new(LifoPolicy),
+            _ => return Err(format!("Unknown policy: {policy}")),
+        };
+        Ok(())
+    }
+
+    /// Gets the priority for a job.
+    pub fn get_priority(&self, world: &World, eid: u32) -> Option<i64> {
+        world
+            .get_component(eid, "Job")
+            .and_then(|job| job.get("priority").and_then(|v| v.as_i64()))
+    }
+
+    /// Sets the priority for a job.
+    pub fn set_priority(&self, world: &mut World, eid: u32, value: i64) -> Result<(), String> {
+        if let Some(mut job) = world.get_component(eid, "Job").cloned() {
+            job["priority"] = serde_json::json!(value);
+            world
+                .set_component(eid, "Job", job)
+                .map_err(|e| e.to_string())
+        } else {
+            Err(format!("No job with eid {eid}"))
         }
     }
 }

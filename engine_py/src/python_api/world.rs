@@ -14,9 +14,10 @@ use crate::python_api::time_of_day::TimeOfDayApi;
 use crate::python_api::turn::TurnApi;
 use crate::system_bridge::SystemBridge;
 use engine_core::ecs::world::World;
+use engine_core::systems::job::job_board::JobBoard;
 use engine_core::systems::job::types::loader::load_job_types_from_dir;
 use pyo3::prelude::*;
-use pyo3::types::{PyAny, PyDict};
+use pyo3::types::{PyAny, PyDict, PyList};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -30,6 +31,7 @@ pub struct PyWorld {
     pub map_postprocessors: RefCell<Vec<Py<PyAny>>>,
     pub map_validators: RefCell<Vec<Py<PyAny>>>,
     pub job_handlers: RefCell<HashMap<String, Py<PyAny>>>,
+    pub job_board: JobBoard,
 }
 
 #[pymethods]
@@ -87,6 +89,7 @@ impl PyWorld {
             map_postprocessors: RefCell::new(Vec::new()),
             map_validators: RefCell::new(Vec::new()),
             job_handlers: RefCell::new(HashMap::new()),
+            job_board: JobBoard::default(),
         })
     }
 
@@ -567,6 +570,64 @@ impl PyWorld {
         world.set_component(job_id, "Job", job).map_err(|e| {
             pyo3::exceptions::PyValueError::new_err(format!("Failed to set job: {e}"))
         })?;
+        Ok(())
+    }
+
+    /// Get the current job board as a list of job dicts (eid, priority, state, ...).
+    fn get_job_board(&self, py: Python<'_>) -> PyResult<PyObject> {
+        let mut world = self.inner.borrow_mut();
+        // Using a raw pointer to allow passing `&World` to methods on a field of `World`
+        // while holding a mutable borrow, which is safe here because the pointer is not leaked
+        // and all access occurs within this single-threaded context.
+        let world_ptr: *mut World = &mut *world;
+        unsafe {
+            world.job_board.update(&*world_ptr);
+            let entries = world.job_board.jobs_with_metadata(&*world_ptr);
+            let py_entries = PyList::empty(py);
+            for entry in entries {
+                let dict = PyDict::new(py);
+                dict.set_item("eid", entry.eid)?;
+                dict.set_item("priority", entry.priority)?;
+                dict.set_item("state", entry.state)?;
+                py_entries.append(dict)?;
+            }
+            Ok(py_entries.into())
+        }
+    }
+
+    /// Get the current job board scheduling policy as a string.
+    fn get_job_board_policy(&self) -> String {
+        let world = self.inner.borrow();
+        world.job_board.get_policy_name().to_string()
+    }
+
+    /// Set the job board scheduling policy ("priority", "fifo", "lifo").
+    fn set_job_board_policy(&self, policy: String) -> PyResult<()> {
+        let mut world = self.inner.borrow_mut();
+        world
+            .job_board
+            .set_policy(&policy)
+            .map_err(pyo3::exceptions::PyValueError::new_err)?;
+        Ok(())
+    }
+
+    /// Get the priority value for a job by ID.
+    fn get_job_priority(&self, job_id: u32) -> Option<i64> {
+        let world = self.inner.borrow();
+        world.job_board.get_priority(&world, job_id)
+    }
+
+    /// Set the priority for a job by ID.
+    fn set_job_priority(&self, job_id: u32, value: i64) -> PyResult<()> {
+        let mut world = self.inner.borrow_mut();
+        // Using a raw pointer to avoid borrow checker conflicts when passing a mutable reference
+        // to `world` into a method of a field of `world`. This is safe here because the pointer
+        // is not leaked and all access is confined to this scope.
+        let world_ptr: *mut World = &mut *world;
+        world
+            .job_board
+            .set_priority(unsafe { &mut *world_ptr }, job_id, value)
+            .map_err(pyo3::exceptions::PyValueError::new_err)?;
         Ok(())
     }
 
