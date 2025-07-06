@@ -6,7 +6,7 @@ use crate::ecs::registry::ComponentRegistry;
 use crate::ecs::system::SystemRegistry;
 use crate::map::Map;
 use crate::plugins::dynamic_systems::DynamicSystemRegistry;
-use crate::systems::job::JobTypeRegistry;
+use crate::systems::job::{JobBoard, JobTypeRegistry};
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use std::collections::{HashMap, VecDeque};
@@ -87,6 +87,8 @@ pub struct World {
     /// Map from job name to job definition (loaded from assets/jobs).
     #[serde(skip)]
     pub jobs: HashMap<String, JsonValue>,
+    #[serde(skip)]
+    pub job_board: JobBoard,
 }
 
 impl World {
@@ -119,6 +121,7 @@ impl World {
             resource_definitions: HashMap::new(),
             recipes: HashMap::new(),
             jobs: HashMap::new(),
+            job_board: JobBoard::default(),
         }
     }
 }
