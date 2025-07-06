@@ -631,6 +631,37 @@ impl PyWorld {
         Ok(())
     }
 
+    // --- Job Event Log Querying ---
+    fn get_job_event_log(&self, py: Python) -> PyResult<PyObject> {
+        crate::python_api::job_events::get_job_event_log(py)
+    }
+    fn get_job_events_by_type(&self, py: Python, event_type: String) -> PyResult<PyObject> {
+        crate::python_api::job_events::get_job_events_by_type(py, event_type)
+    }
+    fn get_job_events_since(&self, py: Python, timestamp: u128) -> PyResult<PyObject> {
+        crate::python_api::job_events::get_job_events_since(py, timestamp)
+    }
+    fn get_job_events_where(&self, py: Python, predicate: Bound<'_, PyAny>) -> PyResult<PyObject> {
+        crate::python_api::job_events::get_job_events_where(py, predicate)
+    }
+
+    // --- Job Event Bus Polling and Subscription ---
+    fn poll_job_event_bus(&self, py: Python, event_type: String) -> PyResult<PyObject> {
+        let mut world = self.inner.borrow_mut();
+        crate::python_api::job_events::poll_job_event_bus(py, event_type, &mut world)
+    }
+    fn subscribe_job_event_bus(
+        &self,
+        py: Python,
+        event_type: String,
+        callback: Py<PyAny>,
+    ) -> PyResult<usize> {
+        crate::python_api::job_events::subscribe_job_event_bus(py, event_type, callback)
+    }
+    fn unsubscribe_job_event_bus(&self, event_type: String, sub_id: usize) -> PyResult<()> {
+        crate::python_api::job_events::unsubscribe_job_event_bus(event_type, sub_id)
+    }
+
     // ---- MAP/CAMERA/TOPOLOGY ----
 
     fn get_map_topology_type(&self) -> String {
