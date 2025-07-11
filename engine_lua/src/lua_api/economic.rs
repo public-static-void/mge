@@ -39,6 +39,64 @@ pub fn register_economic_api(
     })?;
     globals.set("get_production_job", get_production_job)?;
 
+    // get_production_job_progress(entity)
+    let world_get_progress = world.clone();
+    let get_production_job_progress = lua.create_function_mut(move |_, entity: u32| {
+        let world = world_get_progress.borrow();
+        if let Some(job) = world.get_component(entity, "ProductionJob") {
+            Ok(job.get("progress").and_then(|v| v.as_i64()).unwrap_or(0))
+        } else {
+            Ok(0)
+        }
+    })?;
+    globals.set("get_production_job_progress", get_production_job_progress)?;
+
+    // set_production_job_progress(entity, value)
+    let world_set_progress = world.clone();
+    let set_production_job_progress =
+        lua.create_function_mut(move |_, (entity, value): (u32, i64)| {
+            let mut world = world_set_progress.borrow_mut();
+            if let Some(mut job) = world.get_component(entity, "ProductionJob").cloned() {
+                job["progress"] = serde_json::json!(value);
+                world
+                    .set_component(entity, "ProductionJob", job)
+                    .map_err(mlua::Error::external)?;
+            }
+            Ok(())
+        })?;
+    globals.set("set_production_job_progress", set_production_job_progress)?;
+
+    // get_production_job_state(entity)
+    let world_get_state = world.clone();
+    let get_production_job_state = lua.create_function_mut(move |_, entity: u32| {
+        let world = world_get_state.borrow();
+        if let Some(job) = world.get_component(entity, "ProductionJob") {
+            Ok(job
+                .get("state")
+                .and_then(|v| v.as_str())
+                .unwrap_or("pending")
+                .to_string())
+        } else {
+            Ok("pending".to_string())
+        }
+    })?;
+    globals.set("get_production_job_state", get_production_job_state)?;
+
+    // set_production_job_state(entity, value)
+    let world_set_state = world.clone();
+    let set_production_job_state =
+        lua.create_function_mut(move |_, (entity, value): (u32, String)| {
+            let mut world = world_set_state.borrow_mut();
+            if let Some(mut job) = world.get_component(entity, "ProductionJob").cloned() {
+                job["state"] = serde_json::json!(value);
+                world
+                    .set_component(entity, "ProductionJob", job)
+                    .map_err(mlua::Error::external)?;
+            }
+            Ok(())
+        })?;
+    globals.set("set_production_job_state", set_production_job_state)?;
+
     // modify_stockpile_resource(entity, kind, delta)
     let world_modify_stockpile = world.clone();
     let modify_stockpile_resource =
