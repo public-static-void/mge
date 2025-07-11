@@ -144,3 +144,35 @@ pub fn deliver_job_event_bus_callbacks(
     }
     Ok(())
 }
+
+// --- Job Event Log Save/Load/Replay ---
+
+#[pyfunction]
+pub fn save_job_event_log_py(path: String) -> PyResult<()> {
+    Python::with_gil(|_py| {
+        engine_core::systems::job::system::events::save_job_event_log(&path).map_err(|e| {
+            pyo3::exceptions::PyIOError::new_err(format!("Failed to save event log: {e}"))
+        })
+    })
+}
+
+#[pyfunction]
+pub fn load_job_event_log_py(path: String) -> PyResult<()> {
+    Python::with_gil(|_py| {
+        engine_core::systems::job::system::events::load_job_event_log(&path).map_err(|e| {
+            pyo3::exceptions::PyIOError::new_err(format!("Failed to load event log: {e}"))
+        })
+    })
+}
+
+#[pyfunction]
+pub fn replay_job_event_log_py(world: &crate::python_api::world::PyWorld) -> PyResult<()> {
+    let mut world = world.inner.borrow_mut();
+    engine_core::systems::job::system::events::replay_job_event_log(&mut world);
+    Ok(())
+}
+
+pub fn clear_job_event_log_py() -> PyResult<()> {
+    job_event_logger().clear();
+    Ok(())
+}

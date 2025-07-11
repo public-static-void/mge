@@ -156,6 +156,46 @@ pub fn register_job_event_api(
         })?,
     )?;
 
+    // save: save the job event log to a file
+    job_events.set(
+        "save",
+        lua.create_function(|_, path: String| {
+            engine_core::systems::job::system::events::save_job_event_log(&path)
+                .map_err(|e| mlua::Error::external(format!("Failed to save event log: {e}")))?;
+            Ok(())
+        })?,
+    )?;
+
+    // load: load the job event log from a file
+    job_events.set(
+        "load",
+        lua.create_function(|_, path: String| {
+            engine_core::systems::job::system::events::load_job_event_log(&path)
+                .map_err(|e| mlua::Error::external(format!("Failed to load event log: {e}")))?;
+            Ok(())
+        })?,
+    )?;
+
+    // replay: replay the job event log into the world
+    let world_ref = world.clone();
+    job_events.set(
+        "replay",
+        lua.create_function(move |_, ()| {
+            let mut world = world_ref.borrow_mut();
+            engine_core::systems::job::system::events::replay_job_event_log(&mut world);
+            Ok(())
+        })?,
+    )?;
+
+    // clear: clear the job event log
+    job_events.set(
+        "clear",
+        lua.create_function(|_, ()| {
+            job_event_logger().clear();
+            Ok(())
+        })?,
+    )?;
+
     // Register the job_events table as a global
     globals.set("job_events", job_events)?;
     Ok(())
