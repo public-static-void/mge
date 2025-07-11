@@ -457,6 +457,54 @@ impl PyWorld {
         }
     }
 
+    /// Get the progress value for a production job by entity ID.
+    fn get_production_job_progress(&self, entity_id: u32) -> PyResult<i64> {
+        let world = self.inner.borrow();
+        if let Some(job) = world.get_component(entity_id, "ProductionJob") {
+            Ok(job.get("progress").and_then(|v| v.as_i64()).unwrap_or(0))
+        } else {
+            Ok(0)
+        }
+    }
+
+    /// Set the progress value for a production job by entity ID.
+    fn set_production_job_progress(&self, entity_id: u32, value: i64) -> PyResult<()> {
+        let mut world = self.inner.borrow_mut();
+        if let Some(mut job) = world.get_component(entity_id, "ProductionJob").cloned() {
+            job["progress"] = serde_json::json!(value);
+            world
+                .set_component(entity_id, "ProductionJob", job)
+                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+        }
+        Ok(())
+    }
+
+    /// Get the state string for a production job by entity ID.
+    fn get_production_job_state(&self, entity_id: u32) -> PyResult<String> {
+        let world = self.inner.borrow();
+        if let Some(job) = world.get_component(entity_id, "ProductionJob") {
+            Ok(job
+                .get("state")
+                .and_then(|v| v.as_str())
+                .unwrap_or("pending")
+                .to_string())
+        } else {
+            Ok("pending".to_string())
+        }
+    }
+
+    /// Set the state string for a production job by entity ID.
+    fn set_production_job_state(&self, entity_id: u32, value: String) -> PyResult<()> {
+        let mut world = self.inner.borrow_mut();
+        if let Some(mut job) = world.get_component(entity_id, "ProductionJob").cloned() {
+            job["state"] = serde_json::json!(value);
+            world
+                .set_component(entity_id, "ProductionJob", job)
+                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+        }
+        Ok(())
+    }
+
     /// Returns a list of all registered job type names.
     fn get_job_types(&self) -> PyResult<Vec<String>> {
         let world = self.inner.borrow();
