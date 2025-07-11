@@ -662,6 +662,26 @@ impl PyWorld {
         crate::python_api::job_events::unsubscribe_job_event_bus(event_type, sub_id)
     }
 
+    /// Save the job event log to a file.
+    fn save_job_event_log(&self, path: String) -> PyResult<()> {
+        crate::python_api::job_events::save_job_event_log_py(path)
+    }
+
+    /// Load the job event log from a file.
+    fn load_job_event_log(&self, path: String) -> PyResult<()> {
+        crate::python_api::job_events::load_job_event_log_py(path)
+    }
+
+    /// Replay the job event log into the world.
+    fn replay_job_event_log(&self) -> PyResult<()> {
+        crate::python_api::job_events::replay_job_event_log_py(self)
+    }
+
+    /// Clear the job event log.
+    fn clear_job_event_log(&self) -> PyResult<()> {
+        crate::python_api::job_events::clear_job_event_log_py()
+    }
+
     // ---- MAP/CAMERA/TOPOLOGY ----
 
     fn get_map_topology_type(&self) -> String {
