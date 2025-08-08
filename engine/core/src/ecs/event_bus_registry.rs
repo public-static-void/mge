@@ -109,7 +109,6 @@ impl EventBusRegistry {
                 let type_name = "<unknown>";
                 let subscriber_count = {
                     // Try to get subscriber count for common types (JsonValue, etc.)
-                    // If you want to support more types, add them here.
                     if let Ok(bus) = arc_any
                         .clone()
                         .downcast::<Mutex<EventBus<serde_json::Value>>>()
@@ -144,12 +143,7 @@ impl EventBusRegistry {
     pub fn list_bus_types_and_names(&self) -> Vec<(String, String)> {
         self.buses
             .iter()
-            .map(|((type_id, name), _)| {
-                (
-                    format!("{type_id:?}"), // Or use a registry of type_name if you maintain one
-                    name.clone(),
-                )
-            })
+            .map(|((type_id, name), _)| (format!("{type_id:?}"), name.clone()))
             .collect()
     }
 

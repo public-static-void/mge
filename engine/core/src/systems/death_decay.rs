@@ -24,7 +24,7 @@ impl System for ProcessDeaths {
         }
 
         for entity in to_process {
-            // Remove Health component (if you want to simulate "dead" state)
+            // Remove Health component
             if let Some(healths) = world.components.get_mut("Health") {
                 healths.remove(&entity);
             }

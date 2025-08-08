@@ -96,7 +96,6 @@ impl World {
     }
 
     /// Returns a scarcity score for a resource kind (higher = more scarce).
-    /// This is a simple example; you can expand it as needed.
     pub fn get_global_resource_scarcity(&self, kind: &str) -> f64 {
         // Example: scan all stockpiles, sum amounts, invert for scarcity
         let mut total = 0;

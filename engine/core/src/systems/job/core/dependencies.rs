@@ -3,13 +3,15 @@ use serde_json::Value as JsonValue;
 
 /// Evaluates whether all dependencies are satisfied for a job.
 /// Supports AND/OR/NOT, world_state, and entity_state dependencies.
+/// Jobs with no dependencies are always considered satisfied.
 pub fn dependencies_satisfied(world: &World, job: &JsonValue) -> bool {
     match job.get("dependencies") {
-        None => true,
+        None | Some(JsonValue::Null) => true,
         Some(dep) => evaluate_dependency_expr(world, dep, false),
     }
 }
 
+/// Returns true if a job is in a terminal state (complete, failed, or cancelled).
 fn is_forbidden_state(job: &serde_json::Value) -> bool {
     matches!(
         job.get("state").and_then(|v| v.as_str()),
@@ -25,7 +27,7 @@ fn evaluate_dependency_expr(world: &World, dep: &JsonValue, in_not: bool) -> boo
         if let Ok(eid) = dep_eid.parse::<u32>() {
             if let Some(dep_job) = world.get_component(eid, "Job") {
                 if in_not {
-                    // For NOT, forbidden state block satisfaction
+                    // For NOT, forbidden state blocks satisfaction
                     return !is_forbidden_state(dep_job);
                 } else {
                     // For direct dep, only "complete" is satisfied
@@ -92,6 +94,7 @@ fn evaluate_dependency_expr(world: &World, dep: &JsonValue, in_not: bool) -> boo
     false
 }
 
+/// Evaluates a world state dependency.
 pub fn evaluate_world_state(world: &World, ws: &JsonValue) -> bool {
     let resource = ws.get("resource").and_then(|v| v.as_str());
     if let Some(res) = resource {
@@ -113,6 +116,7 @@ pub fn evaluate_world_state(world: &World, ws: &JsonValue) -> bool {
     false
 }
 
+/// Evaluates an entity state dependency.
 pub fn evaluate_entity_state(world: &World, es: &JsonValue) -> bool {
     let entity = es.get("entity").and_then(|v| v.as_u64()).map(|v| v as u32);
     let component = es.get("component").and_then(|v| v.as_str());
@@ -144,7 +148,7 @@ pub fn evaluate_entity_state(world: &World, es: &JsonValue) -> bool {
 /// Returns Some("failed") or Some("cancelled") if any dependency has failed or been cancelled, otherwise None.
 pub fn dependency_failure_state(world: &World, job: &JsonValue) -> Option<&'static str> {
     match job.get("dependencies") {
-        None => None,
+        None | Some(JsonValue::Null) => None,
         Some(dep) => find_failure_state(world, dep),
     }
 }

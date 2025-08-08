@@ -16,9 +16,16 @@ pub fn assign_move_path(
 ) {
     if let Some(map) = &world.map {
         if let Some(pathfinding) = map.find_path(from_cell, to_cell) {
+            if pathfinding.path.len() <= 1 {
+                // Already at destination or path empty; clear move_path if any
+                let mut agent = world.get_component(agent_id, "Agent").cloned().unwrap();
+                agent.as_object_mut().unwrap().remove("move_path");
+                let _ = world.set_component(agent_id, "Agent", agent);
+                return;
+            }
             let move_path: Vec<JsonValue> = pathfinding
                 .path
-                .into_iter()
+                .iter()
                 .skip(1)
                 .map(|cell| match cell {
                     crate::map::CellKey::Square { x, y, z } => {
@@ -27,7 +34,7 @@ pub fn assign_move_path(
                     crate::map::CellKey::Hex { q, r, z } => {
                         json!({ "Hex": { "q": q, "r": r, "z": z } })
                     }
-                    crate::map::CellKey::Region { ref id } => {
+                    crate::map::CellKey::Region { id } => {
                         json!({ "Region": { "id": id } })
                     }
                 })
