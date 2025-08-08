@@ -57,9 +57,9 @@ fn test_fifo_job_assignment_policy() {
 
     // Use FIFO policy
     let mut job_board = JobBoard::with_policy(Box::new(FifoPolicy));
-    job_board.update(&world);
+    job_board.update(&world, 0, &[]);
 
-    engine_core::systems::job::ai::logic::assign_jobs(&mut world, &mut job_board);
+    engine_core::systems::job::ai::logic::assign_jobs(&mut world, &mut job_board, 0, &[]);
 
     let agent_obj = world.get_component(agent, "Agent").unwrap();
     // Should get job1 (the first-added), not job2 (the highest priority)
@@ -120,9 +120,9 @@ fn test_lifo_job_assignment_policy() {
 
     // Use LIFO policy
     let mut job_board = JobBoard::with_policy(Box::new(LifoPolicy));
-    job_board.update(&world);
+    job_board.update(&world, 0, &[]);
 
-    engine_core::systems::job::ai::logic::assign_jobs(&mut world, &mut job_board);
+    engine_core::systems::job::ai::logic::assign_jobs(&mut world, &mut job_board, 0, &[]);
 
     let agent_obj = world.get_component(agent, "Agent").unwrap();
     // Should get job2 (the last-added), not job1 (the highest priority)

@@ -22,7 +22,8 @@ fn test_event_driven_ai_job_enqueue() {
                 "skills": { "production": 5.0 },
                 "preferences": {},
                 "state": "idle",
-                "job_queue": []
+                "job_queue": [],
+                "specializations": ["production"]
             }),
         )
         .unwrap();
@@ -64,8 +65,8 @@ fn test_event_driven_ai_job_enqueue() {
 
     // Now assign jobs
     let mut job_board = JobBoard::default();
-    job_board.update(&world);
-    assign_jobs(&mut world, &mut job_board);
+    job_board.update(&world, 0, &[]);
+    assign_jobs(&mut world, &mut job_board, 0, &[]);
 
     let agent = world.get_component(agent_id, "Agent").unwrap();
     assert_eq!(agent["current_job"], job_id);

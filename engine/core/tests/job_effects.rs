@@ -1,55 +1,22 @@
-use engine_core::ecs::world::World;
-use engine_core::systems::job::{JobLogicKind, JobTypeData};
+#[path = "helpers/agent.rs"]
+mod agent_helper;
+#[path = "helpers/world.rs"]
+mod world_helper;
+
+use agent_helper::AgentTestHelpers;
+use engine_core::ecs::system::System;
+use engine_core::systems::job::{JobBoard, JobLogicKind, JobTypeData, system::JobSystem};
 use serde_json::json;
 
+/// Verifies that job effects are processed when a job completes.
+/// This test registers a job type with an effect that modifies terrain,
+/// assigns the job to an entity, and ensures the effect is applied on completion.
 #[test]
 fn test_job_effects_are_processed_on_completion() {
     engine_core::systems::job::system::events::init_job_event_logger();
-    // This test needs to manually set up the registry due to custom schemas and effect handlers.
-    let mut world = World::new(Default::default());
+    let mut world = world_helper::make_test_world();
 
-    // Register "Job" component for this test (allow in "colony" mode)
-    let job_schema = json!({
-        "title": "Job",
-        "type": "object",
-        "properties": {
-            "job_type": { "type": "string" },
-            "state": { "type": "string" },
-            "progress": { "type": "number" }
-        },
-        "required": ["job_type", "state", "progress"],
-        "modes": ["colony"]
-    });
-    world
-        .registry
-        .lock()
-        .unwrap()
-        .register_external_schema_from_json(&job_schema.to_string())
-        .unwrap();
-
-    // Register "Terrain" component for this test (allow in "colony" mode)
-    let terrain_schema = json!({
-        "title": "Terrain",
-        "type": "object",
-        "properties": {
-            "type": { "type": "string" }
-        },
-        "required": ["type"],
-        "modes": ["colony"]
-    });
-    world
-        .registry
-        .lock()
-        .unwrap()
-        .register_external_schema_from_json(&terrain_schema.to_string())
-        .unwrap();
-
-    // Register the JobSystem so it can be run by name
-    world
-        .systems
-        .register_system(engine_core::systems::job::system::JobSystem::new());
-
-    // Register a simple effect handler for "ModifyTerrain"
+    // Register an effect handler for "ModifyTerrain" that sets the Terrain type.
     world
         .effect_processor_registry
         .as_ref()
@@ -57,16 +24,14 @@ fn test_job_effects_are_processed_on_completion() {
         .lock()
         .unwrap()
         .register_handler("ModifyTerrain", |world, eid, effect| {
-            let to = effect
-                .get("to")
-                .and_then(|v| v.as_str())
-                .unwrap_or("unknown");
-            world
-                .set_component(eid, "Terrain", json!({ "type": to }))
-                .unwrap();
+            if let Some(to) = effect.get("to").and_then(|v| v.as_str()) {
+                world
+                    .set_component(eid, "Terrain", json!({ "type": to, "kind": to }))
+                    .unwrap();
+            }
         });
 
-    // Add a job type with an effect
+    // Register a job type with an effect that modifies terrain.
     let job_type_data = JobTypeData {
         name: "DigTunnel".to_string(),
         requirements: vec![],
@@ -82,25 +47,35 @@ fn test_job_effects_are_processed_on_completion() {
         JobLogicKind::Native(|_, _, _, job| job.clone()),
     );
 
-    // Create an entity and assign the job
+    // Create an entity and assign the job.
     let eid = world.spawn_entity();
     world
         .set_component(
             eid,
             "Job",
             json!({
+                "id": eid, // <-- Make sure the job has an id!
                 "job_type": "DigTunnel",
                 "state": "pending",
+                "category": "test",
                 "progress": 0.0
             }),
         )
         .unwrap();
 
-    // Run the job system enough times to complete the job
+    // Spawn an idle agent so the job can be assigned and completed.
+    world.spawn_idle_agent();
+
+    // Run the job system enough times to complete the job and process effects.
+    let mut job_board = JobBoard::default();
+    let mut job_system = JobSystem::new();
     for _ in 0..4 {
-        world.run_system("JobSystem", None).unwrap();
+        job_board.update(&world, 0, &[]);
+        engine_core::systems::job::ai::logic::assign_jobs(&mut world, &mut job_board, 0, &[]);
+        job_system.run(&mut world, None);
     }
 
+    // After job completion, the terrain type should be updated by the effect.
     let terrain = world.get_component(eid, "Terrain").unwrap();
     assert_eq!(
         terrain["type"], "tunnel",

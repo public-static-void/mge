@@ -56,7 +56,7 @@ fn test_job_assignment_fairness() {
         .unwrap();
 
     let mut job_board = JobBoard::default();
-    job_board.update(&world);
+    job_board.update(&world, 10, &[]);
 
     let result = job_board.claim_job(agent, &mut world, 10);
     assert_eq!(
@@ -130,7 +130,7 @@ fn test_job_assignment_dynamic_priority() {
         .unwrap();
 
     let mut job_board = JobBoard::default();
-    job_board.update(&world);
+    job_board.update(&world, 1, &[]);
 
     let result = job_board.claim_job(agent, &mut world, 1);
     assert_eq!(
@@ -153,7 +153,7 @@ fn test_job_assignment_dynamic_priority() {
     agent_obj["state"] = json!("idle");
     world.set_component(agent, "Agent", agent_obj).unwrap();
 
-    job_board.update(&world);
+    job_board.update(&world, 2, &[]);
 
     let result = job_board.claim_job(agent, &mut world, 2);
     assert_eq!(

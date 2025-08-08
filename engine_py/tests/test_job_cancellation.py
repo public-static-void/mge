@@ -8,7 +8,7 @@ def test_cancel_job_marks_cancelled_and_filters_from_active(make_world):
 
     world.cancel_job(job_id)
     job = world.get_job(job_id)
-    assert job["cancelled"] is True
+    assert job["state"] == "cancelled"
 
     for _ in range(3):
         world.tick()

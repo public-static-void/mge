@@ -43,7 +43,6 @@ fn test_register_job_handler_api_invokes_handler() {
                 "id": job_id,
                 "job_type": "superfast",
                 "state": "pending",
-                "cancelled": false,
                 "priority": 1,
                 "category": "testing"
             }),
@@ -52,8 +51,8 @@ fn test_register_job_handler_api_invokes_handler() {
 
     // Assign job to agent
     let mut job_board = JobBoard::default();
-    job_board.update(&world);
-    assign_jobs(&mut world, &mut job_board);
+    job_board.update(&world, 0, &[]);
+    assign_jobs(&mut world, &mut job_board, 0, &[]);
 
     // Run the job system, custom handler should immediately complete the job
     let mut job_system = JobSystem::new();
@@ -99,7 +98,6 @@ fn test_register_job_handler_multiple_types() {
                 "id": job_foo_id,
                 "job_type": "foo",
                 "state": "pending",
-                "cancelled": false,
                 "priority": 1,
                 "category": "foo"
             }),
@@ -115,14 +113,13 @@ fn test_register_job_handler_multiple_types() {
                 "id": job_bar_id,
                 "job_type": "bar",
                 "state": "pending",
-                "cancelled": false,
                 "priority": 1,
                 "category": "bar"
             }),
         )
         .unwrap();
 
-    // Add an agent so jobs can be assigned
+    // Add two agents so both jobs can be assigned
     let agent_id = world.spawn_entity();
     world
         .set_component(
@@ -135,10 +132,22 @@ fn test_register_job_handler_multiple_types() {
         )
         .unwrap();
 
-    // Assign jobs to agent
+    let agent2_id = world.spawn_entity();
+    world
+        .set_component(
+            agent2_id,
+            "Agent",
+            json!({
+                "entity_id": agent2_id,
+                "state": "idle"
+            }),
+        )
+        .unwrap();
+
+    // Assign jobs to agents
     let mut job_board = JobBoard::default();
-    job_board.update(&world);
-    assign_jobs(&mut world, &mut job_board);
+    job_board.update(&world, 0, &[]);
+    assign_jobs(&mut world, &mut job_board, 0, &[]);
 
     // Run the job system
     let mut job_system = JobSystem::new();

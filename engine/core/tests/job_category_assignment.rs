@@ -88,7 +88,7 @@ fn test_agent_prefers_job_matching_specialization_category() {
         .unwrap();
 
     let mut job_board = JobBoard::default();
-    assign_jobs(&mut world, &mut job_board);
+    assign_jobs(&mut world, &mut job_board, 0, &[]);
 
     // Agent 1 should get hauling job
     let agent1 = world.get_component(agent1_eid, "Agent").unwrap();
@@ -109,7 +109,7 @@ fn test_agent_prefers_job_matching_specialization_category() {
     // Crafting job should remain unassigned
     let job3 = world.get_component(job3_eid, "Job").unwrap();
     assert!(
-        job3.get("assigned_to").is_none(),
+        job3.get("assigned_to").is_none_or(|v| v.is_null()),
         "Crafting job should remain unassigned"
     );
 }

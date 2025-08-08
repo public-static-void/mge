@@ -4,6 +4,9 @@ local function test_dynamic_job_handler_reregistration()
 	init_job_event_logger()
 	set_mode("colony")
 	local eid = spawn_entity()
+	local agent_id = spawn_entity()
+	-- Add Agent component with skills for "LuaJob"
+	set_component(agent_id, "Agent", { entity_id = agent_id, skills = { LuaJob = 1.0 } })
 	local state = { which = nil }
 
 	register_job_type("LuaJob", function(job, progress)
@@ -18,7 +21,7 @@ local function test_dynamic_job_handler_reregistration()
 		return job
 	end)
 
-	assign_job(eid, "LuaJob", { state = "pending", category = "testing" })
+	assign_job(eid, "LuaJob", { state = "pending", category = "testing", assigned_to = agent_id })
 	run_native_system("JobSystem")
 	tick()
 	local job = get_component(eid, "Job")

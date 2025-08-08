@@ -1,8 +1,8 @@
 #[path = "helpers/world.rs"]
 mod world_helper;
 
+use engine_core::ecs::system::System;
 use engine_core::systems::job::job_board::{JobAssignmentResult, JobBoard};
-use engine_core::systems::job::priority_aging::JobPriorityAgingSystem;
 use serde_json::json;
 
 #[test]
@@ -51,11 +51,11 @@ fn test_high_priority_job_is_assigned_first() {
         )
         .unwrap();
 
-    let mut aging_system = JobPriorityAgingSystem::new();
-    aging_system.run(&mut world, 0);
+    // No shortages in this test; pass empty vector
+    let shortage_kinds = vec![];
 
     let mut job_board = JobBoard::default();
-    job_board.update(&world);
+    job_board.update(&world, 0, &shortage_kinds);
     let result = job_board.claim_job(agent_eid, &mut world, 0);
     assert_eq!(result, JobAssignmentResult::Assigned(high_eid));
 }
@@ -106,23 +106,25 @@ fn test_low_priority_job_is_assigned_after_aging() {
         )
         .unwrap();
 
-    let mut aging_system = JobPriorityAgingSystem::new();
-    aging_system.run(&mut world, 0);
+    let shortage_kinds = vec![];
+
     let mut job_board = JobBoard::default();
-    job_board.update(&world);
+    job_board.update(&world, 0, &shortage_kinds);
     let result = job_board.claim_job(agent_eid, &mut world, 0);
     assert_eq!(result, JobAssignmentResult::Assigned(high_eid));
+    // Mark the high-priority job complete
     let mut job = world.get_component(high_eid, "Job").unwrap().clone();
     job["state"] = json!("complete");
     world.set_component(high_eid, "Job", job).unwrap();
+    // Set agent to idle again
     let mut agent = world.get_component(agent_eid, "Agent").unwrap().clone();
     agent["state"] = json!("idle");
     world.set_component(agent_eid, "Agent", agent).unwrap();
 
+    // After sufficient ticks, low-priority job should be assigned due to aging
     let mut assigned = false;
     for tick in 1..=200 {
-        aging_system.run(&mut world, tick);
-        job_board.update(&world);
+        job_board.update(&world, tick, &shortage_kinds);
         let result = job_board.claim_job(agent_eid, &mut world, tick);
         if result == JobAssignmentResult::Assigned(low_eid) {
             assigned = true;
@@ -164,15 +166,15 @@ fn test_job_priority_can_be_bumped_by_world_event() {
         )
         .unwrap();
 
+    // Bump the priority for the test
     let mut job = world.get_component(job_eid, "Job").unwrap().clone();
     job["priority"] = json!(1000);
     world.set_component(job_eid, "Job", job).unwrap();
 
-    let mut aging_system = JobPriorityAgingSystem::new();
-    aging_system.run(&mut world, 1);
+    let shortage_kinds = vec![];
 
     let mut job_board = JobBoard::default();
-    job_board.update(&world);
+    job_board.update(&world, 1, &shortage_kinds);
     let result = job_board.claim_job(agent_eid, &mut world, 1);
     assert_eq!(result, JobAssignmentResult::Assigned(job_eid));
 }
@@ -237,34 +239,34 @@ fn test_jobs_get_priority_boost_on_resource_shortage_event() {
         )
         .unwrap();
 
+    // Reserve resources so all jobs are runnable
     let mut reservation_system =
         engine_core::systems::job::resource_reservation::ResourceReservationSystem::new();
     reservation_system.run(&mut world, None);
 
+    // Send the shortage event for "wood"
     world
         .send_event("resource_shortage", json!({ "kind": "wood" }))
         .unwrap();
-
     world.update_event_buses::<serde_json::Value>();
 
-    let mut aging_system = JobPriorityAgingSystem::new();
-    aging_system.run(&mut world, 1);
+    // Collect shortage kinds for this tick
+    let shortage_kinds = JobPriorityAgingSystem::get_shortage_kinds(&mut world);
 
     let mut job_board = JobBoard::default();
-    job_board.update(&world);
+    job_board.update(&world, 1, &shortage_kinds);
     let result = job_board.claim_job(agent_eid, &mut world, 1);
 
     assert_eq!(result, JobAssignmentResult::Assigned(wood_job_eid));
 
-    let wood_job_effective = world
-        .get_component(wood_job_eid, "Job")
-        .and_then(|j| j.get("effective_priority").and_then(|v| v.as_i64()))
-        .unwrap_or(0);
+    let wood_job = world.get_component(wood_job_eid, "Job").unwrap();
+    let stone_job = world.get_component(stone_job_eid, "Job").unwrap();
 
-    let stone_job_effective = world
-        .get_component(stone_job_eid, "Job")
-        .and_then(|j| j.get("effective_priority").and_then(|v| v.as_i64()))
-        .unwrap_or(0);
+    let wood_job_effective =
+        JobPriorityAgingSystem::compute_effective_priority(wood_job, 1, &shortage_kinds);
+
+    let stone_job_effective =
+        JobPriorityAgingSystem::compute_effective_priority(stone_job, 1, &shortage_kinds);
 
     assert!(
         wood_job_effective > stone_job_effective,

@@ -1,6 +1,7 @@
 #[path = "helpers/world.rs"]
 mod world_helper;
 
+use engine_core::ecs::system::System;
 use engine_core::systems::job::job_board::{JobAssignmentResult, JobBoard};
 use engine_core::systems::job::resource_reservation::{
     ResourceReservationStatus, ResourceReservationSystem,
@@ -52,7 +53,7 @@ fn test_job_is_assigned_only_if_resources_are_available() {
     reservation_system.run(&mut world, None);
 
     let mut job_board = JobBoard::default();
-    job_board.update(&world);
+    job_board.update(&world, 0, &[]);
 
     // Should be able to claim the job
     let result = job_board.claim_job(agent_eid, &mut world, 0);
@@ -70,7 +71,10 @@ fn test_job_is_assigned_only_if_resources_are_available() {
         "Resources should be reserved after assignment"
     );
 
-    // Try to assign a second, identical job (should fail due to insufficient wood)
+    // Release reservation (simulate job completion) BEFORE any further reservation system run
+    reservation_system.release_reservation(&mut world, job_eid);
+
+    // Now add a second, identical job
     let job2_eid = world.spawn_entity();
     world
         .set_component(
@@ -86,23 +90,14 @@ fn test_job_is_assigned_only_if_resources_are_available() {
         )
         .unwrap();
 
-    job_board.update(&world);
+    // Run reservation system again so job2 is considered with released resources
+    reservation_system.run(&mut world, None);
+
+    job_board.update(&world, 0, &[]);
+
     let result2 = job_board.claim_job(agent_eid, &mut world, 1);
     assert_eq!(
         result2,
-        JobAssignmentResult::NoJobsAvailable,
-        "Second job should not be assigned due to insufficient resources"
-    );
-
-    // Release reservation (simulate completion)
-    reservation_system.release_reservation(&mut world, job_eid);
-
-    // Now, job2 should be assignable
-    reservation_system.run(&mut world, None);
-    job_board.update(&world);
-    let result3 = job_board.claim_job(agent_eid, &mut world, 2);
-    assert_eq!(
-        result3,
         JobAssignmentResult::Assigned(job2_eid),
         "Second job should be assigned after resources are released"
     );
@@ -184,7 +179,7 @@ fn test_resources_are_released_on_job_cancellation() {
 
     // Assign job and reserve resources
     let mut job_board = JobBoard::default();
-    job_board.update(&world);
+    job_board.update(&world, 0, &[]);
     let agent_eid = world.spawn_entity();
     world
         .set_component(

@@ -114,7 +114,7 @@ fn test_agent_fetches_and_delivers_resources_for_job() {
 
     // Assign the job using JobBoard logic
     let mut job_board = JobBoard::default();
-    job_board.update(&world);
+    job_board.update(&world, 0, &[]);
     let _ = job_board.claim_job(agent_id, &mut world, 0);
 
     world.run_system("JobSystem", None).unwrap();

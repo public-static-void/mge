@@ -21,7 +21,8 @@ fn test_ai_job_assignment_priority_and_state() {
                 "skills": { "dig": 5.0, "build": 1.0 },
                 "preferences": { "dig": 2.0 },
                 "state": "idle",
-                "category": "mining"
+                "category": "mining",
+                "specializations": ["mining", "construction"]
             }),
         )
         .unwrap();
@@ -37,7 +38,8 @@ fn test_ai_job_assignment_priority_and_state() {
                 "skills": { "dig": 0.0, "build": 6.0 },
                 "preferences": { "build": 2.0 },
                 "state": "idle",
-                "category": "mining"
+                "category": "mining",
+                "specializations": ["mining", "construction"]
             }),
         )
         .unwrap();
@@ -104,9 +106,9 @@ fn test_ai_job_assignment_priority_and_state() {
         .unwrap();
 
     let mut job_board = JobBoard::default();
-    job_board.update(&world);
+    job_board.update(&world, 0, &[]);
 
-    assign_jobs(&mut world, &mut job_board);
+    assign_jobs(&mut world, &mut job_board, 0, &[]);
 
     {
         let agent1_obj = world.get_component(agent1, "Agent").unwrap();
@@ -127,11 +129,17 @@ fn test_ai_job_assignment_priority_and_state() {
         assert_eq!(job200_obj["assigned_to"], agent2);
 
         // Agent 3 should remain unchanged (not idle)
-        assert!(agent3_obj.get("current_job").is_none());
+        assert!(
+            agent3_obj.get("current_job").is_none_or(|v| v.is_null()),
+            "Agent 3 should have no job assigned"
+        );
         assert_eq!(agent3_obj["state"], "working");
 
         // Job 100 should remain unassigned (no idle agent left)
-        assert!(job100_obj.get("assigned_to").is_none());
+        assert!(
+            job100_obj.get("assigned_to").is_none_or(|v| v.is_null()),
+            "Job 100 should be unassigned"
+        );
     }
 }
 
@@ -159,7 +167,8 @@ fn test_agent_job_queue_and_resource_aware_assignment() {
                 "skills": { "dig": 2.0, "build": 1.0 },
                 "preferences": { "dig": 1.0 },
                 "state": "idle",
-                "job_queue": [ ]
+                "job_queue": [ ],
+                "specializations": ["mining", "construction"]
             }),
         )
         .unwrap();
@@ -203,9 +212,9 @@ fn test_agent_job_queue_and_resource_aware_assignment() {
     }
 
     let mut job_board = JobBoard::default();
-    job_board.update(&world);
+    job_board.update(&world, 0, &[]);
 
-    assign_jobs(&mut world, &mut job_board);
+    assign_jobs(&mut world, &mut job_board, 0, &[]);
 
     let agent_obj = world.get_component(agent, "Agent").unwrap();
     assert_eq!(agent_obj["current_job"], job100);
@@ -216,11 +225,11 @@ fn test_agent_job_queue_and_resource_aware_assignment() {
     world.set_component(job100, "Job", job).unwrap();
 
     let mut agent_obj = world.get_component(agent, "Agent").unwrap().clone();
-    agent_obj.as_object_mut().unwrap().remove("current_job");
+    agent_obj["current_job"] = serde_json::Value::Null; // always set to null, not remove
     agent_obj["state"] = json!("idle");
     world.set_component(agent, "Agent", agent_obj).unwrap();
 
-    assign_jobs(&mut world, &mut job_board);
+    assign_jobs(&mut world, &mut job_board, 0, &[]);
 
     let agent_obj = world.get_component(agent, "Agent").unwrap();
     assert_eq!(agent_obj["current_job"], job200);
@@ -241,7 +250,8 @@ fn test_job_preemption_by_higher_priority() {
                 "entity_id": agent,
                 "skills": { "dig": 5.0, "build": 5.0 },
                 "preferences": { "dig": 2.0, "build": 2.0 },
-                "state": "idle"
+                "state": "idle",
+                "specializations": ["mining", "construction"]
             }),
         )
         .unwrap();
@@ -262,8 +272,8 @@ fn test_job_preemption_by_higher_priority() {
 
     // Assign initial job
     let mut job_board = JobBoard::default();
-    job_board.update(&world);
-    assign_jobs(&mut world, &mut job_board);
+    job_board.update(&world, 0, &[]);
+    assign_jobs(&mut world, &mut job_board, 0, &[]);
 
     let agent_obj = world.get_component(agent, "Agent").unwrap();
     assert_eq!(agent_obj["current_job"], job100);
@@ -290,8 +300,8 @@ fn test_job_preemption_by_higher_priority() {
         .unwrap();
 
     // Run assignment again: agent should preempt job 100 for job 200
-    job_board.update(&world);
-    assign_jobs(&mut world, &mut job_board);
+    job_board.update(&world, 0, &[]);
+    assign_jobs(&mut world, &mut job_board, 0, &[]);
 
     let agent_obj = world.get_component(agent, "Agent").unwrap();
     assert_eq!(
@@ -302,7 +312,8 @@ fn test_job_preemption_by_higher_priority() {
 
     let job100_obj = world.get_component(job100, "Job").unwrap();
     assert!(
-        job100_obj.get("assigned_to").is_none() || job100_obj["assigned_to"] != agent,
+        job100_obj.get("assigned_to").is_none_or(|v| v.is_null())
+            || job100_obj["assigned_to"] != agent,
         "Old job should be unassigned"
     );
     let job200_obj = world.get_component(job200, "Job").unwrap();
@@ -325,7 +336,8 @@ fn test_agent_abandons_job_if_blocked() {
                 "skills": { "dig": 5.0 },
                 "preferences": { "dig": 2.0 },
                 "state": "working",
-                "current_job": 0 // will be set below
+                "current_job": 0, // will be set below
+                "specializations": ["mining", "construction"]
             }),
         )
         .unwrap();
@@ -337,9 +349,8 @@ fn test_agent_abandons_job_if_blocked() {
             "Job",
             json!({
                 "job_type": "dig",
-                "state": "in_progress",
+                "state": "blocked",
                 "assigned_to": agent,
-                "blocked": true,
                 "category": "mining"
             }),
         )
@@ -354,18 +365,18 @@ fn test_agent_abandons_job_if_blocked() {
 
     // Run assignment: agent should abandon blocked job and become idle
     let mut job_board = JobBoard::default();
-    job_board.update(&world);
-    assign_jobs(&mut world, &mut job_board);
+    job_board.update(&world, 0, &[]);
+    assign_jobs(&mut world, &mut job_board, 0, &[]);
 
     let agent_obj = world.get_component(agent, "Agent").unwrap();
     assert!(
-        agent_obj.get("current_job").is_none(),
+        agent_obj.get("current_job").is_none_or(|v| v.is_null()),
         "Agent should abandon blocked job"
     );
     assert_eq!(agent_obj["state"], "idle");
     let job_obj = world.get_component(job100, "Job").unwrap();
     assert!(
-        job_obj.get("assigned_to").is_none(),
+        job_obj.get("assigned_to").is_none_or(|v| v.is_null()),
         "Blocked job should be unassigned"
     );
 }
@@ -385,7 +396,8 @@ fn test_dynamic_priority_update_affects_assignment() {
                 "entity_id": agent,
                 "skills": { "dig": 5.0, "build": 5.0 },
                 "preferences": { "dig": 2.0, "build": 2.0 },
-                "state": "idle"
+                "state": "idle",
+                "specializations": ["mining", "construction"]
             }),
         )
         .unwrap();
@@ -420,8 +432,8 @@ fn test_dynamic_priority_update_affects_assignment() {
 
     // Initial assignment: agent should pick job 200 (higher priority)
     let mut job_board = JobBoard::default();
-    job_board.update(&world);
-    assign_jobs(&mut world, &mut job_board);
+    job_board.update(&world, 0, &[]);
+    assign_jobs(&mut world, &mut job_board, 0, &[]);
 
     let agent_obj = world.get_component(agent, "Agent").unwrap();
     assert_eq!(agent_obj["current_job"], job200);
@@ -433,16 +445,16 @@ fn test_dynamic_priority_update_affects_assignment() {
 
     // Unassign agent from job 200
     let mut job = world.get_component(job200, "Job").unwrap().clone();
-    job.as_object_mut().unwrap().remove("assigned_to");
+    job["assigned_to"] = serde_json::Value::Null;
     world.set_component(job200, "Job", job).unwrap();
 
     let mut agent_obj = world.get_component(agent, "Agent").unwrap().clone();
-    agent_obj.as_object_mut().unwrap().remove("current_job");
+    agent_obj["current_job"] = serde_json::Value::Null;
     agent_obj["state"] = json!("idle");
     world.set_component(agent, "Agent", agent_obj).unwrap();
 
-    job_board.update(&world);
-    assign_jobs(&mut world, &mut job_board);
+    job_board.update(&world, 0, &[]);
+    assign_jobs(&mut world, &mut job_board, 0, &[]);
 
     let agent_obj = world.get_component(agent, "Agent").unwrap();
     assert_eq!(
