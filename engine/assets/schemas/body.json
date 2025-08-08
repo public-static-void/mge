@@ -29,30 +29,36 @@
           "default": "healthy"
         },
         "temperature": {
-          "type": "number",
-          "description": "Current temperature of this part (e.g., in Celsius)."
+          "type": ["number", "null"],
+          "description": "Current temperature of this part (e.g., in Celsius).",
+          "default": null
         },
         "ideal_temperature": {
-          "type": "number",
-          "description": "Preferred/comfort temperature for this part."
+          "type": ["number", "null"],
+          "description": "Preferred/comfort temperature for this part.",
+          "default": null
         },
         "insulation": {
-          "type": "number",
-          "description": "Total insulation provided by worn gear/clothing."
+          "type": ["number", "null"],
+          "description": "Total insulation provided by worn gear/clothing.",
+          "default": null
         },
         "heat_loss": {
-          "type": "number",
-          "description": "Current heat loss rate (computed by simulation)."
+          "type": ["number", "null"],
+          "description": "Current heat loss rate (computed by simulation).",
+          "default": null
         },
         "children": {
           "type": "array",
           "items": { "$ref": "#/definitions/BodyPart" },
-          "description": "Nested sub-parts (e.g., hand/fingers on an arm)"
+          "description": "Nested sub-parts (e.g., hand/fingers on an arm)",
+          "default": []
         },
         "equipped": {
           "type": "array",
           "items": { "type": "string" },
-          "description": "IDs or names of items equipped on this part (e.g., rings, gloves, clothes)"
+          "description": "IDs or names of items equipped on this part (e.g., rings, gloves, clothes)",
+          "default": []
         }
       },
       "required": [

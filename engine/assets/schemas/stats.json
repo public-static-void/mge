@@ -2,7 +2,9 @@
   "title": "Stats",
   "type": "object",
   "properties": {
-    "strength": { "type": "number" }
+    "strength": { "type": ["number", "null"], "default": null },
+    "dexterity": { "type": ["number", "null"], "default": null },
+    "intelligence": { "type": ["number", "null"], "default": null }
   },
   "required": [],
   "modes": ["colony", "roguelike"]
