@@ -9,6 +9,7 @@ use std::rc::Rc;
 /// - set_job_board_policy(policy)
 /// - get_job_priority(job_id)
 /// - set_job_priority(job_id, value)
+/// - add_job_to_board(job_id)
 pub fn register_job_board_api(
     lua: &Lua,
     globals: &Table,
@@ -20,7 +21,8 @@ pub fn register_job_board_api(
         let mut world = world_board.borrow_mut();
         let world_ptr: *mut World = &mut *world;
         unsafe {
-            world.job_board.update(&*world_ptr);
+            // Fill in real current_tick and shortage_kinds here if possible
+            world.job_board.update(&*world_ptr, 0, &[]);
             let entries = world.job_board.jobs_with_metadata(&*world_ptr);
             let tbl = lua.create_table()?;
             for (i, entry) in entries.iter().enumerate() {
@@ -77,6 +79,17 @@ pub fn register_job_board_api(
         Ok(())
     })?;
     globals.set("set_job_priority", set_job_priority)?;
+
+    // add_job_to_job_board(job_id)
+    let world_add_job = world.clone();
+    let add_job_to_board = lua.create_function_mut(move |_, job_id: u32| {
+        let mut world = world_add_job.borrow_mut();
+        if !world.job_board.jobs.contains(&job_id) {
+            world.job_board.jobs.push(job_id);
+        }
+        Ok(())
+    })?;
+    globals.set("add_job_to_job_board", add_job_to_board)?;
 
     Ok(())
 }

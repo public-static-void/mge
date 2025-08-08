@@ -1,4 +1,3 @@
-use crate::job_bridge::{PY_JOB_HANDLER_REGISTRY, py_job_handler};
 use crate::python_api::body::BodyApi;
 use crate::python_api::component::ComponentApi;
 use crate::python_api::death_decay::DeathDecayApi;
@@ -8,6 +7,7 @@ use crate::python_api::equipment::EquipmentApi;
 use crate::python_api::inventory::InventoryApi;
 use crate::python_api::job_query::JobQueryApi;
 use crate::python_api::mode::ModeApi;
+use crate::python_api::movement::MovementApi;
 use crate::python_api::region::RegionApi;
 use crate::python_api::save_load::SaveLoadApi;
 use crate::python_api::time_of_day::TimeOfDayApi;
@@ -16,8 +16,11 @@ use crate::system_bridge::SystemBridge;
 use engine_core::ecs::world::World;
 use engine_core::systems::job::job_board::JobBoard;
 use engine_core::systems::job::types::loader::load_job_types_from_dir;
+use pyo3::Python;
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use pyo3::types::{PyAny, PyDict, PyList};
+use pyo3::types::{PyAny, PyAnyMethods, PyDict, PyList};
+use pythonize::depythonize;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -28,10 +31,24 @@ use std::rc::Rc;
 pub struct PyWorld {
     pub inner: Rc<RefCell<World>>,
     pub systems: Rc<SystemBridge>,
-    pub map_postprocessors: RefCell<Vec<Py<PyAny>>>,
-    pub map_validators: RefCell<Vec<Py<PyAny>>>,
-    pub job_handlers: RefCell<HashMap<String, Py<PyAny>>>,
-    pub job_board: JobBoard,
+    pub map_postprocessors: Rc<RefCell<Vec<Py<PyAny>>>>,
+    pub map_validators: Rc<RefCell<Vec<Py<PyAny>>>>,
+    pub job_handlers: Rc<RefCell<HashMap<String, Py<PyAny>>>>,
+    pub job_board: Rc<RefCell<JobBoard>>,
+}
+
+// Manual Clone implementation using Rc clones
+impl Clone for PyWorld {
+    fn clone(&self) -> Self {
+        PyWorld {
+            inner: self.inner.clone(),
+            systems: self.systems.clone(),
+            map_postprocessors: self.map_postprocessors.clone(),
+            map_validators: self.map_validators.clone(),
+            job_handlers: self.job_handlers.clone(),
+            job_board: self.job_board.clone(),
+        }
+    }
 }
 
 #[pymethods]
@@ -86,10 +103,10 @@ impl PyWorld {
             systems: Rc::new(SystemBridge {
                 systems: RefCell::new(std::collections::HashMap::new()),
             }),
-            map_postprocessors: RefCell::new(Vec::new()),
-            map_validators: RefCell::new(Vec::new()),
-            job_handlers: RefCell::new(HashMap::new()),
-            job_board: JobBoard::default(),
+            map_postprocessors: Rc::new(RefCell::new(Vec::new())),
+            map_validators: Rc::new(RefCell::new(Vec::new())),
+            job_handlers: Rc::new(RefCell::new(HashMap::new())),
+            job_board: Rc::new(RefCell::new(JobBoard::default())),
         })
     }
 
@@ -132,10 +149,12 @@ impl PyWorld {
 
     // ---- COMPONENT ----
 
+    // Set component
     fn set_component(&self, entity_id: u32, name: String, value: Bound<'_, PyAny>) -> PyResult<()> {
         ComponentApi::set_component(self, entity_id, name, value)
     }
 
+    // Get component
     fn get_component(
         &self,
         py: Python<'_>,
@@ -145,40 +164,49 @@ impl PyWorld {
         ComponentApi::get_component(self, py, entity_id, name)
     }
 
+    // Remove component
     fn remove_component(&self, entity_id: u32, name: String) -> PyResult<()> {
         ComponentApi::remove_component(self, entity_id, name)
     }
 
+    // Get all entities with a given component
     fn get_entities_with_component(&self, name: String) -> PyResult<Vec<u32>> {
         ComponentApi::get_entities_with_component(self, name)
     }
 
+    // Get all entities with a given list of components
     fn get_entities_with_components(&self, names: Vec<String>) -> Vec<u32> {
         ComponentApi::get_entities_with_components(self, names)
     }
 
+    // List all components
     fn list_components(&self) -> Vec<String> {
         ComponentApi::list_components(self)
     }
 
+    // Get component schema
     fn get_component_schema(&self, name: String) -> PyResult<PyObject> {
         ComponentApi::get_component_schema(self, name)
     }
 
     // ---- INVENTORY ----
 
+    // Get inventory
     fn get_inventory(&self, py: Python<'_>, entity_id: u32) -> PyResult<Option<PyObject>> {
         InventoryApi::get_inventory(self, py, entity_id)
     }
 
+    // Set inventory
     fn set_inventory(&self, entity_id: u32, value: Bound<'_, PyAny>) -> PyResult<()> {
         InventoryApi::set_inventory(self, entity_id, value)
     }
 
+    // Add item to inventory
     fn add_item_to_inventory(&self, entity_id: u32, item_id: String) -> PyResult<()> {
         InventoryApi::add_item_to_inventory(self, entity_id, item_id)
     }
 
+    // Remove item from inventory
     fn remove_item_from_inventory(
         &self,
         py: Python<'_>,
@@ -190,36 +218,44 @@ impl PyWorld {
 
     // ---- EQUIPMENT ----
 
+    // Get equipment
     fn get_equipment(&self, py: Python<'_>, entity_id: u32) -> PyResult<PyObject> {
         EquipmentApi::get_equipment(self, py, entity_id)
     }
 
+    // Equip item
     fn equip_item(&self, entity_id: u32, item_id: String, slot: String) -> PyResult<()> {
         EquipmentApi::equip_item(self, entity_id, item_id, slot)
     }
 
+    // Unequip item
     fn unequip_item(&self, entity_id: u32, slot: String) -> PyResult<()> {
         EquipmentApi::unequip_item(self, entity_id, slot)
     }
 
     // ---- BODY ----
 
+    // Get body
     fn get_body(&self, py: Python<'_>, entity_id: u32) -> PyResult<Option<PyObject>> {
         BodyApi::get_body(self, py, entity_id)
     }
 
+    // Set body
     fn set_body(&self, entity_id: u32, value: Bound<'_, PyAny>) -> PyResult<()> {
         BodyApi::set_body(self, entity_id, value)
     }
 
+    // Add body part
     fn add_body_part(&self, entity_id: u32, part: Bound<'_, PyAny>) -> PyResult<()> {
         BodyApi::add_body_part(self, entity_id, part)
     }
 
+    // Remove body part
     fn remove_body_part(&self, entity_id: u32, part_name: String) -> PyResult<()> {
         BodyApi::remove_body_part(self, entity_id, part_name)
     }
 
+    // Get body part
     fn get_body_part(
         &self,
         py: Python<'_>,
@@ -231,88 +267,96 @@ impl PyWorld {
 
     // ---- REGION ----
 
+    // Get entities in region
     fn get_entities_in_region(&self, region_id: String) -> Vec<u32> {
         RegionApi::get_entities_in_region(self, region_id)
     }
 
+    // Get entities in kind of region
     fn get_entities_in_region_kind(&self, kind: String) -> Vec<u32> {
         RegionApi::get_entities_in_region_kind(self, kind)
     }
 
+    // Get cells in region
     fn get_cells_in_region(&self, py: Python, region_id: String) -> PyResult<PyObject> {
         RegionApi::get_cells_in_region(self, py, region_id)
     }
 
+    // Get cells in kind of region
     fn get_cells_in_region_kind(&self, py: Python, kind: String) -> PyResult<PyObject> {
         RegionApi::get_cells_in_region_kind(self, py, kind)
     }
 
     // ---- MISC ----
 
+    // Progress the turn
     fn tick(&self) {
         TurnApi::tick(self)
     }
 
+    // Get current turn
     fn get_turn(&self) -> u32 {
         TurnApi::get_turn(self)
     }
 
+    // Set game mode
     fn set_mode(&self, mode: String) {
         ModeApi::set_mode(self, mode)
     }
 
+    // Get game mode
     fn get_mode(&self) -> String {
         ModeApi::get_mode(self)
     }
 
+    // Get available game modes
     fn get_available_modes(&self) -> Vec<String> {
         ModeApi::get_available_modes(self)
     }
 
+    // Process deaths
     fn process_deaths(&self) {
         DeathDecayApi::process_deaths(self)
     }
 
+    // Process decay
     fn process_decay(&self) {
         DeathDecayApi::process_decay(self)
     }
 
-    fn modify_stockpile_resource(&self, entity_id: u32, kind: String, delta: f64) -> PyResult<()> {
-        EconomicApi::modify_stockpile_resource(self, entity_id, kind, delta)
-    }
-
+    // Save
     fn save_to_file(&self, path: String) -> PyResult<()> {
         SaveLoadApi::save_to_file(self, path)
     }
 
+    // Load
     fn load_from_file(&mut self, path: String) -> PyResult<()> {
         SaveLoadApi::load_from_file(self, path)
     }
 
-    /// Add a cell to the map (utility for tests/scripts)
+    /// Get the time of day
+    fn get_time_of_day(&self, py: Python) -> PyObject {
+        TimeOfDayApi::get_time_of_day(self, py)
+    }
+
+    /// Add a cell to the map
     fn add_cell(&self, x: i32, y: i32, z: i32) {
-        let mut world = self.inner.borrow_mut();
-        if let Some(map) = &mut world.map {
-            if let Some(square) = map
-                .topology
-                .as_any_mut()
-                .downcast_mut::<engine_core::map::SquareGridMap>()
-            {
-                square.add_cell(x, y, z);
-            }
-        }
+        crate::python_api::map_api::add_cell(self, x, y, z)
     }
 
     // ---- SYSTEM REGISTRATION/BRIDGE ----
 
+    // Register a system
     fn register_system(&self, py: Python, name: String, callback: Py<PyAny>) -> PyResult<()> {
         self.systems.register_system(py, name, callback)
     }
 
+    // Run a system
     fn run_system(&self, py: Python, name: String) -> PyResult<()> {
         self.systems.run_system(py, name)
     }
 
+    // Run a native system
     fn run_native_system(&self, name: String) -> PyResult<()> {
         let mut world = self.inner.borrow_mut();
         world
@@ -322,29 +366,29 @@ impl PyWorld {
 
     // ---- EVENT BUS ----
 
+    // Send event
     fn send_event(&self, event_type: String, payload: String) -> PyResult<()> {
         crate::event_bus::send_event(event_type, payload)
     }
 
+    // Poll event
     fn poll_event(&self, py: Python, event_type: String) -> PyResult<Vec<PyObject>> {
         crate::event_bus::poll_event(py, event_type)
     }
 
+    // Poll ECS event
     fn poll_ecs_event(&self, py: Python, event_type: String) -> PyResult<Vec<PyObject>> {
-        let mut world = self.inner.borrow_mut();
-        let events = world.take_events(&event_type);
-        Ok(events
-            .into_iter()
-            .map(|e| serde_pyobject::to_pyobject(py, &e).unwrap().into())
-            .collect())
+        crate::event_bus::poll_ecs_event(self, py, event_type)
     }
 
+    // Update event buses
     fn update_event_buses(&self) {
         crate::event_bus::update_event_buses()
     }
 
     // ---- USER INPUT ----
 
+    // Get user input
     fn get_user_input(&self, py: Python, prompt: String) -> PyResult<String> {
         let builtins = py.import("builtins")?;
         let input_func = builtins.getattr("input")?;
@@ -354,6 +398,7 @@ impl PyWorld {
 
     // ---- JOB SYSTEM ----
 
+    // Assign a job
     #[pyo3(signature = (entity_id, job_type, **kwargs))]
     fn assign_job(
         &self,
@@ -361,47 +406,12 @@ impl PyWorld {
         job_type: String,
         kwargs: Option<&Bound<'_, PyDict>>,
     ) -> PyResult<()> {
-        let mut world = self.inner.borrow_mut();
-        let mut job_val = serde_json::json!({
-            "id": entity_id,
-            "job_type": job_type,
-            "state": "pending",
-            "progress": 0.0
-        });
-        if let Some(kwargs) = kwargs {
-            let extra: serde_json::Value = pythonize::depythonize(kwargs)?;
-            if let Some(obj) = extra.as_object() {
-                for (k, v) in obj {
-                    job_val[k] = v.clone();
-                }
-            }
-        }
-        world
-            .set_component(entity_id, "Job", job_val)
-            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
+        crate::python_api::job_api::assign_job(self, entity_id, job_type, kwargs)
     }
 
     /// Register a new job type with a Python callback.
     fn register_job_type(&self, py: Python, name: String, callback: Py<PyAny>) {
-        PY_JOB_HANDLER_REGISTRY
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .insert(name.clone(), callback.clone_ref(py));
-
-        let registry = self.inner.borrow().job_handler_registry.clone();
-        registry.lock().unwrap().register_handler(
-            &name,
-            move |world, agent_id, job_id, job_data| {
-                py_job_handler(world, agent_id, job_id, job_data)
-            },
-        );
-
-        let mut world = self.inner.borrow_mut();
-        world
-            .job_types
-            .register_native(&name, |_world, _agent_id, _job_id, job_data| {
-                job_data.clone()
-            });
+        crate::python_api::job_api::register_job_type(self, py, name, callback)
     }
 
     /// List jobs in the world.
@@ -435,102 +445,83 @@ impl PyWorld {
         JobQueryApi::find_jobs(self, py, state, job_type, assigned_to, category)
     }
 
+    // Get stockpile resources
     fn get_stockpile_resources(&self, entity_id: u32) -> PyResult<Option<PyObject>> {
-        let world = self.inner.borrow();
-        if let Some(stockpile) = world.get_component(entity_id, "Stockpile") {
-            if let Some(resources) = stockpile.get("resources") {
-                Python::with_gil(|py| Ok(Some(serde_pyobject::to_pyobject(py, resources)?.into())))
-            } else {
-                Ok(None)
-            }
-        } else {
-            Ok(None)
-        }
+        crate::python_api::economic::get_stockpile_resources(self, entity_id)
     }
 
-    fn get_production_job(&self, entity_id: u32) -> PyResult<Option<PyObject>> {
-        let world = self.inner.borrow();
-        if let Some(job) = world.get_component(entity_id, "ProductionJob") {
-            Python::with_gil(|py| Ok(Some(serde_pyobject::to_pyobject(py, job)?.into())))
-        } else {
-            Ok(None)
-        }
+    // Modify stockpile resource
+    fn modify_stockpile_resource(&self, entity_id: u32, kind: String, delta: f64) -> PyResult<()> {
+        EconomicApi::modify_stockpile_resource(self, entity_id, kind, delta)
+    }
+
+    /// Get a production job by entity ID.
+    fn get_production_job(&self, py: Python, entity_id: u32) -> PyResult<Option<PyObject>> {
+        crate::python_api::job_production::get_production_job(self, py, entity_id)
     }
 
     /// Get the progress value for a production job by entity ID.
     fn get_production_job_progress(&self, entity_id: u32) -> PyResult<i64> {
-        let world = self.inner.borrow();
-        if let Some(job) = world.get_component(entity_id, "ProductionJob") {
-            Ok(job.get("progress").and_then(|v| v.as_i64()).unwrap_or(0))
-        } else {
-            Ok(0)
-        }
+        crate::python_api::job_production::get_production_job_progress(self, entity_id)
     }
 
     /// Set the progress value for a production job by entity ID.
     fn set_production_job_progress(&self, entity_id: u32, value: i64) -> PyResult<()> {
-        let mut world = self.inner.borrow_mut();
-        if let Some(mut job) = world.get_component(entity_id, "ProductionJob").cloned() {
-            job["progress"] = serde_json::json!(value);
-            world
-                .set_component(entity_id, "ProductionJob", job)
-                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
-        }
-        Ok(())
+        crate::python_api::job_production::set_production_job_progress(self, entity_id, value)
     }
 
     /// Get the state string for a production job by entity ID.
     fn get_production_job_state(&self, entity_id: u32) -> PyResult<String> {
-        let world = self.inner.borrow();
-        if let Some(job) = world.get_component(entity_id, "ProductionJob") {
-            Ok(job
-                .get("state")
-                .and_then(|v| v.as_str())
-                .unwrap_or("pending")
-                .to_string())
-        } else {
-            Ok("pending".to_string())
-        }
+        crate::python_api::job_production::get_production_job_state(self, entity_id)
     }
 
     /// Set the state string for a production job by entity ID.
     fn set_production_job_state(&self, entity_id: u32, value: String) -> PyResult<()> {
-        let mut world = self.inner.borrow_mut();
-        if let Some(mut job) = world.get_component(entity_id, "ProductionJob").cloned() {
-            job["state"] = serde_json::json!(value);
-            world
-                .set_component(entity_id, "ProductionJob", job)
-                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
-        }
-        Ok(())
+        crate::python_api::job_production::set_production_job_state(self, entity_id, value)
+    }
+
+    /// Get the reserved resources for a job by entity ID.
+    /// Returns a list of dicts or None.
+    fn get_job_resource_reservations(
+        &self,
+        entity_id: u32,
+        py: Python,
+    ) -> PyResult<Option<PyObject>> {
+        crate::python_api::job_reservation::get_job_resource_reservations(self, entity_id, py)
+    }
+
+    /// Reserve job resources
+    fn reserve_job_resources(&self, entity_id: u32) -> PyResult<bool> {
+        crate::python_api::job_reservation::reserve_job_resources(self, entity_id)
+    }
+
+    /// Release job resources
+    fn release_job_resource_reservations(&self, entity_id: u32) -> PyResult<()> {
+        crate::python_api::job_reservation::release_job_resource_reservations(self, entity_id)
+    }
+
+    /// Run the resource reservation system explicitly.
+    fn run_resource_reservation_system(&self) -> PyResult<()> {
+        crate::python_api::job_reservation::run_resource_reservation_system(self)
     }
 
     /// Returns a list of all registered job type names.
     fn get_job_types(&self) -> PyResult<Vec<String>> {
-        let world = self.inner.borrow();
-        Ok(world
-            .job_types
-            .job_type_names()
-            .into_iter()
-            .map(|s| s.to_string())
-            .collect())
+        crate::python_api::job_board::get_job_types(self)
     }
 
     /// Get the metadata for a job type by name.
     /// Returns the job type data as a Python dict, or None if not found.
-    fn get_job_type_metadata(&self, py: pyo3::Python, name: String) -> PyResult<Option<PyObject>> {
-        let world = self.inner.borrow();
-        if let Some(data) = world.job_types.get_data(&name) {
-            Ok(Some(serde_pyobject::to_pyobject(py, data)?.into()))
-        } else {
-            Ok(None)
-        }
+    fn get_job_type_metadata(&self, py: Python, name: String) -> PyResult<Option<PyObject>> {
+        crate::python_api::job_board::get_job_type_metadata(self, py, name)
     }
 
+    // Set a field on a job
     fn set_job_field(&self, job_id: u32, field: String, value: Bound<'_, PyAny>) -> PyResult<()> {
         JobQueryApi::set_job_field(self, job_id, &field, &value)
     }
 
+    // Update a job
     #[pyo3(signature = (job_id, **kwargs))]
     fn update_job(
         &self,
@@ -540,164 +531,92 @@ impl PyWorld {
         JobQueryApi::update_job(self, job_id, kwargs)
     }
 
+    // Cancel a job
     fn cancel_job(&self, job_id: u32) -> PyResult<()> {
         JobQueryApi::cancel_job(self, job_id)
     }
 
     /// Advance the state machine of a single job by its job_id.
     fn advance_job_state(&self, job_id: u32) -> PyResult<()> {
-        let mut world = self.inner.borrow_mut();
-        let job = match world.get_component(job_id, "Job") {
-            Some(job) => job.clone(),
-            None => {
-                return Err(pyo3::exceptions::PyValueError::new_err(format!(
-                    "No job with id {job_id}"
-                )));
-            }
-        };
-        let new_job =
-            engine_core::systems::job::system::process::process_job(&mut world, None, job_id, job);
-        world.set_component(job_id, "Job", new_job).map_err(|e| {
-            pyo3::exceptions::PyValueError::new_err(format!("Failed to set job: {e}"))
-        })?;
-        Ok(())
+        crate::python_api::job_api::advance_job_state(self, job_id)
     }
 
     /// Get the children array (list of job objects) for a job by ID.
-    fn get_job_children(&self, py: pyo3::Python, job_id: u32) -> pyo3::PyResult<pyo3::PyObject> {
-        let world = self.inner.borrow();
-        let job = world.get_component(job_id, "Job").ok_or_else(|| {
-            pyo3::exceptions::PyKeyError::new_err(format!("No job with id {job_id}"))
-        })?;
-        let children = job
-            .get("children")
-            .cloned()
-            .unwrap_or_else(|| serde_json::json!([]));
-        Ok(serde_pyobject::to_pyobject(py, &children)?.into())
+    fn get_job_children(&self, py: Python, job_id: u32) -> PyResult<PyObject> {
+        crate::python_api::job_children::get_job_children(self, py, job_id)
     }
 
     /// Set the children array (list of job objects) for a job by ID.
     fn set_job_children(&self, job_id: u32, children: Bound<'_, PyAny>) -> PyResult<()> {
-        let children_json: serde_json::Value = serde_pyobject::from_pyobject(children)?;
-        let mut world = self.inner.borrow_mut();
-        let mut job = world.get_component(job_id, "Job").cloned().ok_or_else(|| {
-            pyo3::exceptions::PyKeyError::new_err(format!("No job with id {job_id}"))
-        })?;
-        job["children"] = children_json;
-        world.set_component(job_id, "Job", job).map_err(|e| {
-            pyo3::exceptions::PyValueError::new_err(format!("Failed to set job: {e}"))
-        })?;
-        Ok(())
+        crate::python_api::job_children::set_job_children(self, job_id, children)
     }
 
     /// Get the dependencies field for a job by ID.
-    fn get_job_dependencies(
-        &self,
-        py: pyo3::Python,
-        job_id: u32,
-    ) -> pyo3::PyResult<pyo3::PyObject> {
-        let world = self.inner.borrow();
-        let job = world.get_component(job_id, "Job").ok_or_else(|| {
-            pyo3::exceptions::PyKeyError::new_err(format!("No job with id {job_id}"))
-        })?;
-        let deps = job
-            .get("dependencies")
-            .cloned()
-            .unwrap_or(serde_json::Value::Null);
-        Ok(serde_pyobject::to_pyobject(py, &deps)?.into())
+    fn get_job_dependencies(&self, py: Python, job_id: u32) -> PyResult<PyObject> {
+        crate::python_api::job_dependencies::get_job_dependencies(self, py, job_id)
     }
 
     /// Set the dependencies field for a job by ID.
     fn set_job_dependencies(&self, job_id: u32, dependencies: Bound<'_, PyAny>) -> PyResult<()> {
-        let deps_json: serde_json::Value = serde_pyobject::from_pyobject(dependencies)?;
-        let mut world = self.inner.borrow_mut();
-        let mut job = world.get_component(job_id, "Job").cloned().ok_or_else(|| {
-            pyo3::exceptions::PyKeyError::new_err(format!("No job with id {job_id}"))
-        })?;
-        job["dependencies"] = deps_json;
-        world.set_component(job_id, "Job", job).map_err(|e| {
-            pyo3::exceptions::PyValueError::new_err(format!("Failed to set job: {e}"))
-        })?;
-        Ok(())
+        crate::python_api::job_dependencies::set_job_dependencies(self, job_id, dependencies)
     }
 
     /// Get the current job board as a list of job dicts (eid, priority, state, ...).
-    fn get_job_board(&self, py: Python<'_>) -> PyResult<PyObject> {
-        let mut world = self.inner.borrow_mut();
-        // Using a raw pointer to allow passing `&World` to methods on a field of `World`
-        // while holding a mutable borrow, which is safe here because the pointer is not leaked
-        // and all access occurs within this single-threaded context.
-        let world_ptr: *mut World = &mut *world;
-        unsafe {
-            world.job_board.update(&*world_ptr);
-            let entries = world.job_board.jobs_with_metadata(&*world_ptr);
-            let py_entries = PyList::empty(py);
-            for entry in entries {
-                let dict = PyDict::new(py);
-                dict.set_item("eid", entry.eid)?;
-                dict.set_item("priority", entry.priority)?;
-                dict.set_item("state", entry.state)?;
-                py_entries.append(dict)?;
-            }
-            Ok(py_entries.into())
-        }
+    fn get_job_board(&self, py: Python) -> PyResult<PyObject> {
+        crate::python_api::job_board::get_job_board(self, py)
     }
 
     /// Get the current job board scheduling policy as a string.
     fn get_job_board_policy(&self) -> String {
-        let world = self.inner.borrow();
-        world.job_board.get_policy_name().to_string()
+        crate::python_api::job_board::get_job_board_policy(self)
     }
 
     /// Set the job board scheduling policy ("priority", "fifo", "lifo").
     fn set_job_board_policy(&self, policy: String) -> PyResult<()> {
-        let mut world = self.inner.borrow_mut();
-        world
-            .job_board
-            .set_policy(&policy)
-            .map_err(pyo3::exceptions::PyValueError::new_err)?;
-        Ok(())
+        crate::python_api::job_board::set_job_board_policy(self, policy)
     }
 
     /// Get the priority value for a job by ID.
     fn get_job_priority(&self, job_id: u32) -> Option<i64> {
-        let world = self.inner.borrow();
-        world.job_board.get_priority(&world, job_id)
+        crate::python_api::job_board::get_job_priority(self, job_id)
     }
 
     /// Set the priority for a job by ID.
     fn set_job_priority(&self, job_id: u32, value: i64) -> PyResult<()> {
-        let mut world = self.inner.borrow_mut();
-        // Using a raw pointer to avoid borrow checker conflicts when passing a mutable reference
-        // to `world` into a method of a field of `world`. This is safe here because the pointer
-        // is not leaked and all access is confined to this scope.
-        let world_ptr: *mut World = &mut *world;
-        world
-            .job_board
-            .set_priority(unsafe { &mut *world_ptr }, job_id, value)
-            .map_err(pyo3::exceptions::PyValueError::new_err)?;
-        Ok(())
+        crate::python_api::job_board::set_job_priority(self, job_id, value)
     }
 
     // --- Job Event Log Querying ---
+
+    // Get the job event log
     fn get_job_event_log(&self, py: Python) -> PyResult<PyObject> {
         crate::python_api::job_events::get_job_event_log(py)
     }
+
+    // Get job events by type
     fn get_job_events_by_type(&self, py: Python, event_type: String) -> PyResult<PyObject> {
         crate::python_api::job_events::get_job_events_by_type(py, event_type)
     }
+
+    // Get job events since
     fn get_job_events_since(&self, py: Python, timestamp: u128) -> PyResult<PyObject> {
         crate::python_api::job_events::get_job_events_since(py, timestamp)
     }
+
+    // Get job events where
     fn get_job_events_where(&self, py: Python, predicate: Bound<'_, PyAny>) -> PyResult<PyObject> {
         crate::python_api::job_events::get_job_events_where(py, predicate)
     }
 
     // --- Job Event Bus Polling and Subscription ---
+
+    // Poll the job event bus
     fn poll_job_event_bus(&self, py: Python, event_type: String) -> PyResult<PyObject> {
         let mut world = self.inner.borrow_mut();
         crate::python_api::job_events::poll_job_event_bus(py, event_type, &mut world)
     }
+
+    // Subscribe to job event bus
     fn subscribe_job_event_bus(
         &self,
         py: Python,
@@ -706,6 +625,8 @@ impl PyWorld {
     ) -> PyResult<usize> {
         crate::python_api::job_events::subscribe_job_event_bus(py, event_type, callback)
     }
+
+    // Unsubscribe to job event bus
     fn unsubscribe_job_event_bus(&self, event_type: String, sub_id: usize) -> PyResult<()> {
         crate::python_api::job_events::unsubscribe_job_event_bus(event_type, sub_id)
     }
@@ -730,211 +651,210 @@ impl PyWorld {
         crate::python_api::job_events::clear_job_event_log_py()
     }
 
-    // ---- MAP/CAMERA/TOPOLOGY ----
+    /// Assign a move path to an agent.
+    pub fn assign_move_path(
+        &self,
+        agent_id: u32,
+        from_cell: Bound<'_, PyAny>,
+        to_cell: Bound<'_, PyAny>,
+    ) -> PyResult<()> {
+        let from_val: serde_json::Value = depythonize(&from_cell)
+            .map_err(|e| PyValueError::new_err(format!("Invalid from_cell: {e}")))?;
+        let to_val: serde_json::Value = depythonize(&to_cell)
+            .map_err(|e| PyValueError::new_err(format!("Invalid to_cell: {e}")))?;
 
-    fn get_map_topology_type(&self) -> String {
-        let world = self.inner.borrow();
-        world
-            .map
-            .as_ref()
-            .map(|m| m.topology_type().to_string())
-            .unwrap_or_else(|| "none".to_string())
+        MovementApi::assign_move_path(self, agent_id, from_val, to_val)
     }
 
-    fn get_all_cells(&self, py: Python) -> PyObject {
-        let world = self.inner.borrow();
-        let cells = world
-            .map
-            .as_ref()
-            .map(|m| m.all_cells())
-            .unwrap_or_default();
-        serde_pyobject::to_pyobject(py, &cells).unwrap().into()
+    /// Check if an agent is at a cell.
+    pub fn is_agent_at_cell(&self, agent_id: u32, cell: Bound<'_, PyAny>) -> PyResult<bool> {
+        let val: serde_json::Value =
+            depythonize(&cell).map_err(|e| PyValueError::new_err(format!("Invalid cell: {e}")))?;
+
+        MovementApi::is_agent_at_cell(self, agent_id, val)
     }
 
-    fn get_neighbors(&self, py: Python, cell: &Bound<'_, PyAny>) -> PyObject {
-        let world = self.inner.borrow();
-        let cell_key: engine_core::map::CellKey = pythonize::depythonize(cell).unwrap();
-        let neighbors = world
-            .map
-            .as_ref()
-            .map(|m| m.neighbors(&cell_key))
-            .unwrap_or_default();
-        serde_pyobject::to_pyobject(py, &neighbors).unwrap().into()
+    /// Check if an agent's move path is empty.
+    pub fn is_move_path_empty(&self, agent_id: u32) -> PyResult<bool> {
+        MovementApi::is_move_path_empty(self, agent_id)
     }
 
-    fn add_neighbor(&self, from: (i32, i32, i32), to: (i32, i32, i32)) {
+    #[pyo3(signature = (agent_id, _args))]
+    fn ai_assign_jobs(&self, agent_id: u32, _args: Vec<PyObject>) -> PyResult<()> {
         let mut world = self.inner.borrow_mut();
-        if let Some(map) = &mut world.map {
-            if let Some(square) = map
-                .topology
-                .as_any_mut()
-                .downcast_mut::<engine_core::map::SquareGridMap>()
-            {
-                square.add_neighbor(from, to);
-            }
+
+        let job_board_ptr: *mut _ = &mut world.job_board;
+        use engine_core::systems::job::ai::logic::assign_jobs;
+
+        unsafe {
+            assign_jobs(&mut world, &mut *job_board_ptr, agent_id as u64, &[]);
         }
+
+        Ok(())
     }
 
-    fn entities_in_cell(&self, py: Python, cell: &Bound<'_, PyAny>) -> PyObject {
+    #[pyo3(signature = (agent_id))]
+    fn ai_query_jobs(&self, py: Python, agent_id: u32) -> PyResult<PyObject> {
         let world = self.inner.borrow();
-        let cell_key: engine_core::map::CellKey = pythonize::depythonize(cell).unwrap();
-        let entities = world.entities_in_cell(&cell_key);
-        entities.into_pyobject(py).unwrap().into()
-    }
+        let mut jobs_py: Vec<Py<PyAny>> = Vec::new();
 
-    fn get_cell_metadata(&self, py: Python, cell: &Bound<'_, PyAny>) -> PyObject {
-        let world = self.inner.borrow();
-        let cell_key: engine_core::map::CellKey = pythonize::depythonize(cell).unwrap();
-        if let Some(meta) = world.get_cell_metadata(&cell_key) {
-            serde_pyobject::to_pyobject(py, meta).unwrap().into()
-        } else {
-            py.None()
-        }
-    }
-
-    fn set_cell_metadata(&self, cell: &Bound<'_, PyAny>, metadata: &Bound<'_, PyAny>) {
-        let mut world = self.inner.borrow_mut();
-        let cell_key: engine_core::map::CellKey = pythonize::depythonize(cell).unwrap();
-        let meta_json: serde_json::Value = pythonize::depythonize(metadata).unwrap();
-        world.set_cell_metadata(&cell_key, meta_json);
-    }
-
-    fn find_path(&self, py: Python, start: &Bound<'_, PyAny>, goal: &Bound<'_, PyAny>) -> PyObject {
-        let world = self.inner.borrow();
-        let start_key: engine_core::map::CellKey = pythonize::depythonize(start).unwrap();
-        let goal_key: engine_core::map::CellKey = pythonize::depythonize(goal).unwrap();
-        if let Some(result) = world.find_path(&start_key, &goal_key) {
-            let dict = PyDict::new(py);
-            dict.set_item(
-                "path",
-                serde_pyobject::to_pyobject(py, &result.path).unwrap(),
-            )
-            .unwrap();
-            dict.set_item("total_cost", result.total_cost).unwrap();
-            dict.into()
-        } else {
-            py.None()
-        }
-    }
-
-    fn register_map_validator(&self, py: Python, callback: Py<PyAny>) {
-        self.map_validators
-            .borrow_mut()
-            .push(callback.clone_ref(py));
-    }
-
-    fn clear_map_validators(&self) {
-        self.map_validators.borrow_mut().clear();
-    }
-
-    fn apply_generated_map<'py>(slf: Bound<'py, Self>, map: Bound<'py, PyAny>) -> PyResult<()> {
-        let map_json: serde_json::Value = pythonize::depythonize(&map)?;
-
-        {
-            let slf_borrow = slf.borrow();
-            let validators = slf_borrow.map_validators.borrow();
-            for callback in validators.iter() {
-                let ok: bool = callback
-                    .call1(slf.py(), (map.clone(),))?
-                    .extract(slf.py())?;
-                if !ok {
-                    return Err(pyo3::exceptions::PyValueError::new_err(
-                        "Map validator failed",
-                    ));
+        if let Some(job_map) = world.components.get("Job") {
+            for (&job_id, job_comp) in job_map.iter() {
+                if let Some(assigned_to) = job_comp.get("assigned_to").and_then(|v| v.as_u64())
+                    && assigned_to == agent_id as u64
+                {
+                    let dict = PyDict::new(py);
+                    dict.set_item("id", job_id)?;
+                    dict.set_item(
+                        "state",
+                        job_comp.get("state").and_then(|v| v.as_str()).unwrap_or(""),
+                    )?;
+                    dict.set_item(
+                        "job_type",
+                        job_comp
+                            .get("job_type")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or(""),
+                    )?;
+                    dict.set_item("assigned_to", assigned_to)?;
+                    jobs_py.push(dict.into());
                 }
             }
         }
 
-        {
-            let slf_borrow = slf.borrow();
-            let mut world = slf_borrow.inner.borrow_mut();
-            world
-                .apply_generated_map(&map_json)
-                .map_err(pyo3::exceptions::PyValueError::new_err)?;
-        }
-
-        {
-            let slf_borrow = slf.borrow();
-            let postprocessors = slf_borrow.map_postprocessors.borrow();
-            for callback in postprocessors.iter() {
-                callback.call1(slf.py(), (slf.clone(),))?;
-            }
-        }
-        Ok(())
+        Ok(PyList::new(py, jobs_py)?.into())
     }
 
+    #[pyo3(signature = (job_id, **kwargs))]
+    fn ai_modify_job_assignment(
+        &self,
+        py: Python,
+        job_id: u32,
+        kwargs: Option<PyObject>,
+    ) -> PyResult<bool> {
+        let mut world = self.inner.borrow_mut();
+
+        // Get the job component json or error if missing
+        let mut job = world
+            .get_component(job_id, "Job")
+            .ok_or_else(|| {
+                pyo3::exceptions::PyValueError::new_err(format!("No job with id {job_id}"))
+            })?
+            .clone();
+
+        if let Some(kwargs_obj) = kwargs {
+            // Convert PyObject kwargs to smart borrowed PyDict reference
+            let kwargs_dict = kwargs_obj
+                .downcast_bound::<PyDict>(py)
+                .map_err(|_| pyo3::exceptions::PyValueError::new_err("kwargs must be a dict"))?;
+
+            // Iterate over dict items updating job json
+            for (key, value) in kwargs_dict.iter() {
+                let k: String = key.extract()?;
+                let v: serde_json::Value = depythonize(&value)?; // pass reference as expected
+                job[k] = v;
+            }
+        }
+
+        // Persist updated job component
+        world.set_component(job_id, "Job", job).map_err(|e| {
+            pyo3::exceptions::PyValueError::new_err(format!("Failed to set job: {e}"))
+        })?;
+
+        Ok(true)
+    }
+
+    // ---- MAP/CAMERA/TOPOLOGY ----
+
+    /// Get the topology type of the current map.
+    fn get_map_topology_type(&self) -> String {
+        crate::python_api::map_api::get_map_topology_type(self)
+    }
+
+    /// Get a list of all cells in the current map.
+    fn get_all_cells(&self, py: Python) -> PyObject {
+        crate::python_api::map_api::get_all_cells(self, py)
+    }
+
+    /// Get the neighbors of a given cell.
+    fn get_neighbors(&self, py: Python, cell: &Bound<'_, PyAny>) -> PyObject {
+        crate::python_api::map_api::get_neighbors(self, py, cell)
+    }
+
+    /// Add a directed neighbor edge from one cell to another.
+    fn add_neighbor(&self, from: (i32, i32, i32), to: (i32, i32, i32)) {
+        crate::python_api::map_api::add_neighbor(self, from, to)
+    }
+
+    /// Get a list of entity IDs located in the given cell.
+    fn entities_in_cell(&self, py: Python, cell: &Bound<'_, PyAny>) -> PyObject {
+        crate::python_api::map_api::entities_in_cell(self, py, cell)
+    }
+
+    /// Get metadata associated with a given cell.
+    fn get_cell_metadata(&self, py: Python, cell: &Bound<'_, PyAny>) -> PyObject {
+        crate::python_api::map_api::get_cell_metadata(self, py, cell)
+    }
+
+    /// Set metadata for a given cell.
+    fn set_cell_metadata(
+        &self,
+        cell: &Bound<'_, PyAny>,
+        metadata: &Bound<'_, PyAny>,
+    ) -> PyResult<()> {
+        crate::python_api::map_api::set_cell_metadata(self, cell, metadata)
+    }
+
+    /// Find a path between two cells using the map's pathfinding system.
+    fn find_path(&self, py: Python, start: &Bound<'_, PyAny>, goal: &Bound<'_, PyAny>) -> PyObject {
+        crate::python_api::map_api::find_path(self, py, start, goal)
+    }
+
+    /// Register a Python callback as a map validator.
+    fn register_map_validator(&self, py: Python, callback: Py<PyAny>) {
+        crate::python_api::map_api::register_map_validator(self, py, callback)
+    }
+
+    /// Clear all registered Python map validators.
+    fn clear_map_validators(&self) {
+        crate::python_api::map_api::clear_map_validators(self)
+    }
+
+    /// Apply a generated map JSON.
+    fn apply_generated_map(&self, py: Python<'_>, map: &Bound<'_, PyAny>) -> PyResult<()> {
+        let pyworld_obj: Py<PyWorld> = Py::new(py, self.clone())?;
+        crate::python_api::map_api::apply_generated_map(pyworld_obj, py, map)
+    }
+
+    /// Apply a chunk of map JSON data.
+    fn apply_chunk(&self, py: Python<'_>, chunk: &Bound<'_, PyAny>) -> PyResult<()> {
+        let pyworld_obj: Py<PyWorld> = Py::new(py, self.clone())?;
+        crate::python_api::map_api::apply_chunk(pyworld_obj, py, chunk)
+    }
+
+    // Get the number of cells in the current map
     fn get_map_cell_count(&self) -> usize {
         let world = self.inner.borrow();
         world.map.as_ref().map(|m| m.all_cells().len()).unwrap_or(0)
     }
 
-    /// Register a Python map postprocessor (called after apply_generated_map).
+    /// Register a Python callback as a map postprocessor.
     fn register_map_postprocessor(&self, py: Python, callback: Py<PyAny>) {
-        self.map_postprocessors
-            .borrow_mut()
-            .push(callback.clone_ref(py));
+        crate::python_api::map_api::register_map_postprocessor(self, py, callback)
     }
 
     /// Clear all registered Python map postprocessors.
     fn clear_map_postprocessors(&self) {
-        self.map_postprocessors.borrow_mut().clear();
-    }
-
-    /// Apply a chunk
-    fn apply_chunk<'py>(slf: Bound<'py, Self>, chunk: Bound<'py, PyAny>) -> PyResult<()> {
-        let chunk_json: serde_json::Value = pythonize::depythonize(&chunk)?;
-        let binding = slf.borrow();
-        let mut world = binding.inner.borrow_mut();
-        world
-            .apply_chunk(&chunk_json)
-            .map_err(pyo3::exceptions::PyValueError::new_err)
-    }
-
-    fn get_time_of_day(&self, py: Python) -> PyObject {
-        TimeOfDayApi::get_time_of_day(self, py)
+        crate::python_api::map_api::clear_map_postprocessors(self)
     }
 
     /// Set the camera position (creates camera entity if not present)
     fn set_camera(&self, x: i64, y: i64) {
-        let mut world = self.inner.borrow_mut();
-        // Find or create the camera entity
-        let camera_id = world
-            .get_entities_with_component("Camera")
-            .first()
-            .cloned()
-            .unwrap_or_else(|| {
-                let id = world.spawn_entity();
-                world
-                    .set_component(id, "Camera", serde_json::json!({ "x": x, "y": y }))
-                    .unwrap();
-                id
-            });
-        // Always update Camera component with x and y
-        world
-            .set_component(camera_id, "Camera", serde_json::json!({ "x": x, "y": y }))
-            .unwrap();
-        world
-            .set_component(
-                camera_id,
-                "Position",
-                serde_json::json!({ "pos": { "Square": { "x": x, "y": y, "z": 0 } } }),
-            )
-            .unwrap();
+        crate::python_api::camera_api::set_camera(self, x, y)
     }
 
     /// Get the camera position as a dict {x, y}
     fn get_camera(&self, py: Python) -> PyObject {
-        let world = self.inner.borrow();
-        if let Some(camera_id) = world.get_entities_with_component("Camera").first() {
-            if let Some(pos) = world.get_component(*camera_id, "Position") {
-                let x = pos["pos"]["Square"]["x"].as_i64().unwrap_or(0);
-                let y = pos["pos"]["Square"]["y"].as_i64().unwrap_or(0);
-                let dict = PyDict::new(py);
-                dict.set_item("x", x).unwrap();
-                dict.set_item("y", y).unwrap();
-                return dict.into();
-            }
-        }
-        py.None()
+        crate::python_api::camera_api::get_camera(self, py)
     }
 }

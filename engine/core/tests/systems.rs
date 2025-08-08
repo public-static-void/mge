@@ -27,21 +27,22 @@ fn test_move_all_system_moves_entities() {
     // Move all: increment x, y for all entities with Position
     if let Some(positions) = world.components.get_mut("Position") {
         for (_eid, value) in positions.iter_mut() {
-            if let Some(obj) = value.as_object_mut() {
-                if let Some(pos) = obj.get_mut("pos") {
-                    if let Some(square) = pos.as_object_mut().unwrap().get_mut("Square") {
-                        let square_obj = square.as_object_mut().unwrap();
-                        if let Some(x) = square_obj.get_mut("x") {
-                            if let Some(x_val) = x.as_i64() {
-                                *x = json!(x_val + 1);
-                            }
-                        }
-                        if let Some(y) = square_obj.get_mut("y") {
-                            if let Some(y_val) = y.as_i64() {
-                                *y = json!(y_val + 2);
-                            }
-                        }
-                    }
+            if let Some(obj) = value.as_object_mut()
+                && let Some(pos) = obj.get_mut("pos")
+                && let Some(square) = pos.as_object_mut().unwrap().get_mut("Square")
+            {
+                let square_obj = square.as_object_mut().unwrap();
+
+                if let Some(x) = square_obj.get_mut("x")
+                    && let Some(x_val) = x.as_i64()
+                {
+                    *x = json!(x_val + 1);
+                }
+
+                if let Some(y) = square_obj.get_mut("y")
+                    && let Some(y_val) = y.as_i64()
+                {
+                    *y = json!(y_val + 2);
                 }
             }
         }

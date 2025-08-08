@@ -45,7 +45,6 @@ fn test_job_cancellation_cleans_up_agent_and_emits_event() {
                 "id": job_id,
                 "job_type": "dig",
                 "state": "pending",
-                "cancelled": false,
                 "priority": 1,
                 "category": "mining"
             }),
@@ -54,22 +53,27 @@ fn test_job_cancellation_cleans_up_agent_and_emits_event() {
 
     // Assign job to agent
     let mut job_board = JobBoard::default();
-    job_board.update(&world);
-    assign_jobs(&mut world, &mut job_board);
+    job_board.update(&world, 0, &[]);
+    assign_jobs(&mut world, &mut job_board, 0, &[]);
 
-    // Cancel the job
+    let _agent = world.get_component(agent_id, "Agent").unwrap();
+    let _job = world.get_component(job_id, "Job").unwrap();
+
+    // Cancel the job (by setting state to "cancelled")
     let mut job = world.get_component(job_id, "Job").unwrap().clone();
-    job["cancelled"] = json!(true);
+    job["state"] = json!("cancelled");
     world.set_component(job_id, "Job", job).unwrap();
 
     // Run job system to process cancellation
     let mut job_system = JobSystem;
     job_system.run(&mut world, None);
 
-    // Agent should be idle and unassigned
     let agent = world.get_component(agent_id, "Agent").unwrap();
+    let job = world.get_component(job_id, "Job").unwrap();
+
+    // Agent should be idle and unassigned
     assert!(
-        agent.get("current_job").is_none(),
+        agent.get("current_job").is_none_or(|v| v.is_null()),
         "Agent should have no current job after cancellation"
     );
     assert_eq!(
@@ -78,7 +82,6 @@ fn test_job_cancellation_cleans_up_agent_and_emits_event() {
     );
 
     // Job should be marked as cancelled
-    let job = world.get_component(job_id, "Job").unwrap();
     assert_eq!(job["state"], "cancelled", "Job state should be 'cancelled'");
 
     // Event should be emitted
@@ -108,7 +111,6 @@ fn test_job_effect_rollback_on_cancel() {
             .lock()
             .unwrap()
             .register_handler("ModifyTerrain", |world, eid, effect| {
-                // Apply effect: set Terrain to effect["to"]
                 let to = effect.get("to").and_then(|v| v.as_str()).unwrap();
                 world
                     .set_component(eid, "Terrain", json!({ "kind": to }))
@@ -118,7 +120,6 @@ fn test_job_effect_rollback_on_cancel() {
             .lock()
             .unwrap()
             .register_handler("UndoModifyTerrain", |world, eid, effect| {
-                //Rollback effect: set Terrain back to effect["from"]
                 let from = effect.get("from").and_then(|v| v.as_str()).unwrap();
                 world
                     .set_component(eid, "Terrain", json!({ "kind": from }))
@@ -142,7 +143,6 @@ fn test_job_effect_rollback_on_cancel() {
                 "id": entity_id,
                 "job_type": "dig",
                 "state": "pending",
-                "cancelled": false,
                 "priority": 1,
                 "category": "mining"
             }),
@@ -164,13 +164,15 @@ fn test_job_effect_rollback_on_cancel() {
     // Assign and complete job normally: effect should apply
     {
         let mut job_board = JobBoard::default();
-        job_board.update(&world);
-        assign_jobs(&mut world, &mut job_board);
+        job_board.update(&world, 0, &[]);
+        assign_jobs(&mut world, &mut job_board, 0, &[]);
 
         // Mark job as complete
         let mut job = world.get_component(entity_id, "Job").unwrap().clone();
         job["state"] = json!("complete");
         world.set_component(entity_id, "Job", job).unwrap();
+
+        let _terrain = world.get_component(entity_id, "Terrain").unwrap();
 
         // Run system to apply effect
         let mut job_system = JobSystem;
@@ -194,13 +196,14 @@ fn test_job_effect_rollback_on_cancel() {
             json!({
                 "id": entity_id,
                 "job_type": "dig",
-                "state": "pending",
-                "cancelled": true,
+                "state": "cancelled",
                 "priority": 1,
                 "category": "mining"
             }),
         )
         .unwrap();
+
+    let _terrain = world.get_component(entity_id, "Terrain").unwrap();
 
     // Run system: effect should not apply, and rollback (UndoModifyTerrain) should be called
     {
@@ -235,6 +238,19 @@ fn test_job_cancellation_releases_resources_and_cancels_children() {
 
     world
         .set_component(
+            child_id,
+            "Job",
+            json!({
+                "id": child_id,
+                "job_type": "subtask",
+                "state": "pending",
+                "category": "construction"
+            }),
+        )
+        .unwrap();
+
+    world
+        .set_component(
             parent_id,
             "Job",
             json!({
@@ -257,30 +273,38 @@ fn test_job_cancellation_releases_resources_and_cancels_children() {
         )
         .unwrap();
 
-    // Cancel the parent job
+    let _stockpile = world.get_component(stockpile_id, "Stockpile").unwrap();
+    let _parent_job = world.get_component(parent_id, "Job").unwrap();
+
+    // Cancel the parent job (by setting state to "cancelled")
     let mut job = world.get_component(parent_id, "Job").unwrap().clone();
-    job["cancelled"] = json!(true);
+    job["state"] = json!("cancelled");
     world.set_component(parent_id, "Job", job).unwrap();
 
     // Run job system to process cancellation
     let mut job_system = JobSystem;
     job_system.run(&mut world, None);
 
-    // Check that resources are released
     let stockpile = world.get_component(stockpile_id, "Stockpile").unwrap();
+    let parent_job = world.get_component(parent_id, "Job").unwrap();
+
+    // Check that resources are released
     assert_eq!(
         stockpile["resources"]["wood"], 10,
         "Resources should be released back to stockpile"
     );
 
     // Check that child job is cancelled
-    let parent_job = world.get_component(parent_id, "Job").unwrap();
-    let children = parent_job
+    let child_id = parent_job
         .get("children")
         .and_then(|v| v.as_array())
-        .unwrap();
+        .and_then(|arr| arr.first())
+        .and_then(|child| child.get("id"))
+        .and_then(|id| id.as_u64())
+        .unwrap() as u32;
+    let child_job = world.get_component(child_id, "Job").unwrap();
     assert_eq!(
-        children[0]["state"], "cancelled",
+        child_job["state"], "cancelled",
         "Child job should be cancelled"
     );
 }

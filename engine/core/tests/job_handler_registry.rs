@@ -34,7 +34,7 @@ fn test_register_and_invoke_job_handler() {
         .get("test_job")
         .expect("Handler not found")
         .clone();
-    handler(&world, 42, 99, &json!({}));
+    handler(&mut world, 42, 99, &json!({}));
 
     assert!(*called.lock().unwrap());
 }

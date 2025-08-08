@@ -29,10 +29,26 @@ def test_job_event_log_querying(make_world):
 
     # Assign jobs and trigger events.
     world.assign_job(
-        eid1, "DigTunnel", state="pending", priority=5, category="test"
+        eid1,
+        "DigTunnel",
+        state="pending",
+        priority=5,
+        category="test",
+        assigned_to=agent1,
+        target=None,
+        reserved_stockpile=None,
+        target_position=None,
     )
     world.assign_job(
-        eid2, "BuildWall", state="pending", priority=10, category="test"
+        eid2,
+        "BuildWall",
+        state="pending",
+        priority=10,
+        category="test",
+        assigned_to=agent2,
+        target=None,
+        reserved_stockpile=None,
+        target_position=None,
     )
 
     # Run the job system enough times for assignment and completion.
@@ -55,11 +71,19 @@ def test_job_event_log_querying(make_world):
     # Query since timestamp.
     now = int(time.time() * 1000)
     job3 = world.spawn_entity()
-    world.assign_job(job3, "TestJob", state="pending", category="test")
-    # Add an agent who can do TestJob.
     agent3 = world.spawn_entity()
     world.set_component(
         agent3, "Agent", {"entity_id": agent3, "skills": {"TestJob": 1.0}}
+    )
+    world.assign_job(
+        job3,
+        "TestJob",
+        state="pending",
+        category="test",
+        assigned_to=agent3,
+        target=None,
+        reserved_stockpile=None,
+        target_position=None,
     )
     for _ in range(5):
         world.tick()
@@ -84,7 +108,16 @@ def test_job_event_bus_polling(make_world):
         agent, "Agent", {"entity_id": agent, "skills": {"DigTunnel": 1.0}}
     )
     eid = world.spawn_entity()
-    world.assign_job(eid, "DigTunnel", state="pending", category="test")
+    world.assign_job(
+        eid,
+        "DigTunnel",
+        state="pending",
+        category="test",
+        assigned_to=agent,
+        target=None,
+        reserved_stockpile=None,
+        target_position=None,
+    )
     for _ in range(5):
         world.tick()
 
@@ -111,7 +144,16 @@ def test_job_event_bus_subscription(make_world):
     sub_id = world.subscribe_job_event_bus(
         "job_completed", persistent_on_job_completed
     )
-    world.assign_job(eid, "DigTunnel", state="pending", category="test")
+    world.assign_job(
+        eid,
+        "DigTunnel",
+        state="pending",
+        category="test",
+        assigned_to=agent,
+        target=None,
+        reserved_stockpile=None,
+        target_position=None,
+    )
     for _ in range(10):
         world.tick()
         job_state = world.get_component(eid, "Job")["state"]
@@ -129,7 +171,16 @@ def test_job_event_bus_subscription(make_world):
     world.set_component(
         agent2, "Agent", {"entity_id": agent2, "skills": {"DigTunnel": 1.0}}
     )
-    world.assign_job(job2, "DigTunnel", state="pending", category="test")
+    world.assign_job(
+        job2,
+        "DigTunnel",
+        state="pending",
+        category="test",
+        assigned_to=agent2,
+        target=None,
+        reserved_stockpile=None,
+        target_position=None,
+    )
     for _ in range(10):
         world.tick()
     assert not received_events, "Should not receive events after unsubscribe"

@@ -7,20 +7,20 @@
     "entity_id": { "type": "integer" },
 
     "specializations": {
-      "type": "array",
+      "type": ["array", "null"],
       "items": { "type": "string" },
       "description": "List of job categories this agent specializes in",
       "default": []
     },
 
     "skills": {
-      "type": "object",
+      "type": ["object", "null"],
       "additionalProperties": { "type": "number" },
       "default": {}
     },
 
     "preferences": {
-      "type": "object",
+      "type": ["object", "null"],
       "additionalProperties": { "type": "number" },
       "default": {}
     },
@@ -31,38 +31,38 @@
     },
 
     "job_queue": {
-      "type": "array",
+      "type": ["array", "null"],
       "items": { "type": "integer" },
       "description": "Queue of job entity IDs",
       "default": []
     },
 
     "stamina": {
-      "type": "number",
+      "type": ["number", "null"],
       "default": 100,
       "description": "Stamina points"
     },
 
     "morale": {
-      "type": "number",
+      "type": ["number", "null"],
       "default": 100,
       "description": "Morale points"
     },
 
     "state": {
-      "type": "string",
+      "type": ["string", "null"],
       "enum": ["idle", "working", "resting", "unavailable"],
       "default": "idle"
     },
 
     "jobs_completed": {
-      "type": "integer",
+      "type": ["integer", "null"],
       "default": 0,
       "description": "How many jobs this agent has completed (for fairness/round-robin)."
     },
 
     "move_path": {
-      "type": "array",
+      "type": ["array", "null"],
       "items": {
         "type": "object",
         "properties": {
@@ -83,7 +83,7 @@
     },
 
     "carried_resources": {
-      "type": "array",
+      "type": ["array", "null"],
       "items": {
         "type": "object",
         "properties": {

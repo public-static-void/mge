@@ -11,8 +11,8 @@ local function test_job_event_log_querying()
 
 	local eid1 = spawn_entity()
 	local eid2 = spawn_entity()
-	assign_job(eid1, "DigTunnel", { state = "pending", priority = 5, category = "test" })
-	assign_job(eid2, "BuildWall", { state = "pending", priority = 10, category = "test" })
+	assign_job(eid1, "DigTunnel", { state = "pending", priority = 5, category = "test", assigned_to = agent1 })
+	assign_job(eid2, "BuildWall", { state = "pending", priority = 10, category = "test", assigned_to = agent2 })
 
 	for _ = 1, 10 do
 		tick()
@@ -40,9 +40,10 @@ local function test_job_event_log_querying()
 
 	local now = os.time() * 1000
 	local job3 = spawn_entity()
-	assign_job(job3, "TestJob", { state = "pending", category = "test" })
 	local agent3 = spawn_entity()
 	set_component(agent3, "Agent", { entity_id = agent3, skills = { TestJob = 1.0 } })
+	assign_job(job3, "TestJob", { state = "pending", category = "test", assigned_to = agent3 })
+
 	for _ = 1, 5 do
 		tick()
 	end
@@ -65,7 +66,7 @@ local function test_job_event_bus_polling()
 	local agent = spawn_entity()
 	set_component(agent, "Agent", { entity_id = agent, skills = { DigTunnel = 1.0 } })
 	local eid = spawn_entity()
-	assign_job(eid, "DigTunnel", { state = "pending", category = "test" })
+	assign_job(eid, "DigTunnel", { state = "pending", category = "test", assigned_to = agent })
 	for _ = 1, 5 do
 		tick()
 	end
@@ -91,7 +92,7 @@ local function test_job_event_bus_subscription()
 	end
 
 	local sub_id = job_events.subscribe_bus("job_completed", on_job_completed)
-	assign_job(eid, "DigTunnel", { state = "pending", category = "test" })
+	assign_job(eid, "DigTunnel", { state = "pending", category = "test", assigned_to = agent })
 	for _ = 1, 10 do
 		tick()
 		job_events.deliver_callbacks()
@@ -112,7 +113,7 @@ local function test_job_event_bus_subscription()
 	local job2 = spawn_entity()
 	local agent2 = spawn_entity()
 	set_component(agent2, "Agent", { entity_id = agent2, skills = { DigTunnel = 1.0 } })
-	assign_job(job2, "DigTunnel", { state = "pending", category = "test" })
+	assign_job(job2, "DigTunnel", { state = "pending", category = "test", assigned_to = agent2 })
 	for _ = 1, 10 do
 		tick()
 		job_events.deliver_callbacks()

@@ -15,14 +15,13 @@ impl EquipmentApi for PyWorld {
         let world = self.inner.borrow();
         if let Some(val) = world.get_component(entity_id, "Equipment") {
             let any = to_pyobject(py, val)?;
-            if let Ok(dict) = any.downcast::<PyDict>() {
-                if let Ok(Some(slots_any)) = dict.get_item("slots") {
-                    if let Ok(slots) = slots_any.downcast::<PyDict>() {
-                        for (k, v) in slots.iter() {
-                            if v.is_instance_of::<PyTuple>() && v.len().unwrap_or(1) == 0 {
-                                slots.set_item(k, py.None())?;
-                            }
-                        }
+            if let Ok(dict) = any.downcast::<PyDict>()
+                && let Ok(Some(slots_any)) = dict.get_item("slots")
+                && let Ok(slots) = slots_any.downcast::<PyDict>()
+            {
+                for (k, v) in slots.iter() {
+                    if v.is_instance_of::<PyTuple>() && v.len().unwrap_or(1) == 0 {
+                        slots.set_item(k, py.None())?;
                     }
                 }
             }
@@ -51,11 +50,11 @@ impl EquipmentApi for PyWorld {
         // 2. Check item metadata
         let mut found = None;
         for item_eid in world.get_entities_with_component("Item") {
-            if let Some(item_comp) = world.get_component(item_eid, "Item") {
-                if item_comp.get("id") == Some(&Value::String(item_id.clone())) {
-                    found = Some(item_comp);
-                    break;
-                }
+            if let Some(item_comp) = world.get_component(item_eid, "Item")
+                && item_comp.get("id") == Some(&Value::String(item_id.clone()))
+            {
+                found = Some(item_comp);
+                break;
             }
         }
         let item_meta =
@@ -88,10 +87,10 @@ impl EquipmentApi for PyWorld {
             })?;
 
         // 6. Check if slot is already occupied
-        if let Some(existing) = slots_obj.get(&slot) {
-            if !existing.is_null() {
-                return Err(pyo3::exceptions::PyValueError::new_err("already equipped"));
-            }
+        if let Some(existing) = slots_obj.get(&slot)
+            && !existing.is_null()
+        {
+            return Err(pyo3::exceptions::PyValueError::new_err("already equipped"));
         }
 
         // 7. Equip

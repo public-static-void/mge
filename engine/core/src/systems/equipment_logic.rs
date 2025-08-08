@@ -45,13 +45,12 @@ impl System for EquipmentLogicSystem {
                     return Some(cached.clone());
                 }
                 for item_eid in world.get_entities_with_component("Item") {
-                    if let Some(item_comp) = world.get_component(item_eid, "Item") {
-                        if let Some(id_val) = item_comp.get("id") {
-                            if id_val == item_id {
-                                item_cache.insert(item_id.to_string(), item_comp.clone());
-                                return Some(item_comp.clone());
-                            }
-                        }
+                    if let Some(item_comp) = world.get_component(item_eid, "Item")
+                        && let Some(id_val) = item_comp.get("id")
+                        && id_val == item_id
+                    {
+                        item_cache.insert(item_id.to_string(), item_comp.clone());
+                        return Some(item_comp.clone());
                     }
                 }
                 None
@@ -73,12 +72,12 @@ impl System for EquipmentLogicSystem {
                 };
 
                 // Check slot compatibility
-                if let Some(item_slot) = item_metadata.get("slot").and_then(|v| v.as_str()) {
-                    if item_slot != slot_name {
-                        // Incompatible slot: unequip
-                        slots_mut.insert(slot_name.clone(), JsonValue::Null);
-                        continue;
-                    }
+                if let Some(item_slot) = item_metadata.get("slot").and_then(|v| v.as_str())
+                    && item_slot != slot_name
+                {
+                    // Incompatible slot: unequip
+                    slots_mut.insert(slot_name.clone(), JsonValue::Null);
+                    continue;
                 }
 
                 // Check stat requirements
@@ -91,11 +90,10 @@ impl System for EquipmentLogicSystem {
                         if let (Some(req_num), Some(stat_val)) = (
                             req_val.as_i64(),
                             entity_stats.get(req_key).and_then(JsonValue::as_i64),
-                        ) {
-                            if stat_val < req_num {
-                                unmet = true;
-                                break;
-                            }
+                        ) && stat_val < req_num
+                        {
+                            unmet = true;
+                            break;
                         }
                     }
                     if unmet {

@@ -92,10 +92,9 @@ pub fn register_body_api(lua: &Lua, globals: &Table, world: Rc<RefCell<World>>) 
                         return true;
                     }
                     if let Some(children) = part.get_mut("children").and_then(|v| v.as_array_mut())
+                        && remove_part_recursive(children, name)
                     {
-                        if remove_part_recursive(children, name) {
-                            return true;
-                        }
+                        return true;
                     }
                     i += 1;
                 }
@@ -119,12 +118,11 @@ pub fn register_body_api(lua: &Lua, globals: &Table, world: Rc<RefCell<World>>) 
                                 }
                             }
                         }
-                        if let Some(equipped) = part.get_mut("equipped") {
-                            if equipped.is_null()
-                                || (equipped.is_array() && equipped.as_array().unwrap().is_empty())
-                            {
-                                *equipped = serde_json::json!([]);
-                            }
+                        if let Some(equipped) = part.get_mut("equipped")
+                            && (equipped.is_null()
+                                || (equipped.is_array() && equipped.as_array().unwrap().is_empty()))
+                        {
+                            *equipped = serde_json::json!([]);
                         }
                     }
 

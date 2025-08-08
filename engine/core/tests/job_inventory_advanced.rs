@@ -120,10 +120,63 @@ fn test_agent_makes_multiple_trips_for_large_job() {
     world.register_system(JobSystem::new());
     world.register_system(MovementSystem);
 
+    // Register job handler for "build" jobs that only completes when all resources are delivered
+    {
+        let registry = world.job_handler_registry.clone();
+        registry.lock().unwrap().register_handler(
+            "build",
+            move |_world, _agent_id, _job_id, job| {
+                let mut job = job.clone();
+                let state = job.get("state").and_then(|v| v.as_str()).unwrap_or("");
+                if matches!(
+                    state,
+                    "failed" | "complete" | "cancelled" | "interrupted" | "paused"
+                ) {
+                    return job;
+                }
+                let mut progress = job.get("progress").and_then(|v| v.as_f64()).unwrap_or(0.0);
+
+                let mut all_delivered = true;
+                if let Some(reqs) = job.get("resource_requirements").and_then(|v| v.as_array()) {
+                    if let Some(delivered) =
+                        job.get("delivered_resources").and_then(|v| v.as_array())
+                    {
+                        for req in reqs {
+                            let kind = req.get("kind").and_then(|v| v.as_str()).unwrap_or("");
+                            let amount = req.get("amount").and_then(|v| v.as_i64()).unwrap_or(0);
+                            let delivered_amt = delivered
+                                .iter()
+                                .find(|r| r.get("kind").and_then(|v| v.as_str()) == Some(kind))
+                                .and_then(|r| r.get("amount").and_then(|v| v.as_i64()))
+                                .unwrap_or(0);
+                            if delivered_amt < amount {
+                                all_delivered = false;
+                                break;
+                            }
+                        }
+                    } else {
+                        all_delivered = false;
+                    }
+                }
+
+                if all_delivered {
+                    progress += 1.0;
+                    job["progress"] = json!(progress);
+
+                    if progress >= 3.0 {
+                        job["state"] = json!("complete");
+                    }
+                }
+                job
+            },
+        );
+    }
+
     // Reserve resources and assign job
     world.run_system("ResourceReservationSystem", None).unwrap();
     let mut job_board = JobBoard::default();
-    job_board.update(&world);
+    job_board.update(&world, 0, &[]);
+
     assert_eq!(
         job_board.claim_job(agent_id, &mut world, 0),
         JobAssignmentResult::Assigned(job_id)
@@ -134,16 +187,18 @@ fn test_agent_makes_multiple_trips_for_large_job() {
     let mut trips = 0;
     let mut completed = false;
     for _tick in 0..50 {
+        world.run_system("ResourceReservationSystem", None).unwrap();
         world.run_system("MovementSystem", None).unwrap();
         world.run_system("JobSystem", None).unwrap();
 
         let job = world.get_component(job_id, "Job").unwrap();
-        if let Some(delivered) = job.get("delivered_resources") {
-            if let Some(arr) = delivered.as_array() {
-                if let Some(wood) = arr.iter().find(|r| r.get("kind") == Some(&json!("wood"))) {
-                    delivered_total = wood.get("amount").and_then(|v| v.as_i64()).unwrap_or(0);
-                }
-            }
+        let _agent = world.get_component(agent_id, "Agent").unwrap();
+
+        if let Some(delivered) = job.get("delivered_resources")
+            && let Some(arr) = delivered.as_array()
+            && let Some(wood) = arr.iter().find(|r| r.get("kind") == Some(&json!("wood")))
+        {
+            delivered_total = wood.get("amount").and_then(|v| v.as_i64()).unwrap_or(0);
         }
         if job.get("state") == Some(&json!("delivering_resources")) {
             trips += 1;
@@ -198,8 +253,14 @@ fn test_agent_makes_multiple_trips_for_large_job() {
         )
         .unwrap();
 
+    if let Some(stockpile) = world.get_component(stockpile_id, "Stockpile") {
+        println!("Stockpile resources: {:?}", stockpile.get("resources"));
+    } else {
+        println!("Stockpile {stockpile_id} not found.");
+    }
+
     world.run_system("ResourceReservationSystem", None).unwrap();
-    job_board.update(&world);
+    job_board.update(&world, 0, &[]);
     assert_eq!(
         job_board.claim_job(agent_id, &mut world, 0),
         JobAssignmentResult::Assigned(job_id2)
@@ -209,16 +270,18 @@ fn test_agent_makes_multiple_trips_for_large_job() {
     let mut trips2 = 0;
     let mut completed2 = false;
     for _tick in 0..50 {
+        world.run_system("ResourceReservationSystem", None).unwrap();
         world.run_system("MovementSystem", None).unwrap();
         world.run_system("JobSystem", None).unwrap();
 
         let job = world.get_component(job_id2, "Job").unwrap();
-        if let Some(delivered) = job.get("delivered_resources") {
-            if let Some(arr) = delivered.as_array() {
-                if let Some(wood) = arr.iter().find(|r| r.get("kind") == Some(&json!("wood"))) {
-                    delivered_total2 = wood.get("amount").and_then(|v| v.as_i64()).unwrap_or(0);
-                }
-            }
+        let _agent = world.get_component(agent_id, "Agent").unwrap();
+
+        if let Some(delivered) = job.get("delivered_resources")
+            && let Some(arr) = delivered.as_array()
+            && let Some(wood) = arr.iter().find(|r| r.get("kind") == Some(&json!("wood")))
+        {
+            delivered_total2 = wood.get("amount").and_then(|v| v.as_i64()).unwrap_or(0);
         }
         if job.get("state") == Some(&json!("delivering_resources")) {
             trips2 += 1;

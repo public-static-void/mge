@@ -11,24 +11,27 @@
       }
     },
     "max_slots": {
-      "type": "integer",
-      "description": "Maximum number of slots/items."
+      "type": ["integer", "null"],
+      "description": "Maximum number of slots/items.",
+      "default": null
     },
     "weight": {
       "type": "number",
       "description": "Total weight of contents."
     },
     "max_weight": {
-      "type": "number",
-      "description": "Maximum allowed weight."
+      "type": ["number", "null"],
+      "description": "Maximum allowed weight.",
+      "default": null
     },
     "volume": {
       "type": "number",
       "description": "Total volume of contents."
     },
     "max_volume": {
-      "type": "number",
-      "description": "Maximum allowed volume."
+      "type": ["number", "null"],
+      "description": "Maximum allowed volume.",
+      "default": null
     }
   },
   "required": ["slots", "weight", "volume"],

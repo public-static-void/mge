@@ -1,6 +1,6 @@
 use once_cell::sync::Lazy;
 use pyo3::prelude::*;
-use pyo3::types::PyAny;
+use pythonize::{depythonize, pythonize};
 use std::collections::HashMap;
 use std::sync::Mutex;
 
@@ -18,15 +18,18 @@ pub fn py_job_handler(
             .get("job_type")
             .and_then(|v| v.as_str())
             .unwrap_or("");
+
         let registry = PY_JOB_HANDLER_REGISTRY
             .lock()
             .unwrap_or_else(|e| e.into_inner());
+
         if let Some(cb) = registry.get(job_type) {
-            let job_obj = serde_pyobject::to_pyobject(py, job_data).unwrap();
+            let job_obj = pythonize(py, job_data).unwrap();
+
             match cb.call1(py, (job_obj,)) {
                 Ok(res) => {
                     let result_bound = res.bind(py);
-                    pythonize::depythonize(result_bound).unwrap()
+                    depythonize(result_bound).unwrap()
                 }
                 Err(e) => {
                     e.print(py);

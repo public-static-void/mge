@@ -14,12 +14,11 @@ pub fn validate_schema(schema_json: &str, allowed_modes: &[String]) -> Result<()
     // 2. Check for min > max in properties (generic data sanity)
     if let Some(props) = value.get("properties").and_then(|p| p.as_object()) {
         for (prop_name, prop) in props {
-            if let Some(min) = prop.get("minimum").and_then(|v| v.as_f64()) {
-                if let Some(max) = prop.get("maximum").and_then(|v| v.as_f64()) {
-                    if min > max {
-                        return Err(format!("Property '{prop_name}' has minimum > maximum"));
-                    }
-                }
+            if let Some(min) = prop.get("minimum").and_then(|v| v.as_f64())
+                && let Some(max) = prop.get("maximum").and_then(|v| v.as_f64())
+                && min > max
+            {
+                return Err(format!("Property '{prop_name}' has minimum > maximum"));
             }
         }
     }
@@ -27,10 +26,10 @@ pub fn validate_schema(schema_json: &str, allowed_modes: &[String]) -> Result<()
     // 3. Check for invalid modes if present
     if let Some(modes) = value.get("modes").and_then(|m| m.as_array()) {
         for mode in modes {
-            if let Some(mode_str) = mode.as_str() {
-                if !allowed_modes.iter().any(|m| m == mode_str) {
-                    return Err(format!("Unknown mode '{mode_str}'"));
-                }
+            if let Some(mode_str) = mode.as_str()
+                && !allowed_modes.iter().any(|m| m == mode_str)
+            {
+                return Err(format!("Unknown mode '{mode_str}'"));
             }
         }
     }

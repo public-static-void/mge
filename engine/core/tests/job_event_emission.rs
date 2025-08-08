@@ -11,6 +11,33 @@ fn test_job_lifecycle_events_emitted() {
     engine_core::systems::job::system::events::init_job_event_logger();
     let mut world = world_helper::make_test_world();
 
+    // Register a handler for "dig" jobs so the job can progress and complete
+    {
+        let registry = world.job_handler_registry.clone();
+        registry
+            .lock()
+            .unwrap()
+            .register_handler("dig", move |_world, _agent_id, _job_id, job| {
+                let mut job = job.clone();
+                let state = job.get("state").and_then(|v| v.as_str()).unwrap_or("");
+                if matches!(
+                    state,
+                    "failed" | "complete" | "cancelled" | "interrupted" | "paused"
+                ) {
+                    return job;
+                }
+                let mut progress = job.get("progress").and_then(|v| v.as_f64()).unwrap_or(0.0);
+                progress += 1.0;
+                job["progress"] = json!(progress);
+                if progress >= 3.0 {
+                    job["state"] = json!("complete");
+                } else {
+                    job["state"] = json!("in_progress");
+                }
+                job
+            });
+    }
+
     // Agent and job setup
     let agent_id = world.spawn_entity();
     world
@@ -33,17 +60,17 @@ fn test_job_lifecycle_events_emitted() {
                 "id": job_id,
                 "job_type": "dig",
                 "state": "pending",
-                "cancelled": false,
                 "priority": 1,
-                "category": "mining"
+                "category": "mining",
+                "progress": 0.0
             }),
         )
         .unwrap();
 
     // Assign job to agent
     let mut job_board = JobBoard::default();
-    job_board.update(&world);
-    assign_jobs(&mut world, &mut job_board);
+    job_board.update(&world, 0, &[]);
+    assign_jobs(&mut world, &mut job_board, 0, &[]);
 
     // Advance event buses to make assigned event visible
     world.update_event_buses::<serde_json::Value>();
@@ -58,7 +85,8 @@ fn test_job_lifecycle_events_emitted() {
     let mut progress_events: Vec<serde_json::Value> = Vec::new();
 
     let mut job_system = JobSystem::new();
-    for _ in 0..5 {
+    for _ in 0..10 {
+        // Increase to 10 ticks to guarantee completion
         job_system.run(&mut world, None);
 
         // Advance event buses after system run, before draining
@@ -135,8 +163,7 @@ fn test_job_cancel_and_failure_events() {
             json!({
                 "id": cancel_job_id,
                 "job_type": "dig",
-                "state": "pending",
-                "cancelled": true,
+                "state": "cancelled",
                 "priority": 1,
                 "category": "mining"
             }),

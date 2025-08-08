@@ -106,15 +106,17 @@ impl UiWidget for Checkbox {
     }
 
     fn handle_event(&mut self, event: &UiEvent) {
-        if let UiEvent::Click { x, y } = *event {
-            if y == self.pos.1 && x >= self.pos.0 && x < self.pos.0 + self.label.len() as i32 + 2 {
-                self.checked = !self.checked;
-                if let Some(cb) = self.on_toggle.as_mut() {
-                    cb(self.checked);
-                }
-                if let Some(cb) = self.callbacks.get("toggle").cloned() {
-                    cb(self);
-                }
+        if let UiEvent::Click { x, y } = *event
+            && y == self.pos.1
+            && x >= self.pos.0
+            && x < self.pos.0 + self.label.len() as i32 + 2
+        {
+            self.checked = !self.checked;
+            if let Some(cb) = self.on_toggle.as_mut() {
+                cb(self.checked);
+            }
+            if let Some(cb) = self.callbacks.get("toggle").cloned() {
+                cb(self);
             }
         }
     }

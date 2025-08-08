@@ -42,15 +42,15 @@ impl Eq for Node {}
 /// If "walkable" is false, returns f32::INFINITY (impassable).
 pub fn default_cost_fn(meta: Option<&Value>) -> f32 {
     if let Some(meta) = meta {
-        if let Some(walkable) = meta.get("walkable") {
-            if walkable == &Value::Bool(false) {
-                return f32::INFINITY;
-            }
+        if let Some(walkable) = meta.get("walkable")
+            && walkable == &Value::Bool(false)
+        {
+            return f32::INFINITY;
         }
-        if let Some(cost) = meta.get("cost") {
-            if let Some(c) = cost.as_f64() {
-                return c as f32;
-            }
+        if let Some(cost) = meta.get("cost")
+            && let Some(c) = cost.as_f64()
+        {
+            return c as f32;
         }
     }
     1.0

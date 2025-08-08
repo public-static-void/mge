@@ -10,7 +10,11 @@
       ],
       "description": "One or more region/zone identifiers"
     },
-    "label": { "type": "string", "description": "Human-readable name" },
+    "label": {
+      "type": ["string", "null"],
+      "description": "Human-readable name",
+      "default": null
+    },
     "kind": {
       "type": "string",
       "description": "Region type (e.g., 'room', 'biome', 'stockpile')"

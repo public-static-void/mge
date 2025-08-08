@@ -144,25 +144,23 @@ impl UiApi {
             if let Some(panel) = parent
                 .as_any_mut()
                 .downcast_mut::<engine_core::presentation::ui::widget::panel::Panel>(
-            ) {
-                if let Some(pos) = panel.children.iter().position(|c| c.id() == child_id) {
-                    let mut child = panel.children.remove(pos);
-                    child.set_parent(None);
-                    removed_child = Some(child);
-                }
+            ) && let Some(pos) = panel.children.iter().position(|c| c.id() == child_id)
+            {
+                let mut child = panel.children.remove(pos);
+                child.set_parent(None);
+                removed_child = Some(child);
             }
             // Try GridLayout (if not already removed)
-            if removed_child.is_none() {
-                if let Some(grid) = parent
+            if removed_child.is_none()
+                && let Some(grid) = parent
                     .as_any_mut()
                     .downcast_mut::<engine_core::presentation::ui::layout::grid::GridLayout>(
-                ) {
-                    if let Some(pos) = grid.children.iter().position(|c| c.id() == child_id) {
-                        let mut child = grid.children.remove(pos);
-                        child.set_parent(None);
-                        removed_child = Some(child);
-                    }
-                }
+                )
+                && let Some(pos) = grid.children.iter().position(|c| c.id() == child_id)
+            {
+                let mut child = grid.children.remove(pos);
+                child.set_parent(None);
+                removed_child = Some(child);
             }
         }
         if let Some(child) = removed_child {

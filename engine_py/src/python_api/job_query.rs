@@ -68,25 +68,25 @@ impl JobQueryApi for PyWorld {
         if let Some(job_map) = world.components.get("Job") {
             for (eid, comp) in job_map.iter() {
                 let mut job = comp.clone();
-                if let Some(ref s) = state {
-                    if job.get("state").and_then(|v| v.as_str()) != Some(s) {
-                        continue;
-                    }
+                if let Some(ref s) = state
+                    && job.get("state").and_then(|v| v.as_str()) != Some(s)
+                {
+                    continue;
                 }
-                if let Some(ref jt) = job_type {
-                    if job.get("job_type").and_then(|v| v.as_str()) != Some(jt) {
-                        continue;
-                    }
+                if let Some(ref jt) = job_type
+                    && job.get("job_type").and_then(|v| v.as_str()) != Some(jt)
+                {
+                    continue;
                 }
-                if let Some(aid) = assigned_to {
-                    if job.get("assigned_to").and_then(|v| v.as_u64()) != Some(aid as u64) {
-                        continue;
-                    }
+                if let Some(aid) = assigned_to
+                    && job.get("assigned_to").and_then(|v| v.as_u64()) != Some(aid as u64)
+                {
+                    continue;
                 }
-                if let Some(ref cat) = category {
-                    if job.get("category").and_then(|v| v.as_str()) != Some(cat) {
-                        continue;
-                    }
+                if let Some(ref cat) = category
+                    && job.get("category").and_then(|v| v.as_str()) != Some(cat)
+                {
+                    continue;
                 }
                 job["id"] = json!(eid);
                 jobs.push(job);
@@ -134,7 +134,7 @@ impl JobQueryApi for PyWorld {
     fn cancel_job(&self, job_id: u32) -> PyResult<()> {
         let mut world = self.inner.borrow_mut();
         if let Some(mut job) = world.get_component(job_id, "Job").cloned() {
-            job["cancelled"] = serde_json::json!(true);
+            job["state"] = serde_json::json!("cancelled");
             world
                 .set_component(job_id, "Job", job)
                 .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))

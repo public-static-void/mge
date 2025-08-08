@@ -115,7 +115,7 @@ fn test_agent_fetches_and_delivers_resources_with_failure_and_interruption() {
     // Reserve resources and assign job
     world.run_system("ResourceReservationSystem", None).unwrap();
     let mut job_board = JobBoard::default();
-    job_board.update(&world);
+    job_board.update(&world, 0, &[]);
     match job_board.claim_job(agent_id, &mut world, 0) {
         JobAssignmentResult::Assigned(_) => (),
         other => panic!("Job assignment failed: {other:?}"),
@@ -213,7 +213,7 @@ fn test_agent_fetches_and_delivers_resources_with_failure_and_interruption() {
         .unwrap();
 
     world.run_system("ResourceReservationSystem", None).unwrap();
-    job_board.update(&world);
+    job_board.update(&world, 0, &[]);
     match job_board.claim_job(agent_id, &mut world, 0) {
         JobAssignmentResult::Assigned(_) => (),
         other => panic!("Job assignment failed: {other:?}"),
@@ -242,7 +242,7 @@ fn test_agent_fetches_and_delivers_resources_with_failure_and_interruption() {
     // Cancel the job
     {
         let mut job = world.get_component(job_id2, "Job").unwrap().clone();
-        job["cancelled"] = json!(true);
+        job["state"] = json!("cancelled");
         world.set_component(job_id2, "Job", job).unwrap();
     }
 

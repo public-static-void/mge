@@ -14,7 +14,7 @@
       "description": "Game tick or timestamp when this job was created. Used for FIFO/LIFO scheduling.",
       "default": 0
     },
-    "target": { "type": ["integer", "null"] },
+    "target": { "type": ["integer", "null"], "default": null },
     "state": {
       "type": "string",
       "enum": [
@@ -36,18 +36,19 @@
       "default": "pending",
       "description": "Current execution phase of the job"
     },
-    "progress": { "type": "number", "minimum": 0 },
+    "progress": { "type": ["number", "null"], "minimum": 0, "default": null },
     "assigned_to": {
       "type": ["integer", "null"],
-      "description": "Entity ID assigned to this job"
+      "description": "Entity ID assigned to this job",
+      "default": null
     },
     "priority": {
-      "type": "integer",
+      "type": ["integer", "null"],
       "default": 0,
       "description": "Higher value means higher priority"
     },
     "resource_requirements": {
-      "type": "array",
+      "type": ["array", "null"],
       "items": {
         "type": "object",
         "properties": {
@@ -56,10 +57,11 @@
         },
         "required": ["kind", "amount"]
       },
-      "description": "Resources required to start this job"
+      "description": "Resources required to start this job",
+      "default": []
     },
     "reserved_resources": {
-      "type": "array",
+      "type": ["array", "null"],
       "items": {
         "type": "object",
         "properties": {
@@ -68,14 +70,16 @@
         },
         "required": ["kind", "amount"]
       },
-      "description": "Resources reserved for this job"
+      "description": "Resources reserved for this job",
+      "default": []
     },
     "reserved_stockpile": {
       "type": ["integer", "null"],
-      "description": "Stockpile entity ID from which resources are reserved"
+      "description": "Stockpile entity ID from which resources are reserved",
+      "default": null
     },
     "delivered_resources": {
-      "type": "array",
+      "type": ["array", "null"],
       "items": {
         "type": "object",
         "properties": {
@@ -84,46 +88,49 @@
         },
         "required": ["kind", "amount"]
       },
-      "description": "Resources delivered so far"
+      "description": "Resources delivered so far",
+      "default": []
     },
     "delivery_status": {
-      "type": "string",
+      "type": ["string", "null"],
       "enum": ["none", "partial", "complete"],
       "default": "none"
     },
     "children": {
-      "type": "array",
+      "type": ["array", "null"],
       "items": { "$ref": "#" },
-      "description": "Subtasks of this job"
+      "description": "Subtasks of this job",
+      "default": []
     },
     "dependencies": {
       "description": "Prerequisite jobs or world/entity conditions. Supports AND/OR/NOT/world/entity-state.",
       "oneOf": [
         {
-          "type": "array",
+          "type": ["array", "null"],
           "items": {
             "anyOf": [
               { "type": "string" },
               { "$ref": "#/definitions/DependencyExpr" }
             ]
-          }
+          },
+          "default": []
         },
         { "$ref": "#/definitions/DependencyExpr" }
       ]
     },
     "applied_effects": {
-      "type": "array",
+      "type": ["array", "null"],
       "items": { "type": "integer" },
       "description": "Indices of effects that have been applied; enables rollback on cancel/failure.",
       "default": []
     },
     "assignment_count": {
-      "type": "integer",
+      "type": ["integer", "null"],
       "default": 0,
       "description": "How many times this job has been assigned to any agent."
     },
     "last_assigned_tick": {
-      "type": "integer",
+      "type": ["integer", "null"],
       "default": 0,
       "description": "Game tick when this job was last assigned."
     },
@@ -144,7 +151,8 @@
             }
           }
         }
-      }
+      },
+      "default": null
     }
   },
   "required": ["job_type", "state", "category"],
@@ -153,49 +161,54 @@
       "type": "object",
       "properties": {
         "all_of": {
-          "type": "array",
+          "type": ["array", "null"],
           "items": {
             "anyOf": [
               { "type": "string" },
               { "$ref": "#/definitions/DependencyExpr" }
             ]
-          }
+          },
+          "default": []
         },
         "any_of": {
-          "type": "array",
+          "type": ["array", "null"],
           "items": {
             "anyOf": [
               { "type": "string" },
               { "$ref": "#/definitions/DependencyExpr" }
             ]
-          }
+          },
+          "default": []
         },
         "not": {
-          "type": "array",
+          "type": ["array", "null"],
           "items": {
             "anyOf": [
               { "type": "string" },
               { "$ref": "#/definitions/DependencyExpr" }
             ]
-          }
+          },
+          "default": []
         },
         "world_state": {
-          "type": "object",
+          "type": ["object", "null"],
           "properties": {
             "resource": { "type": "string" },
-            "gte": { "type": "number" },
-            "lte": { "type": "number" }
-          }
+            "gte": { "type": ["number", "null"], "default": null },
+            "lte": { "type": ["number", "null"], "default": null }
+          },
+          "default": null
         },
         "entity_state": {
-          "type": "object",
+          "type": ["object", "null"],
           "properties": {
-            "entity": { "type": "integer" },
+            "entity": { "type": ["integer", "null"], "default": null },
             "component": { "type": "string" },
             "field": { "type": "string" },
-            "gte": { "type": "number" },
-            "lte": { "type": "number" }
-          }
+            "gte": { "type": ["number", "null"], "default": null },
+            "lte": { "type": ["number", "null"], "default": null }
+          },
+          "default": null
         }
       }
     }

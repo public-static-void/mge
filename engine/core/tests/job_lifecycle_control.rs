@@ -13,6 +13,33 @@ fn test_job_can_be_paused_and_resumed() {
     let mut world = make_test_world();
     world.current_mode = "colony".to_string();
 
+    // Register a handler for "dig" jobs that respects pausing
+    {
+        let registry = world.job_handler_registry.clone();
+        registry
+            .lock()
+            .unwrap()
+            .register_handler("dig", move |_world, _agent_id, _job_id, job| {
+                let mut job = job.clone();
+                let state = job.get("state").and_then(|v| v.as_str()).unwrap_or("");
+                if matches!(
+                    state,
+                    "failed" | "complete" | "cancelled" | "interrupted" | "paused"
+                ) {
+                    return job;
+                }
+                let mut progress = job.get("progress").and_then(|v| v.as_f64()).unwrap_or(0.0);
+                progress += 1.0;
+                job["progress"] = json!(progress);
+                if progress >= 3.0 {
+                    job["state"] = json!("complete");
+                } else {
+                    job["state"] = json!("in_progress");
+                }
+                job
+            });
+    }
+
     // Setup agent and job
     let agent_id = world.spawn_entity();
     world
@@ -55,7 +82,7 @@ fn test_job_can_be_paused_and_resumed() {
 
     // Assign job
     let mut job_board = JobBoard::default();
-    job_board.update(&world);
+    job_board.update(&world, 0, &[]);
     assert_eq!(
         job_board.claim_job(agent_id, &mut world, 0),
         JobAssignmentResult::Assigned(job_id)
@@ -118,6 +145,33 @@ fn test_job_is_interrupted_and_resumed_by_another_agent() {
     engine_core::systems::job::system::events::init_job_event_logger();
     let mut world = make_test_world();
     world.current_mode = "colony".to_string();
+
+    // Register a handler for "dig" jobs that respects pausing/interruption
+    {
+        let registry = world.job_handler_registry.clone();
+        registry
+            .lock()
+            .unwrap()
+            .register_handler("dig", move |_world, _agent_id, _job_id, job| {
+                let mut job = job.clone();
+                let state = job.get("state").and_then(|v| v.as_str()).unwrap_or("");
+                if matches!(
+                    state,
+                    "failed" | "complete" | "cancelled" | "interrupted" | "paused"
+                ) {
+                    return job;
+                }
+                let mut progress = job.get("progress").and_then(|v| v.as_f64()).unwrap_or(0.0);
+                progress += 1.0;
+                job["progress"] = json!(progress);
+                if progress >= 3.0 {
+                    job["state"] = json!("complete");
+                } else {
+                    job["state"] = json!("in_progress");
+                }
+                job
+            });
+    }
 
     // Map setup: 3-square-wide walkable map
     let map_json = serde_json::json!({
@@ -195,7 +249,7 @@ fn test_job_is_interrupted_and_resumed_by_another_agent() {
 
     // Assign job to agent1
     let mut job_board = JobBoard::default();
-    job_board.update(&world);
+    job_board.update(&world, 0, &[]);
     assert_eq!(
         job_board.claim_job(agent1, &mut world, 0),
         JobAssignmentResult::Assigned(job_id)
@@ -228,7 +282,7 @@ fn test_job_is_interrupted_and_resumed_by_another_agent() {
     world.set_component(job_id, "Job", job.clone()).unwrap();
 
     // Assign job to agent2
-    job_board.update(&world);
+    job_board.update(&world, 0, &[]);
     assert_eq!(
         job_board.claim_job(agent2, &mut world, 1),
         JobAssignmentResult::Assigned(job_id)
@@ -305,7 +359,7 @@ fn test_job_progression_affected_by_world_conditions() {
         )
         .unwrap();
 
-    // Register a custom job handler that checks for hazard and slows progress
+    // Register a custom job handler that checks for hazard and slows progress, and respects pausing
     {
         let registry = world.job_handler_registry.clone();
         registry
@@ -313,6 +367,13 @@ fn test_job_progression_affected_by_world_conditions() {
             .unwrap()
             .register_handler("dig", move |world, _agent_id, _job_id, job| {
                 let mut job = job.clone();
+                let state = job.get("state").and_then(|v| v.as_str()).unwrap_or("");
+                if matches!(
+                    state,
+                    "failed" | "complete" | "cancelled" | "interrupted" | "paused"
+                ) {
+                    return job;
+                }
                 let mut progress = job.get("progress").and_then(|v| v.as_f64()).unwrap_or(0.0);
                 // Find any Hazard component (use first found)
                 let slowdown = world
@@ -333,6 +394,14 @@ fn test_job_progression_affected_by_world_conditions() {
     }
 
     world.register_system(JobSystem::new());
+
+    // Assign job to agent BEFORE ticking
+    let mut job_board = JobBoard::default();
+    job_board.update(&world, 0, &[]);
+    assert_eq!(
+        job_board.claim_job(agent_id, &mut world, 0),
+        JobAssignmentResult::Assigned(job_id)
+    );
 
     // Tick: progress should be slow due to hazard
     let mut ticks = 0;

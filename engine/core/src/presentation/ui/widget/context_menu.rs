@@ -188,10 +188,10 @@ impl UiWidget for ContextMenu {
                 });
             }
         }
-        if let Some(sub_idx) = self.open_submenu {
-            if let Some(submenu) = self.entries[sub_idx].submenu.as_mut() {
-                submenu.render(renderer);
-            }
+        if let Some(sub_idx) = self.open_submenu
+            && let Some(submenu) = self.entries[sub_idx].submenu.as_mut()
+        {
+            submenu.render(renderer);
         }
     }
 
@@ -289,10 +289,10 @@ impl UiWidget for ContextMenu {
             },
         }
         // Forward event to open submenu if any
-        if let Some(sub_idx) = self.open_submenu {
-            if let Some(submenu) = self.entries[sub_idx].submenu.as_mut() {
-                submenu.handle_event(event);
-            }
+        if let Some(sub_idx) = self.open_submenu
+            && let Some(submenu) = self.entries[sub_idx].submenu.as_mut()
+        {
+            submenu.handle_event(event);
         }
     }
 

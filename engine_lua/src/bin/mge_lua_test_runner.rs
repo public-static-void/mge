@@ -16,6 +16,7 @@ use engine_lua::ScriptEngine;
 use gag::BufferRedirect;
 use regex::Regex;
 use std::cell::RefCell;
+use std::collections::HashSet;
 use std::env;
 use std::fs;
 use std::io::Read;
@@ -76,42 +77,86 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Ensure we are running from the workspace root so all relative paths work
     env::set_current_dir(workspace_root()).expect("Failed to set current dir to workspace root");
 
-    // Compile the regex ONCE, outside the loop (Clippy requirement)
-    let re = Regex::new(r#"test_[a-zA-Z0-9_]+\s*="#).unwrap();
-
-    // Discover test functions, filtered by module and/or function if provided
+    // Directory containing Lua test files
     let test_dir = lua_tests_dir();
-    let mut test_functions = Vec::new();
+    let mut test_functions_set = HashSet::new();
+
+    // Compile regexes once, outside of the loop
+    let return_table_re = Regex::new(r"return\s*\{(?s)(.*?)\}").unwrap();
+    let test_key_re = Regex::new(r"\b(test_[a-zA-Z0-9_]+)\b").unwrap();
+
     for entry in fs::read_dir(&test_dir)? {
         let entry = entry?;
         let path = entry.path();
-        if let Some(fname) = path.file_name().and_then(|s| s.to_str()) {
-            if fname.starts_with("test_") && fname.ends_with(".lua") {
-                let modname = &fname[..fname.len() - 4];
-                if filter_module.is_none_or(|f| modname == f) {
-                    let content = fs::read_to_string(&path)?;
-                    // Use the regex compiled above
-                    for cap in re.find_iter(&content) {
-                        let key = cap.as_str().split('=').next().unwrap().trim();
-                        // Apply filters as before
-                        if let (Some(fmod), Some(ffunc)) = (filter_module, filter_func) {
-                            if modname == fmod && key == ffunc {
-                                test_functions.push((modname.to_string(), key.to_string()));
-                            }
-                        } else if let (None, Some(_)) = (filter_module, filter_func) {
-                            // Do nothing: function filter without module filter is not supported
-                        } else if let (Some(fmod), None) = (filter_module, filter_func) {
-                            if modname == fmod {
-                                test_functions.push((modname.to_string(), key.to_string()));
-                            }
-                        } else if filter_module.is_none() && filter_func.is_none() {
-                            test_functions.push((modname.to_string(), key.to_string()));
+        if let Some(fname) = path.file_name().and_then(|s| s.to_str())
+            && fname.starts_with("test_")
+            && fname.ends_with(".lua")
+        {
+            let modname = &fname[..fname.len() - 4];
+            if filter_module.is_none_or(|f| modname == f) {
+                // Read the Lua source file content
+                let content = fs::read_to_string(&path)?;
+
+                // Strip Lua comments (single-line "--" and multiline "--[[ ... ]]") to avoid false matches
+                let mut inside_multiline_comment = false;
+                let mut uncommented_lines = Vec::new();
+
+                for line in content.lines() {
+                    let trimmed = line.trim_start();
+
+                    if inside_multiline_comment {
+                        if trimmed.contains("]]") {
+                            inside_multiline_comment = false;
                         }
+                        continue; // skip lines inside multiline comment
+                    }
+
+                    if trimmed.starts_with("--[[") {
+                        inside_multiline_comment = true;
+                        continue; // skip start of multiline comment
+                    }
+
+                    if trimmed.starts_with("--") {
+                        continue; // skip single-line comment
+                    }
+
+                    uncommented_lines.push(line);
+                }
+
+                let uncommented_content = uncommented_lines.join("\n");
+
+                // Extract the content inside the return table {...}
+                let return_table_content =
+                    if let Some(caps) = return_table_re.captures(&uncommented_content) {
+                        caps.get(1).map_or("", |m| m.as_str())
+                    } else {
+                        ""
+                    };
+
+                // Collect test functions from keys in return table with filtering
+                for cap in test_key_re.captures_iter(return_table_content) {
+                    let key = cap.get(1).unwrap().as_str();
+                    if let (Some(fmod), Some(ffunc)) = (filter_module, filter_func) {
+                        if modname == fmod && key == ffunc {
+                            test_functions_set.insert((modname.to_string(), key.to_string()));
+                        }
+                    } else if let (None, Some(_)) = (filter_module, filter_func) {
+                        // function filter without module filter not supported
+                    } else if let (Some(fmod), None) = (filter_module, filter_func) {
+                        if modname == fmod {
+                            test_functions_set.insert((modname.to_string(), key.to_string()));
+                        }
+                    } else if filter_module.is_none() && filter_func.is_none() {
+                        test_functions_set.insert((modname.to_string(), key.to_string()));
                     }
                 }
             }
         }
     }
+
+    // Convert to a Vec and sort for deterministic order
+    let mut test_functions: Vec<(String, String)> = test_functions_set.into_iter().collect();
+    test_functions.sort();
 
     if test_functions.is_empty() {
         eprintln!("No tests found matching your filters.");
@@ -191,36 +236,39 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             registry.lock().unwrap().register_external_schema(schema);
         }
 
+        // Each individual test function gets its own fresh World instance,
+        // but all Lua API calls within a test run on that single World.
         let world = Rc::new(RefCell::new(World::new(registry.clone())));
 
         let mut grid = SquareGridMap::new();
         grid.add_cell(0, 2, 0);
         grid.add_cell(1, 2, 0);
+        // Add mutual neighbors since adjacency is undirected
+        grid.add_neighbor((0, 2, 0), (1, 2, 0));
+        grid.add_neighbor((1, 2, 0), (0, 2, 0));
         let map = Map::new(Box::new(grid));
         world.borrow_mut().map = Some(map);
 
         // Move all: increment x for all entities with Position
         if let Some(positions) = world.borrow_mut().components.get_mut("Position") {
             for (_eid, value) in positions.iter_mut() {
-                if let Some(obj) = value.as_object_mut() {
-                    if let Some(x) = obj.get_mut("x") {
-                        if let Some(x_val) = x.as_f64() {
-                            *x = serde_json::json!(x_val + 1.0);
-                        }
-                    }
+                if let Some(obj) = value.as_object_mut()
+                    && let Some(x) = obj.get_mut("x")
+                    && let Some(x_val) = x.as_f64()
+                {
+                    *x = serde_json::json!(x_val + 1.0);
                 }
             }
         }
         // Damage all: decrement health for all entities with Health
         if let Some(healths) = world.borrow_mut().components.get_mut("Health") {
             for (_eid, value) in healths.iter_mut() {
-                if let Some(obj) = value.as_object_mut() {
-                    if let Some(current) = obj.get_mut("current") {
-                        if let Some(cur_val) = current.as_f64() {
-                            let new_val = (cur_val - 1.0).max(0.0);
-                            *current = serde_json::json!(new_val);
-                        }
-                    }
+                if let Some(obj) = value.as_object_mut()
+                    && let Some(current) = obj.get_mut("current")
+                    && let Some(cur_val) = current.as_f64()
+                {
+                    let new_val = (cur_val - 1.0).max(0.0);
+                    *current = serde_json::json!(new_val);
                 }
             }
         }
@@ -271,21 +319,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "#
         );
 
-        // --- Capture stdout/stderr for this test only during test execution ---
-        // let out_buf = BufferRedirect::stdout().unwrap();
-        // let err_buf = BufferRedirect::stderr().unwrap();
-
         // Run the test
         let result = engine.run_script(&script);
-
-        // Stop capturing and read output
-        // drop(out_buf);
-        // drop(err_buf);
 
         let mut output = String::new();
         let mut error_output = String::new();
 
-        // Re-capture from the buffers (they must be dropped first for all output to flush)
+        // Capture stdout and stderr output after the run
         let mut out_buf = BufferRedirect::stdout().unwrap();
         let mut err_buf = BufferRedirect::stderr().unwrap();
 
@@ -302,7 +342,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             print!("{}", indent_lines(&error_output));
         }
 
-        // Print status line after all test output, always aligned
+        // Print result status
         match result {
             Ok(_) => {
                 println!("{} {}", color(COLOR_GREEN, "[OK]    "), testname);
@@ -314,7 +354,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     mlua::Error::SyntaxError { message, .. } => message.clone(),
                     _ => format!("{e:?}"),
                 };
-                // Print error and stacktrace indented
                 println!("{}", indent_lines(&err_str));
                 failed += 1;
                 failed_tests.push((testname, err_str));

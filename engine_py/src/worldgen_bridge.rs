@@ -99,13 +99,13 @@ pub fn register_worldgen_postprocessor(py: Python, callback: Py<PyAny>) -> PyRes
                 let new_map: Value =
                     from_pyobject(dict).expect("Failed to convert PyDict to Value");
                 *map = new_map;
-            } else if let Ok(bound_any) = arg.extract::<pyo3::Bound<'_, pyo3::types::PyAny>>() {
-                if let Ok(dict) = bound_any.extract::<pyo3::Bound<'_, pyo3::types::PyDict>>() {
-                    // If the user mutated the dict in place, update map from arg
-                    let new_map: Value =
-                        from_pyobject(dict).expect("Failed to convert PyDict to Value");
-                    *map = new_map;
-                }
+            } else if let Ok(bound_any) = arg.extract::<pyo3::Bound<'_, pyo3::types::PyAny>>()
+                && let Ok(dict) = bound_any.extract::<pyo3::Bound<'_, pyo3::types::PyDict>>()
+            {
+                // If the user mutated the dict in place, update map from arg
+                let new_map: Value =
+                    from_pyobject(dict).expect("Failed to convert PyDict to Value");
+                *map = new_map;
             }
         });
     });

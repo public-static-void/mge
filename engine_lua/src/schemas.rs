@@ -9,8 +9,8 @@ lazy_static::lazy_static! {
         if let Ok(entries) = fs::read_dir(schema_dir) {
             for entry in entries.flatten() {
                 let path = entry.path();
-                if path.extension().and_then(|s| s.to_str()) == Some("json") {
-                    if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
+                if path.extension().and_then(|s| s.to_str()) == Some("json")
+                    && let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
                         if let Ok(schema_str) = fs::read_to_string(&path) {
                             if let Ok(schema) = serde_json::from_str::<Value>(&schema_str) {
                                 // Normalize key to lowercase for case-insensitive lookup
@@ -22,7 +22,6 @@ lazy_static::lazy_static! {
                             eprintln!("Failed to read schema file: {path:?}");
                         }
                     }
-                }
             }
         }
         map

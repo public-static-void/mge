@@ -33,7 +33,6 @@ fn test_job_progressed_event_emitted_on_progress_change() {
                 "id": job_id,
                 "job_type": "dig",
                 "state": "pending",
-                "cancelled": false,
                 "priority": 1,
                 "category": "mining"
             }),
@@ -42,8 +41,8 @@ fn test_job_progressed_event_emitted_on_progress_change() {
 
     // Assign job to agent
     let mut job_board = JobBoard::default();
-    job_board.update(&world);
-    assign_jobs(&mut world, &mut job_board);
+    job_board.update(&world, 0, &[]);
+    assign_jobs(&mut world, &mut job_board, 0, &[]);
 
     let mut job_system = JobSystem::new();
 
@@ -130,7 +129,6 @@ fn test_job_progressed_event_emitted_for_custom_handler() {
                 "id": job_id,
                 "job_type": "twostep",
                 "state": "pending",
-                "cancelled": false,
                 "priority": 1,
                 "category": "testing"
             }),
@@ -139,8 +137,8 @@ fn test_job_progressed_event_emitted_for_custom_handler() {
 
     // Assign job to agent
     let mut job_board = JobBoard::default();
-    job_board.update(&world);
-    assign_jobs(&mut world, &mut job_board);
+    job_board.update(&world, 0, &[]);
+    assign_jobs(&mut world, &mut job_board, 0, &[]);
 
     let mut job_system = JobSystem::new();
 

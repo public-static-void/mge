@@ -45,7 +45,7 @@ pub fn register_plugins() {
             &config,
             &mut engine_api,
             world_ptr,
-            &mut registry, // <-- fixed here
+            &mut registry,
         )
     }
     .expect("Failed to load native plugins from config at engine_py init");

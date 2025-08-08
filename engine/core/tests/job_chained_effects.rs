@@ -85,10 +85,34 @@ fn test_job_chained_effects() {
     };
     world.job_types.register(
         job_type_data,
-        JobLogicKind::Native(|_, _, _, job| job.clone()),
+        JobLogicKind::Native(|_world, _eid, _actor, job| {
+            let mut job = job.clone();
+            let progress = job.get("progress").and_then(|v| v.as_f64()).unwrap_or(0.0) + 1.0;
+            job["progress"] = serde_json::json!(progress);
+            if progress >= 1.0 {
+                job["state"] = serde_json::json!("complete");
+            }
+            job
+        }),
     );
 
-    // Create an entity and assign the job
+    // Create an agent with the correct specialization
+    let agent = world.spawn_entity();
+    world
+        .set_component(
+            agent,
+            "Agent",
+            json!({
+                "entity_id": agent,
+                "skills": {},
+                "preferences": {},
+                "state": "idle",
+                "specializations": ["test"]
+            }),
+        )
+        .unwrap();
+
+    // Create the job and assign the agent
     let eid = world.spawn_entity();
     world
         .set_component(
@@ -96,9 +120,10 @@ fn test_job_chained_effects() {
             "Job",
             json!({
                 "job_type": "ChainedJob",
-                "state": "pending",
+                "state": "in_progress",
                 "progress": 0.0,
-                "category": "test"
+                "category": "test",
+                "assigned_to": agent
             }),
         )
         .unwrap();

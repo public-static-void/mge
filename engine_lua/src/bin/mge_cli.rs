@@ -92,7 +92,7 @@ fn main() {
 
         // --- Plugin registration ---
         let mut engine_api = EngineApi {
-            // Fill with function pointers as needed for your engine
+            // Fill with function pointers as needed for engine
             spawn_entity: engine_core::plugins::ffi::ffi_spawn_entity,
             set_component: engine_core::plugins::ffi::ffi_set_component,
         };

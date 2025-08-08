@@ -3,7 +3,11 @@ local assert = require("assert")
 local function test_advance_job_progress()
 	init_job_event_logger()
 	local eid = spawn_entity()
-	assign_job(eid, "TestJob", { state = "pending", progress = 0.0, category = "test" })
+	local agent_id = spawn_entity()
+	-- Add Agent component with the appropriate skill for "TestJob"
+	set_component(agent_id, "Agent", { entity_id = agent_id, skills = { TestJob = 1.0 } })
+
+	assign_job(eid, "TestJob", { state = "pending", progress = 0.0, category = "test", assigned_to = agent_id })
 
 	local jobs = list_jobs()
 	assert.equals(1, #jobs)

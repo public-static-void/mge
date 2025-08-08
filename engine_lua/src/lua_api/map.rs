@@ -12,14 +12,16 @@ fn parse_cell_key(cell_json: serde_json::Value) -> Result<CellKey, mlua::Error> 
         return Ok(cell_key);
     }
     // Fallback: treat as Square if x/y/z fields are present
-    if let serde_json::Value::Object(ref obj) = cell_json {
-        if obj.contains_key("x") && obj.contains_key("y") && obj.contains_key("z") {
-            return Ok(CellKey::Square {
-                x: obj["x"].as_i64().unwrap() as i32,
-                y: obj["y"].as_i64().unwrap() as i32,
-                z: obj["z"].as_i64().unwrap() as i32,
-            });
-        }
+    if let serde_json::Value::Object(ref obj) = cell_json
+        && obj.contains_key("x")
+        && obj.contains_key("y")
+        && obj.contains_key("z")
+    {
+        return Ok(CellKey::Square {
+            x: obj["x"].as_i64().unwrap() as i32,
+            y: obj["y"].as_i64().unwrap() as i32,
+            z: obj["z"].as_i64().unwrap() as i32,
+        });
     }
     Err(mlua::Error::external("Invalid cell key format"))
 }
@@ -63,14 +65,13 @@ pub fn register_map_api(lua: &Lua, globals: &Table, world: Rc<RefCell<World>>) -
     let world_add_cell = world.clone();
     let add_cell = lua.create_function_mut(move |_, (x, y, z): (i32, i32, i32)| {
         let mut world = world_add_cell.borrow_mut();
-        if let Some(map) = &mut world.map {
-            if let Some(square) = map
+        if let Some(map) = &mut world.map
+            && let Some(square) = map
                 .topology
                 .as_any_mut()
                 .downcast_mut::<engine_core::map::SquareGridMap>()
-            {
-                square.add_cell(x, y, z);
-            }
+        {
+            square.add_cell(x, y, z);
         }
         Ok(())
     })?;
@@ -120,14 +121,13 @@ pub fn register_map_api(lua: &Lua, globals: &Table, world: Rc<RefCell<World>>) -
         }
         let from_xyz = table_to_xyz(lua, from)?;
         let to_xyz = table_to_xyz(lua, to)?;
-        if let Some(map) = &mut world.map {
-            if let Some(square) = map
+        if let Some(map) = &mut world.map
+            && let Some(square) = map
                 .topology
                 .as_any_mut()
                 .downcast_mut::<engine_core::map::SquareGridMap>()
-            {
-                square.add_neighbor(from_xyz, to_xyz);
-            }
+        {
+            square.add_neighbor(from_xyz, to_xyz);
         }
         Ok(())
     })?;

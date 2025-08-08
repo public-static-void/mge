@@ -53,10 +53,10 @@ impl System for DeathProcessor {
         // Phase 1: Collect entity IDs from events
         let mut to_process = Vec::new();
         world.process_events("EntityDied", |payload| {
-            if let Some(entity_val) = payload.get("entity") {
-                if let Some(entity) = entity_val.as_u64() {
-                    to_process.push(entity as u32);
-                }
+            if let Some(entity_val) = payload.get("entity")
+                && let Some(entity) = entity_val.as_u64()
+            {
+                to_process.push(entity as u32);
             }
         });
 

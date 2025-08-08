@@ -81,8 +81,8 @@ impl System for EconomicSystem {
                 continue;
             }
 
-            // Allow pending jobs to start
-            if state == "pending" {
+            // Allow pending jobs to start only if assigned
+            if state == "pending" && job.get("assigned_to").and_then(|v| v.as_u64()).is_some() {
                 job["state"] = json!("in_progress");
             }
 
@@ -106,7 +106,7 @@ impl System for EconomicSystem {
                 if progress >= recipe.duration {
                     Self::produce_outputs(stock_map, &recipe.outputs);
                     job["state"] = json!("complete");
-                } else {
+                } else if job.get("assigned_to").and_then(|v| v.as_u64()).is_some() {
                     job["state"] = json!("in_progress");
                 }
             } else {

@@ -1,7 +1,22 @@
 def test_job_completion(make_world):
     world = make_world()
     eid = world.spawn_entity()
-    world.assign_job(eid, "test_job", category="testing", state="pending")
+
+    agent_id = world.spawn_entity()
+    world.set_component(
+        agent_id, "Agent", {"entity_id": agent_id, "skills": {"test_job": 1.0}}
+    )
+
+    world.assign_job(
+        eid,
+        "test_job",
+        category="testing",
+        state="pending",
+        assigned_to=agent_id,
+        target=None,
+        reserved_stockpile=None,
+        target_position=None,
+    )
     found = False
     for _ in range(12):  # enough ticks to guarantee completion
         world.run_native_system("JobSystem")

@@ -39,10 +39,10 @@ pub(crate) fn process_args(args: Vec<Meta>) -> ComponentAttr {
                 has_schema = true;
             }
             Meta::NameValue(ref nv) if nv.path.is_ident("version") => {
-                if let syn::Expr::Lit(expr_lit) = &nv.value {
-                    if let syn::Lit::Str(litstr) = &expr_lit.lit {
-                        version = litstr.value();
-                    }
+                if let syn::Expr::Lit(expr_lit) = &nv.value
+                    && let syn::Lit::Str(litstr) = &expr_lit.lit
+                {
+                    version = litstr.value();
                 }
             }
             Meta::List(ref list) if list.path.is_ident("migration") => {
@@ -56,19 +56,17 @@ pub(crate) fn process_args(args: Vec<Meta>) -> ComponentAttr {
                     .expect("Failed to parse migration list");
                 for m in migration_inner {
                     if let Meta::NameValue(nv) = m {
-                        if nv.path.is_ident("from") {
-                            if let syn::Expr::Lit(expr_lit) = &nv.value {
-                                if let syn::Lit::Str(litstr) = &expr_lit.lit {
-                                    from = Some(litstr.value());
-                                }
-                            }
+                        if nv.path.is_ident("from")
+                            && let syn::Expr::Lit(expr_lit) = &nv.value
+                            && let syn::Lit::Str(litstr) = &expr_lit.lit
+                        {
+                            from = Some(litstr.value());
                         }
-                        if nv.path.is_ident("convert") {
-                            if let syn::Expr::Lit(expr_lit) = &nv.value {
-                                if let syn::Lit::Str(litstr) = &expr_lit.lit {
-                                    convert = Some(litstr.value());
-                                }
-                            }
+                        if nv.path.is_ident("convert")
+                            && let syn::Expr::Lit(expr_lit) = &nv.value
+                            && let syn::Lit::Str(litstr) = &expr_lit.lit
+                        {
+                            convert = Some(litstr.value());
                         }
                     }
                 }

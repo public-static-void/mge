@@ -13,7 +13,7 @@
     "requirements": {
       "type": "object",
       "properties": {
-        "strength": { "type": "number" }
+        "strength": { "type": ["number", "null"], "default": null }
       },
       "required": []
     },
@@ -21,9 +21,9 @@
       "type": "object",
       "description": "Stat bonuses or effects applied when equipped",
       "properties": {
-        "strength": { "type": "number" },
-        "dexterity": { "type": "number" },
-        "intelligence": { "type": "number" }
+        "strength": { "type": ["number", "null"], "default": null },
+        "dexterity": { "type": ["number", "null"], "default": null },
+        "intelligence": { "type": ["number", "null"], "default": null }
       },
       "additionalProperties": false
     }

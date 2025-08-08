@@ -2,6 +2,7 @@
 
 use crate::helpers::lua_error_from_any;
 use engine_core::ecs::world::World;
+use engine_core::systems::job::reservation::ResourceReservationSystem;
 use mlua::{Lua, Result as LuaResult, Table};
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -107,6 +108,58 @@ pub fn register_economic_api(
                 .map_err(|e| lua_error_from_any(lua, e))
         })?;
     globals.set("modify_stockpile_resource", modify_stockpile_resource)?;
+
+    // get_job_resource_reservations(entity)
+    let world_get_res = world.clone();
+    let get_job_resource_reservations = lua.create_function_mut(move |lua, entity: u32| {
+        let world = world_get_res.borrow();
+        if let Some(job) = world.get_component(entity, "Job")
+            && let Some(reserved) = job.get("reserved_resources")
+            && let Some(arr) = reserved.as_array()
+        {
+            if arr.is_empty() {
+                return Ok(mlua::Value::Nil);
+            } else {
+                return crate::helpers::json_to_lua_table(lua, reserved);
+            }
+        }
+        Ok(mlua::Value::Nil)
+    })?;
+    globals.set(
+        "get_job_resource_reservations",
+        get_job_resource_reservations,
+    )?;
+
+    // reserve_job_resources(entity)
+    let world_reserve = world.clone();
+    let reserve_job_resources = lua.create_function_mut(move |_, entity: u32| {
+        let mut world = world_reserve.borrow_mut();
+        let mut system = ResourceReservationSystem::new();
+
+        // Run reservation system to allocate resources if possible
+        system.run_reservation(&mut world, None);
+
+        // Now check reservation status
+        let status = system.check_reservation_status(&world, entity);
+        Ok(matches!(
+            status,
+            engine_core::systems::job::reservation::ResourceReservationStatus::Reserved
+        ))
+    })?;
+    globals.set("reserve_job_resources", reserve_job_resources)?;
+
+    // release_job_resource_reservations(entity)
+    let world_release = world.clone();
+    let release_job_resource_reservations = lua.create_function_mut(move |_, entity: u32| {
+        let mut world = world_release.borrow_mut();
+        let system = ResourceReservationSystem::new();
+        system.release_reservation(&mut world, entity);
+        Ok(())
+    })?;
+    globals.set(
+        "release_job_resource_reservations",
+        release_job_resource_reservations,
+    )?;
 
     Ok(())
 }

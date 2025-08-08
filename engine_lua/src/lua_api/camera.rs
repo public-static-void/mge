@@ -49,15 +49,15 @@ pub fn register_camera_api(lua: &Lua, globals: &Table, world: Rc<RefCell<World>>
         let world = world_get.borrow();
         if let Some(camera_id) = world.get_entities_with_component("Camera").first() {
             // Prefer Position component's pos.Square if present
-            if let Some(pos) = world.get_component(*camera_id, "Position") {
-                if let Some(square) = pos.get("pos").and_then(|p| p.get("Square")) {
-                    let x = square.get("x").and_then(|v| v.as_i64()).unwrap_or(0);
-                    let y = square.get("y").and_then(|v| v.as_i64()).unwrap_or(0);
-                    let tbl = lua.create_table()?;
-                    tbl.set("x", x)?;
-                    tbl.set("y", y)?;
-                    return Ok(LuaValue::Table(tbl));
-                }
+            if let Some(pos) = world.get_component(*camera_id, "Position")
+                && let Some(square) = pos.get("pos").and_then(|p| p.get("Square"))
+            {
+                let x = square.get("x").and_then(|v| v.as_i64()).unwrap_or(0);
+                let y = square.get("y").and_then(|v| v.as_i64()).unwrap_or(0);
+                let tbl = lua.create_table()?;
+                tbl.set("x", x)?;
+                tbl.set("y", y)?;
+                return Ok(LuaValue::Table(tbl));
             }
             // Fallback: try Camera component's x/y (for legacy support)
             if let Some(cam) = world.get_component(*camera_id, "Camera") {

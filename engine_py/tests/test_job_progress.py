@@ -1,8 +1,20 @@
 def test_advance_job_progress(make_world):
     world = make_world()
     eid = world.spawn_entity()
+
+    agent_id = world.spawn_entity()
+    world.set_component(agent_id, "Agent", {"entity_id": agent_id, "skills": {"TestJob": 1.0}})
+
     world.assign_job(
-        eid, "TestJob", state="pending", progress=0.0, category="test"
+        eid,
+        "TestJob",
+        state="pending",
+        progress=0.0,
+        category="test",
+        assigned_to=agent_id,
+        target=None,
+        reserved_stockpile=None,
+        target_position=None,
     )
 
     jobs = world.list_jobs()

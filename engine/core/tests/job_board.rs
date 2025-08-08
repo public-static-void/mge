@@ -16,7 +16,7 @@ fn test_job_board_tracks_unassigned_jobs() {
     world.set_component(eid2, "Job", job2.clone()).unwrap();
 
     let mut board = JobBoard::default();
-    board.update(&world);
+    board.update(&world, 0, &[]);
 
     assert!(board.jobs.contains(&eid1));
     assert!(!board.jobs.contains(&eid2));
@@ -31,7 +31,7 @@ fn test_job_assignment_claims_job() {
     world.set_component(eid, "Job", job.clone()).unwrap();
 
     let mut board = JobBoard::default();
-    board.update(&world);
+    board.update(&world, 0, &[]);
 
     let result = board.claim_job(actor_eid, &mut world, 0);
     assert_eq!(result, JobAssignmentResult::Assigned(eid));
@@ -49,7 +49,7 @@ fn test_job_assignment_no_jobs_available() {
     let actor_eid = world.spawn_entity();
 
     let mut board = JobBoard::default();
-    board.update(&world);
+    board.update(&world, 0, &[]);
 
     let result = board.claim_job(actor_eid, &mut world, 0);
     assert_eq!(result, JobAssignmentResult::NoJobsAvailable);
@@ -75,7 +75,7 @@ fn test_job_board_metadata_and_policy_access() {
 
     // Default: PriorityPolicy
     let mut board = JobBoard::default();
-    board.update(&world);
+    board.update(&world, 0, &[]);
     let jobs = board.jobs_with_metadata(&world);
     assert_eq!(jobs.len(), 3);
     assert_eq!(jobs[0].eid, eid2); // Highest priority first
@@ -84,7 +84,7 @@ fn test_job_board_metadata_and_policy_access() {
 
     // Change to FIFO
     board.set_policy("fifo").unwrap();
-    board.update(&world);
+    board.update(&world, 0, &[]);
     let jobs = board.jobs_with_metadata(&world);
     assert_eq!(jobs[0].eid, eid1); // Oldest first (eid1)
     assert_eq!(jobs[1].eid, eid2);
@@ -92,7 +92,7 @@ fn test_job_board_metadata_and_policy_access() {
 
     // Change to LIFO
     board.set_policy("lifo").unwrap();
-    board.update(&world);
+    board.update(&world, 0, &[]);
     let jobs = board.jobs_with_metadata(&world);
     assert_eq!(jobs[0].eid, eid3); // Newest first (eid3)
     assert_eq!(jobs[1].eid, eid2);

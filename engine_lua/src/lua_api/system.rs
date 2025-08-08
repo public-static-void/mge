@@ -21,11 +21,11 @@ pub fn register_system_functions(
             lua_systems_outer.borrow_mut().insert(name.clone(), key);
 
             let mut dependencies = Vec::new();
-            if let Some(opts) = opts {
-                if let Ok(dep_table) = opts.get::<Table>("dependencies") {
-                    for dep in dep_table.sequence_values::<String>() {
-                        dependencies.push(dep?);
-                    }
+            if let Some(opts) = opts
+                && let Ok(dep_table) = opts.get::<Table>("dependencies")
+            {
+                for dep in dep_table.sequence_values::<String>() {
+                    dependencies.push(dep?);
                 }
             }
 
