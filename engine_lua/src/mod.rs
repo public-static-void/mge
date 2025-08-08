@@ -8,7 +8,7 @@
 //! - `get_health(entity)` -> {current, max} or nil
 //!
 //! ## Adding More Components
-//! 1. Extend `World` with your component storage.
+//! 1. Extend `World` with component storage.
 //! 2. Add set/get methods.
 //! 3. Register new Lua functions in `register_world`.
 //! 4. Add Lua and Rust tests.

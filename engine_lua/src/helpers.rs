@@ -183,6 +183,15 @@ pub fn lua_table_to_json_with_schema(
 ) -> LuaResult<JsonValue> {
     let props = schema.get("properties").and_then(|p| p.as_object());
 
+    // If this table is empty and the schema says this is an array, return [] not {}
+    if table.len()? == 0 {
+        if let Some(schema_type) = schema.get("type").and_then(|t| t.as_str()) {
+            if schema_type == "array" {
+                return Ok(JsonValue::Array(vec![]));
+            }
+        }
+    }
+
     let mut map = Map::new();
     for pair in table.clone().pairs::<LuaValue, LuaValue>() {
         let (key, val) = pair?;

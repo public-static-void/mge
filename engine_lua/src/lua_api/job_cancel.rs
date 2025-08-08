@@ -12,7 +12,7 @@ pub fn register_job_cancel_api(
     let cancel_job = lua.create_function_mut(move |_lua, job_id: u32| {
         let mut world = world_cancel.borrow_mut();
         if let Some(mut job) = world.get_component(job_id, "Job").cloned() {
-            job["cancelled"] = serde_json::json!(true);
+            job["state"] = serde_json::json!("cancelled");
             world
                 .set_component(job_id, "Job", job)
                 .map_err(mlua::Error::external)
