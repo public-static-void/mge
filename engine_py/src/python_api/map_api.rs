@@ -54,15 +54,14 @@ pub fn get_neighbors(pyworld: &PyWorld, py: Python, cell: &Bound<'_, PyAny>) -> 
 /// `from` and `to` are tuples of coordinates `(x, y, z)`.
 pub fn add_neighbor(pyworld: &PyWorld, from: (i32, i32, i32), to: (i32, i32, i32)) {
     let mut world = pyworld.inner.borrow_mut();
-    if let Some(map) = &mut world.map {
-        if let Some(square) = map
+    if let Some(map) = &mut world.map
+        && let Some(square) = map
             .topology
             .as_any_mut()
             .downcast_mut::<engine_core::map::SquareGridMap>()
         {
             square.add_neighbor(from, to);
         }
-    }
 }
 
 /// Get a list of entity IDs located in the given cell.
@@ -231,13 +230,12 @@ pub fn apply_chunk(pyworld: Py<PyWorld>, py: Python, chunk: &Bound<'_, PyAny>) -
 /// Add a cell to the map.
 pub fn add_cell(pyworld: &PyWorld, x: i32, y: i32, z: i32) {
     let mut world = pyworld.inner.borrow_mut();
-    if let Some(map) = &mut world.map {
-        if let Some(square) = map
+    if let Some(map) = &mut world.map
+        && let Some(square) = map
             .topology
             .as_any_mut()
             .downcast_mut::<engine_core::map::SquareGridMap>()
         {
             square.add_cell(x, y, z);
         }
-    }
 }

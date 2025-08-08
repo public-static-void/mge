@@ -33,11 +33,10 @@ impl ResourceReservationSystem {
         let mut stockpile_working: HashMap<u32, serde_json::Map<String, JsonValue>> =
             HashMap::new();
         for &stockpile_eid in &stockpile_eids {
-            if let Some(stockpile) = world.get_component(stockpile_eid, "Stockpile") {
-                if let Some(res) = stockpile.get("resources").and_then(|v| v.as_object()) {
+            if let Some(stockpile) = world.get_component(stockpile_eid, "Stockpile")
+                && let Some(res) = stockpile.get("resources").and_then(|v| v.as_object()) {
                     stockpile_working.insert(stockpile_eid, res.clone());
                 }
-            }
         }
 
         // Get all pending jobs, in ascending eid order for deterministic processing.
@@ -112,11 +111,10 @@ impl ResourceReservationSystem {
         if requirements.is_none() || requirements.unwrap().is_empty() {
             return ResourceReservationStatus::NotRequired;
         }
-        if let Some(reserved) = job.get("reserved_resources").and_then(|v| v.as_array()) {
-            if !reserved.is_empty() && job.get("reserved_stockpile").is_some() {
+        if let Some(reserved) = job.get("reserved_resources").and_then(|v| v.as_array())
+            && !reserved.is_empty() && job.get("reserved_stockpile").is_some() {
                 return ResourceReservationStatus::Reserved;
             }
-        }
         ResourceReservationStatus::WaitingForResources
     }
 

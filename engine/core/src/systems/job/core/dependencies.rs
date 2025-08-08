@@ -101,16 +101,14 @@ pub fn evaluate_world_state(world: &World, ws: &JsonValue) -> bool {
         let value = world.get_global_resource_amount(res);
         let gte = ws.get("gte").and_then(|v| v.as_f64());
         let lte = ws.get("lte").and_then(|v| v.as_f64());
-        if let Some(gte) = gte {
-            if value < gte {
+        if let Some(gte) = gte
+            && value < gte {
                 return false;
             }
-        }
-        if let Some(lte) = lte {
-            if value > lte {
+        if let Some(lte) = lte
+            && value > lte {
                 return false;
             }
-        }
         return true;
     }
     false
@@ -121,27 +119,24 @@ pub fn evaluate_entity_state(world: &World, es: &JsonValue) -> bool {
     let entity = es.get("entity").and_then(|v| v.as_u64()).map(|v| v as u32);
     let component = es.get("component").and_then(|v| v.as_str());
     let field = es.get("field").and_then(|v| v.as_str());
-    if let (Some(eid), Some(comp), Some(field)) = (entity, component, field) {
-        if let Some(comp_val) = world.get_component(eid, comp) {
+    if let (Some(eid), Some(comp), Some(field)) = (entity, component, field)
+        && let Some(comp_val) = world.get_component(eid, comp) {
             let value = comp_val
                 .get(field)
                 .and_then(|v| v.as_f64())
                 .unwrap_or(f64::NAN);
             let gte = es.get("gte").and_then(|v| v.as_f64());
             let lte = es.get("lte").and_then(|v| v.as_f64());
-            if let Some(gte) = gte {
-                if value < gte {
+            if let Some(gte) = gte
+                && value < gte {
                     return false;
                 }
-            }
-            if let Some(lte) = lte {
-                if value > lte {
+            if let Some(lte) = lte
+                && value > lte {
                     return false;
                 }
-            }
             return true;
         }
-    }
     false
 }
 
@@ -160,8 +155,8 @@ fn find_failure_state(world: &World, dep: &serde_json::Value) -> Option<&'static
         let dep_eid = dep.as_str().unwrap();
         if let Ok(eid) = dep_eid.parse::<u32>() {
             // Only propagate failure if entity exists
-            if world.entity_exists(eid) {
-                if let Some(dep_job) = world.get_component(eid, "Job") {
+            if world.entity_exists(eid)
+                && let Some(dep_job) = world.get_component(eid, "Job") {
                     let state = dep_job.get("state").and_then(|v| v.as_str()).unwrap_or("");
                     if state == "failed" {
                         return Some("failed");
@@ -170,7 +165,6 @@ fn find_failure_state(world: &World, dep: &serde_json::Value) -> Option<&'static
                         return Some("cancelled");
                     }
                 }
-            }
         }
         // If job doesn't exist, do NOT propagate failure
         return None;

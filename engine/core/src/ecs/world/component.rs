@@ -12,9 +12,9 @@ fn enforce_schema_defaults(value: &mut JsonValue, schema: &JsonValue) {
     {
         for (key, prop_schema) in props {
             // Handle 'oneOf' to respect mutually exclusive schema alternatives.
-            if let Some(one_of) = prop_schema.get("oneOf") {
-                if let Some(alternatives) = one_of.as_array() {
-                    if let Some(JsonValue::Object(prop_val)) = map.get_mut(key) {
+            if let Some(one_of) = prop_schema.get("oneOf")
+                && let Some(alternatives) = one_of.as_array()
+                    && let Some(JsonValue::Object(prop_val)) = map.get_mut(key) {
                         // Find the alternative schema matching the keys present in prop_val.
                         let matched_schema_opt = alternatives.iter().find(|alt_schema| {
                             alt_schema
@@ -36,8 +36,6 @@ fn enforce_schema_defaults(value: &mut JsonValue, schema: &JsonValue) {
                         // No matched alternative found, skip to avoid injecting defaults into all.
                         continue;
                     }
-                }
-            }
 
             // Proceed with normal default enforcement.
             let field_type = prop_schema.get("type").and_then(|t| t.as_str());
@@ -69,22 +67,19 @@ fn enforce_schema_defaults(value: &mut JsonValue, schema: &JsonValue) {
             }
 
             // Recurse into objects
-            if let Some("object") = field_type {
-                if let Some(child) = map.get_mut(key) {
+            if let Some("object") = field_type
+                && let Some(child) = map.get_mut(key) {
                     enforce_schema_defaults(child, prop_schema);
                 }
-            }
 
             // Recurse into arrays
-            if let Some("array") = field_type {
-                if let Some(items_schema) = prop_schema.get("items") {
-                    if let Some(JsonValue::Array(arr)) = map.get_mut(key) {
+            if let Some("array") = field_type
+                && let Some(items_schema) = prop_schema.get("items")
+                    && let Some(JsonValue::Array(arr)) = map.get_mut(key) {
                         for item in arr {
                             enforce_schema_defaults(item, items_schema);
                         }
                     }
-                }
-            }
         }
     }
 }

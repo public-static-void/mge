@@ -53,8 +53,8 @@ impl<R: PresentationRenderer> PresentationSystem<R> {
                 if let (Some(glyph), Some(color)) = (
                     renderable_json.get("glyph").and_then(|v| v.as_str()),
                     renderable_json.get("color").and_then(|v| v.as_array()),
-                ) {
-                    if color.len() == 3 {
+                )
+                    && color.len() == 3 {
                         let r = color[0].as_u64().unwrap_or(255) as u8;
                         let g = color[1].as_u64().unwrap_or(255) as u8;
                         let b = color[2].as_u64().unwrap_or(255) as u8;
@@ -65,7 +65,6 @@ impl<R: PresentationRenderer> PresentationSystem<R> {
                         };
                         self.renderer.queue_draw(cmd);
                     }
-                }
             }
         }
         self.renderer.present();
@@ -144,12 +143,12 @@ impl<R: PresentationRenderer> PresentationSystem<R> {
                     (0, 0)
                 };
 
-                if viewport.contains(x, y) {
-                    if let (Some(glyph), Some(color)) = (
+                if viewport.contains(x, y)
+                    && let (Some(glyph), Some(color)) = (
                         renderable_json.get("glyph").and_then(|v| v.as_str()),
                         renderable_json.get("color").and_then(|v| v.as_array()),
-                    ) {
-                        if color.len() == 3 {
+                    )
+                        && color.len() == 3 {
                             let r = color[0].as_u64().unwrap_or(255) as u8;
                             let g = color[1].as_u64().unwrap_or(255) as u8;
                             let b = color[2].as_u64().unwrap_or(255) as u8;
@@ -160,8 +159,6 @@ impl<R: PresentationRenderer> PresentationSystem<R> {
                             };
                             self.renderer.queue_draw(cmd);
                         }
-                    }
-                }
             }
         }
 
@@ -179,8 +176,8 @@ pub fn region_centroid(map: &crate::map::Map, region_id: &str) -> Option<(i32, i
         let mut sum_y = 0i64;
         let mut count = 0i64;
         for cell_id in cell_ids {
-            if let Some(meta) = region_map.cell_metadata.get(cell_id) {
-                if let (Some(x), Some(y)) = (
+            if let Some(meta) = region_map.cell_metadata.get(cell_id)
+                && let (Some(x), Some(y)) = (
                     meta.get("x").and_then(|v| v.as_i64()),
                     meta.get("y").and_then(|v| v.as_i64()),
                 ) {
@@ -188,7 +185,6 @@ pub fn region_centroid(map: &crate::map::Map, region_id: &str) -> Option<(i32, i
                     sum_y += y;
                     count += 1;
                 }
-            }
         }
         if count > 0 {
             Some(((sum_x / count) as i32, (sum_y / count) as i32))

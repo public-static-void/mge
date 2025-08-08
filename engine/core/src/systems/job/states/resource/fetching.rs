@@ -89,12 +89,12 @@ pub fn handle_fetching_resources_state(
                 );
 
                 // Set move_path to job site after pickup
-                if let Some(target_pos) = job.get("target_position") {
-                    if let Some(agent_pos) = world.get_component(assigned_to, "Position") {
+                if let Some(target_pos) = job.get("target_position")
+                    && let Some(agent_pos) = world.get_component(assigned_to, "Position") {
                         let agent_cell = crate::map::CellKey::from_position(agent_pos);
                         let target_cell = crate::map::CellKey::from_position(target_pos);
-                        if let (Some(agent_cell), Some(target_cell)) = (agent_cell, target_cell) {
-                            if agent_cell != target_cell {
+                        if let (Some(agent_cell), Some(target_cell)) = (agent_cell, target_cell)
+                            && agent_cell != target_cell {
                                 movement_ops::assign_move_path(
                                     world,
                                     assigned_to,
@@ -102,9 +102,7 @@ pub fn handle_fetching_resources_state(
                                     &target_cell,
                                 );
                             }
-                        }
                     }
-                }
 
                 job["state"] = json!("delivering_resources");
                 return job;

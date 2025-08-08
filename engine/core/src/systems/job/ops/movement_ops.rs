@@ -14,8 +14,8 @@ pub fn assign_move_path(
     from_cell: &crate::map::CellKey,
     to_cell: &crate::map::CellKey,
 ) {
-    if let Some(map) = &world.map {
-        if let Some(pathfinding) = map.find_path(from_cell, to_cell) {
+    if let Some(map) = &world.map
+        && let Some(pathfinding) = map.find_path(from_cell, to_cell) {
             if pathfinding.path.len() <= 1 {
                 // Already at destination or path empty; clear move_path if any
                 let mut agent = world.get_component(agent_id, "Agent").cloned().unwrap();
@@ -43,16 +43,14 @@ pub fn assign_move_path(
             agent["move_path"] = json!(move_path);
             let _ = world.set_component(agent_id, "Agent", agent);
         }
-    }
 }
 
 /// Returns `true` if the agent is currently at the given cell.
 pub fn is_agent_at_cell(world: &World, agent_id: u32, cell: &crate::map::CellKey) -> bool {
-    if let Some(agent_pos) = world.get_component(agent_id, "Position") {
-        if let Some(agent_cell) = crate::map::CellKey::from_position(agent_pos) {
+    if let Some(agent_pos) = world.get_component(agent_id, "Position")
+        && let Some(agent_cell) = crate::map::CellKey::from_position(agent_pos) {
             return &agent_cell == cell;
         }
-    }
     false
 }
 

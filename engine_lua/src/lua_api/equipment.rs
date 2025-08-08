@@ -66,12 +66,11 @@ pub fn register_equipment_api(
             // 2. Check item metadata
             let mut found = None;
             for item_eid in world.get_entities_with_component("Item") {
-                if let Some(item_comp) = world.get_component(item_eid, "Item") {
-                    if item_comp.get("id") == Some(&serde_json::Value::String(item_id.clone())) {
+                if let Some(item_comp) = world.get_component(item_eid, "Item")
+                    && item_comp.get("id") == Some(&serde_json::Value::String(item_id.clone())) {
                         found = Some(item_comp);
                         break;
                     }
-                }
             }
             let item_meta = found.ok_or_else(|| lua_error_msg(lua, "Item not found"))?;
 
@@ -100,11 +99,10 @@ pub fn register_equipment_api(
                 .ok_or_else(|| lua_error_msg(lua, "Equipment slots must be an object"))?;
 
             // 6. Check if slot is already occupied
-            if let Some(existing) = slots_obj.get(&slot) {
-                if !existing.is_null() {
+            if let Some(existing) = slots_obj.get(&slot)
+                && !existing.is_null() {
                     return Err(lua_error_msg(lua, "Slot already occupied"));
                 }
-            }
 
             // 7. Equip
             slots_obj.insert(slot.clone(), serde_json::Value::String(item_id.clone()));

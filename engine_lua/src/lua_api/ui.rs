@@ -162,21 +162,18 @@ pub fn register_ui_api(lua: &Lua, globals: &Table) -> LuaResult<()> {
                 if let Some(panel) = parent
                     .as_any_mut()
                     .downcast_mut::<engine_core::presentation::ui::widget::panel::Panel>(
-                ) {
-                    if let Some(pos) = panel.children.iter().position(|c| c.id() == child_id) {
+                )
+                    && let Some(pos) = panel.children.iter().position(|c| c.id() == child_id) {
                         removed_child = Some(panel.children.remove(pos));
                     }
-                }
-                if removed_child.is_none() {
-                    if let Some(grid) = parent
+                if removed_child.is_none()
+                    && let Some(grid) = parent
                         .as_any_mut()
                         .downcast_mut::<engine_core::presentation::ui::layout::grid::GridLayout>(
-                    ) {
-                        if let Some(pos) = grid.children.iter().position(|c| c.id() == child_id) {
+                    )
+                        && let Some(pos) = grid.children.iter().position(|c| c.id() == child_id) {
                             removed_child = Some(grid.children.remove(pos));
                         }
-                    }
-                }
             }
 
             if let Some(child) = removed_child {

@@ -113,17 +113,15 @@ pub fn register_economic_api(
     let world_get_res = world.clone();
     let get_job_resource_reservations = lua.create_function_mut(move |lua, entity: u32| {
         let world = world_get_res.borrow();
-        if let Some(job) = world.get_component(entity, "Job") {
-            if let Some(reserved) = job.get("reserved_resources") {
-                if let Some(arr) = reserved.as_array() {
+        if let Some(job) = world.get_component(entity, "Job")
+            && let Some(reserved) = job.get("reserved_resources")
+                && let Some(arr) = reserved.as_array() {
                     if arr.is_empty() {
                         return Ok(mlua::Value::Nil);
                     } else {
                         return crate::helpers::json_to_lua_table(lua, reserved);
                     }
                 }
-            }
-        }
         Ok(mlua::Value::Nil)
     })?;
     globals.set(

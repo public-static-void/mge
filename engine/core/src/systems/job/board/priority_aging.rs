@@ -42,18 +42,16 @@ impl JobPriorityAgingSystem {
         let aging_bonus = ((current_tick - creation_tick) / AGING_FACTOR) as i64;
 
         let mut dynamic_boost = 0;
-        if !shortage_kinds.is_empty() {
-            if let Some(reqs) = job.get("resource_requirements").and_then(|v| v.as_array()) {
+        if !shortage_kinds.is_empty()
+            && let Some(reqs) = job.get("resource_requirements").and_then(|v| v.as_array()) {
                 for req in reqs {
-                    if let Some(kind) = req.get("kind").and_then(|v| v.as_str()) {
-                        if shortage_kinds.iter().any(|k| k == kind) {
+                    if let Some(kind) = req.get("kind").and_then(|v| v.as_str())
+                        && shortage_kinds.iter().any(|k| k == kind) {
                             dynamic_boost = SHORTAGE_PRIORITY_BOOST;
                             break;
                         }
-                    }
                 }
             }
-        }
         base_priority + aging_bonus + dynamic_boost
     }
 

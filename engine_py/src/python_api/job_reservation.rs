@@ -11,16 +11,14 @@ pub fn get_job_resource_reservations(
     py: Python,
 ) -> PyResult<Option<PyObject>> {
     let world = pyworld.inner.borrow();
-    if let Some(job) = world.get_component(entity_id, "Job") {
-        if let Some(reserved) = job.get("reserved_resources") {
-            if let Some(arr) = reserved.as_array() {
+    if let Some(job) = world.get_component(entity_id, "Job")
+        && let Some(reserved) = job.get("reserved_resources")
+            && let Some(arr) = reserved.as_array() {
                 if arr.is_empty() {
                     return Ok(None);
                 }
                 return Ok(Some(serde_pyobject::to_pyobject(py, reserved)?.into()));
             }
-        }
-    }
     Ok(None)
 }
 

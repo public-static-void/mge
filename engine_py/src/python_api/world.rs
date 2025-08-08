@@ -700,8 +700,8 @@ impl PyWorld {
 
         if let Some(job_map) = world.components.get("Job") {
             for (&job_id, job_comp) in job_map.iter() {
-                if let Some(assigned_to) = job_comp.get("assigned_to").and_then(|v| v.as_u64()) {
-                    if assigned_to == agent_id as u64 {
+                if let Some(assigned_to) = job_comp.get("assigned_to").and_then(|v| v.as_u64())
+                    && assigned_to == agent_id as u64 {
                         let dict = PyDict::new(py);
                         dict.set_item("id", job_id)?;
                         dict.set_item(
@@ -718,7 +718,6 @@ impl PyWorld {
                         dict.set_item("assigned_to", assigned_to)?;
                         jobs_py.push(dict.into());
                     }
-                }
             }
         }
 

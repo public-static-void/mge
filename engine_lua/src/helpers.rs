@@ -16,11 +16,10 @@ fn resolve_ref<'a>(schema: &'a JsonValue, reference: &str) -> Option<&'a JsonVal
 pub fn ensure_schema_arrays(value: &mut JsonValue, schema: &JsonValue) {
     let mut effective_schema = schema;
     // If schema is a $ref, resolve it
-    if let Some(ref_str) = schema.get("$ref").and_then(|v| v.as_str()) {
-        if let Some(resolved) = resolve_ref(schema, ref_str) {
+    if let Some(ref_str) = schema.get("$ref").and_then(|v| v.as_str())
+        && let Some(resolved) = resolve_ref(schema, ref_str) {
             effective_schema = resolved;
         }
-    }
 
     if let (JsonValue::Object(map), Some(props)) = (
         value,
@@ -31,11 +30,10 @@ pub fn ensure_schema_arrays(value: &mut JsonValue, schema: &JsonValue) {
         for (key, prop_schema) in props {
             // If this property is a $ref, resolve it
             let mut field_schema = prop_schema;
-            if let Some(ref_str) = prop_schema.get("$ref").and_then(|v| v.as_str()) {
-                if let Some(resolved) = resolve_ref(schema, ref_str) {
+            if let Some(ref_str) = prop_schema.get("$ref").and_then(|v| v.as_str())
+                && let Some(resolved) = resolve_ref(schema, ref_str) {
                     field_schema = resolved;
                 }
-            }
 
             if let Some(field_type) = field_schema.get("type").and_then(|t| t.as_str()) {
                 if field_type == "array" {
@@ -52,22 +50,20 @@ pub fn ensure_schema_arrays(value: &mut JsonValue, schema: &JsonValue) {
                     if let Some(child) = map.get_mut(key) {
                         ensure_schema_arrays(child, field_schema);
                     }
-                } else if field_type == "array" {
-                    if let Some(items_schema) = field_schema.get("items") {
+                } else if field_type == "array"
+                    && let Some(items_schema) = field_schema.get("items") {
                         // If items is a $ref, resolve it
                         let mut item_schema = items_schema;
-                        if let Some(ref_str) = items_schema.get("$ref").and_then(|v| v.as_str()) {
-                            if let Some(resolved) = resolve_ref(schema, ref_str) {
+                        if let Some(ref_str) = items_schema.get("$ref").and_then(|v| v.as_str())
+                            && let Some(resolved) = resolve_ref(schema, ref_str) {
                                 item_schema = resolved;
                             }
-                        }
                         if let Some(JsonValue::Array(arr)) = map.get_mut(key) {
                             for item in arr {
                                 ensure_schema_arrays(item, item_schema);
                             }
                         }
                     }
-                }
             }
         }
     }
@@ -92,11 +88,10 @@ pub fn lua_error_from_any<E: std::fmt::Display>(lua: &mlua::Lua, err: E) -> mlua
 
 /// Returns true if the table has the global array metatable (`array_mt`).
 fn is_marked_array(table: &Table) -> LuaResult<bool> {
-    if let Some(mt) = table.metatable() {
-        if let Ok(val) = mt.get::<bool>("__is_array") {
+    if let Some(mt) = table.metatable()
+        && let Ok(val) = mt.get::<bool>("__is_array") {
             return Ok(val);
         }
-    }
     Ok(false)
 }
 
@@ -184,13 +179,11 @@ pub fn lua_table_to_json_with_schema(
     let props = schema.get("properties").and_then(|p| p.as_object());
 
     // If this table is empty and the schema says this is an array, return [] not {}
-    if table.len()? == 0 {
-        if let Some(schema_type) = schema.get("type").and_then(|t| t.as_str()) {
-            if schema_type == "array" {
+    if table.len()? == 0
+        && let Some(schema_type) = schema.get("type").and_then(|t| t.as_str())
+            && schema_type == "array" {
                 return Ok(JsonValue::Array(vec![]));
             }
-        }
-    }
 
     let mut map = Map::new();
     for pair in table.clone().pairs::<LuaValue, LuaValue>() {

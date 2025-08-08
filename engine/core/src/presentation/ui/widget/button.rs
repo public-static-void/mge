@@ -100,8 +100,8 @@ impl UiWidget for Button {
     }
 
     fn handle_event(&mut self, event: &UiEvent) {
-        if let UiEvent::Click { x, y } = *event {
-            if y == self.pos.1 && x >= self.pos.0 && x < self.pos.0 + self.label.len() as i32 {
+        if let UiEvent::Click { x, y } = *event
+            && y == self.pos.1 && x >= self.pos.0 && x < self.pos.0 + self.label.len() as i32 {
                 if let Some(cb) = self.on_press.as_mut() {
                     cb();
                 }
@@ -110,9 +110,8 @@ impl UiWidget for Button {
                     cb(self);
                 }
             }
-        }
-        if let UiEvent::KeyPress { ref key } = *event {
-            if self.focused && (key == "Enter" || key == "Space") {
+        if let UiEvent::KeyPress { ref key } = *event
+            && self.focused && (key == "Enter" || key == "Space") {
                 if let Some(cb) = self.on_press.as_mut() {
                     cb();
                 }
@@ -121,7 +120,6 @@ impl UiWidget for Button {
                     cb(self);
                 }
             }
-        }
     }
 
     fn as_any(&self) -> &dyn Any {

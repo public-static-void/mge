@@ -113,11 +113,10 @@ impl UiWidget for TextInput {
                 self.focused = false;
             }
         }
-        if let UiEvent::KeyPress { .. } = *event {
-            if self.focused {
+        if let UiEvent::KeyPress { .. } = *event
+            && self.focused {
                 // Optionally implement text editing here
             }
-        }
     }
 
     fn as_any(&self) -> &dyn Any {

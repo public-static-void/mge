@@ -212,9 +212,9 @@ impl System for BodyEquipmentSyncSystem {
             let mut total_effects: HashMap<String, f64> = HashMap::new();
             for item_id in equipped_items {
                 for item_eid in world.get_entities_with_component("Item") {
-                    if let Some(item_comp) = world.get_component(item_eid, "Item") {
-                        if item_comp.get("id").and_then(|v| v.as_str()) == Some(&item_id) {
-                            if let Some(effects) =
+                    if let Some(item_comp) = world.get_component(item_eid, "Item")
+                        && item_comp.get("id").and_then(|v| v.as_str()) == Some(&item_id)
+                            && let Some(effects) =
                                 item_comp.get("effects").and_then(|v| v.as_object())
                             {
                                 for (stat, delta) in effects {
@@ -223,8 +223,6 @@ impl System for BodyEquipmentSyncSystem {
                                     }
                                 }
                             }
-                        }
-                    }
                 }
             }
 

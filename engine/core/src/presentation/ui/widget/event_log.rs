@@ -58,8 +58,8 @@ impl widget::UiWidget for EventLogWidget {
                 });
             }
         }
-        if let Some(idx) = self.selected_event {
-            if let Some(event) = self.events.get(idx) {
+        if let Some(idx) = self.selected_event
+            && let Some(event) = self.events.get(idx) {
                 let details = format!(
                     "Type: {}\nTimestamp: {}\nPayload: {}",
                     event.event_type,
@@ -77,7 +77,6 @@ impl widget::UiWidget for EventLogWidget {
                     }
                 }
             }
-        }
     }
 
     fn handle_event(&mut self, _event: &UiEvent) {}

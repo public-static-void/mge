@@ -88,8 +88,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     for entry in fs::read_dir(&test_dir)? {
         let entry = entry?;
         let path = entry.path();
-        if let Some(fname) = path.file_name().and_then(|s| s.to_str()) {
-            if fname.starts_with("test_") && fname.ends_with(".lua") {
+        if let Some(fname) = path.file_name().and_then(|s| s.to_str())
+            && fname.starts_with("test_") && fname.ends_with(".lua") {
                 let modname = &fname[..fname.len() - 4];
                 if filter_module.is_none_or(|f| modname == f) {
                     // Read the Lua source file content
@@ -150,7 +150,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                 }
             }
-        }
     }
 
     // Convert to a Vec and sort for deterministic order
@@ -251,26 +250,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Move all: increment x for all entities with Position
         if let Some(positions) = world.borrow_mut().components.get_mut("Position") {
             for (_eid, value) in positions.iter_mut() {
-                if let Some(obj) = value.as_object_mut() {
-                    if let Some(x) = obj.get_mut("x") {
-                        if let Some(x_val) = x.as_f64() {
+                if let Some(obj) = value.as_object_mut()
+                    && let Some(x) = obj.get_mut("x")
+                        && let Some(x_val) = x.as_f64() {
                             *x = serde_json::json!(x_val + 1.0);
                         }
-                    }
-                }
             }
         }
         // Damage all: decrement health for all entities with Health
         if let Some(healths) = world.borrow_mut().components.get_mut("Health") {
             for (_eid, value) in healths.iter_mut() {
-                if let Some(obj) = value.as_object_mut() {
-                    if let Some(current) = obj.get_mut("current") {
-                        if let Some(cur_val) = current.as_f64() {
+                if let Some(obj) = value.as_object_mut()
+                    && let Some(current) = obj.get_mut("current")
+                        && let Some(cur_val) = current.as_f64() {
                             let new_val = (cur_val - 1.0).max(0.0);
                             *current = serde_json::json!(new_val);
                         }
-                    }
-                }
             }
         }
         world.borrow_mut().register_system(ProcessDeaths);

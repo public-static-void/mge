@@ -213,8 +213,8 @@ impl JobBoard {
                 if let (Some(reserved_resources), Some(reserved_stockpile)) = (
                     job.get("reserved_resources").and_then(|v| v.as_array()),
                     job.get("reserved_stockpile").and_then(|v| v.as_u64()),
-                ) {
-                    if let Some(mut stockpile) = world
+                )
+                    && let Some(mut stockpile) = world
                         .get_component(reserved_stockpile as u32, "Stockpile")
                         .cloned()
                     {
@@ -232,7 +232,6 @@ impl JobBoard {
                             .set_component(reserved_stockpile as u32, "Stockpile", stockpile)
                             .unwrap();
                     }
-                }
                 job["assigned_to"] = JsonValue::from(actor_eid);
                 if job.get("state").and_then(|v| v.as_str()) == Some("interrupted") {
                     let state = job.get("state").and_then(|v| v.as_str()).unwrap_or("");
