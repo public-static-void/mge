@@ -16,7 +16,7 @@ pub fn calculate_pickup(
     agent_id: u32,
     requirements: &[JsonValue],
     job: &JsonValue,
-    stock_resources: &mut serde_json::Map<String, JsonValue>,
+    stock_resources: &serde_json::Map<String, JsonValue>,
 ) -> Vec<JsonValue> {
     let mut max_weight = f64::INFINITY;
     let mut max_slots = usize::MAX;
@@ -48,6 +48,9 @@ pub fn calculate_pickup(
 
     let mut pickup: Vec<JsonValue> = Vec::new();
 
+    // Use a shadow copy for calculation, never modify the actual map in this function
+    let mut simulated_resources = stock_resources.clone();
+
     for req in requirements {
         let kind = req.get("kind").and_then(|v| v.as_str()).unwrap_or("");
         let amount_needed = req.get("amount").and_then(|v| v.as_i64()).unwrap_or(0);
@@ -69,7 +72,7 @@ pub fn calculate_pickup(
         }
 
         // How much available in stockpile?
-        let available = stock_resources
+        let available = simulated_resources
             .get(kind)
             .and_then(|v| v.as_i64())
             .unwrap_or(0);
@@ -90,12 +93,13 @@ pub fn calculate_pickup(
 
         if can_carry > 0 {
             pickup.push(json!({"kind": kind, "amount": can_carry}));
-            // Update inventory tracking for next resource kind
             cur_weight += unit_weight * can_carry as f64;
             cur_volume += unit_volume * can_carry as f64;
-            cur_slots += 1; // one slot per resource kind
-            // Subtract from stockpile
-            let entry = stock_resources.entry(kind.to_string()).or_insert(json!(0));
+            cur_slots += 1;
+            // Only update shadow copy, never the actual resource map
+            let entry = simulated_resources
+                .entry(kind.to_string())
+                .or_insert(json!(0));
             *entry = json!(entry.as_i64().unwrap_or(0) - can_carry);
         }
     }
