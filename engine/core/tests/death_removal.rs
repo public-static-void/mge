@@ -17,19 +17,18 @@ fn test_death_replaces_health_with_corpse_and_decay() {
     // Simulate damage that kills the entity
     if let Some(healths) = world.components.get_mut("Health") {
         for (_eid, value) in healths.iter_mut() {
-            if let Some(obj) = value.as_object_mut() {
-                if let Some(current) = obj.get_mut("current") {
-                    if let Some(cur_val) = current.as_f64() {
-                        // Subtract 2.0 damage
-                        let new_val = (cur_val - 2.0).max(0.0);
-                        *current = serde_json::json!(new_val);
-                    }
-                }
+            if let Some(obj) = value.as_object_mut()
+                && let Some(current) = obj.get_mut("current")
+                && let Some(cur_val) = current.as_f64()
+            {
+                // Subtract 2.0 damage
+                let new_val = (cur_val - 2.0).max(0.0);
+                *current = serde_json::json!(new_val);
             }
         }
     }
 
-    // Process deaths (to be implemented)
+    // Process deaths
     world.register_system(ProcessDeaths);
     world.run_system("ProcessDeaths", None).unwrap();
 
@@ -65,5 +64,4 @@ fn test_decay_removes_entity_after_time() {
     world.register_system(ProcessDecay);
     world.run_system("ProcessDecay", None).unwrap();
     assert!(world.get_component(id, "Decay").is_none());
-    // Optionally, check entity no longer exists (depends on your ECS API)
 }

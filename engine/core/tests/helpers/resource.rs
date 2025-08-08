@@ -19,13 +19,12 @@ impl ResourceTestHelpers for World {
                 }
             }
             // Set the amount in the first stockpile found
-            if let Some((_eid, stockpile)) = stockpiles.iter_mut().next() {
-                if let Some(resources) = stockpile
+            if let Some((_eid, stockpile)) = stockpiles.iter_mut().next()
+                && let Some(resources) = stockpile
                     .get_mut("resources")
                     .and_then(|v| v.as_object_mut())
-                {
-                    resources.insert(kind.to_string(), serde_json::json!(amount));
-                }
+            {
+                resources.insert(kind.to_string(), serde_json::json!(amount));
             }
         }
     }

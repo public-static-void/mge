@@ -32,29 +32,25 @@ fn test_tick_advances_turn_and_runs_systems() {
     // Move all: increment x for all entities with Position (Square)
     if let Some(positions) = world.components.get_mut("Position") {
         for (_eid, value) in positions.iter_mut() {
-            if let Some(obj) = value.as_object_mut() {
-                if let Some(pos) = obj.get_mut("pos") {
-                    if let Some(square) = pos.get_mut("Square") {
-                        if let Some(x) = square.get_mut("x") {
-                            if let Some(x_val) = x.as_i64() {
-                                *x = json!(x_val + 1);
-                            }
-                        }
-                    }
-                }
+            if let Some(obj) = value.as_object_mut()
+                && let Some(pos) = obj.get_mut("pos")
+                && let Some(square) = pos.get_mut("Square")
+                && let Some(x) = square.get_mut("x")
+                && let Some(x_val) = x.as_i64()
+            {
+                *x = json!(x_val + 1);
             }
         }
     }
     // Damage all: decrement health for all entities with Health
     if let Some(healths) = world.components.get_mut("Health") {
         for (_eid, value) in healths.iter_mut() {
-            if let Some(obj) = value.as_object_mut() {
-                if let Some(current) = obj.get_mut("current") {
-                    if let Some(cur_val) = current.as_f64() {
-                        let new_val = (cur_val - 1.0).max(0.0);
-                        *current = json!(new_val);
-                    }
-                }
+            if let Some(obj) = value.as_object_mut()
+                && let Some(current) = obj.get_mut("current")
+                && let Some(cur_val) = current.as_f64()
+            {
+                let new_val = (cur_val - 1.0).max(0.0);
+                *current = json!(new_val);
             }
         }
     }

@@ -194,12 +194,11 @@ fn test_agent_makes_multiple_trips_for_large_job() {
         let job = world.get_component(job_id, "Job").unwrap();
         let _agent = world.get_component(agent_id, "Agent").unwrap();
 
-        if let Some(delivered) = job.get("delivered_resources") {
-            if let Some(arr) = delivered.as_array() {
-                if let Some(wood) = arr.iter().find(|r| r.get("kind") == Some(&json!("wood"))) {
-                    delivered_total = wood.get("amount").and_then(|v| v.as_i64()).unwrap_or(0);
-                }
-            }
+        if let Some(delivered) = job.get("delivered_resources")
+            && let Some(arr) = delivered.as_array()
+            && let Some(wood) = arr.iter().find(|r| r.get("kind") == Some(&json!("wood")))
+        {
+            delivered_total = wood.get("amount").and_then(|v| v.as_i64()).unwrap_or(0);
         }
         if job.get("state") == Some(&json!("delivering_resources")) {
             trips += 1;
@@ -278,12 +277,11 @@ fn test_agent_makes_multiple_trips_for_large_job() {
         let job = world.get_component(job_id2, "Job").unwrap();
         let _agent = world.get_component(agent_id, "Agent").unwrap();
 
-        if let Some(delivered) = job.get("delivered_resources") {
-            if let Some(arr) = delivered.as_array() {
-                if let Some(wood) = arr.iter().find(|r| r.get("kind") == Some(&json!("wood"))) {
-                    delivered_total2 = wood.get("amount").and_then(|v| v.as_i64()).unwrap_or(0);
-                }
-            }
+        if let Some(delivered) = job.get("delivered_resources")
+            && let Some(arr) = delivered.as_array()
+            && let Some(wood) = arr.iter().find(|r| r.get("kind") == Some(&json!("wood")))
+        {
+            delivered_total2 = wood.get("amount").and_then(|v| v.as_i64()).unwrap_or(0);
         }
         if job.get("state") == Some(&json!("delivering_resources")) {
             trips2 += 1;
