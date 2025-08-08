@@ -70,14 +70,16 @@ fn default_job_progress(
     let mut at_site = true;
     if assigned_to != 0
         && let Some(target_pos) = job.get("target_position")
-            && let Some(agent_pos) = world.get_component(assigned_to, "Position") {
-                let agent_cell = crate::map::CellKey::from_position(agent_pos);
-                let target_cell = crate::map::CellKey::from_position(target_pos);
-                if let (Some(agent_cell), Some(target_cell)) = (agent_cell, target_cell)
-                    && agent_cell != target_cell {
-                        at_site = false;
-                    }
-            }
+        && let Some(agent_pos) = world.get_component(assigned_to, "Position")
+    {
+        let agent_cell = crate::map::CellKey::from_position(agent_pos);
+        let target_cell = crate::map::CellKey::from_position(target_pos);
+        if let (Some(agent_cell), Some(target_cell)) = (agent_cell, target_cell)
+            && agent_cell != target_cell
+        {
+            at_site = false;
+        }
+    }
     if !at_site {
         return job;
     }
@@ -85,21 +87,22 @@ fn default_job_progress(
     // Always increment progress, even for jobs without an agent.
     let mut progress_increment = 1.0;
     if assigned_to != 0
-        && let Some(agent) = world.get_component(assigned_to, "Agent") {
-            let skills = agent.get("skills").and_then(|v| v.as_object());
-            let skill = skills
-                .and_then(|map| map.get(&job_type))
-                .and_then(|v| v.as_f64())
-                .unwrap_or(1.0);
-            let stamina = agent
-                .get("stamina")
-                .and_then(|v| v.as_f64())
-                .unwrap_or(100.0);
-            progress_increment = 1.0 * skill * (stamina / 100.0);
-            if progress_increment < 0.1 {
-                progress_increment = 0.1;
-            }
+        && let Some(agent) = world.get_component(assigned_to, "Agent")
+    {
+        let skills = agent.get("skills").and_then(|v| v.as_object());
+        let skill = skills
+            .and_then(|map| map.get(&job_type))
+            .and_then(|v| v.as_f64())
+            .unwrap_or(1.0);
+        let stamina = agent
+            .get("stamina")
+            .and_then(|v| v.as_f64())
+            .unwrap_or(100.0);
+        progress_increment = 1.0 * skill * (stamina / 100.0);
+        if progress_increment < 0.1 {
+            progress_increment = 0.1;
         }
+    }
     let prev_progress = job.get("progress").and_then(|v| v.as_f64()).unwrap_or(0.0);
     let progress = prev_progress + progress_increment;
     job["progress"] = serde_json::json!(progress);
@@ -170,14 +173,14 @@ pub fn process_job(
             }
             if state == "complete"
                 && let Some(agent_id) = job.get("assigned_to").and_then(|v| v.as_u64())
-                    && let Some(mut agent) = world.get_component(agent_id as u32, "Agent").cloned()
-                    {
-                        agent["current_job"] = serde_json::Value::Null;
-                        agent["state"] = serde_json::json!("idle");
-                        world
-                            .set_component(agent_id as u32, "Agent", agent)
-                            .unwrap();
-                    }
+                && let Some(mut agent) = world.get_component(agent_id as u32, "Agent").cloned()
+            {
+                agent["current_job"] = serde_json::Value::Null;
+                agent["state"] = serde_json::json!("idle");
+                world
+                    .set_component(agent_id as u32, "Agent", agent)
+                    .unwrap();
+            }
             return job;
         }
     }
@@ -209,17 +212,17 @@ pub fn process_job(
             && let Some(to_spawn) = job
                 .get("on_dependency_failed_spawn")
                 .and_then(|v| v.as_array())
-            {
-                let mut children = job
-                    .get("children")
-                    .and_then(|v| v.as_array())
-                    .cloned()
-                    .unwrap_or_default();
-                for child in to_spawn {
-                    children.push(child.clone());
-                }
-                job["children"] = serde_json::Value::Array(children);
+        {
+            let mut children = job
+                .get("children")
+                .and_then(|v| v.as_array())
+                .cloned()
+                .unwrap_or_default();
+            for child in to_spawn {
+                children.push(child.clone());
             }
+            job["children"] = serde_json::Value::Array(children);
+        }
         world.set_component(eid, "Job", job.clone()).unwrap();
         return job;
     }
@@ -333,13 +336,14 @@ pub fn process_job(
     let current_state = job.get("state").and_then(|v| v.as_str());
     if current_state == Some("complete") && prev_state.as_deref() != Some("complete") {
         if let Some(agent_id) = job.get("assigned_to").and_then(|v| v.as_u64())
-            && let Some(mut agent) = world.get_component(agent_id as u32, "Agent").cloned() {
-                agent["current_job"] = serde_json::Value::Null;
-                agent["state"] = serde_json::json!("idle");
-                world
-                    .set_component(agent_id as u32, "Agent", agent)
-                    .unwrap();
-            }
+            && let Some(mut agent) = world.get_component(agent_id as u32, "Agent").cloned()
+        {
+            agent["current_job"] = serde_json::Value::Null;
+            agent["state"] = serde_json::json!("idle");
+            world
+                .set_component(agent_id as u32, "Agent", agent)
+                .unwrap();
+        }
         job["assigned_to"] = serde_json::Value::Null;
         world.set_component(eid, "Job", job.clone()).unwrap();
     }

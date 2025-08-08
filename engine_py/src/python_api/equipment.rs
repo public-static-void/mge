@@ -17,13 +17,14 @@ impl EquipmentApi for PyWorld {
             let any = to_pyobject(py, val)?;
             if let Ok(dict) = any.downcast::<PyDict>()
                 && let Ok(Some(slots_any)) = dict.get_item("slots")
-                    && let Ok(slots) = slots_any.downcast::<PyDict>() {
-                        for (k, v) in slots.iter() {
-                            if v.is_instance_of::<PyTuple>() && v.len().unwrap_or(1) == 0 {
-                                slots.set_item(k, py.None())?;
-                            }
-                        }
+                && let Ok(slots) = slots_any.downcast::<PyDict>()
+            {
+                for (k, v) in slots.iter() {
+                    if v.is_instance_of::<PyTuple>() && v.len().unwrap_or(1) == 0 {
+                        slots.set_item(k, py.None())?;
                     }
+                }
+            }
             Ok(any.into())
         } else {
             Ok(PyDict::new(py).into())
@@ -50,10 +51,11 @@ impl EquipmentApi for PyWorld {
         let mut found = None;
         for item_eid in world.get_entities_with_component("Item") {
             if let Some(item_comp) = world.get_component(item_eid, "Item")
-                && item_comp.get("id") == Some(&Value::String(item_id.clone())) {
-                    found = Some(item_comp);
-                    break;
-                }
+                && item_comp.get("id") == Some(&Value::String(item_id.clone()))
+            {
+                found = Some(item_comp);
+                break;
+            }
         }
         let item_meta =
             found.ok_or_else(|| pyo3::exceptions::PyValueError::new_err("Item not found"))?;
@@ -86,9 +88,10 @@ impl EquipmentApi for PyWorld {
 
         // 6. Check if slot is already occupied
         if let Some(existing) = slots_obj.get(&slot)
-            && !existing.is_null() {
-                return Err(pyo3::exceptions::PyValueError::new_err("already equipped"));
-            }
+            && !existing.is_null()
+        {
+            return Err(pyo3::exceptions::PyValueError::new_err("already equipped"));
+        }
 
         // 7. Equip
         slots_obj.insert(slot.clone(), Value::String(item_id.clone()));

@@ -15,9 +15,10 @@ impl System for ProcessDeaths {
             for (&entity, value) in healths.iter() {
                 if let Some(obj) = value.as_object()
                     && let Some(current) = obj.get("current")
-                        && current.as_f64().unwrap_or(1.0) <= 0.0 {
-                            to_process.push(entity);
-                        }
+                    && current.as_f64().unwrap_or(1.0) <= 0.0
+                {
+                    to_process.push(entity);
+                }
             }
         }
 
@@ -48,13 +49,14 @@ impl System for ProcessDecay {
             for (&entity, value) in decays.iter_mut() {
                 if let Some(obj) = value.as_object_mut()
                     && let Some(time_remaining) = obj.get_mut("time_remaining")
-                        && let Some(t) = time_remaining.as_u64() {
-                            if t <= 1 {
-                                to_despawn_entities.push(entity);
-                            } else {
-                                *time_remaining = json!(t - 1);
-                            }
-                        }
+                    && let Some(t) = time_remaining.as_u64()
+                {
+                    if t <= 1 {
+                        to_despawn_entities.push(entity);
+                    } else {
+                        *time_remaining = json!(t - 1);
+                    }
+                }
             }
         }
         for entity in to_despawn_entities {

@@ -90,10 +90,11 @@ impl<E: Clone + Send + Sync + 'static> EventBus<E> {
         for sub in &self.subscribers {
             // Remove if weak_owner has been dropped
             if let Some(weak) = &sub.weak_owner
-                && weak.upgrade().is_none() {
-                    to_remove.push(sub.id);
-                    continue;
-                }
+                && weak.upgrade().is_none()
+            {
+                to_remove.push(sub.id);
+                continue;
+            }
             (sub.handler)(&event);
             if sub.once {
                 to_remove.push(sub.id);

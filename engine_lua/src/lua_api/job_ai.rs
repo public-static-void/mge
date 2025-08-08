@@ -28,23 +28,22 @@ pub fn register_job_ai_api(lua: &Lua, globals: &Table, world: Rc<RefCell<World>>
         // Set assigned_to on the job if assigned by AI
         if let Some(agent_json) = world.get_component(agent_id, "Agent")
             && let Some(current_job_id) = agent_json.get("current_job").and_then(|v| v.as_u64())
-                && prev_current_job != Some(current_job_id)
-                    && let Some(job_json) = world.get_component(current_job_id as u32, "Job") {
-                        let mut job_json_obj = job_json.as_object().unwrap().clone();
-                        job_json_obj.insert(
-                            "assigned_to".to_string(),
-                            JsonValue::Number(agent_id.into()),
-                        );
-                        world
-                            .set_component(
-                                current_job_id as u32,
-                                "Job",
-                                JsonValue::Object(job_json_obj),
-                            )
-                            .map_err(|e| {
-                                mlua::Error::external(format!("Failed to set job component: {e}"))
-                            })?;
-                    }
+            && prev_current_job != Some(current_job_id)
+            && let Some(job_json) = world.get_component(current_job_id as u32, "Job")
+        {
+            let mut job_json_obj = job_json.as_object().unwrap().clone();
+            job_json_obj.insert(
+                "assigned_to".to_string(),
+                JsonValue::Number(agent_id.into()),
+            );
+            world
+                .set_component(
+                    current_job_id as u32,
+                    "Job",
+                    JsonValue::Object(job_json_obj),
+                )
+                .map_err(|e| mlua::Error::external(format!("Failed to set job component: {e}")))?;
+        }
 
         Ok(())
     })?;
@@ -61,24 +60,25 @@ pub fn register_job_ai_api(lua: &Lua, globals: &Table, world: Rc<RefCell<World>>
             for (job_eid, job_json) in job_map {
                 // Only count jobs with assigned_to as a Number matching agent_id
                 if let Some(JsonValue::Number(n)) = job_json.get("assigned_to")
-                    && n.as_u64() == Some(agent_id as u64) {
-                        let tbl = match json_to_lua_table(lua_ctx, job_json)? {
-                            mlua::Value::Table(t) => t,
-                            _ => {
-                                return Err(mlua::Error::external(
-                                    "Expected JSON conversion to Lua table",
-                                ));
-                            }
-                        };
-                        tbl.set("id", *job_eid)?;
-                        let state = job_json
-                            .get("state")
-                            .and_then(|v| v.as_str())
-                            .unwrap_or("<no state>");
-                        tbl.set("state", state)?;
-                        tbl.set("assigned_to", n.as_u64().unwrap())?;
-                        results.push(tbl);
-                    }
+                    && n.as_u64() == Some(agent_id as u64)
+                {
+                    let tbl = match json_to_lua_table(lua_ctx, job_json)? {
+                        mlua::Value::Table(t) => t,
+                        _ => {
+                            return Err(mlua::Error::external(
+                                "Expected JSON conversion to Lua table",
+                            ));
+                        }
+                    };
+                    tbl.set("id", *job_eid)?;
+                    let state = job_json
+                        .get("state")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("<no state>");
+                    tbl.set("state", state)?;
+                    tbl.set("assigned_to", n.as_u64().unwrap())?;
+                    results.push(tbl);
+                }
             }
         }
 

@@ -39,13 +39,14 @@ pub fn get_camera(pyworld: &PyWorld, py: Python) -> PyObject {
     let world = pyworld.inner.borrow();
 
     if let Some(camera_id) = world.get_entities_with_component("Camera").first()
-        && let Some(pos) = world.get_component(*camera_id, "Position") {
-            let x = pos["pos"]["Square"]["x"].as_i64().unwrap_or(0);
-            let y = pos["pos"]["Square"]["y"].as_i64().unwrap_or(0);
-            let dict = PyDict::new(py);
-            dict.set_item("x", x).unwrap();
-            dict.set_item("y", y).unwrap();
-            return dict.into();
-        }
+        && let Some(pos) = world.get_component(*camera_id, "Position")
+    {
+        let x = pos["pos"]["Square"]["x"].as_i64().unwrap_or(0);
+        let y = pos["pos"]["Square"]["y"].as_i64().unwrap_or(0);
+        let dict = PyDict::new(py);
+        dict.set_item("x", x).unwrap();
+        dict.set_item("y", y).unwrap();
+        return dict.into();
+    }
     py.None()
 }

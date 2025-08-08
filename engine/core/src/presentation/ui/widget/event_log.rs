@@ -59,24 +59,25 @@ impl widget::UiWidget for EventLogWidget {
             }
         }
         if let Some(idx) = self.selected_event
-            && let Some(event) = self.events.get(idx) {
-                let details = format!(
-                    "Type: {}\nTimestamp: {}\nPayload: {}",
-                    event.event_type,
-                    event.timestamp,
-                    serde_json::to_string_pretty(&event.payload).unwrap()
-                );
-                let start_row = self.events.len() as i32;
-                for (i, line) in details.lines().enumerate() {
-                    for (col, ch) in line.chars().enumerate() {
-                        renderer.queue_draw(RenderCommand {
-                            glyph: ch,
-                            color: RenderColor(255, 255, 255),
-                            pos: (col as i32, start_row + i as i32),
-                        });
-                    }
+            && let Some(event) = self.events.get(idx)
+        {
+            let details = format!(
+                "Type: {}\nTimestamp: {}\nPayload: {}",
+                event.event_type,
+                event.timestamp,
+                serde_json::to_string_pretty(&event.payload).unwrap()
+            );
+            let start_row = self.events.len() as i32;
+            for (i, line) in details.lines().enumerate() {
+                for (col, ch) in line.chars().enumerate() {
+                    renderer.queue_draw(RenderCommand {
+                        glyph: ch,
+                        color: RenderColor(255, 255, 255),
+                        pos: (col as i32, start_row + i as i32),
+                    });
                 }
             }
+        }
     }
 
     fn handle_event(&mut self, _event: &UiEvent) {}

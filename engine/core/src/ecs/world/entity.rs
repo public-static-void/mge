@@ -73,27 +73,26 @@ impl World {
 
     pub fn move_entity(&mut self, entity: u32, dx: f32, dy: f32) {
         if let Some(value) = self.get_component(entity, "Position").cloned()
-            && let Ok(mut pos_comp) = serde_json::from_value::<PositionComponent>(value) {
-                if let Position::Square { x, y, .. } = &mut pos_comp.pos {
-                    *x += dx as i32;
-                    *y += dy as i32;
-                }
-                let _ = self.set_component(
-                    entity,
-                    "Position",
-                    serde_json::to_value(&pos_comp).unwrap(),
-                );
+            && let Ok(mut pos_comp) = serde_json::from_value::<PositionComponent>(value)
+        {
+            if let Position::Square { x, y, .. } = &mut pos_comp.pos {
+                *x += dx as i32;
+                *y += dy as i32;
             }
+            let _ =
+                self.set_component(entity, "Position", serde_json::to_value(&pos_comp).unwrap());
+        }
     }
 
     pub fn damage_entity(&mut self, entity: u32, amount: f32) {
         if let Some(healths) = self.components.get_mut("Health")
             && let Some(value) = healths.get_mut(&entity)
-                && let Some(obj) = value.as_object_mut()
-                    && let Some(current) = obj.get_mut("current")
-                        && let Some(cur_val) = current.as_f64() {
-                            *current = serde_json::json!((cur_val - amount as f64).max(0.0));
-                        }
+            && let Some(obj) = value.as_object_mut()
+            && let Some(current) = obj.get_mut("current")
+            && let Some(cur_val) = current.as_f64()
+        {
+            *current = serde_json::json!((cur_val - amount as f64).max(0.0));
+        }
     }
 
     pub fn is_entity_alive(&self, entity: u32) -> bool {
@@ -131,19 +130,20 @@ impl World {
                     .and_then(|val| {
                         val.get("pos").and_then(|p| {
                             if let Some(obj) = p.as_object()
-                                && let Some(sq) = obj.get("Square") {
-                                    let x = sq.get("x")?.as_i64()? as i32;
-                                    let y = sq.get("y")?.as_i64()? as i32;
-                                    let z = sq.get("z")?.as_i64()? as i32;
-                                    if let crate::map::CellKey::Square {
-                                        x: cx,
-                                        y: cy,
-                                        z: cz,
-                                    } = cell
-                                    {
-                                        return Some(*cx == x && *cy == y && *cz == z);
-                                    }
+                                && let Some(sq) = obj.get("Square")
+                            {
+                                let x = sq.get("x")?.as_i64()? as i32;
+                                let y = sq.get("y")?.as_i64()? as i32;
+                                let z = sq.get("z")?.as_i64()? as i32;
+                                if let crate::map::CellKey::Square {
+                                    x: cx,
+                                    y: cy,
+                                    z: cz,
+                                } = cell
+                                {
+                                    return Some(*cx == x && *cy == y && *cz == z);
                                 }
+                            }
                             None
                         })
                     })
@@ -162,10 +162,11 @@ impl World {
                     .and_then(|val| {
                         val.get("pos").and_then(|p| {
                             if let Some(obj) = p.as_object()
-                                && let Some(sq) = obj.get("Square") {
-                                    let zval = sq.get("z")?.as_i64()? as i32;
-                                    return Some(zval == z);
-                                }
+                                && let Some(sq) = obj.get("Square")
+                            {
+                                let zval = sq.get("z")?.as_i64()? as i32;
+                                return Some(zval == z);
+                            }
                             None
                         })
                     })

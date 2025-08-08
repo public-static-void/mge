@@ -89,67 +89,69 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let entry = entry?;
         let path = entry.path();
         if let Some(fname) = path.file_name().and_then(|s| s.to_str())
-            && fname.starts_with("test_") && fname.ends_with(".lua") {
-                let modname = &fname[..fname.len() - 4];
-                if filter_module.is_none_or(|f| modname == f) {
-                    // Read the Lua source file content
-                    let content = fs::read_to_string(&path)?;
+            && fname.starts_with("test_")
+            && fname.ends_with(".lua")
+        {
+            let modname = &fname[..fname.len() - 4];
+            if filter_module.is_none_or(|f| modname == f) {
+                // Read the Lua source file content
+                let content = fs::read_to_string(&path)?;
 
-                    // Strip Lua comments (single-line "--" and multiline "--[[ ... ]]") to avoid false matches
-                    let mut inside_multiline_comment = false;
-                    let mut uncommented_lines = Vec::new();
+                // Strip Lua comments (single-line "--" and multiline "--[[ ... ]]") to avoid false matches
+                let mut inside_multiline_comment = false;
+                let mut uncommented_lines = Vec::new();
 
-                    for line in content.lines() {
-                        let trimmed = line.trim_start();
+                for line in content.lines() {
+                    let trimmed = line.trim_start();
 
-                        if inside_multiline_comment {
-                            if trimmed.contains("]]") {
-                                inside_multiline_comment = false;
-                            }
-                            continue; // skip lines inside multiline comment
+                    if inside_multiline_comment {
+                        if trimmed.contains("]]") {
+                            inside_multiline_comment = false;
                         }
-
-                        if trimmed.starts_with("--[[") {
-                            inside_multiline_comment = true;
-                            continue; // skip start of multiline comment
-                        }
-
-                        if trimmed.starts_with("--") {
-                            continue; // skip single-line comment
-                        }
-
-                        uncommented_lines.push(line);
+                        continue; // skip lines inside multiline comment
                     }
 
-                    let uncommented_content = uncommented_lines.join("\n");
+                    if trimmed.starts_with("--[[") {
+                        inside_multiline_comment = true;
+                        continue; // skip start of multiline comment
+                    }
 
-                    // Extract the content inside the return table {...}
-                    let return_table_content =
-                        if let Some(caps) = return_table_re.captures(&uncommented_content) {
-                            caps.get(1).map_or("", |m| m.as_str())
-                        } else {
-                            ""
-                        };
+                    if trimmed.starts_with("--") {
+                        continue; // skip single-line comment
+                    }
 
-                    // Collect test functions from keys in return table with filtering
-                    for cap in test_key_re.captures_iter(return_table_content) {
-                        let key = cap.get(1).unwrap().as_str();
-                        if let (Some(fmod), Some(ffunc)) = (filter_module, filter_func) {
-                            if modname == fmod && key == ffunc {
-                                test_functions_set.insert((modname.to_string(), key.to_string()));
-                            }
-                        } else if let (None, Some(_)) = (filter_module, filter_func) {
-                            // function filter without module filter not supported
-                        } else if let (Some(fmod), None) = (filter_module, filter_func) {
-                            if modname == fmod {
-                                test_functions_set.insert((modname.to_string(), key.to_string()));
-                            }
-                        } else if filter_module.is_none() && filter_func.is_none() {
+                    uncommented_lines.push(line);
+                }
+
+                let uncommented_content = uncommented_lines.join("\n");
+
+                // Extract the content inside the return table {...}
+                let return_table_content =
+                    if let Some(caps) = return_table_re.captures(&uncommented_content) {
+                        caps.get(1).map_or("", |m| m.as_str())
+                    } else {
+                        ""
+                    };
+
+                // Collect test functions from keys in return table with filtering
+                for cap in test_key_re.captures_iter(return_table_content) {
+                    let key = cap.get(1).unwrap().as_str();
+                    if let (Some(fmod), Some(ffunc)) = (filter_module, filter_func) {
+                        if modname == fmod && key == ffunc {
                             test_functions_set.insert((modname.to_string(), key.to_string()));
                         }
+                    } else if let (None, Some(_)) = (filter_module, filter_func) {
+                        // function filter without module filter not supported
+                    } else if let (Some(fmod), None) = (filter_module, filter_func) {
+                        if modname == fmod {
+                            test_functions_set.insert((modname.to_string(), key.to_string()));
+                        }
+                    } else if filter_module.is_none() && filter_func.is_none() {
+                        test_functions_set.insert((modname.to_string(), key.to_string()));
                     }
                 }
             }
+        }
     }
 
     // Convert to a Vec and sort for deterministic order
@@ -252,9 +254,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             for (_eid, value) in positions.iter_mut() {
                 if let Some(obj) = value.as_object_mut()
                     && let Some(x) = obj.get_mut("x")
-                        && let Some(x_val) = x.as_f64() {
-                            *x = serde_json::json!(x_val + 1.0);
-                        }
+                    && let Some(x_val) = x.as_f64()
+                {
+                    *x = serde_json::json!(x_val + 1.0);
+                }
             }
         }
         // Damage all: decrement health for all entities with Health
@@ -262,10 +265,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             for (_eid, value) in healths.iter_mut() {
                 if let Some(obj) = value.as_object_mut()
                     && let Some(current) = obj.get_mut("current")
-                        && let Some(cur_val) = current.as_f64() {
-                            let new_val = (cur_val - 1.0).max(0.0);
-                            *current = serde_json::json!(new_val);
-                        }
+                    && let Some(cur_val) = current.as_f64()
+                {
+                    let new_val = (cur_val - 1.0).max(0.0);
+                    *current = serde_json::json!(new_val);
+                }
             }
         }
         world.borrow_mut().register_system(ProcessDeaths);

@@ -95,9 +95,10 @@ impl Map {
                     this_hex.merge_from(other_hex);
                 }
             } else if let Some(this_region) = self.topology.as_any_mut().downcast_mut::<RegionMap>()
-                && let Some(other_region) = other.topology.as_any().downcast_ref::<RegionMap>() {
-                    this_region.merge_from(other_region);
-                }
+                && let Some(other_region) = other.topology.as_any().downcast_ref::<RegionMap>()
+            {
+                this_region.merge_from(other_region);
+            }
         } else {
             println!("Topology types do not match; skipping merge.");
         }

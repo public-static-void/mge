@@ -22,11 +22,12 @@ pub fn register_system_functions(
 
             let mut dependencies = Vec::new();
             if let Some(opts) = opts
-                && let Ok(dep_table) = opts.get::<Table>("dependencies") {
-                    for dep in dep_table.sequence_values::<String>() {
-                        dependencies.push(dep?);
-                    }
+                && let Ok(dep_table) = opts.get::<Table>("dependencies")
+            {
+                for dep in dep_table.sequence_values::<String>() {
+                    dependencies.push(dep?);
                 }
+            }
 
             let system_name_for_closure = name.clone();
             let system_name_for_fn = system_name_for_closure.clone();

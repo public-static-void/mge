@@ -97,14 +97,14 @@ pub fn process_job_effects(
     if on_cancel {
         for idx in &applied_effect_indices {
             if let Some(effect_idx) = idx.as_u64()
-                && let Some(effect) = effects.get(effect_idx as usize) {
-                    let effect_value = serde_json::to_value(effect.clone()).unwrap();
-                    effect_registry.lock().unwrap().rollback_effects(
-                        world,
-                        job_id,
-                        &[effect_value],
-                    );
-                }
+                && let Some(effect) = effects.get(effect_idx as usize)
+            {
+                let effect_value = serde_json::to_value(effect.clone()).unwrap();
+                effect_registry
+                    .lock()
+                    .unwrap()
+                    .rollback_effects(world, job_id, &[effect_value]);
+            }
         }
         applied_effect_indices.clear();
         job.insert(

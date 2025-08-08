@@ -77,21 +77,25 @@ pub fn register_job_query_api(
             for (eid, comp) in job_map.iter() {
                 let mut job = comp.clone();
                 if let Some(ref s) = state
-                    && job.get("state").and_then(|v| v.as_str()) != Some(s) {
-                        continue;
-                    }
+                    && job.get("state").and_then(|v| v.as_str()) != Some(s)
+                {
+                    continue;
+                }
                 if let Some(ref jt) = job_type
-                    && job.get("job_type").and_then(|v| v.as_str()) != Some(jt) {
-                        continue;
-                    }
+                    && job.get("job_type").and_then(|v| v.as_str()) != Some(jt)
+                {
+                    continue;
+                }
                 if let Some(aid) = assigned_to
-                    && job.get("assigned_to").and_then(|v| v.as_u64()) != Some(aid as u64) {
-                        continue;
-                    }
+                    && job.get("assigned_to").and_then(|v| v.as_u64()) != Some(aid as u64)
+                {
+                    continue;
+                }
                 if let Some(ref cat) = category
-                    && job.get("category").and_then(|v| v.as_str()) != Some(cat) {
-                        continue;
-                    }
+                    && job.get("category").and_then(|v| v.as_str()) != Some(cat)
+                {
+                    continue;
+                }
                 job["id"] = serde_json::json!(eid);
                 jobs.push(json_to_lua_table(lua, &job)?);
             }

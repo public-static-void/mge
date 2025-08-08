@@ -14,28 +14,28 @@ fn enforce_schema_defaults(value: &mut JsonValue, schema: &JsonValue) {
             // Handle 'oneOf' to respect mutually exclusive schema alternatives.
             if let Some(one_of) = prop_schema.get("oneOf")
                 && let Some(alternatives) = one_of.as_array()
-                    && let Some(JsonValue::Object(prop_val)) = map.get_mut(key) {
-                        // Find the alternative schema matching the keys present in prop_val.
-                        let matched_schema_opt = alternatives.iter().find(|alt_schema| {
-                            alt_schema
-                                .get("required")
-                                .and_then(|req| req.as_array())
-                                .is_some_and(|req| {
-                                    req.iter().all(|r| {
-                                        r.as_str().is_some_and(|rk| prop_val.contains_key(rk))
-                                    })
-                                })
-                        });
+                && let Some(JsonValue::Object(prop_val)) = map.get_mut(key)
+            {
+                // Find the alternative schema matching the keys present in prop_val.
+                let matched_schema_opt = alternatives.iter().find(|alt_schema| {
+                    alt_schema
+                        .get("required")
+                        .and_then(|req| req.as_array())
+                        .is_some_and(|req| {
+                            req.iter()
+                                .all(|r| r.as_str().is_some_and(|rk| prop_val.contains_key(rk)))
+                        })
+                });
 
-                        if let Some(matched_schema) = matched_schema_opt {
-                            // Recursively apply defaults for the matched alternative only.
-                            enforce_schema_defaults(map.get_mut(key).unwrap(), matched_schema);
-                            // Skip to next property since handled here.
-                            continue;
-                        }
-                        // No matched alternative found, skip to avoid injecting defaults into all.
-                        continue;
-                    }
+                if let Some(matched_schema) = matched_schema_opt {
+                    // Recursively apply defaults for the matched alternative only.
+                    enforce_schema_defaults(map.get_mut(key).unwrap(), matched_schema);
+                    // Skip to next property since handled here.
+                    continue;
+                }
+                // No matched alternative found, skip to avoid injecting defaults into all.
+                continue;
+            }
 
             // Proceed with normal default enforcement.
             let field_type = prop_schema.get("type").and_then(|t| t.as_str());
@@ -68,18 +68,20 @@ fn enforce_schema_defaults(value: &mut JsonValue, schema: &JsonValue) {
 
             // Recurse into objects
             if let Some("object") = field_type
-                && let Some(child) = map.get_mut(key) {
-                    enforce_schema_defaults(child, prop_schema);
-                }
+                && let Some(child) = map.get_mut(key)
+            {
+                enforce_schema_defaults(child, prop_schema);
+            }
 
             // Recurse into arrays
             if let Some("array") = field_type
                 && let Some(items_schema) = prop_schema.get("items")
-                    && let Some(JsonValue::Array(arr)) = map.get_mut(key) {
-                        for item in arr {
-                            enforce_schema_defaults(item, items_schema);
-                        }
-                    }
+                && let Some(JsonValue::Array(arr)) = map.get_mut(key)
+            {
+                for item in arr {
+                    enforce_schema_defaults(item, items_schema);
+                }
+            }
         }
     }
 }

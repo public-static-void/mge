@@ -43,13 +43,15 @@ impl Eq for Node {}
 pub fn default_cost_fn(meta: Option<&Value>) -> f32 {
     if let Some(meta) = meta {
         if let Some(walkable) = meta.get("walkable")
-            && walkable == &Value::Bool(false) {
-                return f32::INFINITY;
-            }
+            && walkable == &Value::Bool(false)
+        {
+            return f32::INFINITY;
+        }
         if let Some(cost) = meta.get("cost")
-            && let Some(c) = cost.as_f64() {
-                return c as f32;
-            }
+            && let Some(c) = cost.as_f64()
+        {
+            return c as f32;
+        }
     }
     1.0
 }

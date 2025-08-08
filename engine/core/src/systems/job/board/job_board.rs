@@ -213,25 +213,24 @@ impl JobBoard {
                 if let (Some(reserved_resources), Some(reserved_stockpile)) = (
                     job.get("reserved_resources").and_then(|v| v.as_array()),
                     job.get("reserved_stockpile").and_then(|v| v.as_u64()),
-                )
-                    && let Some(mut stockpile) = world
-                        .get_component(reserved_stockpile as u32, "Stockpile")
-                        .cloned()
+                ) && let Some(mut stockpile) = world
+                    .get_component(reserved_stockpile as u32, "Stockpile")
+                    .cloned()
+                {
+                    // Reservation block intentionally left empty to avoid subtracting resources here.
+                    // Resources are consumed at pickup time.
+                    // Keeping logic here allows future logic extension.
+                    // No unused variable warnings.
+                    if let Some(_resources) = stockpile
+                        .get_mut("resources")
+                        .and_then(|v| v.as_object_mut())
                     {
-                        // Reservation block intentionally left empty to avoid subtracting resources here.
-                        // Resources are consumed at pickup time.
-                        // Keeping logic here allows future logic extension.
-                        // No unused variable warnings.
-                        if let Some(_resources) = stockpile
-                            .get_mut("resources")
-                            .and_then(|v| v.as_object_mut())
-                        {
-                            for _req in reserved_resources {}
-                        }
-                        world
-                            .set_component(reserved_stockpile as u32, "Stockpile", stockpile)
-                            .unwrap();
+                        for _req in reserved_resources {}
                     }
+                    world
+                        .set_component(reserved_stockpile as u32, "Stockpile", stockpile)
+                        .unwrap();
+                }
                 job["assigned_to"] = JsonValue::from(actor_eid);
                 if job.get("state").and_then(|v| v.as_str()) == Some("interrupted") {
                     let state = job.get("state").and_then(|v| v.as_str()).unwrap_or("");

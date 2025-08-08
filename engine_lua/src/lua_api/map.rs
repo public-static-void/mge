@@ -13,13 +13,16 @@ fn parse_cell_key(cell_json: serde_json::Value) -> Result<CellKey, mlua::Error> 
     }
     // Fallback: treat as Square if x/y/z fields are present
     if let serde_json::Value::Object(ref obj) = cell_json
-        && obj.contains_key("x") && obj.contains_key("y") && obj.contains_key("z") {
-            return Ok(CellKey::Square {
-                x: obj["x"].as_i64().unwrap() as i32,
-                y: obj["y"].as_i64().unwrap() as i32,
-                z: obj["z"].as_i64().unwrap() as i32,
-            });
-        }
+        && obj.contains_key("x")
+        && obj.contains_key("y")
+        && obj.contains_key("z")
+    {
+        return Ok(CellKey::Square {
+            x: obj["x"].as_i64().unwrap() as i32,
+            y: obj["y"].as_i64().unwrap() as i32,
+            z: obj["z"].as_i64().unwrap() as i32,
+        });
+    }
     Err(mlua::Error::external("Invalid cell key format"))
 }
 
@@ -67,9 +70,9 @@ pub fn register_map_api(lua: &Lua, globals: &Table, world: Rc<RefCell<World>>) -
                 .topology
                 .as_any_mut()
                 .downcast_mut::<engine_core::map::SquareGridMap>()
-            {
-                square.add_cell(x, y, z);
-            }
+        {
+            square.add_cell(x, y, z);
+        }
         Ok(())
     })?;
     globals.set("add_cell", add_cell)?;
@@ -123,9 +126,9 @@ pub fn register_map_api(lua: &Lua, globals: &Table, world: Rc<RefCell<World>>) -
                 .topology
                 .as_any_mut()
                 .downcast_mut::<engine_core::map::SquareGridMap>()
-            {
-                square.add_neighbor(from_xyz, to_xyz);
-            }
+        {
+            square.add_neighbor(from_xyz, to_xyz);
+        }
         Ok(())
     })?;
     globals.set("add_neighbor", add_neighbor)?;

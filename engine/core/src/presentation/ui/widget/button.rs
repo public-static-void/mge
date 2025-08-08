@@ -101,25 +101,30 @@ impl UiWidget for Button {
 
     fn handle_event(&mut self, event: &UiEvent) {
         if let UiEvent::Click { x, y } = *event
-            && y == self.pos.1 && x >= self.pos.0 && x < self.pos.0 + self.label.len() as i32 {
-                if let Some(cb) = self.on_press.as_mut() {
-                    cb();
-                }
-                let cb = self.callbacks.get("click").cloned();
-                if let Some(cb) = cb {
-                    cb(self);
-                }
+            && y == self.pos.1
+            && x >= self.pos.0
+            && x < self.pos.0 + self.label.len() as i32
+        {
+            if let Some(cb) = self.on_press.as_mut() {
+                cb();
             }
+            let cb = self.callbacks.get("click").cloned();
+            if let Some(cb) = cb {
+                cb(self);
+            }
+        }
         if let UiEvent::KeyPress { ref key } = *event
-            && self.focused && (key == "Enter" || key == "Space") {
-                if let Some(cb) = self.on_press.as_mut() {
-                    cb();
-                }
-                let cb = self.callbacks.get("activate").cloned();
-                if let Some(cb) = cb {
-                    cb(self);
-                }
+            && self.focused
+            && (key == "Enter" || key == "Space")
+        {
+            if let Some(cb) = self.on_press.as_mut() {
+                cb();
             }
+            let cb = self.callbacks.get("activate").cloned();
+            if let Some(cb) = cb {
+                cb(self);
+            }
+        }
     }
 
     fn as_any(&self) -> &dyn Any {

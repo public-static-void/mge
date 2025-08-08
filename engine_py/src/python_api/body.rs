@@ -67,9 +67,10 @@ impl BodyApi for PyWorld {
                     return true;
                 }
                 if let Some(children) = part.get_mut("children").and_then(|v| v.as_array_mut())
-                    && remove_part_recursive(children, name) {
-                        return true;
-                    }
+                    && remove_part_recursive(children, name)
+                {
+                    return true;
+                }
                 i += 1;
             }
             false
@@ -106,17 +107,19 @@ impl BodyApi for PyWorld {
                         return Some(part);
                     }
                     if let Some(children) = part.get("children").and_then(|v| v.as_array())
-                        && let Some(found) = find_part(children, name) {
-                            return Some(found);
-                        }
+                        && let Some(found) = find_part(children, name)
+                    {
+                        return Some(found);
+                    }
                 }
                 None
             }
             if let Some(parts) = body.get("parts").and_then(|v| v.as_array())
-                && let Some(part) = find_part(parts, &part_name) {
-                    let py_obj = serde_pyobject::to_pyobject(py, part)?;
-                    return Ok(Some(py_obj.into()));
-                }
+                && let Some(part) = find_part(parts, &part_name)
+            {
+                let py_obj = serde_pyobject::to_pyobject(py, part)?;
+                return Ok(Some(py_obj.into()));
+            }
         }
         Ok(None)
     }

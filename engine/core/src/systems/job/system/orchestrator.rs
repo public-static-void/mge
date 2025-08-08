@@ -14,11 +14,11 @@ pub fn cleanup_agent_on_job_state(world: &mut World, job: &serde_json::Value) {
         if let Some(mut agent) = update_agent
             && agent.get("current_job").and_then(|v| v.as_u64())
                 == job.get("id").and_then(|v| v.as_u64())
-            {
-                agent["current_job"] = serde_json::Value::Null;
-                agent["state"] = serde_json::json!("idle");
-                world.set_component(agent_id, "Agent", agent).unwrap();
-            }
+        {
+            agent["current_job"] = serde_json::Value::Null;
+            agent["state"] = serde_json::json!("idle");
+            world.set_component(agent_id, "Agent", agent).unwrap();
+        }
     }
     // Also clear assigned_to on the job itself
     if let Some(job_id) = job.get("id").and_then(|v| v.as_u64()) {
@@ -38,9 +38,10 @@ pub fn should_spawn_conditional_child(
     spawn_if: &serde_json::Value,
 ) -> bool {
     if let Some(field) = spawn_if.get("field").and_then(|v| v.as_str())
-        && let Some(equals) = spawn_if.get("equals") {
-            return parent_job.get(field) == Some(equals);
-        }
+        && let Some(equals) = spawn_if.get("equals")
+    {
+        return parent_job.get(field) == Some(equals);
+    }
     if let Some(ws) = spawn_if.get("world_state") {
         return dependencies::evaluate_world_state(world, ws);
     }
@@ -274,22 +275,23 @@ pub fn run_job_system(world: &mut World, lua: Option<&mlua::Lua>) {
     }
     for (eid, job_type, state) in terminal_jobs {
         if let Some(mut job_obj) = world.get_component(eid, "Job").cloned()
-            && let Some(obj) = job_obj.as_object_mut() {
-                match state.as_str() {
-                    "failed" | "cancelled" => {
-                        effects::process_job_effects(world, eid, &job_type, obj, true);
-                        world
-                            .set_component(eid, "Job", serde_json::Value::Object(obj.clone()))
-                            .unwrap();
-                    }
-                    "complete" => {
-                        effects::process_job_effects(world, eid, &job_type, obj, false);
-                        world
-                            .set_component(eid, "Job", serde_json::Value::Object(obj.clone()))
-                            .unwrap();
-                    }
-                    _ => {}
+            && let Some(obj) = job_obj.as_object_mut()
+        {
+            match state.as_str() {
+                "failed" | "cancelled" => {
+                    effects::process_job_effects(world, eid, &job_type, obj, true);
+                    world
+                        .set_component(eid, "Job", serde_json::Value::Object(obj.clone()))
+                        .unwrap();
                 }
+                "complete" => {
+                    effects::process_job_effects(world, eid, &job_type, obj, false);
+                    world
+                        .set_component(eid, "Job", serde_json::Value::Object(obj.clone()))
+                        .unwrap();
+                }
+                _ => {}
             }
+        }
     }
 }

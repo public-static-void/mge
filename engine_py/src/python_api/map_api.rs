@@ -59,9 +59,9 @@ pub fn add_neighbor(pyworld: &PyWorld, from: (i32, i32, i32), to: (i32, i32, i32
             .topology
             .as_any_mut()
             .downcast_mut::<engine_core::map::SquareGridMap>()
-        {
-            square.add_neighbor(from, to);
-        }
+    {
+        square.add_neighbor(from, to);
+    }
 }
 
 /// Get a list of entity IDs located in the given cell.
@@ -235,7 +235,7 @@ pub fn add_cell(pyworld: &PyWorld, x: i32, y: i32, z: i32) {
             .topology
             .as_any_mut()
             .downcast_mut::<engine_core::map::SquareGridMap>()
-        {
-            square.add_cell(x, y, z);
-        }
+    {
+        square.add_cell(x, y, z);
+    }
 }

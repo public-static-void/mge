@@ -214,15 +214,14 @@ impl System for BodyEquipmentSyncSystem {
                 for item_eid in world.get_entities_with_component("Item") {
                     if let Some(item_comp) = world.get_component(item_eid, "Item")
                         && item_comp.get("id").and_then(|v| v.as_str()) == Some(&item_id)
-                            && let Some(effects) =
-                                item_comp.get("effects").and_then(|v| v.as_object())
-                            {
-                                for (stat, delta) in effects {
-                                    if let Some(d) = delta.as_f64() {
-                                        *total_effects.entry(stat.clone()).or_insert(0.0) += d;
-                                    }
-                                }
+                        && let Some(effects) = item_comp.get("effects").and_then(|v| v.as_object())
+                    {
+                        for (stat, delta) in effects {
+                            if let Some(d) = delta.as_f64() {
+                                *total_effects.entry(stat.clone()).or_insert(0.0) += d;
                             }
+                        }
+                    }
                 }
             }
 

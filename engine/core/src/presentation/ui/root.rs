@@ -41,10 +41,11 @@ impl UiRoot {
             }
         }
         if let Some(idx) = self.focused
-            && let Some(child) = self.children.get_mut(idx) {
-                child.handle_event(event);
-                return;
-            }
+            && let Some(child) = self.children.get_mut(idx)
+        {
+            child.handle_event(event);
+            return;
+        }
         for child in self.children.iter_mut().rev() {
             child.handle_event(event);
         }

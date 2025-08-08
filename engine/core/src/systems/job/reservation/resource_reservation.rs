@@ -34,9 +34,10 @@ impl ResourceReservationSystem {
             HashMap::new();
         for &stockpile_eid in &stockpile_eids {
             if let Some(stockpile) = world.get_component(stockpile_eid, "Stockpile")
-                && let Some(res) = stockpile.get("resources").and_then(|v| v.as_object()) {
-                    stockpile_working.insert(stockpile_eid, res.clone());
-                }
+                && let Some(res) = stockpile.get("resources").and_then(|v| v.as_object())
+            {
+                stockpile_working.insert(stockpile_eid, res.clone());
+            }
         }
 
         // Get all pending jobs, in ascending eid order for deterministic processing.
@@ -112,9 +113,11 @@ impl ResourceReservationSystem {
             return ResourceReservationStatus::NotRequired;
         }
         if let Some(reserved) = job.get("reserved_resources").and_then(|v| v.as_array())
-            && !reserved.is_empty() && job.get("reserved_stockpile").is_some() {
-                return ResourceReservationStatus::Reserved;
-            }
+            && !reserved.is_empty()
+            && job.get("reserved_stockpile").is_some()
+        {
+            return ResourceReservationStatus::Reserved;
+        }
         ResourceReservationStatus::WaitingForResources
     }
 
