@@ -141,7 +141,7 @@ impl UiWidget for FocusGrid {
     }
 
     fn add_child(&mut self, child: Box<dyn UiWidget + Send>) {
-        // By default, add at (0, 0). You may want to extend this for real layout.
+        // By default, add at (0, 0).
         self.children.push((child, 0, 0));
     }
 
