@@ -117,11 +117,69 @@
 
 ## Job System
 
-| Function                                        | Description                                                          |
-| ----------------------------------------------- | -------------------------------------------------------------------- |
-| `assign_job(entity, job_type, [fields/kwargs])` | Assign a job to an entity. Extra fields/kwargs become job properties |
-| `get_job_types()`                               | List all available job types                                         |
-| `register_job_type(name, fn)`                   | Register a custom job type                                           |
+| Function (Lua) / Method (Python)                                                                   | Description                                                                        |
+| -------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `assign_job(entity, job_type, fields?)`<br>`world.assign_job(entity, job_type, fields=None)`       | Assign a job of the given type to an entity. Optional fields/dict sets properties. |
+| `cancel_job(job_id)`<br>`world.cancel_job(job_id)`                                                 | Cancel a job by unique ID.                                                         |
+| `set_job_field(job_id, field, value)`<br>`world.set_job_field(job_id, field, value)`               | Set a single field (by name) on a job.                                             |
+| `update_job(job_id, fields)`<br>`world.update_job(job_id, fields)`                                 | Update multiple fields on a job (fields table/dict).                               |
+| `list_jobs([opts])`<br>`world.list_jobs(opts=None)`                                                | List jobs. Optionally filter with a table/dict.                                    |
+| `get_job(job_id)`<br>`world.get_job(job_id)`                                                       | Retrieve a job by its ID.                                                          |
+| `find_jobs([filter])`<br>`world.find_jobs(filter=None)`                                            | Find jobs matching a filter table/dict.                                            |
+| `advance_job_state(job_id)`<br>`world.advance_job_state(job_id)`                                   | Advance a job’s internal state machine.                                            |
+| `get_job_children(job_id)`<br>`world.get_job_children(job_id)`                                     | Get list of child job IDs for a job.                                               |
+| `set_job_children(job_id, children)`<br>`world.set_job_children(job_id, children)`                 | Set list of child job IDs for a job.                                               |
+| `get_job_dependencies(job_id)`<br>`world.get_job_dependencies(job_id)`                             | Get job IDs this job depends on.                                                   |
+| `set_job_dependencies(job_id, deps)`<br>`world.set_job_dependencies(job_id, deps)`                 | Set dependency job IDs for a job.                                                  |
+| `get_job_board()`<br>`world.get_job_board()`                                                       | Return the current job scheduling board.                                           |
+| `get_job_board_policy()`<br>`world.get_job_board_policy()`                                         | Get the current job scheduling policy name.                                        |
+| `set_job_board_policy(policy)`<br>`world.set_job_board_policy(policy)`                             | Set the job scheduling policy by name.                                             |
+| `get_job_priority(job_id)`<br>`world.get_job_priority(job_id)`                                     | Get the priority value of a job.                                                   |
+| `set_job_priority(job_id, value)`<br>`world.set_job_priority(job_id, value)`                       | Set the priority value of a job.                                                   |
+| `add_job_to_job_board(job_id)` _(Lua only)_                                                        | Add a job to the job scheduling board.                                             |
+| `get_job_types()`<br>`world.get_job_types()`                                                       | List all registered job types.                                                     |
+| `register_job_type(name, fn/callback)`<br>`world.register_job_type(name, callback)`                | Register a custom job type with a script-side handler/callback.                    |
+| `get_job_type_metadata(name)`<br>`world.get_job_type_metadata(name)`                               | Get metadata/schema for a job type.                                                |
+| `ai_assign_jobs(agent_id, args?)`<br>`world.ai_assign_jobs(agent_id, args=None)`                   | Assign jobs to an AI agent, optionally with args.                                  |
+| `ai_query_jobs(agent_id)`<br>`world.ai_query_jobs(agent_id)`                                       | Query which jobs are available to an AI agent.                                     |
+| `ai_modify_job_assignment(job_id, changes)`<br>`world.ai_modify_job_assignment(job_id, changes)`   | Change job assignment for agent/job.                                               |
+| `get_production_job(entity)`<br>`world.get_production_job(entity)`                                 | Get ProductionJob component for an entity.                                         |
+| `get_production_job_progress(entity)`<br>`world.get_production_job_progress(entity)`               | Get progress of a ProductionJob for the entity.                                    |
+| `set_production_job_progress(entity, value)`<br>`world.set_production_job_progress(entity, value)` | Set progress of a ProductionJob.                                                   |
+| `get_production_job_state(entity)`<br>`world.get_production_job_state(entity)`                     | Get current state/status of ProductionJob.                                         |
+| `set_production_job_state(entity, value)`<br>`world.set_production_job_state(entity, value)`       | Set state/status on ProductionJob.                                                 |
+| `get_job_resource_reservations(entity)`<br>`world.get_job_resource_reservations(entity)`           | Get resource reservations for an entity's job.                                     |
+| `reserve_job_resources(entity)`<br>`world.reserve_job_resources(entity)`                           | Reserve resources for the entity’s job(s).                                         |
+| `release_job_resource_reservations(entity)`<br>`world.release_job_resource_reservations(entity)`   | Release reserved resources for jobs.                                               |
+
+---
+
+### Job Event Log API
+
+> _Lua:_ All functions below are methods on the `job_events` table.
+> _Python:_ All functions are methods on `PyWorld` (e.g. `world.get_job_event_log()`).
+
+| Function / Method                                                                               | Description                                                            |
+| ----------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `job_events.get_all_events()`<br>`get_job_event_log()`                                          | Get all recorded job events from the job event log.                    |
+| `job_events.get_events_by_type(event_type)`<br>`get_job_events_by_type(event_type)`             | Get job events filtered by event type.                                 |
+| `job_events.get_events_by_timestamp(ts)`<br>`get_job_events_since(ts)`                          | Get job events with timestamp ≥ supplied value.                        |
+| `job_events.get_events_matching_type(type)`<br>`get_job_events_where(predicate)`                | (Lua: filter by type substring. Python: filter by predicate function.) |
+| `job_events.subscribe(event_type, callback)`<br>`subscribe_job_event_bus(event_type, callback)` | Register a callback for job events of the given type.                  |
+| `job_events.unsubscribe(event_type, sub_id)`<br>`unsubscribe_job_event_bus(event_type, sub_id)` | Remove a previously registered event callback subscription.            |
+| `job_events.get_last_events()` _(Lua only)_                                                     | Get the most recent batch of job events.                               |
+| `job_events.save_event_log(path)`<br>`save_job_event_log(path)`                                 | Save current job event log to a file.                                  |
+| `job_events.load_event_log(path)`<br>`load_job_event_log(path)`                                 | Load job event log from file.                                          |
+| `job_events.replay_event_log()`<br>`replay_job_event_log()`                                     | Replay loaded event log, applying events to the simulation.            |
+| `job_events.clear_all_events()`<br>`clear_job_event_log()`                                      | Clear all stored job events from the log.                              |
+
+---
+
+### Utility (Python)
+
+| Function                     | Description                                                                 |
+| ---------------------------- | --------------------------------------------------------------------------- |
+| `py_init_job_event_logger()` | Initialize the job event logger system. Typically called once during setup. |
 
 ---
 
