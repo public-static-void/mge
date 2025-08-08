@@ -134,7 +134,7 @@ impl JobQueryApi for PyWorld {
     fn cancel_job(&self, job_id: u32) -> PyResult<()> {
         let mut world = self.inner.borrow_mut();
         if let Some(mut job) = world.get_component(job_id, "Job").cloned() {
-            job["cancelled"] = serde_json::json!(true);
+            job["state"] = serde_json::json!("cancelled");
             world
                 .set_component(job_id, "Job", job)
                 .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
