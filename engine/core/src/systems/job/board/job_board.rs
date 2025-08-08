@@ -1,4 +1,5 @@
 use crate::ecs::world::World;
+use crate::systems::job::priority_aging::JobPriorityAgingSystem;
 use serde_json::Value as JsonValue;
 
 /// Trait for pluggable job scheduling policies.
@@ -49,9 +50,16 @@ impl SchedulingPolicy for LifoPolicy {
     }
 }
 
+/// The job board manages the current set of pending, unassigned jobs and performs scheduling
+/// according to the selected policy. Candidates are sorted by the given policy and exposed as a queue.
 pub struct JobBoard {
-    pub jobs: Vec<u32>, // entity IDs of unassigned jobs, sorted by policy
+    /// Entity IDs of unassigned jobs, sorted by policy.
+    pub jobs: Vec<u32>,
     policy: Box<dyn SchedulingPolicy>,
+    /// Current game tick used for effective priority calculation.
+    current_tick: u64,
+    /// Resource kinds considered 'in shortage' for boost logic.
+    shortage_kinds: Vec<String>,
 }
 
 /// Struct for job board metadata, suitable for scripting bridges.
@@ -60,9 +68,9 @@ pub struct JobBoardEntry {
     pub eid: u32,
     pub priority: i64,
     pub state: String,
-    // Add more fields as needed (assignment_count, created_at, etc.)
 }
 
+/// Result of a job assignment attempt.
 #[derive(Debug, PartialEq, Eq)]
 pub enum JobAssignmentResult {
     Assigned(u32),
@@ -76,6 +84,7 @@ impl Default for JobBoard {
 }
 
 impl JobBoard {
+    /// Returns true if the requirements are empty or all their amounts are zero.
     fn requirements_are_empty_or_zero(requirements: &[serde_json::Value]) -> bool {
         requirements.is_empty()
             || requirements
@@ -83,26 +92,35 @@ impl JobBoard {
                 .all(|req| req.get("amount").and_then(|a| a.as_i64()).unwrap_or(0) == 0)
     }
 
-    /// Create a JobBoard with the given scheduling policy.
+    /// Creates a JobBoard with the given scheduling policy.
     pub fn with_policy(policy: Box<dyn SchedulingPolicy>) -> Self {
         JobBoard {
             jobs: Vec::new(),
             policy,
+            current_tick: 0,
+            shortage_kinds: Vec::new(),
         }
     }
 
-    pub fn update(&mut self, world: &World) {
+    /// Updates the internal job list by scanning the world for unassigned, pending jobs.
+    /// The caller must pass the current tick and the set of resource shortage kinds.
+    ///
+    /// Each candidate job's effective priority is determined live, using the aging and shortage logic;
+    /// only jobs that satisfy requirements and dependencies are considered.
+    pub fn update(&mut self, world: &World, current_tick: u64, shortage_kinds: &[String]) {
         self.jobs.clear();
+        self.current_tick = current_tick;
+        self.shortage_kinds = shortage_kinds.to_vec();
         let mut candidates: Vec<(u32, i64, u64, u64, u64)> = Vec::new();
         for eid in world.get_entities_with_component("Job") {
             if let Some(job) = world.get_component(eid, "Job") {
                 let assigned = job.get("assigned_to").and_then(|v| v.as_u64()).unwrap_or(0);
                 let state = job.get("state").and_then(|v| v.as_str()).unwrap_or("");
-                let priority = job
-                    .get("effective_priority")
-                    .and_then(|v| v.as_i64())
-                    .or_else(|| job.get("priority").and_then(|v| v.as_i64()))
-                    .unwrap_or(0);
+                let priority = JobPriorityAgingSystem::compute_effective_priority(
+                    job,
+                    current_tick,
+                    shortage_kinds,
+                );
                 let assignment_count = job
                     .get("assignment_count")
                     .and_then(|v| v.as_u64())
@@ -117,23 +135,33 @@ impl JobBoard {
                     .unwrap_or(eid as u64);
 
                 let resource_requirements = job.get("resource_requirements");
-                let has_reservation = job.get("reserved_resources").is_some()
-                    && job.get("reserved_stockpile").is_some();
 
-                let requirements_satisfied = resource_requirements.is_none()
-                    || resource_requirements
-                        .and_then(|v| v.as_array())
-                        .map(|arr| Self::requirements_are_empty_or_zero(arr))
-                        .unwrap_or(true)
-                    || has_reservation;
+                let reserved_resources_ok = matches!(job.get("reserved_resources"), Some(JsonValue::Array(arr)) if !arr.is_empty());
+                let reserved_stockpile_ok =
+                    matches!(job.get("reserved_stockpile"), Some(JsonValue::Number(_)));
+                let has_reservation = reserved_resources_ok && reserved_stockpile_ok;
+
+                let requirements_satisfied = match resource_requirements.and_then(|v| v.as_array())
+                {
+                    Some(arr) if !arr.is_empty() => {
+                        Self::requirements_are_empty_or_zero(arr) || has_reservation
+                    }
+                    _ => true,
+                };
+
+                let dependencies_satisfied =
+                    crate::systems::job::core::dependencies::dependencies_satisfied(world, job);
 
                 if assigned == 0
-                    && (state == "pending" || state == "interrupted")
-                    && !job
-                        .get("blocked")
-                        .and_then(|v| v.as_bool())
-                        .unwrap_or(false)
+                    && (state == "pending"
+                        || state == "interrupted"
+                        || state == "fetching_resources")
+                    && state != "blocked"
+                    && state != "cancelled"
+                    && state != "complete"
+                    && state != "failed"
                     && requirements_satisfied
+                    && dependencies_satisfied
                 {
                     candidates.push((
                         eid,
@@ -152,6 +180,7 @@ impl JobBoard {
             .collect();
     }
 
+    /// Attempts to claim the first candidate job, assigning the actor and updating assignment stats.
     pub fn claim_job(
         &mut self,
         actor_eid: u32,
@@ -162,28 +191,58 @@ impl JobBoard {
             if let Some(job) = world.get_component(eid, "Job") {
                 let assigned = job.get("assigned_to").and_then(|v| v.as_u64()).unwrap_or(0);
                 let state = job.get("state").and_then(|v| v.as_str()).unwrap_or("");
-                let resource_requirements = job.get("resource_requirements");
+                let requirements = job.get("resource_requirements").and_then(|v| v.as_array());
                 let has_reservation = job.get("reserved_resources").is_some()
                     && job.get("reserved_stockpile").is_some();
-                let requirements_satisfied = resource_requirements.is_none()
-                    || resource_requirements
-                        .and_then(|v| v.as_array())
-                        .map(|arr| Self::requirements_are_empty_or_zero(arr))
-                        .unwrap_or(true)
-                    || has_reservation;
+
+                let requirements_empty_or_zero = requirements
+                    .map(|arr| Self::requirements_are_empty_or_zero(arr))
+                    .unwrap_or(true);
+
                 assigned == 0
-                    && (state == "pending" || state == "interrupted")
-                    && requirements_satisfied
+                    && (state == "pending"
+                        || state == "interrupted"
+                        || state == "fetching_resources")
+                    && (requirements.is_none() || requirements_empty_or_zero || has_reservation)
             } else {
                 false
             }
         }) {
             if let Some(job) = world.get_component(job_eid, "Job") {
                 let mut job = job.clone();
+                if let (Some(reserved_resources), Some(reserved_stockpile)) = (
+                    job.get("reserved_resources").and_then(|v| v.as_array()),
+                    job.get("reserved_stockpile").and_then(|v| v.as_u64()),
+                ) {
+                    if let Some(mut stockpile) = world
+                        .get_component(reserved_stockpile as u32, "Stockpile")
+                        .cloned()
+                    {
+                        // Reservation block intentionally left empty to avoid subtracting resources here.
+                        // Resources are consumed at pickup time.
+                        // Keeping logic here allows future logic extension.
+                        // No unused variable warnings.
+                        if let Some(_resources) = stockpile
+                            .get_mut("resources")
+                            .and_then(|v| v.as_object_mut())
+                        {
+                            for _req in reserved_resources {}
+                        }
+                        world
+                            .set_component(reserved_stockpile as u32, "Stockpile", stockpile)
+                            .unwrap();
+                    }
+                }
                 job["assigned_to"] = JsonValue::from(actor_eid);
-                // If the job was interrupted, reset to pending so it goes through the assignment pipeline
                 if job.get("state").and_then(|v| v.as_str()) == Some("interrupted") {
-                    job["state"] = JsonValue::from("pending");
+                    let state = job.get("state").and_then(|v| v.as_str()).unwrap_or("");
+                    if state != "blocked"
+                        && state != "cancelled"
+                        && state != "complete"
+                        && state != "failed"
+                    {
+                        job["state"] = JsonValue::from("pending");
+                    }
                 }
                 job["assignment_count"] = JsonValue::from(
                     job.get("assignment_count")
@@ -208,7 +267,11 @@ impl JobBoard {
             .filter_map(|&eid| {
                 world.get_component(eid, "Job").map(|job| JobBoardEntry {
                     eid,
-                    priority: job.get("priority").and_then(|v| v.as_i64()).unwrap_or(0),
+                    priority: JobPriorityAgingSystem::compute_effective_priority(
+                        job,
+                        self.current_tick,
+                        &self.shortage_kinds,
+                    ),
                     state: job
                         .get("state")
                         .and_then(|v| v.as_str())
@@ -219,7 +282,7 @@ impl JobBoard {
             .collect()
     }
 
-    /// Returns the current policy as a string.
+    /// Returns the current scheduling policy as a string.
     pub fn get_policy_name(&self) -> &str {
         self.policy.name()
     }
@@ -235,14 +298,18 @@ impl JobBoard {
         Ok(())
     }
 
-    /// Gets the priority for a job.
+    /// Gets the effective priority for a job at the current tick and with shortages.
     pub fn get_priority(&self, world: &World, eid: u32) -> Option<i64> {
-        world
-            .get_component(eid, "Job")
-            .and_then(|job| job.get("priority").and_then(|v| v.as_i64()))
+        world.get_component(eid, "Job").map(|job| {
+            JobPriorityAgingSystem::compute_effective_priority(
+                job,
+                self.current_tick,
+                &self.shortage_kinds,
+            )
+        })
     }
 
-    /// Sets the priority for a job.
+    /// Sets the persistent base priority value for a job (does not affect effective priority directly).
     pub fn set_priority(&self, world: &mut World, eid: u32, value: i64) -> Result<(), String> {
         if let Some(mut job) = world.get_component(eid, "Job").cloned() {
             job["priority"] = serde_json::json!(value);
