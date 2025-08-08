@@ -49,11 +49,11 @@ impl SystemRegistry {
         self.systems.contains_key(name)
     }
 
-    pub fn get_system(&self, name: &str) -> Option<std::cell::Ref<Box<dyn System>>> {
+    pub fn get_system(&self, name: &str) -> Option<std::cell::Ref<'_, Box<dyn System>>> {
         self.systems.get(name).map(|cell| cell.borrow())
     }
 
-    pub fn sorted_systems(&self) -> Vec<std::cell::Ref<Box<dyn System>>> {
+    pub fn sorted_systems(&self) -> Vec<std::cell::Ref<'_, Box<dyn System>>> {
         let names = self.sorted_system_names();
         names
             .into_iter()
@@ -61,7 +61,7 @@ impl SystemRegistry {
             .collect()
     }
 
-    pub fn get_system_mut(&self, name: &str) -> Option<std::cell::RefMut<Box<dyn System>>> {
+    pub fn get_system_mut(&self, name: &str) -> Option<std::cell::RefMut<'_, Box<dyn System>>> {
         self.systems.get(name).map(|cell| cell.borrow_mut())
     }
 
