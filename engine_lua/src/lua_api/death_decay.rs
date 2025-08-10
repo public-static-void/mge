@@ -6,6 +6,7 @@ use mlua::{Lua, Result as LuaResult, Table};
 use std::cell::RefCell;
 use std::rc::Rc;
 
+/// Registers the death/decay API.
 pub fn register_death_decay_api(
     lua: &Lua,
     globals: &Table,

@@ -7,13 +7,19 @@ use std::any::Any;
 /// A node in the UI tree: any widget as a boxed trait object.
 pub type UiNode = Box<dyn UiWidget + Send>;
 
+/// A UI panel.
 #[derive(Serialize, Deserialize)]
 pub struct Panel {
+    /// The widget ID
     pub id: WidgetId,
+    /// The position
     pub pos: (i32, i32),
+    /// The children
     #[serde(skip)]
     pub children: Vec<UiNode>,
+    /// The z-order
     pub z_order: i32,
+    /// The parent
     pub parent: Option<WidgetId>,
 }
 
@@ -31,6 +37,7 @@ impl Clone for Panel {
 }
 
 impl Panel {
+    /// Create a new panel
     pub fn new(pos: (i32, i32)) -> Self {
         static mut NEXT_ID: WidgetId = 100_000;
         let id = unsafe {
@@ -139,6 +146,7 @@ impl UiWidget for Panel {
     }
 }
 
+/// Register the panel
 pub fn register_panel_widget() {
     use crate::presentation::ui::factory::{UI_FACTORY, WidgetProps};
 

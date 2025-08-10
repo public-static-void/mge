@@ -2,6 +2,7 @@ use engine_core::ecs::world::wasm::WasmWorld;
 use std::sync::{Arc, Mutex};
 use wasmtime::{Caller, Linker};
 
+/// Registers the entity API
 pub fn register_entity_api(linker: &mut Linker<Arc<Mutex<WasmWorld>>>) -> anyhow::Result<()> {
     linker.func_wrap(
         "entity",

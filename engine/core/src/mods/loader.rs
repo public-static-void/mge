@@ -50,5 +50,6 @@ pub fn load_mod<S: ModScriptEngine>(
 
 /// Trait for scripting engines that can run mod scripts.
 pub trait ModScriptEngine {
+    /// Runs a mod script.
     fn run_script(&mut self, script: &str) -> Result<(), String>;
 }

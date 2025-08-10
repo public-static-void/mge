@@ -1,8 +1,12 @@
 use super::PyWorld;
 
+/// Game mode API
 pub trait ModeApi {
+    /// Set game mode
     fn set_mode(&self, mode: String);
+    /// Get current game mode
     fn get_mode(&self) -> String;
+    /// Get all available game modes
     fn get_available_modes(&self) -> Vec<String>;
 }
 

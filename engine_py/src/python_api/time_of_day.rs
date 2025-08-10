@@ -2,7 +2,9 @@ use super::PyWorld;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
+/// Time of day
 pub trait TimeOfDayApi {
+    /// Get time of day
     fn get_time_of_day(&self, py: Python) -> PyObject;
 }
 

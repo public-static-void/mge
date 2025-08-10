@@ -1,20 +1,32 @@
+//! Presentation layer for ECS systems.
+//!
+//! This layer provides a common interface for rendering entities in a world,
+//! abstracting away the underlying graphics system.
+
+/// Internal modules
 pub mod input;
+/// Layouts
 pub mod layout;
+/// Renderers
 pub mod renderer;
+/// User interface
 pub mod ui;
 
 use crate::presentation::renderer::{PresentationRenderer, RenderColor, RenderCommand};
 
 /// Presentation system for ECS worlds with schema-driven components.
 pub struct PresentationSystem<R: PresentationRenderer> {
+    /// The renderer
     pub renderer: R,
 }
 
 impl<R: PresentationRenderer> PresentationSystem<R> {
+    /// Create a new presentation system
     pub fn new(renderer: R) -> Self {
         Self { renderer }
     }
 
+    /// Render the world
     pub fn render_world(&mut self, world: &crate::ecs::world::World) {
         for entity in &world.entities {
             let pos_json = world.get_component(*entity, "Position");
@@ -70,6 +82,7 @@ impl<R: PresentationRenderer> PresentationSystem<R> {
         self.renderer.present();
     }
 
+    /// Render the map
     pub fn render_map(&mut self, world: &crate::ecs::world::World, viewport: &Viewport) {
         use crate::presentation::layout::{CellLayout, HexLayout, SquareLayout};
 
@@ -198,15 +211,21 @@ pub fn region_centroid(map: &crate::map::Map, region_id: &str) -> Option<(i32, i
     }
 }
 
+/// A viewport
 #[derive(Debug, Clone, Copy)]
 pub struct Viewport {
+    /// The x position
     pub x: i32,
+    /// The y position
     pub y: i32,
+    /// The width
     pub width: i32,
+    /// The height
     pub height: i32,
 }
 
 impl Viewport {
+    /// Create a new viewport
     pub fn new(x: i32, y: i32, width: i32, height: i32) -> Self {
         Self {
             x,
@@ -215,6 +234,8 @@ impl Viewport {
             height,
         }
     }
+
+    /// Check if a position is in the viewport
     pub fn contains(&self, x: i32, y: i32) -> bool {
         x >= self.x && x < self.x + self.width && y >= self.y && y < self.y + self.height
     }

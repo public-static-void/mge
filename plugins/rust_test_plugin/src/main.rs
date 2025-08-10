@@ -1,26 +1,47 @@
+//! Rust test plugin
+
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::io::{BufRead, BufReader, Write};
 use std::os::unix::net::UnixStream;
 
+/// Plugin requests
 #[derive(Debug, Serialize, Deserialize)]
 pub enum PluginRequest {
+    /// Initialize plugin
     Initialize,
+    /// Reload plugin
     Reload,
+    /// Shutdown plugin
     Shutdown,
+    /// Run command
     RunCommand {
+        /// Command
         command: String,
+        /// Arguments
         data: serde_json::Value,
     },
 }
 
+/// Plugin responses
 #[derive(Debug, Serialize, Deserialize)]
 pub enum PluginResponse {
+    /// Plugin initialized
     Initialized,
+    /// Plugin reloaded
     Reloaded,
+    /// Plugin shutdown
     Shutdown,
-    CommandResult { result: serde_json::Value },
-    Error { message: String },
+    /// Command result
+    CommandResult {
+        /// Command result
+        result: serde_json::Value,
+    },
+    /// Error
+    Error {
+        /// Error message
+        message: String,
+    },
 }
 
 fn main() -> std::io::Result<()> {

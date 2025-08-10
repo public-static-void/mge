@@ -12,18 +12,26 @@ thread_local! {
     static LUA_JOB_HANDLERS: RefCell<HashMap<String, RegistryKey>> = RefCell::new(HashMap::new());
 }
 
+/// Lua job call
 #[derive(Clone)]
 pub struct LuaJobCall {
+    /// Job type
     pub job_type: String,
+    /// Entity
     pub entity: u32,
+    /// Assigned to
     pub assigned_to: u32,
+    /// Job ID
     pub job_id: u32,
+    /// Job
     pub job: serde_json::Value,
 }
 
+/// Lua job call queue
 pub static LUA_JOB_CALL_QUEUE: Lazy<Arc<Mutex<Vec<LuaJobCall>>>> =
     Lazy::new(|| Arc::new(Mutex::new(Vec::new())));
 
+/// Registers job system API
 pub fn register_job_system_api(
     lua: &Lua,
     globals: &Table,

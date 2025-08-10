@@ -13,10 +13,12 @@ pub use process::*;
 use crate::ecs::system::System;
 use crate::ecs::world::World;
 
+/// Job system
 #[derive(Default)]
 pub struct JobSystem;
 
 impl JobSystem {
+    /// Create new job system
     pub fn new() -> Self {
         JobSystem
     }

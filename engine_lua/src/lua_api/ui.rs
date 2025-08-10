@@ -5,6 +5,7 @@ use mlua::{
     Function as LuaFunction, Lua, LuaSerdeExt, Result as LuaResult, Table, Value as LuaValue,
 };
 
+/// Register UI API
 pub fn register_ui_api(lua: &Lua, globals: &Table) -> LuaResult<()> {
     engine_core::presentation::ui::register_all_widgets();
 

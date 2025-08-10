@@ -10,6 +10,7 @@ use serde_json::Value as JsonValue;
 use std::cell::RefCell;
 use std::rc::Rc;
 
+/// Registers the body API.
 pub fn register_body_api(lua: &Lua, globals: &Table, world: Rc<RefCell<World>>) -> LuaResult<()> {
     // get_body(entity)
     let world_get_body = world.clone();

@@ -17,10 +17,8 @@ use engine_core::ecs::world::World;
 use engine_core::systems::job::job_board::JobBoard;
 use engine_core::systems::job::types::loader::load_job_types_from_dir;
 use pyo3::Python;
-use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use pyo3::types::{PyAny, PyAnyMethods, PyDict, PyList};
-use pythonize::depythonize;
+use pyo3::types::{PyAny, PyAnyMethods, PyDict};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -29,11 +27,17 @@ use std::rc::Rc;
 /// Exposes all core ECS, component, job, inventory, region, and system APIs.
 #[pyclass(unsendable, subclass)]
 pub struct PyWorld {
+    /// The underlying ECS world
     pub inner: Rc<RefCell<World>>,
+    /// The systems bridge
     pub systems: Rc<SystemBridge>,
+    /// The map postprocessors
     pub map_postprocessors: Rc<RefCell<Vec<Py<PyAny>>>>,
+    /// The map validators
     pub map_validators: Rc<RefCell<Vec<Py<PyAny>>>>,
+    /// The job handlers
     pub job_handlers: Rc<RefCell<HashMap<String, Py<PyAny>>>>,
+    /// The job board
     pub job_board: Rc<RefCell<JobBoard>>,
 }
 
@@ -149,12 +153,12 @@ impl PyWorld {
 
     // ---- COMPONENT ----
 
-    // Set component
+    /// Set component
     fn set_component(&self, entity_id: u32, name: String, value: Bound<'_, PyAny>) -> PyResult<()> {
         ComponentApi::set_component(self, entity_id, name, value)
     }
 
-    // Get component
+    /// Get component
     fn get_component(
         &self,
         py: Python<'_>,
@@ -164,98 +168,93 @@ impl PyWorld {
         ComponentApi::get_component(self, py, entity_id, name)
     }
 
-    // Remove component
+    /// Remove component
     fn remove_component(&self, entity_id: u32, name: String) -> PyResult<()> {
         ComponentApi::remove_component(self, entity_id, name)
     }
 
-    // Get all entities with a given component
+    /// Get all entities with a given component
     fn get_entities_with_component(&self, name: String) -> PyResult<Vec<u32>> {
         ComponentApi::get_entities_with_component(self, name)
     }
 
-    // Get all entities with a given list of components
+    /// Get all entities with a given list of components
     fn get_entities_with_components(&self, names: Vec<String>) -> Vec<u32> {
         ComponentApi::get_entities_with_components(self, names)
     }
 
-    // List all components
+    /// List all components
     fn list_components(&self) -> Vec<String> {
         ComponentApi::list_components(self)
     }
 
-    // Get component schema
+    /// Get component schema
     fn get_component_schema(&self, name: String) -> PyResult<PyObject> {
         ComponentApi::get_component_schema(self, name)
     }
 
     // ---- INVENTORY ----
 
-    // Get inventory
+    /// Get inventory
     fn get_inventory(&self, py: Python<'_>, entity_id: u32) -> PyResult<Option<PyObject>> {
         InventoryApi::get_inventory(self, py, entity_id)
     }
 
-    // Set inventory
+    /// Set inventory
     fn set_inventory(&self, entity_id: u32, value: Bound<'_, PyAny>) -> PyResult<()> {
         InventoryApi::set_inventory(self, entity_id, value)
     }
 
-    // Add item to inventory
+    /// Add item to inventory
     fn add_item_to_inventory(&self, entity_id: u32, item_id: String) -> PyResult<()> {
         InventoryApi::add_item_to_inventory(self, entity_id, item_id)
     }
 
-    // Remove item from inventory
-    fn remove_item_from_inventory(
-        &self,
-        py: Python<'_>,
-        entity_id: u32,
-        index: usize,
-    ) -> PyResult<()> {
-        InventoryApi::remove_item_from_inventory(self, py, entity_id, index)
+    /// Remove item from inventory
+    fn remove_item_from_inventory(&self, entity_id: u32, index: usize) -> PyResult<()> {
+        InventoryApi::remove_item_from_inventory(self, entity_id, index)
     }
 
     // ---- EQUIPMENT ----
 
-    // Get equipment
+    /// Get equipment
     fn get_equipment(&self, py: Python<'_>, entity_id: u32) -> PyResult<PyObject> {
         EquipmentApi::get_equipment(self, py, entity_id)
     }
 
-    // Equip item
+    /// Equip item
     fn equip_item(&self, entity_id: u32, item_id: String, slot: String) -> PyResult<()> {
         EquipmentApi::equip_item(self, entity_id, item_id, slot)
     }
 
-    // Unequip item
+    /// Unequip item
     fn unequip_item(&self, entity_id: u32, slot: String) -> PyResult<()> {
         EquipmentApi::unequip_item(self, entity_id, slot)
     }
 
     // ---- BODY ----
 
-    // Get body
+    /// Get body
     fn get_body(&self, py: Python<'_>, entity_id: u32) -> PyResult<Option<PyObject>> {
         BodyApi::get_body(self, py, entity_id)
     }
 
-    // Set body
+    /// Set body
     fn set_body(&self, entity_id: u32, value: Bound<'_, PyAny>) -> PyResult<()> {
         BodyApi::set_body(self, entity_id, value)
     }
 
-    // Add body part
+    /// Add body part
     fn add_body_part(&self, entity_id: u32, part: Bound<'_, PyAny>) -> PyResult<()> {
         BodyApi::add_body_part(self, entity_id, part)
     }
 
-    // Remove body part
+    /// Remove body part
     fn remove_body_part(&self, entity_id: u32, part_name: String) -> PyResult<()> {
         BodyApi::remove_body_part(self, entity_id, part_name)
     }
 
-    // Get body part
+    /// Get body part
     fn get_body_part(
         &self,
         py: Python<'_>,
@@ -267,69 +266,69 @@ impl PyWorld {
 
     // ---- REGION ----
 
-    // Get entities in region
+    /// Get entities in region
     fn get_entities_in_region(&self, region_id: String) -> Vec<u32> {
         RegionApi::get_entities_in_region(self, region_id)
     }
 
-    // Get entities in kind of region
+    /// Get entities in kind of region
     fn get_entities_in_region_kind(&self, kind: String) -> Vec<u32> {
         RegionApi::get_entities_in_region_kind(self, kind)
     }
 
-    // Get cells in region
+    /// Get cells in region
     fn get_cells_in_region(&self, py: Python, region_id: String) -> PyResult<PyObject> {
         RegionApi::get_cells_in_region(self, py, region_id)
     }
 
-    // Get cells in kind of region
+    /// Get cells in kind of region
     fn get_cells_in_region_kind(&self, py: Python, kind: String) -> PyResult<PyObject> {
         RegionApi::get_cells_in_region_kind(self, py, kind)
     }
 
     // ---- MISC ----
 
-    // Progress the turn
+    /// Progress the turn
     fn tick(&self) {
         TurnApi::tick(self)
     }
 
-    // Get current turn
+    /// Get current turn
     fn get_turn(&self) -> u32 {
         TurnApi::get_turn(self)
     }
 
-    // Set game mode
+    /// Set game mode
     fn set_mode(&self, mode: String) {
         ModeApi::set_mode(self, mode)
     }
 
-    // Get game mode
+    /// Get game mode
     fn get_mode(&self) -> String {
         ModeApi::get_mode(self)
     }
 
-    // Get available game modes
+    /// Get available game modes
     fn get_available_modes(&self) -> Vec<String> {
         ModeApi::get_available_modes(self)
     }
 
-    // Process deaths
+    /// Process deaths
     fn process_deaths(&self) {
         DeathDecayApi::process_deaths(self)
     }
 
-    // Process decay
+    /// Process decay
     fn process_decay(&self) {
         DeathDecayApi::process_decay(self)
     }
 
-    // Save
+    /// Save
     fn save_to_file(&self, path: String) -> PyResult<()> {
         SaveLoadApi::save_to_file(self, path)
     }
 
-    // Load
+    /// Load
     fn load_from_file(&mut self, path: String) -> PyResult<()> {
         SaveLoadApi::load_from_file(self, path)
     }
@@ -346,17 +345,17 @@ impl PyWorld {
 
     // ---- SYSTEM REGISTRATION/BRIDGE ----
 
-    // Register a system
+    /// Register a system
     fn register_system(&self, py: Python, name: String, callback: Py<PyAny>) -> PyResult<()> {
         self.systems.register_system(py, name, callback)
     }
 
-    // Run a system
+    /// Run a system
     fn run_system(&self, py: Python, name: String) -> PyResult<()> {
         self.systems.run_system(py, name)
     }
 
-    // Run a native system
+    /// Run a native system
     fn run_native_system(&self, name: String) -> PyResult<()> {
         let mut world = self.inner.borrow_mut();
         world
@@ -366,29 +365,29 @@ impl PyWorld {
 
     // ---- EVENT BUS ----
 
-    // Send event
+    /// Send event
     fn send_event(&self, event_type: String, payload: String) -> PyResult<()> {
         crate::event_bus::send_event(event_type, payload)
     }
 
-    // Poll event
+    /// Poll event
     fn poll_event(&self, py: Python, event_type: String) -> PyResult<Vec<PyObject>> {
         crate::event_bus::poll_event(py, event_type)
     }
 
-    // Poll ECS event
+    /// Poll ECS event
     fn poll_ecs_event(&self, py: Python, event_type: String) -> PyResult<Vec<PyObject>> {
         crate::event_bus::poll_ecs_event(self, py, event_type)
     }
 
-    // Update event buses
+    /// Update event buses
     fn update_event_buses(&self) {
         crate::event_bus::update_event_buses()
     }
 
     // ---- USER INPUT ----
 
-    // Get user input
+    /// Get user input
     fn get_user_input(&self, py: Python, prompt: String) -> PyResult<String> {
         let builtins = py.import("builtins")?;
         let input_func = builtins.getattr("input")?;
@@ -398,7 +397,7 @@ impl PyWorld {
 
     // ---- JOB SYSTEM ----
 
-    // Assign a job
+    /// Assign a job
     #[pyo3(signature = (entity_id, job_type, **kwargs))]
     fn assign_job(
         &self,
@@ -617,13 +616,8 @@ impl PyWorld {
     }
 
     // Subscribe to job event bus
-    fn subscribe_job_event_bus(
-        &self,
-        py: Python,
-        event_type: String,
-        callback: Py<PyAny>,
-    ) -> PyResult<usize> {
-        crate::python_api::job_events::subscribe_job_event_bus(py, event_type, callback)
+    fn subscribe_job_event_bus(&self, event_type: String, callback: Py<PyAny>) -> PyResult<usize> {
+        crate::python_api::job_events::subscribe_job_event_bus(event_type, callback)
     }
 
     // Unsubscribe to job event bus
@@ -658,20 +652,14 @@ impl PyWorld {
         from_cell: Bound<'_, PyAny>,
         to_cell: Bound<'_, PyAny>,
     ) -> PyResult<()> {
-        let from_val: serde_json::Value = depythonize(&from_cell)
-            .map_err(|e| PyValueError::new_err(format!("Invalid from_cell: {e}")))?;
-        let to_val: serde_json::Value = depythonize(&to_cell)
-            .map_err(|e| PyValueError::new_err(format!("Invalid to_cell: {e}")))?;
-
-        MovementApi::assign_move_path(self, agent_id, from_val, to_val)
+        crate::python_api::movement::MovementApi::assign_move_path(
+            self, agent_id, &from_cell, &to_cell,
+        )
     }
 
     /// Check if an agent is at a cell.
     pub fn is_agent_at_cell(&self, agent_id: u32, cell: Bound<'_, PyAny>) -> PyResult<bool> {
-        let val: serde_json::Value =
-            depythonize(&cell).map_err(|e| PyValueError::new_err(format!("Invalid cell: {e}")))?;
-
-        MovementApi::is_agent_at_cell(self, agent_id, val)
+        MovementApi::is_agent_at_cell(self, agent_id, &cell)
     }
 
     /// Check if an agent's move path is empty.
@@ -679,89 +667,26 @@ impl PyWorld {
         MovementApi::is_move_path_empty(self, agent_id)
     }
 
+    /// Assign jobs to an AI agent using the internal job AI logic.
     #[pyo3(signature = (agent_id, _args))]
-    fn ai_assign_jobs(&self, agent_id: u32, _args: Vec<PyObject>) -> PyResult<()> {
-        let mut world = self.inner.borrow_mut();
-
-        let job_board_ptr: *mut _ = &mut world.job_board;
-        use engine_core::systems::job::ai::logic::assign_jobs;
-
-        unsafe {
-            assign_jobs(&mut world, &mut *job_board_ptr, agent_id as u64, &[]);
-        }
-
-        Ok(())
+    pub fn ai_assign_jobs(&self, agent_id: u32, _args: Vec<PyObject>) -> PyResult<()> {
+        crate::python_api::job_ai::ai_assign_jobs(self, agent_id, _args)
     }
 
+    /// Query all jobs assigned to a given AI agent.
     #[pyo3(signature = (agent_id))]
     fn ai_query_jobs(&self, py: Python, agent_id: u32) -> PyResult<PyObject> {
-        let world = self.inner.borrow();
-        let mut jobs_py: Vec<Py<PyAny>> = Vec::new();
-
-        if let Some(job_map) = world.components.get("Job") {
-            for (&job_id, job_comp) in job_map.iter() {
-                if let Some(assigned_to) = job_comp.get("assigned_to").and_then(|v| v.as_u64())
-                    && assigned_to == agent_id as u64
-                {
-                    let dict = PyDict::new(py);
-                    dict.set_item("id", job_id)?;
-                    dict.set_item(
-                        "state",
-                        job_comp.get("state").and_then(|v| v.as_str()).unwrap_or(""),
-                    )?;
-                    dict.set_item(
-                        "job_type",
-                        job_comp
-                            .get("job_type")
-                            .and_then(|v| v.as_str())
-                            .unwrap_or(""),
-                    )?;
-                    dict.set_item("assigned_to", assigned_to)?;
-                    jobs_py.push(dict.into());
-                }
-            }
-        }
-
-        Ok(PyList::new(py, jobs_py)?.into())
+        crate::python_api::job_ai::ai_query_jobs(self, py, agent_id)
     }
 
+    /// Modify a job assignment for an AI-controlled agent.
     #[pyo3(signature = (job_id, **kwargs))]
     fn ai_modify_job_assignment(
         &self,
-        py: Python,
         job_id: u32,
-        kwargs: Option<PyObject>,
+        kwargs: Option<&Bound<'_, PyDict>>,
     ) -> PyResult<bool> {
-        let mut world = self.inner.borrow_mut();
-
-        // Get the job component json or error if missing
-        let mut job = world
-            .get_component(job_id, "Job")
-            .ok_or_else(|| {
-                pyo3::exceptions::PyValueError::new_err(format!("No job with id {job_id}"))
-            })?
-            .clone();
-
-        if let Some(kwargs_obj) = kwargs {
-            // Convert PyObject kwargs to smart borrowed PyDict reference
-            let kwargs_dict = kwargs_obj
-                .downcast_bound::<PyDict>(py)
-                .map_err(|_| pyo3::exceptions::PyValueError::new_err("kwargs must be a dict"))?;
-
-            // Iterate over dict items updating job json
-            for (key, value) in kwargs_dict.iter() {
-                let k: String = key.extract()?;
-                let v: serde_json::Value = depythonize(&value)?; // pass reference as expected
-                job[k] = v;
-            }
-        }
-
-        // Persist updated job component
-        world.set_component(job_id, "Job", job).map_err(|e| {
-            pyo3::exceptions::PyValueError::new_err(format!("Failed to set job: {e}"))
-        })?;
-
-        Ok(true)
+        crate::python_api::job_ai::ai_modify_job_assignment(self, job_id, kwargs)
     }
 
     // ---- MAP/CAMERA/TOPOLOGY ----
@@ -832,7 +757,7 @@ impl PyWorld {
         crate::python_api::map_api::apply_chunk(pyworld_obj, py, chunk)
     }
 
-    // Get the number of cells in the current map
+    /// Get the number of cells in the current map
     fn get_map_cell_count(&self) -> usize {
         let world = self.inner.borrow();
         world.map.as_ref().map(|m| m.all_cells().len()).unwrap_or(0)

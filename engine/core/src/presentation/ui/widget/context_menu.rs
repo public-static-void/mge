@@ -4,14 +4,20 @@ use crate::presentation::ui::widget::widget_trait::{UiWidget, WidgetId, update_s
 use serde::{Deserialize, Serialize};
 use std::any::Any;
 
+///Callback to be called when an action is selected
 pub type ContextMenuAction = Box<dyn FnMut() + Send>;
 
+/// A single entry in a context menu
 #[derive(Serialize, Deserialize)]
 pub struct ContextMenuEntry {
+    /// The label to display
     pub label: String,
+    /// Whether the entry is enabled
     pub enabled: bool,
+    /// The action to call
     #[serde(skip)]
     pub action: Option<ContextMenuAction>,
+    /// The submenu
     #[serde(skip)]
     pub submenu: Option<Box<ContextMenu>>,
 }
@@ -28,6 +34,7 @@ impl Clone for ContextMenuEntry {
 }
 
 impl ContextMenuEntry {
+    /// Create a new entry
     pub fn new<L: Into<String>>(
         label: L,
         enabled: bool,
@@ -41,6 +48,7 @@ impl ContextMenuEntry {
         }
     }
 
+    /// Create a submenu
     pub fn with_submenu<L: Into<String>>(label: L, submenu: ContextMenu) -> Self {
         Self {
             label: label.into(),
@@ -51,16 +59,26 @@ impl ContextMenuEntry {
     }
 }
 
+/// A context menu
 #[derive(Serialize, Deserialize)]
 pub struct ContextMenu {
+    /// The id of the widget
     pub id: WidgetId,
+    /// The position
     pub pos: (i32, i32),
+    /// The entries
     pub entries: Vec<ContextMenuEntry>,
+    /// The selected entry
     pub selected: usize,
+    /// The currently open submenu
     pub open_submenu: Option<usize>,
+    /// The color
     pub color: RenderColor,
+    /// The background color
     pub bg_color: RenderColor,
+    /// Whether the menu is visible
     pub visible: bool,
+    /// The parent
     pub parent: Option<WidgetId>,
 }
 
@@ -81,6 +99,7 @@ impl Clone for ContextMenu {
 }
 
 impl ContextMenu {
+    /// Create a new context menu
     pub fn new(
         pos: (i32, i32),
         entries: Vec<ContextMenuEntry>,
@@ -106,6 +125,7 @@ impl ContextMenu {
         }
     }
 
+    /// Show the menu
     pub fn show(&mut self, pos: (i32, i32)) {
         self.pos = pos;
         self.visible = true;
@@ -113,15 +133,18 @@ impl ContextMenu {
         self.open_submenu = None;
     }
 
+    /// Hide the menu
     pub fn hide(&mut self) {
         self.visible = false;
         self.open_submenu = None;
     }
 
+    /// Whether the menu is visible
     pub fn is_visible(&self) -> bool {
         self.visible
     }
 
+    /// Set the parent
     pub fn set_parent(&mut self, parent: WidgetId) {
         self.parent = Some(parent);
     }
@@ -323,7 +346,8 @@ impl UiWidget for ContextMenu {
     }
 }
 
-// --- Registration function for data-driven UI ---
+/// Register ContextMenu widget
+/// Registration function for data-driven UI
 pub fn register_context_menu_widget() {
     use crate::presentation::renderer::RenderColor;
     use crate::presentation::ui::factory::{UI_FACTORY, WidgetProps};

@@ -6,7 +6,9 @@ use serde_json::json;
 pub trait JobQueryApi {
     /// List jobs. If `include_terminal` is true, include jobs in terminal states ("complete", "failed", "cancelled").
     fn list_jobs(&self, py: Python<'_>, include_terminal: Option<bool>) -> PyResult<PyObject>;
+    /// Get a job
     fn get_job(&self, py: Python<'_>, job_id: u32) -> PyResult<PyObject>;
+    /// Find jobs
     fn find_jobs(
         &self,
         py: Python<'_>,
@@ -15,12 +17,15 @@ pub trait JobQueryApi {
         assigned_to: Option<u32>,
         category: Option<String>,
     ) -> PyResult<PyObject>;
+    /// Set a field on a job
     fn set_job_field(&self, job_id: u32, field: &str, value: &Bound<'_, PyAny>) -> PyResult<()>;
+    /// Update a job
     fn update_job(
         &self,
         job_id: u32,
         kwargs: Option<&Bound<'_, pyo3::types::PyDict>>,
     ) -> PyResult<()>;
+    /// Cancel a job
     fn cancel_job(&self, job_id: u32) -> PyResult<()>;
 }
 

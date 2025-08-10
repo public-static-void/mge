@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use std::fs;
 
 lazy_static::lazy_static! {
+    /// Schema registry
     pub static ref SCHEMA_REGISTRY: HashMap<String, Value> = {
         let mut map = HashMap::new();
         let schema_dir = "engine/assets/schemas";

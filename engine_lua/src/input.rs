@@ -1,8 +1,10 @@
 use std::io::{self, Write};
 
+/// Standard input
 pub struct StdinInput;
 
 impl InputProvider for StdinInput {
+    /// Reads input from stdin
     fn read_line(&mut self, prompt: &str) -> Result<String, io::Error> {
         print!("{prompt}");
         io::stdout().flush()?;
@@ -12,6 +14,8 @@ impl InputProvider for StdinInput {
     }
 }
 
+/// Input provider
 pub trait InputProvider {
+    /// Reads input
     fn read_line(&mut self, prompt: &str) -> Result<String, std::io::Error>;
 }

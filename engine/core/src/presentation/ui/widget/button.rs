@@ -9,19 +9,30 @@ use std::any::Any;
 use std::collections::HashMap;
 use std::sync::Arc;
 
+/// A button widget
 #[derive(Serialize, Deserialize)]
 pub struct Button {
+    /// The widget ID
     pub id: WidgetId,
+    /// The button label
     pub label: String,
+    /// The button position
     pub pos: (i32, i32),
+    /// The button color
     pub color: RenderColor,
+    /// The callback to call when the button is pressed
     #[serde(skip)]
     pub on_press: Option<Box<dyn FnMut() + Send>>,
+    /// Whether the button is focused
     pub focused: bool,
+    /// The focus group
     pub group: Option<u32>,
+    /// The callbacks
     #[serde(skip)]
     pub callbacks: HashMap<String, WidgetCallback>,
+    /// The z-order
     pub z_order: i32,
+    /// The parent
     pub parent: Option<WidgetId>,
 }
 
@@ -43,6 +54,7 @@ impl Clone for Button {
 }
 
 impl Button {
+    /// Create a new button
     pub fn new<T: Into<String>>(
         label: T,
         pos: (i32, i32),
@@ -186,6 +198,7 @@ impl UiWidget for Button {
     }
 }
 
+/// Register the button widget
 pub fn register_button_widget() {
     let ctor = |props: WidgetProps| {
         let label = props

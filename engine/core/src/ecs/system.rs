@@ -3,25 +3,32 @@ use indexmap::IndexMap;
 use std::cell::RefCell;
 use topo_sort::{SortResults, TopoSort};
 
+/// A trait for systems
 pub trait System: Send + Sync {
+    /// Returns the name of the system
     fn name(&self) -> &'static str;
+    /// Runs the system
     fn run(&mut self, world: &mut World, lua: Option<&mlua::Lua>);
+    /// Returns a list of dependencies
     fn dependencies(&self) -> &'static [&'static str] {
         &[]
     }
 }
 
+/// A registry of systems
 pub struct SystemRegistry {
     systems: IndexMap<String, RefCell<Box<dyn System>>>,
 }
 
 impl SystemRegistry {
+    /// Create a new system registry
     pub fn new() -> Self {
         Self {
             systems: IndexMap::new(),
         }
     }
 
+    /// Register a system
     pub fn register_system<S: System + 'static>(&mut self, system: S) {
         self.systems.insert(
             system.name().to_string(),
@@ -29,10 +36,12 @@ impl SystemRegistry {
         );
     }
 
+    /// Take a system by name
     pub fn take_system(&mut self, name: &str) -> Option<std::cell::RefCell<Box<dyn System>>> {
         self.systems.shift_remove(name)
     }
 
+    /// Register a system boxed
     pub fn register_system_boxed(
         &mut self,
         name: String,
@@ -41,18 +50,22 @@ impl SystemRegistry {
         self.systems.insert(name, system);
     }
 
+    /// List all registered systems
     pub fn list_systems(&self) -> Vec<String> {
         self.systems.keys().cloned().collect()
     }
 
+    /// Check if a system is registered
     pub fn is_registered(&self, name: &str) -> bool {
         self.systems.contains_key(name)
     }
 
+    /// Get a system
     pub fn get_system(&self, name: &str) -> Option<std::cell::Ref<'_, Box<dyn System>>> {
         self.systems.get(name).map(|cell| cell.borrow())
     }
 
+    /// Get sorted systems
     pub fn sorted_systems(&self) -> Vec<std::cell::Ref<'_, Box<dyn System>>> {
         let names = self.sorted_system_names();
         names
@@ -61,6 +74,7 @@ impl SystemRegistry {
             .collect()
     }
 
+    /// Get a system mutable
     pub fn get_system_mut(&self, name: &str) -> Option<std::cell::RefMut<'_, Box<dyn System>>> {
         self.systems.get(name).map(|cell| cell.borrow_mut())
     }

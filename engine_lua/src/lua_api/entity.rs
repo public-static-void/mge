@@ -5,6 +5,7 @@ use mlua::{Lua, Result as LuaResult, Table};
 use std::cell::RefCell;
 use std::rc::Rc;
 
+/// Registers the entity API.
 pub fn register_entity_api(lua: &Lua, globals: &Table, world: Rc<RefCell<World>>) -> LuaResult<()> {
     // spawn_entity()
     let world_spawn = world.clone();

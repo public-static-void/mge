@@ -1,7 +1,10 @@
 use super::PyWorld;
 
+/// API for the death decay system
 pub trait DeathDecayApi {
+    /// Process deaths
     fn process_deaths(&self);
+    /// Process decay
     fn process_decay(&self);
 }
 

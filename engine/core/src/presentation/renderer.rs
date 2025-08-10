@@ -3,13 +3,18 @@
 use crate::map::cell_key::CellKey;
 use serde::{Deserialize, Serialize};
 
+/// A color in RGB space
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RenderColor(pub u8, pub u8, pub u8);
 
+/// A command to draw a glyph at a position with a color
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RenderCommand {
+    /// Glyph to draw
     pub glyph: char,
+    /// Color
     pub color: RenderColor,
+    /// Position
     pub pos: (i32, i32),
 }
 
@@ -32,11 +37,14 @@ pub trait PresentationRenderer {
 
 /// Example: a headless/test renderer that records draw calls.
 pub struct TestRenderer {
+    /// Draw commands
     pub draws: Vec<RenderCommand>,
+    /// Cells to draw
     pub cells: Vec<(i32, i32, CellKey)>,
 }
 
 impl TestRenderer {
+    /// Create a new test renderer
     pub fn new() -> Self {
         Self {
             draws: Vec::new(),
@@ -49,9 +57,11 @@ impl PresentationRenderer for TestRenderer {
     fn queue_draw(&mut self, cmd: RenderCommand) {
         self.draws.push(cmd);
     }
+
     fn queue_draw_cell(&mut self, pos: (i32, i32), cell: &CellKey) {
         self.cells.push((pos.0, pos.1, cell.clone()));
     }
+
     fn present(&mut self) {
         // No-op for tests.
     }
@@ -63,13 +73,18 @@ impl Default for TestRenderer {
     }
 }
 
+/// Terminal renderer
 pub struct TerminalRenderer {
+    /// Terminal width
     pub width: i32,
+    /// Terminal height
     pub height: i32,
+    /// Frame buffer
     pub buffer: Vec<Vec<Option<RenderCommand>>>,
 }
 
 impl TerminalRenderer {
+    /// Create a new terminal renderer
     pub fn new(width: i32, height: i32) -> Self {
         Self {
             width,
@@ -86,9 +101,11 @@ impl PresentationRenderer for TerminalRenderer {
             self.buffer[y as usize][x as usize] = Some(cmd);
         }
     }
+
     fn queue_draw_cell(&mut self, _pos: (i32, i32), _cell: &CellKey) {
         // Not needed for terminal output
     }
+
     fn present(&mut self) {
         for row in &self.buffer {
             for cell in row {

@@ -1,3 +1,10 @@
+//! # Schema Validator
+//!
+//! This crate provides validation utilities for JSON schemas used in the engine.
+//! It can ensure that schemas have a title, that property constraints are sane
+//! (e.g., `minimum` is not greater than `maximum`), and that any declared modes
+//! are part of the allowed list passed at runtime.
+
 use serde_json::Value;
 
 /// Validates that the JSON is a schema with a title and no invalid property constraints.

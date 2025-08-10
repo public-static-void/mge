@@ -31,6 +31,7 @@ pub struct JobHandlerRegistry {
 }
 
 impl JobHandlerRegistry {
+    /// Creates a new job handler registry.
     pub fn new() -> Self {
         Self {
             handlers: HashMap::new(),

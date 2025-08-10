@@ -73,6 +73,7 @@ pub fn ensure_schema_arrays(value: &mut JsonValue, schema: &JsonValue) {
     }
 }
 
+/// Returns a LuaError that looks like a luaunit error.
 pub fn luaunit_style_error(_lua: &Lua, msg: &str) -> LuaError {
     let err_json = json!({
         "msg": msg,
@@ -82,10 +83,12 @@ pub fn luaunit_style_error(_lua: &Lua, msg: &str) -> LuaError {
     LuaError::RuntimeError(err_json.to_string())
 }
 
+/// Returns a LuaError with the given error message.
 pub fn lua_error_msg(lua: &Lua, msg: &str) -> LuaError {
     luaunit_style_error(lua, msg)
 }
 
+/// Returns a LuaError with the given error message from any error type.
 pub fn lua_error_from_any<E: std::fmt::Display>(lua: &mlua::Lua, err: E) -> mlua::Error {
     luaunit_style_error(lua, &format!("{err}"))
 }
@@ -210,6 +213,7 @@ pub fn lua_table_to_json_with_schema(
     Ok(JsonValue::Object(map))
 }
 
+/// Converts a Lua value to JSON
 pub fn lua_value_to_json(
     lua: &Lua,
     val: LuaValue,
@@ -242,6 +246,7 @@ fn lua_value_to_string(val: &LuaValue) -> LuaResult<String> {
     }
 }
 
+/// Converts a JSON value to a Lua table
 pub fn json_to_lua_table(lua: &mlua::Lua, value: &JsonValue) -> mlua::Result<LuaValue> {
     match value {
         JsonValue::Null => Ok(LuaValue::Nil),

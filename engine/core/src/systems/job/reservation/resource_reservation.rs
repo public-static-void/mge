@@ -7,9 +7,13 @@ use serde_json::Value as JsonValue;
 /// Status of resource reservation for a job.
 #[derive(Debug, PartialEq, Eq)]
 pub enum ResourceReservationStatus {
+    /// Resources reserved.
     Reserved,
+    /// Waiting for resources to be reserved.
     WaitingForResources,
+    /// No resources required.
     NotRequired,
+    /// No resources found.
     NotFound,
 }
 
@@ -19,6 +23,7 @@ pub enum ResourceReservationStatus {
 pub struct ResourceReservationSystem;
 
 impl ResourceReservationSystem {
+    /// Creates a new instance of the resource reservation system.
     pub fn new() -> Self {
         Self
     }

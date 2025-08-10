@@ -4,18 +4,26 @@ use pyo3::types::PyAny;
 use serde_json::Value;
 use serde_pyobject::{from_pyobject, to_pyobject};
 
+/// Component API
 pub trait ComponentApi {
+    /// Set a component
     fn set_component(&self, entity_id: u32, name: String, value: Bound<'_, PyAny>) -> PyResult<()>;
+    /// Get a component
     fn get_component(
         &self,
         py: Python<'_>,
         entity_id: u32,
         name: String,
     ) -> PyResult<Option<PyObject>>;
+    /// Remove a component
     fn remove_component(&self, entity_id: u32, name: String) -> PyResult<()>;
+    /// Get all entities with a component
     fn get_entities_with_component(&self, name: String) -> PyResult<Vec<u32>>;
+    /// Get all entities with a list of components
     fn get_entities_with_components(&self, names: Vec<String>) -> Vec<u32>;
+    /// List all components
     fn list_components(&self) -> Vec<String>;
+    /// Get component schema
     fn get_component_schema(&self, name: String) -> PyResult<PyObject>;
 }
 

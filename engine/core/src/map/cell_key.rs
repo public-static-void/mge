@@ -1,10 +1,31 @@
 use serde::{Deserialize, Serialize};
 
+/// Represents a key for a cell.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum CellKey {
-    Square { x: i32, y: i32, z: i32 },
-    Hex { q: i32, r: i32, z: i32 },
-    Region { id: String },
+    /// Represents a key for a square cell.
+    Square {
+        /// The x coordinate of the cell.
+        x: i32,
+        /// The y coordinate of the cell.
+        y: i32,
+        /// The z coordinate of the cell.
+        z: i32,
+    },
+    /// Represents a key for a hex cell.
+    Hex {
+        /// The q coordinate of the cell.
+        q: i32,
+        /// The r coordinate of the cell.
+        r: i32,
+        /// The z coordinate of the cell.
+        z: i32,
+    },
+    /// Represents a key for a region cell.
+    Region {
+        /// The ID of the region.
+        id: String,
+    },
 }
 
 impl CellKey {

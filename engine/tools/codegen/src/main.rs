@@ -1,3 +1,5 @@
+//! Codegen for ECS components
+
 use serde_json::Value;
 use std::env;
 use std::fs;

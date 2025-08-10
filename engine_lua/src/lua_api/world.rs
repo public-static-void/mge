@@ -5,6 +5,7 @@ use mlua::{
 use std::cell::RefCell;
 use std::rc::Rc;
 
+/// Register the world API
 pub fn register_world_api(
     lua: &Lua,
     globals: &mlua::Table,
@@ -29,10 +30,15 @@ pub fn register_world_api(
     Ok(())
 }
 
+/// Wrapper for world userdata
 pub struct WorldWrapper {
+    /// World
     pub world: Rc<RefCell<World>>,
+    /// Map Postprocessors
     pub map_postprocessors: RefCell<Vec<RegistryKey>>,
+    /// Map Validators
     pub map_validators: RefCell<Vec<RegistryKey>>,
+    /// World userdata
     pub self_userdata: RefCell<Option<AnyUserData>>,
 }
 

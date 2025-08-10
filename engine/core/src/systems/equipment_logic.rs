@@ -3,6 +3,7 @@ use crate::ecs::world::World;
 use serde_json::Value as JsonValue;
 use std::collections::HashMap;
 
+///Equipment logic system
 pub struct EquipmentLogicSystem;
 
 impl System for EquipmentLogicSystem {

@@ -12,27 +12,36 @@ use serde_json::Value as JsonValue;
 use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, Mutex};
 
+/// Job handler modules
+pub mod job_handlers;
+/// Wasm exports
+pub mod wasm;
+
 mod component;
 mod entity;
 mod events;
-pub mod job_handlers;
 mod map;
 mod mode;
 mod resources;
 mod save_load;
 mod systems;
-pub mod wasm;
 
+/// Map postprocessor function
 pub type MapPostprocessor = Arc<dyn Fn(&mut World) -> Result<(), String> + Send + Sync>;
+
+/// Map validator function
 pub type MapValidator = Arc<dyn Fn(&serde_json::Value) -> Result<(), String> + Send + Sync>;
 
-/// Represents the in-memory game world, including all ECS state and loaded assets.
+/// Time of day
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct TimeOfDay {
+    /// Current hour.
     pub hour: u8,
+    /// Current minute.
     pub minute: u8,
 }
 
+/// The ECS world, which holds all entities, components, systems, and loaded assets.
 #[derive(Serialize, Deserialize)]
 pub struct World {
     /// List of all entity IDs in the world.
@@ -46,19 +55,26 @@ pub struct World {
     pub turn: u32,
     /// Current time of day.
     pub time_of_day: TimeOfDay,
+    /// Component registry
     #[serde(skip)]
     pub registry: Arc<Mutex<ComponentRegistry>>,
+    /// System registry
     #[serde(skip)]
     pub systems: SystemRegistry,
+    /// Event bus registry
     #[serde(skip)]
     pub event_buses: crate::ecs::event_bus_registry::EventBusRegistry,
+    /// Dynamic system registry
     #[serde(skip)]
     pub dynamic_systems: DynamicSystemRegistry,
+    /// Job type registry
     #[serde(skip)]
     pub job_types: JobTypeRegistry,
+    /// Job handler registry
     #[serde(skip)]
     pub job_handler_registry:
         Arc<Mutex<crate::systems::job::job_handler_registry::JobHandlerRegistry>>,
+    /// Effect processor registry
     #[serde(skip)]
     pub effect_processor_registry: Option<
         std::sync::Arc<
@@ -67,13 +83,17 @@ pub struct World {
             >,
         >,
     >,
+    /// Map
     #[serde(skip)]
     pub map: Option<Map>,
     event_queues: HashMap<String, (VecDeque<JsonValue>, VecDeque<JsonValue>)>, // (write, read)
+    /// Map postprocessors
     #[serde(skip)]
     pub map_postprocessors: Vec<MapPostprocessor>,
+    /// Map validators
     #[serde(skip)]
     pub map_validators: Vec<MapValidator>,
+    /// AI event intents
     #[serde(skip)]
     pub ai_event_intents: VecDeque<JsonValue>,
 
@@ -87,6 +107,7 @@ pub struct World {
     /// Map from job name to job definition (loaded from assets/jobs).
     #[serde(skip)]
     pub jobs: HashMap<String, JsonValue>,
+    /// Job board
     #[serde(skip)]
     pub job_board: JobBoard,
 }

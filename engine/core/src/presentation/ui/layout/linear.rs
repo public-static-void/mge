@@ -4,13 +4,20 @@ use crate::presentation::renderer::{PresentationRenderer, RenderCommand};
 use crate::presentation::ui::UiEvent;
 use std::any::Any;
 
+/// A linear layout widget.
 pub struct Layout {
     id: u64,
+    /// The direction of the layout
     pub direction: LayoutDirection,
+    /// The position of the layout
     pub pos: (i32, i32),
+    /// The spacing between items
     pub spacing: i32,
+    /// The alignment of items
     pub alignment: Alignment,
+    /// The padding of the layout
     pub padding: Padding,
+    /// The children of the layout
     pub children: Vec<UiNode>,
 }
 
@@ -29,6 +36,7 @@ impl Clone for Layout {
 }
 
 impl Layout {
+    /// Creates a new linear layout
     pub fn new(direction: LayoutDirection, pos: (i32, i32), spacing: i32) -> Self {
         static mut NEXT_ID: u64 = 200_000;
         let id = unsafe {
@@ -47,14 +55,17 @@ impl Layout {
         }
     }
 
+    /// Adds a child to the layout
     pub fn add_child(&mut self, child: UiNode) {
         self.children.push(child);
     }
 
+    /// Sets the alignment of the layout
     pub fn set_alignment(&mut self, alignment: Alignment) {
         self.alignment = alignment;
     }
 
+    /// Sets the padding of the layout
     pub fn set_padding(&mut self, padding: Padding) {
         self.padding = padding;
     }

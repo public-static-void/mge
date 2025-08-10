@@ -5,12 +5,14 @@ use std::collections::HashMap;
 
 use super::recipe::{Recipe, ResourceAmount};
 
+/// Economic system
 #[derive(Default)]
 pub struct EconomicSystem {
     recipes: HashMap<String, Recipe>,
 }
 
 impl EconomicSystem {
+    /// Create a new economic system
     pub fn with_recipes(recipes: Vec<Recipe>) -> Self {
         let mut map = HashMap::new();
         for recipe in recipes {

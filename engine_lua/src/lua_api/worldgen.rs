@@ -41,6 +41,7 @@ impl ScriptingWorldgenPlugin for LuaWorldgenPlugin {
     }
 }
 
+/// Registers worldgen API
 pub fn register_worldgen_api(
     lua: &Lua,
     globals: &Table,

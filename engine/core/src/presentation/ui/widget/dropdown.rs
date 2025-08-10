@@ -9,21 +9,34 @@ use std::any::Any;
 use std::collections::HashMap;
 use std::sync::Arc;
 
+/// A dropdown widget
 #[derive(Serialize, Deserialize)]
 pub struct Dropdown {
+    /// The ID of the widget
     pub id: WidgetId,
+    /// The position of the widget
     pub pos: (i32, i32),
+    /// The width of the widget
     pub width: usize,
+    /// The options of the dropdown
     pub options: Vec<String>,
+    /// The color of the widget
     pub color: RenderColor,
+    /// Whether the dropdown is expanded
     pub expanded: bool,
+    /// The selected option
     pub selected: Option<String>,
+    /// Whether the widget is focused
     pub focused: bool,
+    /// The callbacks of the widget
     #[serde(skip)]
     pub callbacks: HashMap<String, WidgetCallback>,
+    /// The callback for when the dropdown is selected
     #[serde(skip)]
     pub on_select: Option<Box<dyn FnMut(String) + Send>>,
+    /// The z-order of the widget
     pub z_order: i32,
+    /// The parent of the widget
     pub parent: Option<WidgetId>,
 }
 
@@ -47,6 +60,7 @@ impl Clone for Dropdown {
 }
 
 impl Dropdown {
+    /// Create a new dropdown
     pub fn new(pos: (i32, i32), width: usize, options: Vec<String>, color: RenderColor) -> Self {
         static mut NEXT_ID: WidgetId = 4000;
         let id = unsafe {
@@ -70,6 +84,7 @@ impl Dropdown {
         }
     }
 
+    /// Set the callback for when the dropdown is selected
     pub fn set_on_select(&mut self, cb: Box<dyn FnMut(String) + Send>) {
         self.on_select = Some(cb);
     }
@@ -197,6 +212,7 @@ impl UiWidget for Dropdown {
     }
 }
 
+/// Register the dropdown widget
 pub fn register_dropdown_widget() {
     let ctor = |props: WidgetProps| {
         let pos = props

@@ -7,9 +7,12 @@ use super::topology::MapTopology;
 
 type CellSet = HashSet<CellKey>;
 
+/// Hexagonal grid map
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HexGridMap {
+    /// Cells in the map
     pub cells: HashMap<CellKey, CellSet>,
+    /// Metadata for cells
     pub cell_metadata: HashMap<CellKey, Value>,
 }
 

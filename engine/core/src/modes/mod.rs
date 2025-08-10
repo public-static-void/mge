@@ -1,11 +1,18 @@
+//! Game mode management.
+//!
+//! This module provides a way to manage game modes and their associated components.
+
 use std::any::TypeId;
 use std::collections::{HashMap, HashSet};
 
 /// Supported game modes for the engine.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum GameMode {
+    /// Colony mode.
     Colony,
+    /// Roguelike mode.
     Roguelike,
+    /// Editor mode.
     Editor,
 }
 
@@ -18,13 +25,17 @@ pub trait ModeRestrictedComponent {
 /// Errors that can occur during mode transitions.
 #[derive(Debug)]
 pub enum ModeTransitionError {
+    /// Attempted to activate a component that is not supported in the current mode.
     ComponentConflict,
+    /// Attempted to transition to an invalid mode.
     InvalidTransition(String),
 }
 
 /// Trait for hooks that run before and after mode transitions.
 pub trait ModeTransitionHook: Send + Sync {
+    /// Runs before the mode transition.
     fn pre_transition(&self, from: &GameMode, to: &GameMode);
+    /// Runs after the mode transition.
     fn post_transition(&self, from: &GameMode, to: &GameMode);
 }
 

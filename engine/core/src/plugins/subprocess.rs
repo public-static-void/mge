@@ -6,26 +6,46 @@ use std::process::{Child, Command, Stdio};
 use std::thread;
 use std::time::Duration;
 
+/// Plugin requests
 #[derive(Debug, Serialize, Deserialize)]
 pub enum PluginRequest {
+    /// Initialize
     Initialize,
+    /// Reload
     Reload,
+    /// Shutdown
     Shutdown,
+    /// Run command
     RunCommand {
+        /// Command
         command: String,
+        /// Arguments
         data: serde_json::Value,
     },
 }
 
+/// Plugin responses
 #[derive(Debug, Serialize, Deserialize)]
 pub enum PluginResponse {
+    /// Plugin initialized
     Initialized,
+    /// Plugin reloaded
     Reloaded,
+    /// Plugin shutdown
     Shutdown,
-    CommandResult { result: serde_json::Value },
-    Error { message: String },
+    /// Command result
+    CommandResult {
+        /// Result
+        result: serde_json::Value,
+    },
+    /// Error
+    Error {
+        /// Error message
+        message: String,
+    },
 }
 
+/// Plugin subprocess
 pub struct PluginSubprocess {
     child: Child,
     stream: UnixStream,
@@ -33,6 +53,7 @@ pub struct PluginSubprocess {
 }
 
 impl PluginSubprocess {
+    /// Spawn plugin subprocess
     pub fn spawn<P: AsRef<std::path::Path>>(
         bin_path: P,
         socket_path: &str,
@@ -74,6 +95,7 @@ impl PluginSubprocess {
         })
     }
 
+    /// Send request
     pub fn send_request(&mut self, request: &PluginRequest) -> Result<PluginResponse, String> {
         let msg = serde_json::to_string(request).map_err(|e| e.to_string())? + "\n";
         self.stream
@@ -87,6 +109,7 @@ impl PluginSubprocess {
         serde_json::from_str(&line).map_err(|e| e.to_string())
     }
 
+    /// Terminate
     pub fn terminate(&mut self) {
         let _ = self.child.kill();
         let _ = fs::remove_file(&self.socket_path);

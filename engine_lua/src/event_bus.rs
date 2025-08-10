@@ -2,14 +2,18 @@ use engine_core::ecs::event::{EventBus, EventReader};
 use mlua::{UserData, UserDataMethods};
 use std::sync::{Arc, Mutex};
 
+/// An event
 #[derive(Clone)]
 pub struct MyEvent(pub u32);
 
+/// A Lua event bus
 pub struct LuaEventBus {
+    /// The inner event bus
     pub inner: Arc<Mutex<EventBus<MyEvent>>>,
 }
 
 impl LuaEventBus {
+    /// Create a new event bus
     pub fn new() -> Self {
         Self {
             inner: Arc::new(Mutex::new(EventBus::default())),
