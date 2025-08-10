@@ -7,15 +7,21 @@ use crate::presentation::ui::widget::widget_trait::{
 use serde::{Deserialize, Serialize};
 use std::any::Any;
 
+/// A label widget.
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Label {
+    /// The widget ID
     pub id: WidgetId,
+    /// The label text
     pub text: String,
+    /// The position
     pub pos: (i32, i32),
+    /// The color
     pub color: RenderColor,
 }
 
 impl Label {
+    /// Create a new label
     pub fn new<T: Into<String>>(text: T, pos: (i32, i32), color: RenderColor) -> Self {
         static mut NEXT_ID: WidgetId = 1;
         let id = unsafe {
@@ -78,7 +84,8 @@ impl UiWidget for Label {
     }
 }
 
-// Factory registration for data-driven UI
+/// Register the label widget
+/// Factory registration for data-driven UI
 pub fn register_label_widget() {
     let ctor = |props: WidgetProps| {
         let text = props.get("text").and_then(|v| v.as_str()).unwrap_or("");

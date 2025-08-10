@@ -1,10 +1,15 @@
 use super::PyWorld;
 use pyo3::prelude::*;
 
+/// Methods for accessing entities in regions
 pub trait RegionApi {
+    /// Get all entities in a region
     fn get_entities_in_region(&self, region_id: String) -> Vec<u32>;
+    /// Get all entities of a kind in a region
     fn get_entities_in_region_kind(&self, kind: String) -> Vec<u32>;
+    /// Get all cells in a region
     fn get_cells_in_region(&self, py: Python, region_id: String) -> PyResult<PyObject>;
+    /// Get all cells of a kind in a region
     fn get_cells_in_region_kind(&self, py: Python, kind: String) -> PyResult<PyObject>;
 }
 

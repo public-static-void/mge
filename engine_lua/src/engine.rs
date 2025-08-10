@@ -25,7 +25,9 @@ fn lua_init_job_event_logger(_lua: &mlua::Lua, _args: mlua::Value) -> mlua::Resu
     Ok(mlua::Value::Nil)
 }
 
+/// A Lua script engine
 pub struct ScriptEngine {
+    /// The underlying Lua VM
     pub lua: Rc<Lua>,
     input_provider: Arc<Mutex<Box<dyn InputProvider + Send + Sync>>>,
     worldgen_registry: Rc<RefCell<WorldgenRegistry>>,
@@ -38,6 +40,7 @@ impl ScriptEngine {
         Self::new_with_input(Box::new(StdinInput))
     }
 
+    /// Creates a new ScriptEngine with a custom input provider
     pub fn new_with_input(input_provider: Box<dyn InputProvider + Send + Sync>) -> Self {
         use mlua::{Lua, LuaOptions, StdLib};
 

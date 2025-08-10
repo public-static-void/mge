@@ -6,18 +6,29 @@ use crate::presentation::ui::{Alignment, Padding};
 use serde::{Deserialize, Serialize};
 use std::any::Any;
 
+/// A grid layout
 #[derive(Serialize, Deserialize)]
 pub struct GridLayout {
+    /// The ID of the widget
     pub id: WidgetId,
+    /// The children
     #[serde(skip)]
     pub children: Vec<Box<dyn UiWidget + Send>>,
+    /// The number of columns
     pub columns: usize,
+    /// The cell size
     pub cell_size: (i32, i32),
+    /// The spacing
     pub spacing: (i32, i32),
+    /// The origin
     pub origin: (i32, i32),
+    /// The alignment
     pub alignment: Alignment,
+    /// The padding
     pub padding: Padding,
+    /// The z-order
     pub z_order: i32,
+    /// The parent
     pub parent: Option<WidgetId>,
 }
 
@@ -39,6 +50,7 @@ impl Clone for GridLayout {
 }
 
 impl GridLayout {
+    /// Create a new grid layout
     pub fn new(cell_size: (i32, i32), spacing: (i32, i32)) -> Self {
         static mut NEXT_ID: WidgetId = 1_000_000;
         let id = unsafe {
@@ -59,28 +71,40 @@ impl GridLayout {
             parent: None,
         }
     }
+
+    /// Set the number of columns
     pub fn set_columns(&mut self, columns: usize) {
         self.columns = columns.max(1);
     }
+
+    /// Set the origin
     pub fn set_origin(&mut self, origin: (i32, i32)) {
         self.origin = origin;
     }
+
+    /// Set the alignment
     pub fn set_alignment(&mut self, alignment: Alignment) {
         self.alignment = alignment;
     }
+
+    /// Set the padding
     pub fn set_padding(&mut self, padding: Padding) {
         self.padding = padding;
     }
+
+    /// Add a child
     pub fn add_child(&mut self, mut widget: Box<dyn UiWidget + Send>) {
         widget.set_parent(Some(self.id));
         self.children.push(widget);
     }
+
     fn grid_size(&self) -> (usize, usize) {
         let cols = self.columns;
         let len = self.children.len();
         let rows = len.div_ceil(cols);
         (cols, rows)
     }
+
     fn grid_area(&self) -> (i32, i32) {
         let (cols, rows) = self.grid_size();
         let (cell_w, cell_h) = self.cell_size;
@@ -90,6 +114,7 @@ impl GridLayout {
             (rows as i32) * cell_h + ((rows - 1) as i32) * space_y,
         )
     }
+
     fn widget_area(&self) -> (i32, i32) {
         let (grid_w, grid_h) = self.grid_area();
         (
@@ -97,6 +122,7 @@ impl GridLayout {
             self.padding.top + grid_h + self.padding.bottom,
         )
     }
+
     fn alignment_offset(&self) -> (i32, i32) {
         let (widget_w, widget_h) = self.widget_area();
         let (grid_w, grid_h) = self.grid_area();
@@ -110,6 +136,7 @@ impl GridLayout {
         };
         (offset_x, offset_y)
     }
+
     fn child_position(&self, index: usize) -> (i32, i32) {
         let (cols, _) = self.grid_size();
         let (cell_w, cell_h) = self.cell_size;
@@ -121,6 +148,7 @@ impl GridLayout {
         let y = self.origin.1 + self.padding.top + offset_y + row * (cell_h + space_y);
         (x, y)
     }
+
     fn child_at(&self, x: i32, y: i32) -> Option<usize> {
         let (cols, rows) = self.grid_size();
         let (cell_w, cell_h) = self.cell_size;
@@ -188,6 +216,7 @@ impl UiWidget for GridLayout {
             child.render(renderer);
         }
     }
+
     fn handle_event(&mut self, event: &crate::presentation::ui::UiEvent) {
         let positions: Vec<(i32, i32)> = (0..self.children.len())
             .map(|i| self.child_position(i))
@@ -223,53 +252,69 @@ impl UiWidget for GridLayout {
             }
         }
     }
+
     fn as_any(&self) -> &dyn Any {
         self
     }
+
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
     }
+
     fn is_focusable(&self) -> bool {
         false
     }
+
     fn set_focused(&mut self, _focused: bool) {}
+
     fn is_focused(&self) -> bool {
         false
     }
+
     fn focus_pos(&self) -> (i32, i32) {
         self.origin
     }
+
     fn focus_group(&self) -> Option<u32> {
         None
     }
+
     fn set_callback(
         &mut self,
         _event: &str,
         _cb: Option<std::sync::Arc<dyn Fn(&mut dyn UiWidget) + Send + Sync>>,
     ) {
     }
+
     fn add_child(&mut self, mut child: Box<dyn UiWidget + Send>) {
         child.set_parent(Some(self.id));
         self.children.push(child);
     }
+
     fn get_children(&self) -> Vec<u64> {
         self.children.iter().map(|c| c.id()).collect()
     }
+
     fn set_props(&mut self, props: &std::collections::HashMap<String, serde_json::Value>) {
         update_struct_from_props(self, props);
     }
+
     fn widget_type(&self) -> &'static str {
         "GridLayout"
     }
+
     fn get_parent(&self) -> Option<WidgetId> {
         self.parent
     }
+
     fn set_parent(&mut self, parent: Option<WidgetId>) {
         self.parent = parent;
     }
+
     fn set_z_order(&mut self, z: i32) {
         self.z_order = z;
     }
+
     fn get_z_order(&self) -> i32 {
         self.z_order
     }
@@ -279,6 +324,7 @@ impl UiWidget for GridLayout {
     }
 }
 
+/// Register the grid layout widget
 pub fn register_grid_layout_widget() {
     use crate::presentation::ui::factory::{UI_FACTORY, WidgetProps};
 

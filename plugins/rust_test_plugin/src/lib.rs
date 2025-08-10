@@ -1,32 +1,52 @@
+//! Rust test plugin
+//!
+//! A simple plugin that uses the engine API to spawn entities and set their components
+
 use libc::{c_char, c_float, c_int, c_uint, c_void};
 use std::ffi::CString;
 use std::ptr;
 use std::ptr::addr_of_mut;
 
+/// Rust bindings for the engine API
 #[repr(C)]
 pub struct EngineApi {
+    /// Spawns an entity
     pub spawn_entity: unsafe extern "C" fn(*mut c_void) -> c_uint,
+    /// Sets a component
     pub set_component:
         unsafe extern "C" fn(*mut c_void, c_uint, *const c_char, *const c_char) -> c_int,
 }
 
+/// Pointer to the world
 pub type WorldPtr = *mut c_void;
+/// System run function
 pub type SystemRunFn = unsafe extern "C" fn(WorldPtr, c_float);
 
+/// System plugin
 #[repr(C)]
 pub struct SystemPlugin {
+    /// System plugin name
     pub name: *const c_char,
+    /// System plugin run function
     pub run: SystemRunFn,
 }
 
+/// Plugin vtable
 #[repr(C)]
 pub struct PluginVTable {
+    /// Plugin initialization
     pub init: unsafe extern "C" fn(*mut EngineApi, *mut c_void) -> c_int,
+    /// Plugin shutdown
     pub shutdown: unsafe extern "C" fn(),
+    /// Plugin update
     pub update: unsafe extern "C" fn(c_float),
+    /// Worldgen name
     pub worldgen_name: Option<unsafe extern "C" fn() -> *const c_char>,
+    /// Generate world
     pub generate_world: Option<unsafe extern "C" fn(*const c_char, *mut *mut c_char) -> c_int>,
+    /// Free worldgen result JSON
     pub free_result_json: Option<unsafe extern "C" fn(*mut c_char)>,
+    /// Register systems
     pub register_systems: Option<
         unsafe extern "C" fn(
             *mut EngineApi,
@@ -35,7 +55,9 @@ pub struct PluginVTable {
             *mut c_int,
         ) -> c_int,
     >,
+    /// Free systems
     pub free_systems: Option<unsafe extern "C" fn(*mut SystemPlugin, c_int)>,
+    /// Hot reload
     pub hot_reload: Option<unsafe extern "C" fn(old_state: *mut c_void) -> *mut c_void>,
 }
 
@@ -84,6 +106,7 @@ unsafe extern "C" fn hot_reload(old_state: *mut c_void) -> *mut c_void {
 }
 
 // --- VTable setup ---
+/// Plugin vtable
 #[no_mangle]
 pub static mut PLUGIN_VTABLE: *mut PluginVTable = ptr::null_mut();
 

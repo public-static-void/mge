@@ -2,17 +2,20 @@ use crate::plugins::subprocess::{PluginRequest, PluginResponse, PluginSubprocess
 use std::collections::HashMap;
 use std::path::Path;
 
+/// Manages plugins
 pub struct PluginManager {
     plugins: HashMap<String, PluginSubprocess>,
 }
 
 impl PluginManager {
+    /// Create a new plugin manager
     pub fn new() -> Self {
         Self {
             plugins: HashMap::new(),
         }
     }
 
+    /// Launch a plugin
     pub fn launch_plugin<P: AsRef<Path>>(
         &mut self,
         name: String,
@@ -27,11 +30,13 @@ impl PluginManager {
         Ok(())
     }
 
+    /// Send a request to a plugin
     pub fn send(&mut self, name: &str, request: &PluginRequest) -> Result<PluginResponse, String> {
         let plugin = self.plugins.get_mut(name).ok_or("Plugin not found")?;
         plugin.send_request(request)
     }
 
+    /// Reload a plugin
     pub fn reload_plugin<P: AsRef<Path>>(
         &mut self,
         name: &str,
@@ -42,6 +47,7 @@ impl PluginManager {
         self.launch_plugin(name.to_string(), bin_path, socket_path)
     }
 
+    /// Shutdown a plugin
     pub fn shutdown_plugin(&mut self, name: &str) -> Result<(), String> {
         if let Some(mut plugin) = self.plugins.remove(name) {
             plugin.send_request(&PluginRequest::Shutdown).ok();
@@ -50,6 +56,7 @@ impl PluginManager {
         Ok(())
     }
 
+    /// Shutdown all plugins
     pub fn shutdown_all(&mut self) {
         for (_name, mut plugin) in self.plugins.drain() {
             plugin.send_request(&PluginRequest::Shutdown).ok();

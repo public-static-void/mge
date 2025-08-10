@@ -1,26 +1,50 @@
+//! The core engine
+//!
+//! The core engine is the main process that runs in the background and handles
+//! all the logic.
+
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::io::{BufRead, BufReader, Write};
 use std::os::unix::net::UnixStream;
 
+/// The plugin request
 #[derive(Debug, Serialize, Deserialize)]
 pub enum PluginRequest {
+    /// Initialize
     Initialize,
+    /// Reload
     Reload,
+    /// Shutdown
     Shutdown,
+    /// Run command
     RunCommand {
+        /// Command
         command: String,
+        /// Arguments
         data: serde_json::Value,
     },
 }
 
+/// The plugin response
 #[derive(Debug, Serialize, Deserialize)]
 pub enum PluginResponse {
+    /// Plugin is initialized
     Initialized,
+    /// Plugin is reloaded
     Reloaded,
+    /// Plugin is shutting down
     Shutdown,
-    CommandResult { result: serde_json::Value },
-    Error { message: String },
+    /// Command result
+    CommandResult {
+        /// Result
+        result: serde_json::Value,
+    },
+    /// Error
+    Error {
+        /// Error message
+        message: String,
+    },
 }
 
 fn main() -> std::io::Result<()> {

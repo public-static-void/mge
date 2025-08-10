@@ -23,6 +23,7 @@ fn aggregate_inventory(inv: &JsonValue) -> (f64, f64, usize) {
     (total_weight, total_volume, total_items)
 }
 
+/// System that checks for constrains concerning the inventor e.g. if an inventory is encumbered
 pub struct InventoryConstraintSystem;
 
 impl crate::ecs::system::System for InventoryConstraintSystem {

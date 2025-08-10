@@ -1,8 +1,13 @@
+//! Engine Python API
+
+/// PyWorld API
 pub mod api;
 mod event_bus;
+/// Job bridge
 pub mod job_bridge;
 mod job_logger;
 mod plugin_init;
+/// Python API
 pub mod python_api;
 mod system_bridge;
 mod worldgen_bridge;

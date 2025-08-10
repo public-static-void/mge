@@ -8,12 +8,16 @@ use std::time::{SystemTime, UNIX_EPOCH};
 /// A single logged event, with timestamp and payload.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LoggedEvent<E> {
+    /// Timestamp
     pub timestamp: u128,
+    /// Event type
     pub event_type: String,
+    /// Payload
     pub payload: E,
 }
 
 impl<E> LoggedEvent<E> {
+    /// Create a new logged event.
     pub fn new(event_type: &str, payload: E) -> Self {
         let timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -33,25 +37,30 @@ pub struct EventLogger<E> {
 }
 
 impl<E: Clone + Serialize + for<'de> Deserialize<'de> + Send + Sync + 'static> EventLogger<E> {
+    /// Create a new event logger.
     pub fn new() -> Self {
         Self {
             events: Arc::new(Mutex::new(Vec::new())),
         }
     }
 
+    /// Log an event.
     pub fn log(&self, event_type: &str, payload: E) {
         let event = LoggedEvent::new(event_type, payload);
         self.events.lock().unwrap().push(event);
     }
 
+    /// Get all logged events.
     pub fn all(&self) -> Vec<LoggedEvent<E>> {
         self.events.lock().unwrap().clone()
     }
 
+    /// Clear all logged events.
     pub fn clear(&self) {
         self.events.lock().unwrap().clear();
     }
 
+    /// Save all logged events to a file.
     pub fn save_to_file<P: AsRef<Path>>(&self, path: P) -> anyhow::Result<()> {
         let file = File::create(path)?;
         let writer = BufWriter::new(file);
@@ -59,6 +68,7 @@ impl<E: Clone + Serialize + for<'de> Deserialize<'de> + Send + Sync + 'static> E
         Ok(())
     }
 
+    /// Load logged events from a file.
     pub fn load_from_file<P: AsRef<Path>>(path: P) -> anyhow::Result<Self> {
         let file = File::open(path)?;
         let reader = BufReader::new(file);

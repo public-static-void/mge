@@ -15,8 +15,11 @@ use std::path::{Path, PathBuf};
 /// - `modes`: List of game modes this component is valid in.
 #[derive(Debug, Clone, Deserialize)]
 pub struct ComponentSchema {
+    /// The name of the component
     pub name: String,
+    /// The JSON schema
     pub schema: Value, // Store as serde_json::Value for maximum compatibility
+    /// The game modes this component is valid in
     pub modes: Vec<String>,
 }
 

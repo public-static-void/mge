@@ -1,13 +1,16 @@
 use crate::presentation::ui::UiEvent;
 use crate::presentation::ui::widget::UiNode;
 
+/// Root UI node
 pub struct UiRoot {
+    /// Child nodes
     pub children: Vec<UiNode>,
     focused: Option<usize>,   // index in children
     focus_group: Option<u32>, // Optional: current focus group id
 }
 
 impl UiRoot {
+    /// Create new UI root
     pub fn new() -> Self {
         Self {
             children: Vec::new(),
@@ -15,9 +18,13 @@ impl UiRoot {
             focus_group: None,
         }
     }
+
+    /// Add a child node
     pub fn add_child(&mut self, child: UiNode) {
         self.children.push(child);
     }
+
+    /// Render the UI
     pub fn render(
         &mut self,
         renderer: &mut dyn crate::presentation::renderer::PresentationRenderer,
@@ -26,6 +33,8 @@ impl UiRoot {
             child.render(renderer);
         }
     }
+
+    /// Handle an event
     pub fn handle_event(&mut self, event: &UiEvent) {
         if let UiEvent::KeyPress { key } = event {
             let direction = match key.as_str() {
@@ -51,6 +60,7 @@ impl UiRoot {
         }
     }
 
+    /// Focus the first focusable child
     pub fn focus_physical(&mut self, direction: Direction) {
         let len = self.children.len();
         if len == 0 {
@@ -113,17 +123,20 @@ impl UiRoot {
         self.focused = Some(idx);
     }
 
+    /// Set focus group
     pub fn set_focus_group(&mut self, group: Option<u32>) {
         self.focus_group = group;
         self.focused = None;
     }
 
+    /// Clear focus
     pub fn clear_focus(&mut self) {
         if let Some(idx) = self.focused.take() {
             self.children[idx].set_focused(false);
         }
     }
 
+    /// Get focused index
     pub fn focused_index(&self) -> Option<usize> {
         self.focused
     }
@@ -135,11 +148,16 @@ impl Default for UiRoot {
     }
 }
 
+/// UI Navigation direction
 #[derive(Clone, Copy)]
 pub enum Direction {
+    /// Right
     Right,
+    /// Left
     Left,
+    /// Down
     Down,
+    /// Up
     Up,
 }
 

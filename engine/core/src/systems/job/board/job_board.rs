@@ -65,15 +65,20 @@ pub struct JobBoard {
 /// Struct for job board metadata, suitable for scripting bridges.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
 pub struct JobBoardEntry {
+    /// Entity ID of the job.
     pub eid: u32,
+    /// Job priority.
     pub priority: i64,
+    /// Job state.
     pub state: String,
 }
 
 /// Result of a job assignment attempt.
 #[derive(Debug, PartialEq, Eq)]
 pub enum JobAssignmentResult {
+    /// Job was successfully assigned.
     Assigned(u32),
+    /// Job was not eligible for assignment.
     NoJobsAvailable,
 }
 

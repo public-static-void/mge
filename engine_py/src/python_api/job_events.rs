@@ -16,6 +16,7 @@ static SUBSCRIPTION_ID_COUNTER: Lazy<Mutex<usize>> = Lazy::new(|| Mutex::new(0))
 
 // --- Job Event Log Querying ---
 
+/// Returns a list of all job events.
 pub fn get_job_event_log(py: Python) -> PyResult<PyObject> {
     let events = job_event_logger().all();
     let py_events = PyList::empty(py);
@@ -29,6 +30,7 @@ pub fn get_job_event_log(py: Python) -> PyResult<PyObject> {
     Ok(py_events.into())
 }
 
+/// Returns a list of job events of a specific type
 pub fn get_job_events_by_type(py: Python, event_type: String) -> PyResult<PyObject> {
     let events = job_event_logger().get_events_by_type(&event_type);
     let py_events = PyList::empty(py);
@@ -42,6 +44,7 @@ pub fn get_job_events_by_type(py: Python, event_type: String) -> PyResult<PyObje
     Ok(py_events.into())
 }
 
+/// Returns a list of job events since a specific timestamp
 pub fn get_job_events_since(py: Python, timestamp: u128) -> PyResult<PyObject> {
     let events = job_event_logger().get_events_since(timestamp);
     let py_events = PyList::empty(py);
@@ -55,6 +58,7 @@ pub fn get_job_events_since(py: Python, timestamp: u128) -> PyResult<PyObject> {
     Ok(py_events.into())
 }
 
+/// Returns a list of job events that match a predicate
 pub fn get_job_events_where<'py>(
     py: Python<'py>,
     predicate: Bound<'py, PyAny>,
@@ -77,6 +81,7 @@ pub fn get_job_events_where<'py>(
 
 // --- Job Event Bus Polling and Subscription ---
 
+/// Returns a list of job events of a specific type
 pub fn poll_job_event_bus(
     py: Python,
     event_type: String,
@@ -93,11 +98,8 @@ pub fn poll_job_event_bus(
     Ok(py_events.into())
 }
 
-pub fn subscribe_job_event_bus(
-    _py: Python,
-    event_type: String,
-    callback: PyObject,
-) -> PyResult<usize> {
+/// Subscribes to job events
+pub fn subscribe_job_event_bus(event_type: String, callback: PyObject) -> PyResult<usize> {
     let mut counter = SUBSCRIPTION_ID_COUNTER.lock().unwrap();
     *counter += 1;
     let id = *counter;
@@ -106,6 +108,7 @@ pub fn subscribe_job_event_bus(
     Ok(id)
 }
 
+/// Unsubscribes from job events
 pub fn unsubscribe_job_event_bus(event_type: String, sub_id: usize) -> PyResult<()> {
     let mut subs = JOB_EVENT_SUBSCRIPTIONS.lock().unwrap();
     if let Some(vec) = subs.get_mut(&event_type) {
@@ -114,6 +117,7 @@ pub fn unsubscribe_job_event_bus(event_type: String, sub_id: usize) -> PyResult<
     Ok(())
 }
 
+/// Delivers job events
 pub fn deliver_job_event_bus_callbacks(
     py: Python,
     world: &mut engine_core::ecs::world::World,
@@ -147,6 +151,7 @@ pub fn deliver_job_event_bus_callbacks(
 
 // --- Job Event Log Save/Load/Replay ---
 
+/// Saves job event log
 #[pyfunction]
 pub fn save_job_event_log_py(path: String) -> PyResult<()> {
     Python::with_gil(|_py| {
@@ -156,6 +161,7 @@ pub fn save_job_event_log_py(path: String) -> PyResult<()> {
     })
 }
 
+/// Loads job event log
 #[pyfunction]
 pub fn load_job_event_log_py(path: String) -> PyResult<()> {
     Python::with_gil(|_py| {
@@ -165,6 +171,7 @@ pub fn load_job_event_log_py(path: String) -> PyResult<()> {
     })
 }
 
+/// Replays job event log
 #[pyfunction]
 pub fn replay_job_event_log_py(world: &crate::python_api::world::PyWorld) -> PyResult<()> {
     let mut world = world.inner.borrow_mut();
@@ -172,6 +179,7 @@ pub fn replay_job_event_log_py(world: &crate::python_api::world::PyWorld) -> PyR
     Ok(())
 }
 
+/// Clears job event log
 pub fn clear_job_event_log_py() -> PyResult<()> {
     job_event_logger().clear();
     Ok(())

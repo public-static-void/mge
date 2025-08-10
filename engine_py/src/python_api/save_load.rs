@@ -1,8 +1,11 @@
 use super::PyWorld;
 use pyo3::prelude::*;
 
+/// API for saving and loading a world
 pub trait SaveLoadApi {
+    /// Save a world to a file
     fn save_to_file(&self, path: String) -> PyResult<()>;
+    /// Load a world from a file
     fn load_from_file(&mut self, path: String) -> PyResult<()>;
 }
 

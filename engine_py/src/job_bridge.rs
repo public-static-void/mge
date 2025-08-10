@@ -4,9 +4,11 @@ use pythonize::{depythonize, pythonize};
 use std::collections::HashMap;
 use std::sync::Mutex;
 
+/// Job handler registry
 pub static PY_JOB_HANDLER_REGISTRY: Lazy<Mutex<HashMap<String, Py<PyAny>>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
 
+/// Register a job handler
 pub fn py_job_handler(
     _world: &engine_core::ecs::world::World,
     _agent_id: u32,

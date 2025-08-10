@@ -5,8 +5,10 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use topo_sort::{SortResults, TopoSort};
 
+/// A function that can be run on a world
 pub type DynSystemFn = Box<dyn Fn(Rc<RefCell<World>>, f32) + 'static>;
 
+/// A registry of dynamic systems
 #[derive(Default)]
 pub struct DynamicSystemRegistry {
     systems: IndexMap<String, DynSystemFn>,
@@ -14,6 +16,7 @@ pub struct DynamicSystemRegistry {
 }
 
 impl DynamicSystemRegistry {
+    /// Create a new registry
     pub fn new() -> Self {
         Self {
             systems: IndexMap::new(),
@@ -21,15 +24,18 @@ impl DynamicSystemRegistry {
         }
     }
 
+    /// Check if a system is registered
     pub fn is_registered(&self, name: &str) -> bool {
         self.systems.contains_key(name)
     }
 
+    /// Register a system
     pub fn register_system(&mut self, name: String, run: DynSystemFn) {
         self.systems.insert(name.clone(), run);
         self.dependencies.entry(name).or_default();
     }
 
+    /// Register a system with dependencies
     pub fn register_system_with_deps(
         &mut self,
         name: String,
@@ -40,6 +46,7 @@ impl DynamicSystemRegistry {
         self.dependencies.insert(name, dependencies);
     }
 
+    /// Update the dependencies of a system
     pub fn update_system_dependencies(
         &mut self,
         name: &str,
@@ -52,6 +59,7 @@ impl DynamicSystemRegistry {
         Ok(())
     }
 
+    /// Run all systems
     pub fn run_all_systems(
         &self,
         world: Rc<RefCell<World>>,
@@ -86,12 +94,14 @@ impl DynamicSystemRegistry {
         }
     }
 
+    /// Unregister a system
     pub fn unregister_system(&mut self, name: &str) -> Result<(), String> {
         self.systems.swap_remove(name);
         self.dependencies.remove(name);
         Ok(())
     }
 
+    /// Run a system
     pub fn run_system(
         &self,
         world: Rc<RefCell<World>>,
@@ -106,6 +116,7 @@ impl DynamicSystemRegistry {
         }
     }
 
+    /// List all systems
     pub fn list_systems(&self) -> Vec<String> {
         self.systems.keys().cloned().collect()
     }

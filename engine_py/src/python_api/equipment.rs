@@ -4,9 +4,13 @@ use pyo3::types::{PyDict, PyTuple};
 use serde_json::Value;
 use serde_pyobject::to_pyobject;
 
+/// Equipment API
 pub trait EquipmentApi {
+    /// Get equipment data
     fn get_equipment(&self, py: Python<'_>, entity_id: u32) -> PyResult<PyObject>;
+    /// Equip an item
     fn equip_item(&self, entity_id: u32, item_id: String, slot: String) -> PyResult<()>;
+    /// Unequip an item
     fn unequip_item(&self, entity_id: u32, slot: String) -> PyResult<()>;
 }
 

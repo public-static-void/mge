@@ -12,6 +12,7 @@ const SHORTAGE_PRIORITY_BOOST: i64 = 100;
 pub struct JobPriorityAgingSystem;
 
 impl JobPriorityAgingSystem {
+    /// Creates a new job priority aging system.
     pub fn new() -> Self {
         Self
     }

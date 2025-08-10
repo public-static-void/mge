@@ -6,6 +6,7 @@ use serde_json::Value as JsonValue;
 use std::sync::Arc;
 use std::sync::Mutex;
 
+/// Apply and rollback job effects.
 pub fn process_job_effects(
     world: &mut World,
     job_id: u32,
@@ -53,15 +54,14 @@ pub fn process_job_effects(
 
     if on_cancel {
         for idx in &applied_effect_indices {
-            if let Some(effect_idx) = idx.as_u64() {
-                if let Some(effect) = effects.get(effect_idx as usize) {
-                    let effect_value = serde_json::to_value(effect.clone()).unwrap();
-                    effect_registry.lock().unwrap().rollback_effects(
-                        world,
-                        job_id,
-                        &[effect_value],
-                    );
-                }
+            if let Some(effect_idx) = idx.as_u64()
+                && let Some(effect) = effects.get(effect_idx as usize)
+            {
+                let effect_value = serde_json::to_value(effect.clone()).unwrap();
+                effect_registry
+                    .lock()
+                    .unwrap()
+                    .rollback_effects(world, job_id, &[effect_value]);
             }
         }
         applied_effect_indices.clear();

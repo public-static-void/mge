@@ -1,3 +1,5 @@
+//! CLI entry point for running a game from a script or demo.
+
 use engine_core::config::GameConfig;
 use engine_core::ecs::registry::ComponentRegistry;
 use engine_core::ecs::world::World;

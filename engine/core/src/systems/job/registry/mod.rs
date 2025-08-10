@@ -1,6 +1,8 @@
 //! Job registry submodule for job system.
 
+/// Effect processor registry
 pub mod effect_processor_registry;
+/// Job handler registry
 pub mod job_handler_registry;
 
 // Re-export core job type logic/data/registry

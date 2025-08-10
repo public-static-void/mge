@@ -9,20 +9,32 @@ use std::any::Any;
 use std::collections::HashMap;
 use std::sync::Arc;
 
+/// Checkbox widget
 #[derive(Serialize, Deserialize)]
 pub struct Checkbox {
+    /// Widget ID
     pub id: WidgetId,
+    /// Checkbox state
     pub checked: bool,
+    /// Checkbox label
     pub label: String,
+    /// Position
     pub pos: (i32, i32),
+    /// Color
     pub color: RenderColor,
+    /// Focus group
     pub group: Option<u32>,
+    /// Whether the widget is focused
     pub focused: bool,
+    /// Callbacks
     #[serde(skip)]
     pub callbacks: HashMap<String, WidgetCallback>,
+    /// Toggle callback
     #[serde(skip)]
     pub on_toggle: Option<Box<dyn FnMut(bool) + Send>>,
+    /// Z-order
     pub z_order: i32,
+    /// Parent
     pub parent: Option<WidgetId>,
 }
 
@@ -45,6 +57,7 @@ impl Clone for Checkbox {
 }
 
 impl Checkbox {
+    /// Create new checkbox
     pub fn new(
         label: impl Into<String>,
         pos: (i32, i32),
@@ -72,6 +85,7 @@ impl Checkbox {
         }
     }
 
+    /// Set toggle callback
     pub fn set_on_toggle(&mut self, cb: Box<dyn FnMut(bool) + Send>) {
         self.on_toggle = Some(cb);
     }
@@ -177,6 +191,7 @@ impl UiWidget for Checkbox {
     }
 }
 
+/// Register checkbox widget
 pub fn register_checkbox_widget() {
     let ctor = |props: WidgetProps| {
         let label = props

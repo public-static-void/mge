@@ -6,19 +6,30 @@ use crate::presentation::ui::widget::widget_trait::{
 use serde::{Deserialize, Serialize};
 use std::any::Any;
 
+/// A callback for text input
 pub type OnTextChange = Box<dyn FnMut(&str) + Send>;
 
+/// A text input widget
 #[derive(Serialize, Deserialize)]
 pub struct TextInput {
+    /// The widget ID
     pub id: WidgetId,
+    /// The position
     pub pos: (i32, i32),
+    /// The width
     pub width: usize,
+    /// The text
     pub text: String,
+    /// The cursor
     pub cursor: usize,
+    /// The color
     pub color: RenderColor,
+    /// Whether the text input is focused
     pub focused: bool,
+    /// The on change callback
     #[serde(skip)]
     pub on_change: Option<OnTextChange>,
+    /// The focus group
     pub group: Option<u32>,
 }
 
@@ -39,6 +50,7 @@ impl Clone for TextInput {
 }
 
 impl TextInput {
+    /// Create a new text input
     pub fn new(pos: (i32, i32), width: usize, color: RenderColor, group: Option<u32>) -> Self {
         static mut NEXT_ID: WidgetId = 500_000;
         let id = unsafe {
@@ -59,10 +71,12 @@ impl TextInput {
         }
     }
 
+    /// Set the on change callback
     pub fn set_on_change(&mut self, f: Box<dyn FnMut(&str) + Send>) {
         self.on_change = Some(f);
     }
 
+    /// Set the text
     pub fn set_text(&mut self, text: &str) {
         self.text = text.to_string();
         self.cursor = self.text.len();
@@ -70,6 +84,8 @@ impl TextInput {
             cb(&self.text);
         }
     }
+
+    /// Check if the text input is focused
     pub fn is_focused(&self) -> bool {
         self.focused
     }
@@ -168,7 +184,8 @@ impl SetPos for TextInput {
     }
 }
 
-// --- Registration function for data-driven UI ---
+/// Register the TextInput widget
+/// Registration function for data-driven UI
 pub fn register_text_input_widget() {
     use crate::presentation::renderer::RenderColor;
     use crate::presentation::ui::factory::{UI_FACTORY, WidgetProps};

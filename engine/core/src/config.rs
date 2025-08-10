@@ -2,17 +2,24 @@ use serde::Deserialize;
 use std::fs;
 use std::path::Path;
 
+/// The plugin config file
 #[derive(Debug, Clone, Deserialize)]
 pub struct PluginConfig {
+    /// List of native plugins
     pub native: Vec<String>,
     // Optionally: pub scripting: Vec<String>,
 }
 
+/// The game config file
 #[derive(Debug, Clone, Deserialize)]
 pub struct GameConfig {
+    /// Game title
     pub title: String,
+    /// Game version
     pub version: String,
+    /// Allowed game modes
     pub allowed_modes: Vec<String>,
+    /// Game plugins
     pub plugins: Option<PluginConfig>,
     // Add more fields as needed
 }

@@ -3,6 +3,7 @@ use mlua::{Lua, Result as LuaResult, Table};
 use std::cell::RefCell;
 use std::rc::Rc;
 
+/// Registers the job cancel API
 pub fn register_job_cancel_api(
     lua: &Lua,
     globals: &Table,

@@ -6,6 +6,7 @@ use mlua::{Lua, Result as LuaResult, Table};
 use std::cell::RefCell;
 use std::rc::Rc;
 
+/// Register save/load API.
 pub fn register_save_load_api(
     lua: &Lua,
     globals: &Table,

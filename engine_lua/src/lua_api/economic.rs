@@ -7,6 +7,7 @@ use mlua::{Lua, Result as LuaResult, Table};
 use std::cell::RefCell;
 use std::rc::Rc;
 
+/// Registers the economic API.
 pub fn register_economic_api(
     lua: &Lua,
     globals: &Table,

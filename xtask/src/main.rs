@@ -1,3 +1,7 @@
+//! xtask runner
+//!
+//! This script is used for building and deploying plugins.
+
 use std::error::Error;
 use std::fs;
 use std::path::{Path, PathBuf};

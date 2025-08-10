@@ -2,12 +2,17 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use std::collections::{HashMap, HashSet};
 
+/// Wasm implementation of a world
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct WasmWorld {
+    /// Entities
     pub entities: Vec<u32>,
+    /// Components
     pub components: HashMap<String, HashMap<u32, JsonValue>>,
     next_id: u32,
+    /// Current game mode
     pub current_mode: String,
+    /// Current turn
     pub turn: u32,
 }
 

@@ -177,7 +177,7 @@ impl ComponentRegistry {
         modes
     }
 
-    // Get all component names registered for a given mode.
+    /// Get all component names registered for a given mode.
     pub fn components_for_mode(&self, mode: &str) -> Vec<String> {
         self.components
             .values()

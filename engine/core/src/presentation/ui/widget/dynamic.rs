@@ -4,12 +4,14 @@ use crate::presentation::ui::widget::{UiWidget, WidgetId};
 use std::any::Any;
 use std::sync::Arc;
 
+/// A widget that is created at runtime.
 pub struct DynamicWidget {
     type_name: String,
     inner: Box<dyn UiWidget + Send>,
 }
 
 impl DynamicWidget {
+    /// Create a new dynamic widget
     pub fn new(type_name: String, inner: Box<dyn UiWidget + Send>) -> Self {
         Self { type_name, inner }
     }

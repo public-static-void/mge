@@ -7,6 +7,7 @@ use serde_json::Value as JsonValue;
 use std::any::Any;
 use std::sync::Arc;
 
+/// A widget that displays the events that have been logged by the engine
 pub struct EventLogWidget {
     logger: Arc<EventLogger<JsonValue>>,
     filter: String,
@@ -18,6 +19,7 @@ pub struct EventLogWidget {
 }
 
 impl EventLogWidget {
+    /// Create a new EventLogWidget
     pub fn new(id: widget::WidgetId) -> Self {
         Self {
             logger: job_event_logger(),
@@ -30,6 +32,7 @@ impl EventLogWidget {
         }
     }
 
+    /// Update the widget
     pub fn update(&mut self) {
         self.events = self.logger.query_events(|_| true);
         if !self.filter.is_empty() {
@@ -37,6 +40,7 @@ impl EventLogWidget {
         }
     }
 
+    /// Set a filter
     pub fn set_filter(&mut self, filter: String) {
         self.filter = filter;
     }

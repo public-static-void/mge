@@ -2,6 +2,7 @@ use crate::presentation::renderer::PresentationRenderer;
 use crate::presentation::ui::widget::widget_trait::{UiWidget, WidgetId};
 use std::any::Any;
 
+/// A grid of widgets with a focused widget.
 pub struct FocusGrid {
     id: WidgetId,
     children: Vec<(Box<dyn UiWidget + Send>, i32, i32)>, // (widget, col, row)
@@ -23,6 +24,7 @@ impl Clone for FocusGrid {
 }
 
 impl FocusGrid {
+    /// Create a new FocusGrid with the given number of columns and rows.
     pub fn new(_cols: i32, _rows: i32) -> Self {
         static mut NEXT_ID: WidgetId = 2_000_000;
         let id = unsafe {
@@ -37,10 +39,12 @@ impl FocusGrid {
         }
     }
 
+    /// Add a child to the grid.
     pub fn add_child(&mut self, widget: Box<dyn UiWidget + Send>, col: i32, row: i32) {
         self.children.push((widget, col, row));
     }
 
+    /// Move the focus to a child.
     pub fn move_focus_public(&mut self, dcol: i32, drow: i32) {
         if self.children.is_empty() {
             self.focused = None;
@@ -84,6 +88,7 @@ impl FocusGrid {
         }
     }
 
+    /// Get the focused index.
     pub fn focused_index(&self) -> Option<usize> {
         self.focused
     }

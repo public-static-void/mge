@@ -1,9 +1,20 @@
+//! Map module.
+//!
+//! This module provides the Map struct and related functionality for handling maps in the game.
+
+/// Cell key module.
 pub mod cell_key;
+/// Map deserialization module.
 pub mod deserialize;
+/// Hex grid map module.
 pub mod hex;
+/// Map pathfinding module.
 pub mod pathfinding;
+/// Region map module.
 pub mod region;
+/// Square grid map module.
 pub mod square;
+/// Map topology module.
 pub mod topology;
 
 pub use cell_key::CellKey;
@@ -16,6 +27,7 @@ pub use topology::MapTopology;
 
 /// The main Map type (boxed trait object for dynamic dispatch).
 pub struct Map {
+    /// The underlying MapTopology.
     pub topology: Box<dyn MapTopology>,
 }
 

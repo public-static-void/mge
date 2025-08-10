@@ -2,6 +2,7 @@ use super::World;
 use crate::ecs::components::position::{Position, PositionComponent};
 
 impl World {
+    /// Spawn a new entity
     pub fn spawn_entity(&mut self) -> u32 {
         let id = self.next_id;
         self.next_id += 1;
@@ -9,6 +10,7 @@ impl World {
         id
     }
 
+    /// Despawn an entity
     pub fn despawn_entity(&mut self, entity: u32) {
         for (_comp_name, comps) in self.components.iter_mut() {
             let _existed = comps.remove(&entity).is_some();
@@ -16,6 +18,7 @@ impl World {
         self.entities.retain(|&id| id != entity);
     }
 
+    /// Checks if an entity exists
     pub fn entity_exists(&self, entity: u32) -> bool {
         let in_entities = self.entities.contains(&entity);
         let in_any_component = self
@@ -25,10 +28,12 @@ impl World {
         in_entities || in_any_component
     }
 
+    /// Get all entities
     pub fn get_entities(&self) -> Vec<u32> {
         self.entities.clone()
     }
 
+    /// Get all entities with a given component
     pub fn get_entities_with_component(&self, name: &str) -> Vec<u32> {
         if !self.is_component_allowed_in_mode(name, &self.current_mode) {
             return vec![];
@@ -39,12 +44,14 @@ impl World {
             .unwrap_or_default()
     }
 
+    /// Checks if an entity has a component
     pub fn has_component(&self, entity: u32, name: &str) -> bool {
         self.components
             .get(name)
             .is_some_and(|m| m.contains_key(&entity))
     }
 
+    /// Get all entities with a given component
     pub fn get_entities_with_components(&self, names: &[&str]) -> Vec<u32> {
         if names.is_empty() {
             return self.entities.clone();
@@ -71,6 +78,7 @@ impl World {
             .collect()
     }
 
+    /// Move an entity
     pub fn move_entity(&mut self, entity: u32, dx: f32, dy: f32) {
         if let Some(value) = self.get_component(entity, "Position").cloned()
             && let Ok(mut pos_comp) = serde_json::from_value::<PositionComponent>(value)
@@ -84,6 +92,7 @@ impl World {
         }
     }
 
+    /// Damage an entity
     pub fn damage_entity(&mut self, entity: u32, amount: f32) {
         if let Some(healths) = self.components.get_mut("Health")
             && let Some(value) = healths.get_mut(&entity)
@@ -95,6 +104,7 @@ impl World {
         }
     }
 
+    /// Checks if an entity is alive
     pub fn is_entity_alive(&self, entity: u32) -> bool {
         if let Some(health) = self.get_component(entity, "Health") {
             health
@@ -107,6 +117,7 @@ impl World {
         }
     }
 
+    /// Counts the number of entities with a given type
     pub fn count_entities_with_type(&self, type_str: &str) -> usize {
         self.get_entities_with_component("Type")
             .into_iter()

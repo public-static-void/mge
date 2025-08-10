@@ -1,43 +1,57 @@
-use crate::PyWorld;
+// engine_py/src/python_api/movement.rs
+
+use crate::python_api::world::PyWorld;
 use engine_core::map::CellKey;
 use engine_core::systems::job::ops::movement_ops;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use serde_json::Value;
+use pyo3::types::PyAny;
+use pythonize::depythonize;
 
-pub trait MovementApi {
-    fn assign_move_path(&self, agent_id: u32, from_cell: Value, to_cell: Value) -> PyResult<()>;
-    fn is_agent_at_cell(&self, agent_id: u32, cell: Value) -> PyResult<bool>;
-    fn is_move_path_empty(&self, agent_id: u32) -> PyResult<bool>;
-}
+/// Adapter for exposed Python movement methods.
+pub struct MovementApi;
 
-impl MovementApi for PyWorld {
-    fn assign_move_path(&self, agent_id: u32, from_cell: Value, to_cell: Value) -> PyResult<()> {
-        let from_cell_key: CellKey = serde_json::from_value(from_cell)
+impl MovementApi {
+    /// Assign a move path to an agent from one cell to another.
+    pub fn assign_move_path(
+        pyworld: &PyWorld,
+        agent_id: u32,
+        from_cell: &Bound<'_, PyAny>,
+        to_cell: &Bound<'_, PyAny>,
+    ) -> PyResult<()> {
+        let from_val: serde_json::Value = depythonize(from_cell)
             .map_err(|e| PyValueError::new_err(format!("Invalid from_cell: {e}")))?;
-        let to_cell_key: CellKey = serde_json::from_value(to_cell)
+        let to_val: serde_json::Value = depythonize(to_cell)
             .map_err(|e| PyValueError::new_err(format!("Invalid to_cell: {e}")))?;
 
-        let mut world = self.inner.borrow_mut();
+        let from_key: CellKey = serde_json::from_value(from_val)
+            .map_err(|e| PyValueError::new_err(format!("Invalid from_cell key: {e}")))?;
+        let to_key: CellKey = serde_json::from_value(to_val)
+            .map_err(|e| PyValueError::new_err(format!("Invalid to_cell key: {e}")))?;
 
-        // assign_move_path returns (), so don't call map_err here
-        movement_ops::assign_move_path(&mut world, agent_id, &from_cell_key, &to_cell_key);
-
+        let mut world = pyworld.inner.borrow_mut();
+        movement_ops::assign_move_path(&mut world, agent_id, &from_key, &to_key);
         Ok(())
     }
 
-    fn is_agent_at_cell(&self, agent_id: u32, cell: Value) -> PyResult<bool> {
-        let cell_key: CellKey = serde_json::from_value(cell)
-            .map_err(|e| PyValueError::new_err(format!("Invalid cell: {e}")))?;
+    /// Check if an agent is at the given cell.
+    pub fn is_agent_at_cell(
+        pyworld: &PyWorld,
+        agent_id: u32,
+        cell: &Bound<'_, PyAny>,
+    ) -> PyResult<bool> {
+        let val: serde_json::Value =
+            depythonize(cell).map_err(|e| PyValueError::new_err(format!("Invalid cell: {e}")))?;
+        let cell_key: CellKey = serde_json::from_value(val)
+            .map_err(|e| PyValueError::new_err(format!("Invalid cell key: {e}")))?;
 
-        let world = self.inner.borrow();
-
+        let world = pyworld.inner.borrow();
         Ok(movement_ops::is_agent_at_cell(&world, agent_id, &cell_key))
     }
 
-    fn is_move_path_empty(&self, agent_id: u32) -> PyResult<bool> {
-        let world = self.inner.borrow();
-
+    /// Check if an agent's movement path is currently empty.
+    pub fn is_move_path_empty(pyworld: &PyWorld, agent_id: u32) -> PyResult<bool> {
+        let world = pyworld.inner.borrow();
         Ok(movement_ops::is_move_path_empty(&world, agent_id))
     }
 }

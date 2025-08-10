@@ -16,57 +16,85 @@ type WorldgenPostprocessor = Box<dyn Fn(&mut serde_json::Value) + Send + Sync>;
 type ScriptingValidator = Box<dyn Fn(&serde_json::Value) -> Result<(), String>>;
 type ScriptingPostprocessor = Box<dyn Fn(&mut serde_json::Value)>;
 
-// Threadsafe plugin trait for global registry
+/// Threadsafe plugin trait for global registry
 pub trait ThreadSafeScriptingWorldgenPlugin: Send + Sync + DynClone {
+    /// Invoke plugin
     fn invoke(&self, params: &JsonValue) -> Result<JsonValue, Box<dyn std::error::Error>>;
+    /// Plugin backend
     fn backend(&self) -> &str;
 }
 dyn_clone::clone_trait_object!(ThreadSafeScriptingWorldgenPlugin);
 
-// Non-threadsafe plugin trait for local registries (Lua)
+/// Non-threadsafe plugin trait for local registries (Lua)
 pub trait ScriptingWorldgenPlugin: DynClone {
+    /// Invoke plugin
     fn invoke(&self, params: &JsonValue) -> Result<JsonValue, Box<dyn std::error::Error>>;
+    /// Plugin backend
     fn backend(&self) -> &str;
 }
 dyn_clone::clone_trait_object!(ScriptingWorldgenPlugin);
 
-// THREAD-SAFE plugin enum for global registry
+/// Thread-safe plugin enum for global registry
 pub enum ThreadSafeWorldgenPlugin {
+    /// CAbi plugin
     CAbi {
+        /// Plugin name
         name: String,
+        /// World generate function
         generate: Arc<dyn Fn(&JsonValue) -> JsonValue + Send + Sync>,
+        /// Library
         _lib: Option<Library>,
     },
+    /// Thread-safe scripting plugin
     ThreadSafeScripting {
+        /// Plugin name
         name: String,
+        /// Plugin backend
         backend: String,
+        /// Opaque type
         opaque: Box<dyn ThreadSafeScriptingWorldgenPlugin + Send + Sync>,
     },
 }
 
-// FULL plugin enum for local registries (can include non-threadsafe scripting)
+/// Plugin enum for local registries (can include non-threadsafe scripting)
 pub enum WorldgenPlugin {
+    /// CAbi plugin
     CAbi {
+        /// Plugin name
         name: String,
+        /// World generate function
         generate: Arc<dyn Fn(&JsonValue) -> JsonValue + Send + Sync>,
+        /// Library
         _lib: Option<Library>,
     },
+    /// Thread-safe scripting plugin
     ThreadSafeScripting {
+        /// Plugin name
         name: String,
+        /// Plugin backend
         backend: String,
+        /// Opaque type
         opaque: Box<dyn ThreadSafeScriptingWorldgenPlugin + Send + Sync>,
     },
+    /// Non-threadsafe scripting plugin
     Scripting {
+        /// Plugin name
         name: String,
+        /// Plugin backend
         backend: String,
+        /// Opaque type
         opaque: Box<dyn ScriptingWorldgenPlugin>,
     },
 }
 
+/// Worldgen errors
 #[derive(Debug)]
 pub enum WorldgenError {
+    /// Plugin not found
     NotFound,
+    /// Plugin error
     ScriptError(String),
+    /// Validation error
     ValidationError(String),
 }
 
@@ -86,6 +114,7 @@ pub struct ThreadSafeWorldgenRegistry {
 }
 
 impl ThreadSafeWorldgenRegistry {
+    /// Create a new registry
     pub fn new() -> Self {
         Self {
             plugins: Vec::new(),
@@ -94,10 +123,12 @@ impl ThreadSafeWorldgenRegistry {
         }
     }
 
+    /// Register a plugin
     pub fn register(&mut self, plugin: ThreadSafeWorldgenPlugin) {
         self.plugins.push(plugin);
     }
 
+    /// List plugin names
     pub fn list_names(&self) -> Vec<String> {
         self.plugins
             .iter()
@@ -108,6 +139,7 @@ impl ThreadSafeWorldgenRegistry {
             .collect()
     }
 
+    /// Register a validator
     pub fn register_validator<F>(&mut self, f: F)
     where
         F: Fn(&serde_json::Value) -> Result<(), String> + Send + Sync + 'static,
@@ -115,6 +147,7 @@ impl ThreadSafeWorldgenRegistry {
         self.validators.push(Box::new(f));
     }
 
+    /// Register a postprocessor
     pub fn register_postprocessor<F>(&mut self, f: F)
     where
         F: Fn(&mut serde_json::Value) + Send + Sync + 'static,
@@ -122,6 +155,7 @@ impl ThreadSafeWorldgenRegistry {
         self.postprocessors.push(Box::new(f));
     }
 
+    /// Run validators
     pub fn run_validators(&self, map: &serde_json::Value) -> Result<(), String> {
         for validator in &self.validators {
             validator(map)?;
@@ -129,12 +163,14 @@ impl ThreadSafeWorldgenRegistry {
         Ok(())
     }
 
+    /// Run postprocessors
     pub fn run_postprocessors(&self, map: &mut serde_json::Value) {
         for post in &self.postprocessors {
             post(map);
         }
     }
 
+    /// Invoke a plugin
     pub fn invoke(&self, name: &str, params: &JsonValue) -> Result<JsonValue, WorldgenError> {
         for plugin in &self.plugins {
             let plugin_name = match plugin {
@@ -176,6 +212,7 @@ pub struct WorldgenRegistry {
 }
 
 impl WorldgenRegistry {
+    /// Create a new registry
     pub fn new() -> Self {
         Self {
             plugins: Vec::new(),
@@ -186,10 +223,12 @@ impl WorldgenRegistry {
         }
     }
 
+    /// Register a plugin
     pub fn register(&mut self, plugin: WorldgenPlugin) {
         self.plugins.push(plugin);
     }
 
+    /// List plugin names
     pub fn list_names(&self) -> Vec<String> {
         self.plugins
             .iter()
@@ -201,6 +240,7 @@ impl WorldgenRegistry {
             .collect()
     }
 
+    /// Registers a validator
     pub fn register_validator<F>(&mut self, f: F)
     where
         F: Fn(&serde_json::Value) -> Result<(), String> + Send + Sync + 'static,
@@ -208,6 +248,7 @@ impl WorldgenRegistry {
         self.validators.push(Box::new(f));
     }
 
+    /// Registers a postprocessor
     pub fn register_postprocessor<F>(&mut self, f: F)
     where
         F: Fn(&mut serde_json::Value) + Send + Sync + 'static,
@@ -215,6 +256,7 @@ impl WorldgenRegistry {
         self.postprocessors.push(Box::new(f));
     }
 
+    /// Registers a validator for scripting
     pub fn register_scripting_validator<F>(&mut self, f: F)
     where
         F: Fn(&serde_json::Value) -> Result<(), String> + 'static,
@@ -222,6 +264,7 @@ impl WorldgenRegistry {
         self.scripting_validators.push(Box::new(f));
     }
 
+    /// Registers a postprocessor for scripting
     pub fn register_scripting_postprocessor<F>(&mut self, f: F)
     where
         F: Fn(&mut serde_json::Value) + 'static,
@@ -229,6 +272,7 @@ impl WorldgenRegistry {
         self.scripting_postprocessors.push(Box::new(f));
     }
 
+    /// Runs validators
     pub fn run_validators(&self, map: &serde_json::Value) -> Result<(), String> {
         for validator in &self.validators {
             validator(map)?;
@@ -239,6 +283,7 @@ impl WorldgenRegistry {
         Ok(())
     }
 
+    /// Runs postprocessors
     pub fn run_postprocessors(&self, map: &mut serde_json::Value) {
         for post in &self.postprocessors {
             post(map);
@@ -248,6 +293,7 @@ impl WorldgenRegistry {
         }
     }
 
+    /// Runs a plugin by name
     pub fn invoke(&self, name: &str, params: &JsonValue) -> Result<JsonValue, WorldgenError> {
         for plugin in &self.plugins {
             let plugin_name = match plugin {
@@ -313,6 +359,7 @@ impl Default for WorldgenRegistry {
     }
 }
 
-// Only the thread-safe registry is global
+/// Global thread-safe registry for world generation.
+/// Only the thread-safe registry is global
 pub static GLOBAL_WORLDGEN_REGISTRY: Lazy<Mutex<ThreadSafeWorldgenRegistry>> =
     Lazy::new(|| Mutex::new(ThreadSafeWorldgenRegistry::new()));

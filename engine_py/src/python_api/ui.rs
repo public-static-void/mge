@@ -7,17 +7,20 @@ use serde_json::Value;
 use serde_pyobject::from_pyobject;
 use std::sync::Arc;
 
+/// UI API
 #[pyclass]
 pub struct UiApi {}
 
 #[pymethods]
 impl UiApi {
+    /// Create a new UI API
     #[new]
     pub fn new() -> Self {
         engine_core::presentation::ui::register_all_widgets();
         UiApi {}
     }
 
+    /// Create a new widget
     pub fn create_widget(&self, type_name: String, props: Bound<'_, PyAny>) -> PyResult<u64> {
         let props_dict: &Bound<PyDict> = props.downcast::<PyDict>()?;
         let mut widget_props = WidgetProps::new();
@@ -40,6 +43,7 @@ impl UiApi {
         }
     }
 
+    /// Load UI from JSON
     pub fn load_json(&self, json_str: String) -> Vec<u64> {
         let mut ids = Vec::new();
         if let Some(root_widget) = load_ui_from_json(&json_str) {
@@ -52,6 +56,7 @@ impl UiApi {
         ids
     }
 
+    /// Set widget props
     pub fn set_widget_props(&self, widget_id: u64, props: Bound<'_, PyAny>) -> PyResult<bool> {
         let props_dict: &Bound<PyDict> = props.downcast::<PyDict>()?;
         let mut widget_props = WidgetProps::new();
@@ -70,6 +75,7 @@ impl UiApi {
         }
     }
 
+    /// Get widget props
     pub fn get_widget_props(&self, py: Python<'_>, widget_id: u64) -> PyResult<Option<PyObject>> {
         let registry_binding = WIDGET_REGISTRY.lock();
         let registry = registry_binding.borrow();
@@ -102,11 +108,13 @@ impl UiApi {
         }
     }
 
+    /// Remove a widget
     pub fn remove_widget(&self, widget_id: u64) -> bool {
         let registry_binding = WIDGET_REGISTRY.lock();
         registry_binding.borrow_mut().remove(&widget_id).is_some()
     }
 
+    /// Add a child
     pub fn add_child(&self, parent_id: u64, child_id: u64) -> bool {
         let registry_binding = WIDGET_REGISTRY.lock();
         let mut registry = registry_binding.borrow_mut();
@@ -124,6 +132,7 @@ impl UiApi {
         }
     }
 
+    /// Get children
     pub fn get_children(&self, widget_id: u64) -> Vec<u64> {
         let registry_binding = WIDGET_REGISTRY.lock();
         let registry = registry_binding.borrow();
@@ -134,6 +143,7 @@ impl UiApi {
         }
     }
 
+    /// Remove a child
     pub fn remove_child(&self, parent_id: u64, child_id: u64) -> bool {
         let registry_binding = WIDGET_REGISTRY.lock();
         let mut registry = registry_binding.borrow_mut();
@@ -171,6 +181,7 @@ impl UiApi {
         }
     }
 
+    /// Set a callback
     pub fn set_callback(
         &self,
         widget_id: u64,
@@ -194,6 +205,7 @@ impl UiApi {
         }
     }
 
+    /// Remove a callback
     pub fn remove_callback(&self, widget_id: u64, event_name: String) -> PyResult<bool> {
         let registry_binding = WIDGET_REGISTRY.lock();
         let mut registry = registry_binding.borrow_mut();
@@ -205,6 +217,7 @@ impl UiApi {
         }
     }
 
+    /// Focus a widget
     pub fn focus_widget(&self, widget_id: u64) -> bool {
         let registry_binding = WIDGET_REGISTRY.lock();
         let mut registry = registry_binding.borrow_mut();
@@ -216,6 +229,7 @@ impl UiApi {
         }
     }
 
+    /// Trigger an event
     pub fn trigger_event(
         &self,
         widget_id: u64,
@@ -256,6 +270,7 @@ impl UiApi {
         }
     }
 
+    /// Get the type of a widget
     pub fn get_widget_type(&self, widget_id: u64) -> Option<String> {
         let registry_binding = WIDGET_REGISTRY.lock();
         let registry = registry_binding.borrow();
@@ -264,12 +279,14 @@ impl UiApi {
             .map(|w| w.widget_type().to_string())
     }
 
+    /// Get the parent of a widget
     pub fn get_parent(&self, widget_id: u64) -> Option<u64> {
         let registry_binding = WIDGET_REGISTRY.lock();
         let registry = registry_binding.borrow();
         registry.get(&widget_id).and_then(|w| w.get_parent())
     }
 
+    /// Set the z-order of a widget
     pub fn set_z_order(&self, widget_id: u64, z: i32) -> bool {
         let registry_binding = WIDGET_REGISTRY.lock();
         let mut registry = registry_binding.borrow_mut();
@@ -281,6 +298,7 @@ impl UiApi {
         }
     }
 
+    /// Get the z-order of a widget
     pub fn get_z_order(&self, widget_id: u64) -> i32 {
         let registry_binding = WIDGET_REGISTRY.lock();
         let registry = registry_binding.borrow();
@@ -290,6 +308,7 @@ impl UiApi {
             .unwrap_or(0)
     }
 
+    /// Register a widget
     pub fn register_widget(&self, type_name: String, py_ctor: PyObject) -> PyResult<bool> {
         use engine_core::presentation::ui::factory::WidgetProps;
         use engine_core::presentation::ui::widget::dynamic::DynamicWidget;

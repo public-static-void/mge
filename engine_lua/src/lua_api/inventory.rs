@@ -7,6 +7,7 @@ use serde_json::Value as JsonValue;
 use std::cell::RefCell;
 use std::rc::Rc;
 
+/// Registers the inventory API.
 pub fn register_inventory_api(
     lua: &Lua,
     globals: &Table,

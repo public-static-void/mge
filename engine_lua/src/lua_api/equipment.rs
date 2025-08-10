@@ -10,6 +10,7 @@ use serde_json::Value as JsonValue;
 use std::cell::RefCell;
 use std::rc::Rc;
 
+/// Registers the equipment API.
 pub fn register_equipment_api(
     lua: &Lua,
     globals: &Table,

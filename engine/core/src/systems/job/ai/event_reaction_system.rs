@@ -2,6 +2,7 @@ use crate::ecs::system::System;
 use crate::ecs::world::World;
 use serde_json::Value as JsonValue;
 
+/// System to react to AI events
 pub struct AiEventReactionSystem;
 
 impl System for AiEventReactionSystem {

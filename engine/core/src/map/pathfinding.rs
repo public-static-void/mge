@@ -2,9 +2,12 @@ use crate::map::{CellKey, MapTopology};
 use serde_json::Value;
 use std::collections::{BinaryHeap, HashMap, HashSet};
 
+/// A* pathfinding result
 #[derive(Debug, Clone, PartialEq)]
 pub struct PathfindingResult {
+    /// Path from start to goal
     pub path: Vec<CellKey>,
+    /// Total cost
     pub total_cost: f32,
 }
 

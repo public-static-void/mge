@@ -2,6 +2,7 @@ use crate::ecs::system::System;
 use crate::ecs::world::World;
 use serde_json::{Map, Value as JsonValue};
 
+/// System for calculating stats
 pub struct StatCalculationSystem;
 
 impl System for StatCalculationSystem {

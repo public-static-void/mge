@@ -5,11 +5,17 @@ use pyo3::types::PyAny;
 use serde_json::Value;
 use serde_pyobject::from_pyobject;
 
+/// Body API
 pub trait BodyApi {
+    /// Get body component
     fn get_body(&self, py: Python<'_>, entity_id: u32) -> PyResult<Option<PyObject>>;
+    /// Set body component
     fn set_body(&self, entity_id: u32, value: Bound<'_, PyAny>) -> PyResult<()>;
+    /// Add body part
     fn add_body_part(&self, entity_id: u32, part: Bound<'_, PyAny>) -> PyResult<()>;
+    /// Remove body part
     fn remove_body_part(&self, entity_id: u32, part_name: String) -> PyResult<()>;
+    /// Get body part
     fn get_body_part(
         &self,
         py: Python<'_>,

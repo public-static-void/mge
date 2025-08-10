@@ -5,20 +5,44 @@ use serde::{Deserialize, Serialize};
 /// Position for any map topology (square, hex, region, etc.)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 pub enum Position {
-    Square { x: i32, y: i32, z: i32 },
-    Hex { q: i32, r: i32, z: i32 },
-    Region { id: String },
+    /// Square topology
+    Square {
+        /// X coordinate
+        x: i32,
+        /// Y coordinate
+        y: i32,
+        /// Z coordinate
+        z: i32,
+    },
+    /// Hexagonal topology
+    Hex {
+        /// q coordinate
+        q: i32,
+        /// r coordinate
+        r: i32,
+        /// z coordinate
+        z: i32,
+    },
+    /// Region topology
+    Region {
+        /// Region ID
+        id: String,
+    },
 }
 
+/// Position component
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct PositionComponent {
+    /// Position
     pub pos: Position,
 }
 
 /// Legacy struct for migration from version 1.0.0
 #[derive(Deserialize)]
 pub struct LegacyPosition {
+    /// X coordinate
     pub x: f32,
+    /// Y coordinate
     pub y: f32,
 }
 

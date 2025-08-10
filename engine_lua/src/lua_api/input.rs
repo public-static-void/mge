@@ -5,6 +5,7 @@ use crate::input::InputProvider;
 use mlua::{Lua, Result as LuaResult, Table};
 use std::sync::{Arc, Mutex};
 
+/// Registers the input API.
 pub fn register_input_api(
     lua: &Lua,
     globals: &Table,

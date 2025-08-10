@@ -7,9 +7,12 @@ use super::topology::MapTopology;
 
 type CellSet = HashSet<CellKey>;
 
+/// A square grid map
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SquareGridMap {
+    /// The cells in the map
     pub cells: HashMap<CellKey, CellSet>,
+    /// Metadata for each cell
     pub cell_metadata: HashMap<CellKey, Value>,
 }
 

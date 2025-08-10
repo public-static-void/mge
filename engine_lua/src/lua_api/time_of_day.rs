@@ -5,6 +5,7 @@ use mlua::{Lua, Result as LuaResult, Table};
 use std::cell::RefCell;
 use std::rc::Rc;
 
+/// Register the time of day API.
 pub fn register_time_of_day_api(
     lua: &Lua,
     globals: &Table,

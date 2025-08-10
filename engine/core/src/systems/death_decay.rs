@@ -2,7 +2,9 @@ use crate::ecs::system::System;
 use crate::ecs::world::World;
 use serde_json::json;
 
+/// System: Processes death for entities with a Health component.
 pub struct ProcessDeaths;
+
 impl System for ProcessDeaths {
     fn name(&self) -> &'static str {
         "ProcessDeaths"

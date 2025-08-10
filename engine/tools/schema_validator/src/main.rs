@@ -1,3 +1,5 @@
+//! CLI for validating JSON schemas
+
 use clap::Parser;
 use schema_validator::validate_schema;
 use std::fs;

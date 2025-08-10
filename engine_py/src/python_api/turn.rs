@@ -3,8 +3,11 @@ use engine_core::World;
 use pyo3::Python;
 use std::rc::Rc;
 
+/// Represents a turn in the game
 pub trait TurnApi {
+    /// Advances the turn
     fn tick(&self);
+    /// Gets the current turn
     fn get_turn(&self) -> u32;
 }
 

@@ -5,13 +5,19 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use wasmtime::{Engine, Instance, Linker, Module, Store, Val};
 
+/// A function to register host imports
 pub type HostImportRegistrar = Box<dyn Fn(&mut Linker<Arc<Mutex<WasmWorld>>>) + Send + Sync>;
 
+/// A value in the Wasm world
 #[derive(Debug, Clone, PartialEq)]
 pub enum WasmValue {
+    /// 32-bit integer
     I32(i32),
+    /// 64-bit integer
     I64(i64),
+    /// 32-bit float
     F32(f32),
+    /// 64-bit float
     F64(f64),
 }
 
@@ -60,17 +66,22 @@ impl TryFrom<Val> for WasmValue {
     }
 }
 
+/// Configuration for a WASM engine
 pub struct WasmScriptEngineConfig {
+    /// Path to the WASM module
     pub module_path: PathBuf,
+    /// Optional host function registrar
     pub import_host_functions: Option<HostImportRegistrar>,
 }
 
+/// A WASM script engine
 pub struct WasmScriptEngine {
     store: Mutex<Store<Arc<Mutex<WasmWorld>>>>,
     instance: Instance,
 }
 
 impl WasmScriptEngine {
+    /// Create a new WASM script engine
     pub fn new(config: WasmScriptEngineConfig) -> Result<Self> {
         let engine = Engine::default();
         let module = Module::from_file(&engine, &config.module_path)
@@ -95,6 +106,7 @@ impl WasmScriptEngine {
         })
     }
 
+    /// Invoke an exported function
     pub fn invoke_exported_function(
         &self,
         func_name: &str,

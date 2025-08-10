@@ -95,6 +95,7 @@ fn find_part<'a>(part: &'a JsonValue, name: &str) -> Option<&'a JsonValue> {
     None
 }
 
+/// Syncs Body and Equipment components
 pub struct BodyEquipmentSyncSystem;
 
 impl System for BodyEquipmentSyncSystem {

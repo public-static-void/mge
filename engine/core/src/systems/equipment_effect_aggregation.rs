@@ -3,6 +3,8 @@ use crate::ecs::world::World;
 use serde_json::{Map, Value as JsonValue};
 use std::collections::HashMap;
 
+/// Equipment effect aggregation system
+/// Aggregates the effects of all items in the same slot
 pub struct EquipmentEffectAggregationSystem;
 
 impl System for EquipmentEffectAggregationSystem {

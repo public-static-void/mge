@@ -5,9 +5,12 @@ use std::collections::{HashMap, HashSet};
 use super::cell_key::CellKey;
 use super::topology::MapTopology;
 
+/// A region map
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RegionMap {
+    /// The cells in the map
     pub cells: HashMap<String, HashSet<String>>,
+    /// Metadata for the cells
     pub cell_metadata: HashMap<String, Value>,
 }
 

@@ -1,7 +1,9 @@
 use super::PyWorld;
 use pyo3::prelude::*;
 
+/// Economic API
 pub trait EconomicApi {
+    /// Modify the stockpile resource
     fn modify_stockpile_resource(&self, entity_id: u32, kind: String, delta: f64) -> PyResult<()>;
 }
 

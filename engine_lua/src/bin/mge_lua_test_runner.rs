@@ -1,3 +1,5 @@
+//! A test runner for Lua tests
+
 use engine_core::ecs::registry::ComponentRegistry;
 use engine_core::ecs::schema::{load_allowed_modes, load_schemas_from_dir_with_modes};
 use engine_core::ecs::world::World;

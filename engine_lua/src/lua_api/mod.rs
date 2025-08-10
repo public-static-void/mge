@@ -1,32 +1,63 @@
 //! Scripting API bridge: orchestrates registration of all Lua API subsystems.
+//!
+//! All API functions are registered into the same table, which is then
+//! exposed to the Lua script.
 
+/// Body API
 pub mod body;
+/// Camera API
 pub mod camera;
+/// Component API
 pub mod component;
+/// Death/Decay API
 pub mod death_decay;
+/// Economic API
 pub mod economic;
+/// Entity API
 pub mod entity;
+/// Equipment API
 pub mod equipment;
+/// Event Bus API
 pub mod event_bus;
+/// Input API
 pub mod input;
+/// Inventory API
 pub mod inventory;
+/// Job AI API
 pub mod job_ai;
+/// Job Board API
 pub mod job_board;
+/// Job Cancel API
 pub mod job_cancel;
+/// Job Events API
 pub mod job_events;
+/// Job Mutation API
 pub mod job_mutation;
+/// Job Query API
 pub mod job_query;
+/// Job System API
 pub mod job_system;
+/// Map API
 pub mod map;
+/// Game mode API
 pub mod mode;
+/// Movement API
 pub mod movement_ops;
+/// Region API
 pub mod region;
+/// Save/Load API
 pub mod save_load;
+/// System API
 pub mod system;
+/// Time of Day API
 pub mod time_of_day;
+/// Turn API
 pub mod turn;
+/// UI API
 pub mod ui;
+/// World API
 pub mod world;
+/// Worldgen API
 pub mod worldgen;
 
 use crate::input::InputProvider;

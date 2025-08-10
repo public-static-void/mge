@@ -6,6 +6,7 @@ use mlua::{Lua, Result as LuaResult, Table};
 use std::cell::RefCell;
 use std::rc::Rc;
 
+/// Register region API
 pub fn register_region_api(lua: &Lua, globals: &Table, world: Rc<RefCell<World>>) -> LuaResult<()> {
     // get_entities_in_region(region_id)
     let world_entities_in_region = world.clone();

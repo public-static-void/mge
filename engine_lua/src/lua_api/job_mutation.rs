@@ -4,6 +4,7 @@ use std::rc::Rc;
 use engine_core::ecs::world::World;
 use mlua::{Lua, Result as LuaResult, Table, Value};
 
+/// Registers the job mutation API
 pub fn register_job_mutation_api(
     lua: &Lua,
     globals: &Table,

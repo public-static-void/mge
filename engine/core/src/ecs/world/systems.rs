@@ -4,26 +4,31 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 impl World {
+    /// Register a system
     pub fn register_system<S: crate::ecs::system::System + 'static>(&mut self, system: S) {
         self.systems.register_system(system);
     }
 
+    /// List all registered systems
     pub fn list_systems(&self) -> Vec<String> {
         let mut all = self.systems.list_systems();
         all.extend(self.dynamic_systems.list_systems());
         all
     }
 
+    /// List all registered systems in dependency order
     pub fn list_systems_in_dependency_order(&self) -> Vec<String> {
         let mut all = self.systems.sorted_system_names();
         all.extend(self.dynamic_systems.list_systems());
         all
     }
 
+    /// Check if a system is registered
     pub fn has_system(&self, name: &str) -> bool {
         self.systems.is_registered(name) || self.dynamic_systems.is_registered(name)
     }
 
+    /// Register a dynamic system
     pub fn register_dynamic_system<F>(&mut self, name: &str, run: F)
     where
         F: Fn(Rc<RefCell<World>>, f32) + 'static,
@@ -32,6 +37,7 @@ impl World {
             .register_system(name.to_string(), Box::new(run));
     }
 
+    /// Register a dynamic system with dependencies
     pub fn register_dynamic_system_with_deps<F>(
         &mut self,
         name: &str,
@@ -47,6 +53,7 @@ impl World {
         );
     }
 
+    /// Run a dynamic system
     pub fn run_dynamic_system(
         &self,
         world_rc: Rc<RefCell<World>>,
@@ -55,6 +62,7 @@ impl World {
         self.dynamic_systems.run_system(world_rc, name, 0.0)
     }
 
+    /// Run a system
     pub fn run_system(&mut self, name: &str, lua: Option<&mlua::Lua>) -> Result<(), String> {
         if let Some(system) = self.systems.take_system(name) {
             system.borrow_mut().run(self, lua);
@@ -104,6 +112,7 @@ impl World {
         }
     }
 
+    /// Borrow-safe, idiomatic ECS tick
     pub fn tick(world_rc: Rc<RefCell<World>>) {
         World::simulation_tick(Rc::clone(&world_rc));
         world_rc.borrow_mut().advance_time_of_day();
@@ -120,6 +129,7 @@ impl World {
         }
     }
 
+    /// Get the current time of day
     pub fn get_time_of_day(&self) -> TimeOfDay {
         self.time_of_day
     }

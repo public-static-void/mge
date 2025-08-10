@@ -2,6 +2,7 @@ use super::recipe::Recipe;
 use std::fs;
 use std::path::Path;
 
+/// Load recipes from a directory
 pub fn load_recipes_from_dir<P: AsRef<Path>>(dir: P) -> Vec<Recipe> {
     let mut recipes = Vec::new();
     let entries = match fs::read_dir(dir) {

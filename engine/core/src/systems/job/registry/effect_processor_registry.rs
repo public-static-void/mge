@@ -3,8 +3,10 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
+/// Effect handler
 pub type EffectHandler = dyn Fn(&mut World, u32, &Value) + Send + Sync;
 
+/// Effect processor registry
 #[derive(Default)]
 pub struct EffectProcessorRegistry {
     handlers: HashMap<String, Arc<EffectHandler>>,
@@ -12,6 +14,7 @@ pub struct EffectProcessorRegistry {
 }
 
 impl EffectProcessorRegistry {
+    /// Create a new effect processor registry
     pub fn new() -> Self {
         Self {
             handlers: HashMap::new(),
@@ -19,6 +22,7 @@ impl EffectProcessorRegistry {
         }
     }
 
+    /// Register a handler
     pub fn register_handler<F>(&mut self, action: &str, handler: F)
     where
         F: Fn(&mut World, u32, &Value) + Send + Sync + 'static,
@@ -26,6 +30,7 @@ impl EffectProcessorRegistry {
         self.handlers.insert(action.to_string(), Arc::new(handler));
     }
 
+    /// Register an undo handler
     pub fn register_undo_handler<F>(&mut self, action: &str, handler: F)
     where
         F: Fn(&mut World, u32, &Value) + Send + Sync + 'static,
@@ -34,6 +39,7 @@ impl EffectProcessorRegistry {
             .insert(action.to_string(), Arc::new(handler));
     }
 
+    /// Process effects
     /// Deadlock-free, recursive effect processing for Arc<Mutex<EffectProcessorRegistry>>
     pub fn process_effects_arc(
         effect_proc: &Arc<Mutex<EffectProcessorRegistry>>,
@@ -65,6 +71,8 @@ impl EffectProcessorRegistry {
         }
     }
 
+    /// Rollback effects
+    /// Deadlock-free, recursive effect processing for Arc<Mutex<EffectProcessorRegistry>>
     pub fn rollback_effects_arc(
         effect_proc: &Arc<Mutex<EffectProcessorRegistry>>,
         world: &mut World,
@@ -94,6 +102,7 @@ impl EffectProcessorRegistry {
         }
     }
 
+    /// Process effects
     /// Non-Arc version for single-threaded or direct use
     pub fn process_effects(&mut self, world: &mut World, eid: u32, effects: &[Value]) {
         let to_call: Vec<_> = effects
@@ -114,6 +123,8 @@ impl EffectProcessorRegistry {
         }
     }
 
+    /// Rollback effects
+    /// Non-Arc version for single-threaded or direct use
     pub fn rollback_effects(&mut self, world: &mut World, eid: u32, effects: &[Value]) {
         let to_call: Vec<_> = effects
             .iter()
