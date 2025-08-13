@@ -1,7 +1,7 @@
 use super::Map;
 use super::cell_key::CellKey;
 use super::hex::HexGridMap;
-use super::region::RegionMap;
+use super::province::ProvinceMap;
 use super::square::SquareGridMap;
 use crate::map::topology::MapTopology;
 use serde_json::Value;
@@ -142,9 +142,9 @@ pub fn map_from_json(value: &Value) -> Option<Map> {
             Some(Map::new(Box::new(map)))
         }
 
-        "region" => {
-            // Neighbors must be explicit for region maps
-            let mut map = RegionMap::new();
+        "province" => {
+            // Neighbors must be explicit for province maps
+            let mut map = ProvinceMap::new();
             for cell in value.get("cells")?.as_array()? {
                 let id = cell.get("id")?.as_str()?.to_string();
                 map.add_cell(&id);
@@ -155,7 +155,7 @@ pub fn map_from_json(value: &Value) -> Option<Map> {
                     }
                 }
                 if let Some(meta) = cell.get("metadata") {
-                    let key = CellKey::Region { id: id.clone() };
+                    let key = CellKey::Province { id: id.clone() };
                     map.set_cell_metadata(&key, meta.clone());
                 }
             }

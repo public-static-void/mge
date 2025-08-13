@@ -35,8 +35,8 @@ pub fn assign_move_path(
                 crate::map::CellKey::Hex { q, r, z } => {
                     json!({ "Hex": { "q": q, "r": r, "z": z } })
                 }
-                crate::map::CellKey::Region { id } => {
-                    json!({ "Region": { "id": id } })
+                crate::map::CellKey::Province { id } => {
+                    json!({ "Province": { "id": id } })
                 }
             })
             .collect();

@@ -74,7 +74,7 @@ pub fn default_heuristic(a: &CellKey, b: &CellKey) -> f32 {
                 z: bz,
             },
         ) => ((ax - bx).abs() + (ay - by).abs() + (az - bz).abs()) as f32,
-        // For hex or region, fallback to 0 (Dijkstra)
+        // For hex or province, fallback to 0 (Dijkstra)
         _ => 0.0,
     }
 }

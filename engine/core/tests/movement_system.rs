@@ -3,7 +3,7 @@ mod world_helper;
 use world_helper::make_test_world;
 
 use engine_core::ecs::components::position::{Position, PositionComponent};
-use engine_core::map::{HexGridMap, Map, RegionMap, SquareGridMap};
+use engine_core::map::{HexGridMap, Map, ProvinceMap, SquareGridMap};
 
 #[test]
 fn test_move_all_moves_positions() {
@@ -123,9 +123,9 @@ fn test_move_all_hex() {
 }
 
 #[test]
-fn test_move_all_region() {
+fn test_move_all_province() {
     let mut world = make_test_world();
-    let mut grid = RegionMap::new();
+    let mut grid = ProvinceMap::new();
     grid.add_cell("A");
     grid.add_cell("B");
     grid.add_neighbor("A", "B");
@@ -133,7 +133,7 @@ fn test_move_all_region() {
 
     let entity = world.spawn_entity();
     let pos = PositionComponent {
-        pos: Position::Region { id: "A".into() },
+        pos: Position::Province { id: "A".into() },
     };
     world
         .set_component(entity, "Position", serde_json::to_value(&pos).unwrap())
@@ -142,7 +142,7 @@ fn test_move_all_region() {
     if let Some(positions) = world.components.get_mut("Position") {
         for (_eid, value) in positions.iter_mut() {
             if let Ok(mut pos_comp) = serde_json::from_value::<PositionComponent>(value.clone()) {
-                if let Position::Region { id } = &mut pos_comp.pos {
+                if let Position::Province { id } = &mut pos_comp.pos {
                     *id = "B".into();
                 }
                 *value = serde_json::to_value(&pos_comp).unwrap();
@@ -153,5 +153,5 @@ fn test_move_all_region() {
     let new_pos: PositionComponent =
         serde_json::from_value(world.get_component(entity, "Position").unwrap().clone())
             .expect("valid Position");
-    assert_eq!(new_pos.pos, Position::Region { id: "B".into() });
+    assert_eq!(new_pos.pos, Position::Province { id: "B".into() });
 }

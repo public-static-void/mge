@@ -1,4 +1,4 @@
-use engine_core::map::{CellKey, HexGridMap, Map, RegionMap, SquareGridMap};
+use engine_core::map::{CellKey, HexGridMap, Map, ProvinceMap, SquareGridMap};
 
 #[test]
 fn test_square_grid_map() {
@@ -30,23 +30,23 @@ fn test_hex_grid_map() {
 }
 
 #[test]
-fn test_region_map() {
-    let mut region = RegionMap::new();
-    region.add_cell("A");
-    region.add_cell("B");
-    region.add_cell("C");
-    region.add_neighbor("A", "B");
-    region.add_neighbor("A", "C");
+fn test_province_map() {
+    let mut province = ProvinceMap::new();
+    province.add_cell("A");
+    province.add_cell("B");
+    province.add_cell("C");
+    province.add_neighbor("A", "B");
+    province.add_neighbor("A", "C");
 
-    let map = Map::new(Box::new(region));
-    let cell = CellKey::Region {
+    let map = Map::new(Box::new(province));
+    let cell = CellKey::Province {
         id: "A".to_string(),
     };
     let neighbors = map.neighbors(&cell);
-    assert!(neighbors.contains(&CellKey::Region {
+    assert!(neighbors.contains(&CellKey::Province {
         id: "B".to_string()
     }));
-    assert!(neighbors.contains(&CellKey::Region {
+    assert!(neighbors.contains(&CellKey::Province {
         id: "C".to_string()
     }));
 }

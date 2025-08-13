@@ -206,24 +206,24 @@ fn test_map_from_json_hex() {
 }
 
 #[test]
-fn test_map_from_json_region() {
+fn test_map_from_json_province() {
     let value = json!({
-        "topology": "region",
+        "topology": "province",
         "cells": [
             { "id": "A", "neighbors": ["B"] },
             { "id": "B", "neighbors": ["A"] }
         ]
     });
-    let map = Map::from_json(&value).expect("should parse region map");
-    assert_eq!(map.topology_type(), "region");
-    assert!(map.contains(&CellKey::Region {
+    let map = Map::from_json(&value).expect("should parse province map");
+    assert_eq!(map.topology_type(), "province");
+    assert!(map.contains(&CellKey::Province {
         id: "A".to_string()
     }));
     assert_eq!(
-        map.neighbors(&CellKey::Region {
+        map.neighbors(&CellKey::Province {
             id: "A".to_string()
         }),
-        vec![CellKey::Region {
+        vec![CellKey::Province {
             id: "B".to_string()
         }]
     );

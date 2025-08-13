@@ -10,8 +10,8 @@ pub mod deserialize;
 pub mod hex;
 /// Map pathfinding module.
 pub mod pathfinding;
-/// Region map module.
-pub mod region;
+/// Province map module.
+pub mod province;
 /// Square grid map module.
 pub mod square;
 /// Map topology module.
@@ -20,7 +20,7 @@ pub mod topology;
 pub use cell_key::CellKey;
 pub use hex::HexGridMap;
 pub use pathfinding::{PathfindingResult, find_path as pathfinding_find_path};
-pub use region::RegionMap;
+pub use province::ProvinceMap;
 use serde_json::Value;
 pub use square::SquareGridMap;
 pub use topology::MapTopology;
@@ -106,10 +106,11 @@ impl Map {
                 if let Some(other_hex) = other.topology.as_any().downcast_ref::<HexGridMap>() {
                     this_hex.merge_from(other_hex);
                 }
-            } else if let Some(this_region) = self.topology.as_any_mut().downcast_mut::<RegionMap>()
-                && let Some(other_region) = other.topology.as_any().downcast_ref::<RegionMap>()
+            } else if let Some(this_province) =
+                self.topology.as_any_mut().downcast_mut::<ProvinceMap>()
+                && let Some(other_province) = other.topology.as_any().downcast_ref::<ProvinceMap>()
             {
-                this_region.merge_from(other_region);
+                this_province.merge_from(other_province);
             }
         } else {
             println!("Topology types do not match; skipping merge.");

@@ -21,9 +21,9 @@ pub enum CellKey {
         /// The z coordinate of the cell.
         z: i32,
     },
-    /// Represents a key for a region cell.
-    Region {
-        /// The ID of the region.
+    /// Represents a key for a province cell.
+    Province {
+        /// The ID of the province.
         id: String,
     },
 }
@@ -35,8 +35,8 @@ impl CellKey {
     /// - { "Square": ... }
     /// - { "pos": { "Hex": ... } }
     /// - { "Hex": ... }
-    /// - { "pos": { "Region": ... } }
-    /// - { "Region": ... }
+    /// - { "pos": { "Province": ... } }
+    /// - { "Province": ... }
     pub fn from_position(position: &serde_json::Value) -> Option<Self> {
         // Try to unwrap "pos" if present
         let obj = if let Some(pos) = position.get("pos") {
@@ -57,9 +57,9 @@ impl CellKey {
                 r: hex.get("r")?.as_i64()? as i32,
                 z: hex.get("z")?.as_i64()? as i32,
             })
-        } else if let Some(region) = obj.get("Region") {
-            Some(CellKey::Region {
-                id: region.get("id")?.as_str()?.to_string(),
+        } else if let Some(province) = obj.get("Province") {
+            Some(CellKey::Province {
+                id: province.get("id")?.as_str()?.to_string(),
             })
         } else {
             None
