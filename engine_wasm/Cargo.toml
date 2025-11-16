@@ -5,7 +5,7 @@ edition = "2024"
 
 [dependencies]
 engine_core = { path = "../engine/core" }
-wasmtime = { version = "33.0.0", features = ["async"] }
+wasmtime = { version = ">=36.0.3", features = ["async"] }
 anyhow = "1.0"
 serde_json = "1.0"
 
