@@ -9,7 +9,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 /// Helper to convert a Lua table to a Rust CellKey enum.
-/// Expects the Lua table to have exactly one key: "Square", "Hex", or "Region",
+/// Expects the Lua table to have exactly one key: "Square", "Hex", or "Province",
 /// with the relevant coordinate data as a nested table.
 fn from_lua_cell(table: &Table) -> LuaResult<CellKey> {
     // Collect keys from the table, expecting exactly one key
@@ -24,7 +24,7 @@ fn from_lua_cell(table: &Table) -> LuaResult<CellKey> {
 
     if keys.len() != 1 {
         return Err(mlua::Error::external(
-            "Cell table must have exactly one key (Square, Hex, or Region)",
+            "Cell table must have exactly one key (Square, Hex, or Province)",
         ));
     }
 
@@ -44,10 +44,10 @@ fn from_lua_cell(table: &Table) -> LuaResult<CellKey> {
             let z: i32 = pos_table.get("z")?;
             Ok(CellKey::Hex { q, r, z })
         }
-        "Region" => {
-            let pos_table: Table = table.get("Region")?;
+        "Province" => {
+            let pos_table: Table = table.get("Province")?;
             let id: String = pos_table.get("id")?;
-            Ok(CellKey::Region { id })
+            Ok(CellKey::Province { id })
         }
         _ => Err(mlua::Error::external(format!("Unknown cell kind '{kind}'"))),
     }
@@ -83,7 +83,7 @@ pub fn register_movement_ops_api(
                                 CellKey::Hex { q, r, z } => {
                                     json!({ "Hex": { "q": q, "r": r, "z": z } })
                                 }
-                                CellKey::Region { id } => json!({ "Region": { "id": id } }),
+                                CellKey::Province { id } => json!({ "Province": { "id": id } }),
                             })
                             .collect::<Vec<_>>()
                     } else {

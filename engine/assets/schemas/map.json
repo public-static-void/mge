@@ -5,7 +5,7 @@
   "properties": {
     "topology": {
       "type": "string",
-      "enum": ["square", "hex", "region"]
+      "enum": ["square", "hex", "province"]
     },
     "cells": {
       "type": "array",

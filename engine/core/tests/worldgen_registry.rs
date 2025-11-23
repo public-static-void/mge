@@ -206,24 +206,24 @@ fn test_map_from_json_hex() {
 }
 
 #[test]
-fn test_map_from_json_region() {
+fn test_map_from_json_province() {
     let value = json!({
-        "topology": "region",
+        "topology": "province",
         "cells": [
             { "id": "A", "neighbors": ["B"] },
             { "id": "B", "neighbors": ["A"] }
         ]
     });
-    let map = Map::from_json(&value).expect("should parse region map");
-    assert_eq!(map.topology_type(), "region");
-    assert!(map.contains(&CellKey::Region {
+    let map = Map::from_json(&value).expect("should parse province map");
+    assert_eq!(map.topology_type(), "province");
+    assert!(map.contains(&CellKey::Province {
         id: "A".to_string()
     }));
     assert_eq!(
-        map.neighbors(&CellKey::Region {
+        map.neighbors(&CellKey::Province {
             id: "A".to_string()
         }),
-        vec![CellKey::Region {
+        vec![CellKey::Province {
             id: "B".to_string()
         }]
     );
@@ -371,4 +371,133 @@ fn test_worldgen_scripting_validator_and_postprocessor() {
     let params = json!({});
     let result = registry.invoke("simple2", &params).unwrap();
     assert_eq!(result["lua_post"], "ok");
+}
+
+#[test]
+fn test_register_and_invoke_hex_worldgen_plugin() {
+    use engine_core::worldgen::{WorldgenPlugin, WorldgenRegistry};
+    use serde_json::json;
+
+    let mut registry = WorldgenRegistry::new();
+
+    registry.register(WorldgenPlugin::CAbi {
+        name: "simple_hex".to_string(),
+        generate: std::sync::Arc::new(|params: &serde_json::Value| {
+            let width = params.get("width").and_then(|v| v.as_u64()).unwrap_or(1) as i32;
+            let height = params.get("height").and_then(|v| v.as_u64()).unwrap_or(1) as i32;
+            let z_levels = params.get("z_levels").and_then(|v| v.as_u64()).unwrap_or(1) as i32;
+
+            let mut cells = Vec::new();
+
+            // Axial neighbor offsets
+            let neighbors_offset = [(1, 0), (1, -1), (0, -1), (-1, 0), (-1, 1), (0, 1)];
+
+            for z in 0..z_levels {
+                for q in 0..width {
+                    for r in 0..height {
+                        let mut neighbors = Vec::new();
+                        for (dq, dr) in neighbors_offset.iter() {
+                            let nq = q + dq;
+                            let nr = r + dr;
+                            if nq >= 0 && nq < width && nr >= 0 && nr < height {
+                                neighbors.push(json!({
+                                    "q": nq,
+                                    "r": nr,
+                                    "z": z,
+                                }));
+                            }
+                        }
+
+                        cells.push(json!({
+                            "q": q,
+                            "r": r,
+                            "z": z,
+                            "neighbors": neighbors,
+                            "biome": "TestBiome",
+                            "terrain": "TestTerrain",
+                        }));
+                    }
+                }
+            }
+
+            json!({
+                "topology": "hex",
+                "cells": cells,
+            })
+        }),
+        _lib: None,
+    });
+
+    let params = json!({
+        "width": 3,
+        "height": 3,
+        "z_levels": 1,
+    });
+
+    let map = registry
+        .invoke("simple_hex", &params)
+        .expect("Should generate map");
+
+    assert_eq!(map["topology"], "hex");
+    let cells = map["cells"].as_array().unwrap();
+    assert_eq!(cells.len(), 3 * 3);
+
+    for cell in cells {
+        assert!(cell.get("q").is_some());
+        assert!(cell.get("r").is_some());
+        assert!(cell.get("z").is_some());
+
+        let neighbors = cell.get("neighbors").unwrap().as_array().unwrap();
+        assert!(neighbors.len() <= 6);
+
+        let biome = cell.get("biome").unwrap().as_str().unwrap();
+        assert_eq!(biome, "TestBiome");
+
+        let terrain = cell.get("terrain").unwrap().as_str().unwrap();
+        assert_eq!(terrain, "TestTerrain");
+    }
+}
+
+#[test]
+fn test_register_and_invoke_province_worldgen_plugin() {
+    use engine_core::worldgen::{WorldgenPlugin, WorldgenRegistry};
+    use serde_json::json;
+
+    let mut registry = WorldgenRegistry::new();
+
+    registry.register(WorldgenPlugin::CAbi {
+        name: "simple_province".to_string(),
+        generate: std::sync::Arc::new(|_params: &serde_json::Value| {
+            let cells = vec![
+                json!({"id": "A", "neighbors": ["B", "C"]}),
+                json!({"id": "B", "neighbors": ["A"]}),
+                json!({"id": "C", "neighbors": ["A"]}),
+            ];
+
+            json!({
+                "topology": "province",
+                "cells": cells,
+            })
+        }),
+        _lib: None,
+    });
+
+    let params = json!({});
+
+    let map = registry
+        .invoke("simple_province", &params)
+        .expect("Should generate map");
+    assert_eq!(map["topology"], "province");
+
+    let cells = map["cells"].as_array().unwrap();
+    assert_eq!(cells.len(), 3);
+
+    for cell in cells {
+        // Validate presence of id and neighbors
+        assert!(cell.get("id").is_some());
+        let neighbors = cell.get("neighbors").unwrap().as_array().unwrap();
+        for neighbor in neighbors {
+            assert!(neighbor.is_string());
+        }
+    }
 }

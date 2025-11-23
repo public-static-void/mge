@@ -1,10 +1,8 @@
-
-    {
-        "name": "Test Plugin",
-        "version": "1.0.0",
-        "description": "A test plugin for the Modular Game Engine.",
-        "authors": ["Test Author"],
-        "dependencies": [],
-        "dynamic_library": "libtest_plugin.so"
-    }
-    
+{
+  "name": "Simple Square Plugin",
+  "version": "1.0.0",
+  "description": "A Square Map Worldgen plugin for the Modular Game Engine.",
+  "authors": ["Test Author"],
+  "dependencies": [],
+  "dynamic_library": "libsimple_square_plugin.so"
+}
