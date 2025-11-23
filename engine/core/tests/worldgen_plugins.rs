@@ -78,14 +78,14 @@ fn test_simple_square_plugin() {
     assert_eq!(map.get("topology").unwrap(), "square");
 
     let cells = map.get("cells").unwrap().as_array().unwrap();
-    assert_eq!(cells.len(), 2 * 2 * 1);
+    assert_eq!(cells.len(), 2 * 2);
 
     for cell in cells {
         let x = cell.get("x").unwrap().as_i64().unwrap();
         let y = cell.get("y").unwrap().as_i64().unwrap();
         let z = cell.get("z").unwrap().as_i64().unwrap();
-        assert!(x >= 0 && x < 2);
-        assert!(y >= 0 && y < 2);
+        assert!((0..2).contains(&x));
+        assert!((0..2).contains(&y));
         assert_eq!(z, 0);
 
         let neighbors = cell.get("neighbors").unwrap().as_array().unwrap();
@@ -98,14 +98,13 @@ fn test_simple_square_plugin() {
             let nz = neighbor.get("z").unwrap().as_i64().unwrap();
             assert_eq!(nz, 0);
             // Neighbor must be adjacent and within bounds
-            assert!(nx >= 0 && nx < 2);
-            assert!(ny >= 0 && ny < 2);
+            assert!((0..2).contains(&nx));
+            assert!((0..2).contains(&ny));
             let dx = (nx - x).abs();
             let dy = (ny - y).abs();
             assert!(dx + dy == 1);
         }
 
-        // If biome/terrain are present, check they are valid strings
         if let Some(biome) = cell.get("biome") {
             assert!(biome.is_string());
         }
@@ -151,18 +150,17 @@ fn test_simple_hex_plugin() {
     assert_eq!(map.get("topology").unwrap(), "hex");
 
     let cells = map.get("cells").unwrap().as_array().unwrap();
-    assert_eq!(cells.len(), 3 * 3 * 1);
+    assert_eq!(cells.len(), 3 * 3);
 
     for cell in cells {
         let q = cell.get("q").unwrap().as_i64().unwrap();
         let r = cell.get("r").unwrap().as_i64().unwrap();
         let z = cell.get("z").unwrap().as_i64().unwrap();
-        assert!(q >= 0 && q < 3);
-        assert!(r >= 0 && r < 3);
+        assert!((0..3).contains(&q));
+        assert!((0..3).contains(&r));
         assert_eq!(z, 0);
 
         let neighbors = cell.get("neighbors").unwrap().as_array().unwrap();
-        // Hex cell max 6 neighbors
         assert!(neighbors.len() <= 6);
 
         for neighbor in neighbors {
@@ -170,15 +168,13 @@ fn test_simple_hex_plugin() {
             let nr = neighbor.get("r").unwrap().as_i64().unwrap();
             let nz = neighbor.get("z").unwrap().as_i64().unwrap();
             assert_eq!(nz, 0);
-            assert!(nq >= 0 && nq < 3);
-            assert!(nr >= 0 && nr < 3);
-            // neighbors should be adjacent - neighbor axial distance = 1 (approx)
+            assert!((0..3).contains(&nq));
+            assert!((0..3).contains(&nr));
             let dq = (nq - q).abs();
             let dr = (nr - r).abs();
-            assert!((dq <= 1) && (dr <= 1));
+            assert!(dq <= 1 && dr <= 1);
         }
 
-        // Validate biome and terrain if present
         if let Some(biome) = cell.get("biome") {
             assert!(biome.is_string());
         }
@@ -223,10 +219,8 @@ fn test_province_plugin() {
 
     let cells = map.get("cells").unwrap().as_array().unwrap();
 
-    // Expect exactly 3 provinces based on plugin code
     assert_eq!(cells.len(), 3);
 
-    // Validate each cell's id and neighbors explicitly
     for cell in cells {
         let id = cell.get("id").unwrap().as_str().unwrap();
         let neighbors = cell.get("neighbors").unwrap().as_array().unwrap();

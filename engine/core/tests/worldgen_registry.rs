@@ -440,7 +440,7 @@ fn test_register_and_invoke_hex_worldgen_plugin() {
 
     assert_eq!(map["topology"], "hex");
     let cells = map["cells"].as_array().unwrap();
-    assert_eq!(cells.len(), 3 * 3 * 1);
+    assert_eq!(cells.len(), 3 * 3);
 
     for cell in cells {
         assert!(cell.get("q").is_some());
