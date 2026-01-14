@@ -6,7 +6,6 @@ use engine_core::ecs::Health;
 use engine_core::ecs::components::position::PositionComponent;
 use engine_core::ecs::registry::ComponentRegistry;
 use schemars::Schema;
-use serde_json::json;
 
 #[test]
 fn test_component_registration() {
