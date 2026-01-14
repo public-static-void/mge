@@ -5,16 +5,16 @@ use std::collections::{HashMap, HashSet};
 use super::cell_key::CellKey;
 use super::topology::MapTopology;
 
-/// A region map
+/// A province map
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RegionMap {
+pub struct ProvinceMap {
     /// The cells in the map
     pub cells: HashMap<String, HashSet<String>>,
     /// Metadata for the cells
     pub cell_metadata: HashMap<String, Value>,
 }
 
-impl RegionMap {
+impl ProvinceMap {
     /// Create a new empty map
     pub fn new() -> Self {
         Self {
@@ -36,8 +36,8 @@ impl RegionMap {
             .insert(to.to_string());
     }
 
-    /// Merge another RegionMap into this one
-    pub fn merge_from(&mut self, other: &RegionMap) {
+    /// Merge another ProvinceMap into this one
+    pub fn merge_from(&mut self, other: &ProvinceMap) {
         for (id, neighbors) in &other.cells {
             self.cells
                 .entry(id.clone())
@@ -52,21 +52,21 @@ impl RegionMap {
     }
 }
 
-impl Default for RegionMap {
+impl Default for ProvinceMap {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl MapTopology for RegionMap {
+impl MapTopology for ProvinceMap {
     /// Returns the neighbors of a cell
     fn neighbors(&self, cell: &CellKey) -> Vec<CellKey> {
-        if let CellKey::Region { id } = cell {
+        if let CellKey::Province { id } = cell {
             self.cells
                 .get(id)
                 .map(|set| {
                     set.iter()
-                        .map(|nid| CellKey::Region { id: nid.clone() })
+                        .map(|nid| CellKey::Province { id: nid.clone() })
                         .collect()
                 })
                 .unwrap_or_default()
@@ -77,20 +77,20 @@ impl MapTopology for RegionMap {
 
     /// Returns true if the map contains the cell
     fn contains(&self, cell: &CellKey) -> bool {
-        matches!(cell, CellKey::Region { id } if self.cells.contains_key(id))
+        matches!(cell, CellKey::Province { id } if self.cells.contains_key(id))
     }
 
     /// Returns all the cells
     fn all_cells(&self) -> Vec<CellKey> {
         self.cells
             .keys()
-            .map(|id| CellKey::Region { id: id.clone() })
+            .map(|id| CellKey::Province { id: id.clone() })
             .collect()
     }
 
     /// Returns the type of the topology
     fn topology_type(&self) -> &'static str {
-        "region"
+        "province"
     }
 
     /// Returns a reference to the topology
@@ -105,14 +105,14 @@ impl MapTopology for RegionMap {
 
     /// Sets the metadata for a cell
     fn set_cell_metadata(&mut self, cell: &CellKey, data: Value) {
-        if let CellKey::Region { id } = cell {
+        if let CellKey::Province { id } = cell {
             self.cell_metadata.insert(id.clone(), data);
         }
     }
 
     /// Gets the metadata for a cell
     fn get_cell_metadata(&self, cell: &CellKey) -> Option<&Value> {
-        if let CellKey::Region { id } = cell {
+        if let CellKey::Province { id } = cell {
             self.cell_metadata.get(id)
         } else {
             None

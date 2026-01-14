@@ -2,7 +2,7 @@ use crate::ecs::error::MigrationError;
 use semver::Version;
 use serde::{Deserialize, Serialize};
 
-/// Position for any map topology (square, hex, region, etc.)
+/// Position for any map topology (square, hex, province, etc.)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 pub enum Position {
     /// Square topology
@@ -23,9 +23,9 @@ pub enum Position {
         /// z coordinate
         z: i32,
     },
-    /// Region topology
-    Region {
-        /// Region ID
+    /// Province topology
+    Province {
+        /// Province ID
         id: String,
     },
 }

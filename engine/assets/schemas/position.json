@@ -38,7 +38,7 @@
         {
           "type": "object",
           "properties": {
-            "Region": {
+            "Province": {
               "type": "object",
               "properties": {
                 "id": { "type": "string" }
@@ -46,7 +46,7 @@
               "required": ["id"]
             }
           },
-          "required": ["Region"]
+          "required": ["Province"]
         }
       ]
     }

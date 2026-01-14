@@ -37,13 +37,13 @@ impl CellLayout for HexLayout {
     }
 }
 
-/// Region layout: default to (0,0) or implement centroid/bbox as needed.
-pub struct RegionLayout;
+/// Province layout: default to (0,0) or implement centroid/bbox as needed.
+pub struct ProvinceLayout;
 
-impl CellLayout for RegionLayout {
+impl CellLayout for ProvinceLayout {
     fn cell_to_screen(&self, cell: &CellKey) -> (i32, i32) {
         match cell {
-            CellKey::Region { .. } => (0, 0), // TODO: implement region centroid
+            CellKey::Province { .. } => (0, 0), // TODO: implement province centroid
             _ => (0, 0),
         }
     }

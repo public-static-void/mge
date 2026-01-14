@@ -1,0 +1,8 @@
+{
+  "name": "Simple Hex Plugin",
+  "version": "1.0.0",
+  "description": "A Hex Map Worldgen plugin for the Modular Game Engine.",
+  "authors": ["Test Author"],
+  "dependencies": [],
+  "dynamic_library": "libsimple_hex_plugin.so"
+}

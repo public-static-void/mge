@@ -32,7 +32,7 @@ impl<R: PresentationRenderer> PresentationSystem<R> {
             let pos_json = world.get_component(*entity, "Position");
             let renderable_json = world.get_component(*entity, "Renderable");
             if let (Some(pos_json), Some(renderable_json)) = (pos_json, renderable_json) {
-                // Extract position (supports Square, Hex, Region)
+                // Extract position (supports Square, Hex, Province)
                 let (x, y) = if let Some(pos_obj) = pos_json.get("pos") {
                     if let Some(square) = pos_obj.get("Square") {
                         (
@@ -44,10 +44,10 @@ impl<R: PresentationRenderer> PresentationSystem<R> {
                             hex.get("q").and_then(|v| v.as_i64()).unwrap_or(0) as i32,
                             hex.get("r").and_then(|v| v.as_i64()).unwrap_or(0) as i32,
                         )
-                    } else if let Some(region) = pos_obj.get("Region") {
-                        if let Some(region_id) = region.get("id").and_then(|v| v.as_str()) {
+                    } else if let Some(province) = pos_obj.get("Province") {
+                        if let Some(province_id) = province.get("id").and_then(|v| v.as_str()) {
                             if let Some(map) = &world.map {
-                                region_centroid(map, region_id).unwrap_or((0, 0))
+                                province_centroid(map, province_id).unwrap_or((0, 0))
                             } else {
                                 (0, 0)
                             }
@@ -139,10 +139,10 @@ impl<R: PresentationRenderer> PresentationSystem<R> {
                             hex.get("q").and_then(|v| v.as_i64()).unwrap_or(0) as i32,
                             hex.get("r").and_then(|v| v.as_i64()).unwrap_or(0) as i32,
                         )
-                    } else if let Some(region) = pos_obj.get("Region") {
-                        if let Some(region_id) = region.get("id").and_then(|v| v.as_str()) {
+                    } else if let Some(province) = pos_obj.get("Province") {
+                        if let Some(province_id) = province.get("id").and_then(|v| v.as_str()) {
                             if let Some(map) = &world.map {
-                                region_centroid(map, region_id).unwrap_or((0, 0))
+                                province_centroid(map, province_id).unwrap_or((0, 0))
                             } else {
                                 (0, 0)
                             }
@@ -180,17 +180,20 @@ impl<R: PresentationRenderer> PresentationSystem<R> {
     }
 }
 
-/// Calculate the centroid of a region for rendering.
+/// Calculate the centroid of a province for rendering.
 /// Returns (x, y) as i32 grid coordinates.
-/// This function assumes the map contains regions as collections of cell positions.
-pub fn region_centroid(map: &crate::map::Map, region_id: &str) -> Option<(i32, i32)> {
-    if let Some(region_map) = map.as_any().downcast_ref::<crate::map::region::RegionMap>() {
-        let cell_ids = region_map.cells.get(region_id)?;
+/// This function assumes the map contains provinces as collections of cell positions.
+pub fn province_centroid(map: &crate::map::Map, province_id: &str) -> Option<(i32, i32)> {
+    if let Some(province_map) = map
+        .as_any()
+        .downcast_ref::<crate::map::province::ProvinceMap>()
+    {
+        let cell_ids = province_map.cells.get(province_id)?;
         let mut sum_x = 0i64;
         let mut sum_y = 0i64;
         let mut count = 0i64;
         for cell_id in cell_ids {
-            if let Some(meta) = region_map.cell_metadata.get(cell_id)
+            if let Some(meta) = province_map.cell_metadata.get(cell_id)
                 && let (Some(x), Some(y)) = (
                     meta.get("x").and_then(|v| v.as_i64()),
                     meta.get("y").and_then(|v| v.as_i64()),
