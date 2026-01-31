@@ -2,6 +2,7 @@
   "name": "mge-release",
   "private": true,
   "devDependencies": {
-    "npm-check-updates": "^19.1.2"
+    "npm-check-updates": "^19.1.2",
+    "@timada/semantic-release-cargo": "^1.0.7"
   }
 }
