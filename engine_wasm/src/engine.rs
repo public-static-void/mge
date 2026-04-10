@@ -1,8 +1,9 @@
 use crate::host_api::entity::register_entity_api;
-use anyhow::{Context, Result};
+use anyhow::Result;
 use engine_core::ecs::world::wasm::WasmWorld;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
+use wasmtime::error::Context as WasmContext;
 use wasmtime::{Engine, Instance, Linker, Module, Store, Val};
 
 /// A function to register host imports
@@ -84,8 +85,12 @@ impl WasmScriptEngine {
     /// Create a new WASM script engine
     pub fn new(config: WasmScriptEngineConfig) -> Result<Self> {
         let engine = Engine::default();
-        let module = Module::from_file(&engine, &config.module_path)
-            .with_context(|| format!("Failed to load WASM module: {:?}", config.module_path))?;
+        let module = Module::from_file(&engine, &config.module_path).map_err(|e| {
+            e.context(format!(
+                "Failed to load WASM module: {:?}",
+                config.module_path
+            ))
+        })?;
 
         let mut linker = Linker::new(&engine);
         register_entity_api(&mut linker)?;
@@ -98,7 +103,7 @@ impl WasmScriptEngine {
         let mut store = Store::new(&engine, world.clone());
         let instance = linker
             .instantiate(&mut store, &module)
-            .context("Failed to instantiate WASM module")?;
+            .map_err(|e| e.context("Failed to instantiate WASM module"))?;
 
         Ok(Self {
             store: Mutex::new(store),
