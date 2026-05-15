@@ -291,18 +291,15 @@ impl UiWidget for ContextMenu {
                         submenu.show((self.pos.0 + menu_width, self.pos.1 + menu_selected as i32));
                     }
                 }
-                "Enter" | "Space" => {
-                    if self.entries[self.selected].enabled {
-                        let menu_width = self.width() as i32;
-                        let menu_selected = self.selected;
-                        if let Some(ref mut submenu) = self.entries[menu_selected].submenu {
-                            self.open_submenu = Some(menu_selected);
-                            submenu
-                                .show((self.pos.0 + menu_width, self.pos.1 + menu_selected as i32));
-                        } else if let Some(ref mut action) = self.entries[self.selected].action {
-                            action();
-                            self.hide();
-                        }
+                "Enter" | "Space" if self.entries[self.selected].enabled => {
+                    let menu_width = self.width() as i32;
+                    let menu_selected = self.selected;
+                    if let Some(ref mut submenu) = self.entries[menu_selected].submenu {
+                        self.open_submenu = Some(menu_selected);
+                        submenu.show((self.pos.0 + menu_width, self.pos.1 + menu_selected as i32));
+                    } else if let Some(ref mut action) = self.entries[self.selected].action {
+                        action();
+                        self.hide();
                     }
                 }
                 "Esc" => {
