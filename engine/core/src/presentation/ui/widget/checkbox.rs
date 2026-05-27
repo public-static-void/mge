@@ -65,6 +65,10 @@ impl Checkbox {
         group: Option<u32>,
     ) -> Self {
         static mut NEXT_ID: WidgetId = 3000;
+        // SAFETY: Access to `static mut NEXT_ID` is inherently unsafe due to potential data
+        // races, but this is safe because Checkbox::new() is called only from the single-threaded
+        // UI construction context. The Checkbox type is Send (not Sync), so concurrent access
+        // via shared references is statically prevented by the type system.
         let id = unsafe {
             let id = NEXT_ID;
             NEXT_ID += 1;

@@ -39,6 +39,10 @@ impl Layout {
     /// Creates a new linear layout
     pub fn new(direction: LayoutDirection, pos: (i32, i32), spacing: i32) -> Self {
         static mut NEXT_ID: u64 = 200_000;
+        // SAFETY: Access to `static mut NEXT_ID` is inherently unsafe due to potential data
+        // races, but this is safe because Layout::new() is called only from the single-threaded
+        // UI construction context. The Layout type is Send (not Sync), so concurrent access
+        // via shared references is statically prevented by the type system.
         let id = unsafe {
             let id = NEXT_ID;
             NEXT_ID += 1;

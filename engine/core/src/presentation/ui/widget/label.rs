@@ -24,6 +24,10 @@ impl Label {
     /// Create a new label
     pub fn new<T: Into<String>>(text: T, pos: (i32, i32), color: RenderColor) -> Self {
         static mut NEXT_ID: WidgetId = 1;
+        // SAFETY: Access to `static mut NEXT_ID` is inherently unsafe due to potential data
+        // races, but this is safe because Label::new() is called only from the single-threaded
+        // UI construction context. The Label type is Send (not Sync), so concurrent access
+        // via shared references is statically prevented by the type system.
         let id = unsafe {
             let id = NEXT_ID;
             NEXT_ID += 1;

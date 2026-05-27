@@ -27,6 +27,10 @@ impl FocusGrid {
     /// Create a new FocusGrid with the given number of columns and rows.
     pub fn new(_cols: i32, _rows: i32) -> Self {
         static mut NEXT_ID: WidgetId = 2_000_000;
+        // SAFETY: Access to `static mut NEXT_ID` is inherently unsafe due to potential data
+        // races, but this is safe because FocusGrid::new() is called only from the single-threaded
+        // UI construction context. The FocusGrid type is Send (not Sync), so concurrent access
+        // via shared references is statically prevented by the type system.
         let id = unsafe {
             let id = NEXT_ID;
             NEXT_ID += 1;

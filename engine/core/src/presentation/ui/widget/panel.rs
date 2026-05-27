@@ -40,6 +40,10 @@ impl Panel {
     /// Create a new panel
     pub fn new(pos: (i32, i32)) -> Self {
         static mut NEXT_ID: WidgetId = 100_000;
+        // SAFETY: Access to `static mut NEXT_ID` is inherently unsafe due to potential data
+        // races, but this is safe because Panel::new() is called only from the single-threaded
+        // UI construction context. The Panel type is Send (not Sync), so concurrent access
+        // via shared references is statically prevented by the type system.
         let id = unsafe {
             let id = NEXT_ID;
             NEXT_ID += 1;
