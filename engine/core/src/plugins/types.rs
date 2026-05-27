@@ -47,9 +47,14 @@ pub struct SystemPlugin {
     pub run: unsafe extern "C" fn(*mut c_void, f32),
 }
 
+/// The current ABI version that the engine expects plugins to match.
+pub const PLUGIN_ABI_VERSION: u32 = 1;
+
 /// A plugin's vtable
 #[repr(C)]
 pub struct PluginVTable {
+    /// MUST equal PLUGIN_ABI_VERSION
+    pub abi_version: u32,
     /// The plugin's init function
     pub init: unsafe extern "C" fn(*mut EngineApi, *mut c_void) -> c_int,
     /// The plugin's shutdown function

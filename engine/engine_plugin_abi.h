@@ -1,6 +1,9 @@
 #ifndef ENGINE_PLUGIN_ABI_H
 #define ENGINE_PLUGIN_ABI_H
 
+// Current ABI version. Increment on any breaking change to PluginVTable layout.
+#define PLUGIN_ABI_VERSION 1
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -22,6 +25,7 @@ typedef struct EngineApi {
 } EngineApi;
 
 typedef struct PluginVTable {
+  unsigned int abi_version;  // MUST equal PLUGIN_ABI_VERSION
   int (*init)(struct EngineApi *api, void *world);
   void (*shutdown)();
   void (*update)(float delta_time);

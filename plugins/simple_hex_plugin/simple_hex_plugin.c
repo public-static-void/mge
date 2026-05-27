@@ -111,6 +111,7 @@ int plugin_init(struct EngineApi *api, void *world) {
 struct PluginVTable vtable;
 
 __attribute__((constructor)) void init_vtable() {
+  vtable.abi_version = PLUGIN_ABI_VERSION;
   vtable.init = plugin_init;
   vtable.shutdown = stub_void;
   vtable.update = stub_update;

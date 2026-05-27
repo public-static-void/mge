@@ -1,5 +1,6 @@
 use crate::config::GameConfig;
 use crate::ecs::World;
+use crate::plugins::PLUGIN_ABI_VERSION;
 use crate::plugins::types::{EngineApi, PluginManifest, PluginVTable, SystemPlugin};
 use crate::worldgen::{
     ThreadSafeWorldgenPlugin, ThreadSafeWorldgenRegistry, WorldgenPlugin, WorldgenRegistry,
@@ -35,6 +36,17 @@ pub unsafe fn load_plugin<P: AsRef<Path>>(
     }
     let vtable_ref: &PluginVTable = unsafe { &*plugin_vtable };
 
+    // Check ABI version before calling any plugin code
+    let plugin_version = vtable_ref.abi_version;
+    if plugin_version != PLUGIN_ABI_VERSION {
+        return Err(format!(
+            "Plugin '{}' ABI version mismatch: expected {}, got {}",
+            path.as_ref().display(),
+            PLUGIN_ABI_VERSION,
+            plugin_version,
+        ));
+    }
+
     let init_result = unsafe { (vtable_ref.init)(engine_api as *mut _, world) };
     if init_result != 0 {
         return Err(format!("Plugin init failed with code {init_result}"));
@@ -62,6 +74,17 @@ pub unsafe fn load_plugin_and_register_worldgen_threadsafe<P: AsRef<Path>>(
         return Err("PLUGIN_VTABLE symbol is null".to_string());
     }
     let vtable_ref: &PluginVTable = unsafe { &*plugin_vtable };
+
+    // Check ABI version before calling any plugin code
+    let plugin_version = vtable_ref.abi_version;
+    if plugin_version != PLUGIN_ABI_VERSION {
+        return Err(format!(
+            "Plugin '{}' ABI version mismatch: expected {}, got {}",
+            path.as_ref().display(),
+            PLUGIN_ABI_VERSION,
+            plugin_version,
+        ));
+    }
 
     let init_result = unsafe { (vtable_ref.init)(engine_api as *mut _, world) };
     if init_result != 0 {
@@ -132,6 +155,17 @@ pub unsafe fn load_plugin_and_register_worldgen<P: AsRef<Path>>(
     }
     let vtable_ref: &PluginVTable = unsafe { &*plugin_vtable };
 
+    // Check ABI version before calling any plugin code
+    let plugin_version = vtable_ref.abi_version;
+    if plugin_version != PLUGIN_ABI_VERSION {
+        return Err(format!(
+            "Plugin '{}' ABI version mismatch: expected {}, got {}",
+            path.as_ref().display(),
+            PLUGIN_ABI_VERSION,
+            plugin_version,
+        ));
+    }
+
     let init_result = unsafe { (vtable_ref.init)(engine_api as *mut _, world) };
     if init_result != 0 {
         return Err(format!("Plugin init failed with code {init_result}"));
@@ -200,6 +234,17 @@ pub unsafe fn load_plugin_and_register_systems<P: AsRef<Path>>(
         return Err("PLUGIN_VTABLE symbol is null".to_string());
     }
     let vtable_ref: &PluginVTable = unsafe { &*plugin_vtable };
+
+    // Check ABI version before calling any plugin code
+    let plugin_version = vtable_ref.abi_version;
+    if plugin_version != PLUGIN_ABI_VERSION {
+        return Err(format!(
+            "Plugin '{}' ABI version mismatch: expected {}, got {}",
+            path.as_ref().display(),
+            PLUGIN_ABI_VERSION,
+            plugin_version,
+        ));
+    }
 
     let init_result = unsafe { (vtable_ref.init)(engine_api as *mut _, world) };
     if init_result != 0 {
@@ -285,6 +330,17 @@ pub unsafe fn load_plugin_with_manifest<P: AsRef<Path>>(
         return Err("PLUGIN_VTABLE symbol is null".to_string());
     }
     let vtable_ref: &PluginVTable = unsafe { &*plugin_vtable };
+
+    // Check ABI version before calling any plugin code
+    let plugin_version = vtable_ref.abi_version;
+    if plugin_version != PLUGIN_ABI_VERSION {
+        return Err(format!(
+            "Plugin '{}' ABI version mismatch: expected {}, got {}",
+            dylib_path.display(),
+            PLUGIN_ABI_VERSION,
+            plugin_version,
+        ));
+    }
 
     let init_result = unsafe { (vtable_ref.init)(engine_api as *mut _, world) };
     if init_result != 0 {

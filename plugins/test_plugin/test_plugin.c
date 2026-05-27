@@ -30,6 +30,7 @@ int register_systems(struct EngineApi *api, void *world, SystemPlugin **systems,
 
 // Runtime initialization of vtable after relocation
 __attribute__((constructor)) void init_vtable() {
+  vtable.abi_version = PLUGIN_ABI_VERSION;
   vtable.init = init;
   vtable.shutdown = shutdown;
   vtable.update = update;

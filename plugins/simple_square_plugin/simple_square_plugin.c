@@ -138,6 +138,7 @@ struct PluginVTable vtable;
 
 // Runtime initialization of vtable after relocation
 __attribute__((constructor)) void init_vtable() {
+  vtable.abi_version = PLUGIN_ABI_VERSION;
   vtable.init = plugin_init;
   vtable.shutdown = stub_void;
   vtable.update = stub_update;

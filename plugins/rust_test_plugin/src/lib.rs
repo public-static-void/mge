@@ -31,9 +31,14 @@ pub struct SystemPlugin {
     pub run: SystemRunFn,
 }
 
+/// Must match the engine's PLUGIN_ABI_VERSION in engine/core/src/plugins/types.rs
+pub const PLUGIN_ABI_VERSION: u32 = 1;
+
 /// Plugin vtable
 #[repr(C)]
 pub struct PluginVTable {
+    /// ABI version (must match PLUGIN_ABI_VERSION)
+    pub abi_version: u32,
     /// Plugin initialization
     pub init: unsafe extern "C" fn(*mut EngineApi, *mut c_void) -> c_int,
     /// Plugin shutdown
@@ -113,6 +118,7 @@ pub static mut PLUGIN_VTABLE: *mut PluginVTable = ptr::null_mut();
 #[ctor::ctor]
 fn init_vtable() {
     static mut VTABLE: PluginVTable = PluginVTable {
+        abi_version: PLUGIN_ABI_VERSION,
         init,
         shutdown,
         update,

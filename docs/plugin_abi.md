@@ -52,10 +52,40 @@ cargo run -p xtask -- build-plugins rust_test_plugin
 
 ---
 
+## ABI Versioning
+
+The plugin ABI uses a single-integer version scheme to detect incompatible plugins at load time.
+
+- **`PLUGIN_ABI_VERSION`** (currently `1`) is defined as a preprocessor constant in [`engine/engine_plugin_abi.h`](../engine/engine_plugin_abi.h) and mirrored as a Rust `const` in `engine/core/src/plugins/types.rs`.
+- The version is incremented on any **breaking change** to the `PluginVTable` layout (field reordering, type changes, semantic changes to existing fields).
+- The `abi_version` field is the **first field** (offset 0) of `PluginVTable`. This placement ensures that a plugin compiled against an older ABI (where the `init` function pointer occupied offset 0) will almost certainly be rejected — the old function pointer address read as a `u32` will not equal the expected version.
+
+### Load-Time Validation
+
+Every plugin loader function performs the following check immediately after null-checking the vtable pointer, **before** calling `vtable.init`:
+
+1. Read `vtable.abi_version`
+2. Compare to `PLUGIN_ABI_VERSION`
+3. If mismatch, return `Err` with message: `Plugin '<path>' ABI version mismatch: expected <expected>, got <actual>`
+
+This check is performed by all 5 loader functions in `engine/core/src/plugins/loader.rs`:
+- `load_plugin`
+- `load_plugin_and_register_worldgen_threadsafe`
+- `load_plugin_and_register_worldgen`
+- `load_plugin_and_register_systems`
+- `load_plugin_with_manifest`
+
+### Plugin Requirements
+
+Every plugin (C or Rust) **must** set `vtable.abi_version = PLUGIN_ABI_VERSION;` in its vtable initialization. Plugins compiled without this field (pre-versioning) will be rejected at load time.
+
+---
+
 ## VTable Structure
 
 ```c
 typedef struct PluginVTable {
+  unsigned int abi_version;  // MUST equal PLUGIN_ABI_VERSION
   int (*init)(struct EngineApi *api, void *world);
   void (*shutdown)();
   void (*update)(float delta_time);
@@ -65,9 +95,11 @@ typedef struct PluginVTable {
   int (*register_systems)(struct EngineApi *api, void *world,
                           SystemPlugin **systems, int *count);
   void (*free_systems)(SystemPlugin *systems, int count);
+  void *(*hot_reload)(void *old_state);
 } PluginVTable;
 ```
 
+- **abi_version:** MUST equal `PLUGIN_ABI_VERSION` (currently 1). Used to detect ABI mismatches at load time. This is the first field (offset 0) to enable backward-compat detection.
 - **init:** Called once after loading. Set up plugin state, register components, spawn entities, etc.
 - **shutdown:** Called before unloading. Clean up resources.
 - **update:** Called every frame/tick (if used).
@@ -78,6 +110,7 @@ typedef struct PluginVTable {
 - **free_systems:**
   If you dynamically allocate the `SystemPlugin` array (e.g., with `malloc`), provide a function here to free it.
   If you use a static/global array, set this to `NULL`.
+- **hot_reload:** Optional. If provided, called when the plugin is reloaded. Receives the old state pointer and returns a new state pointer.
 
 ---
 
