@@ -1,7 +1,7 @@
 ---
 title: "PLAN: Plugin ABI Versioning"
 version: 1.0.0
-status: draft
+status: approved
 type: plan
 created: 2026-05-27
 author: Pathfinder

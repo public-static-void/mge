@@ -564,6 +564,8 @@ This is a positive indicator but may also suggest that markers are being cleaned
 - **Lua Engine**: `engine_lua/src/engine.rs`
 - **WASM Engine**: `engine_wasm/src/engine.rs`
 - **Plugin Loader**: `engine/core/src/plugins/loader.rs`
+- **ABI Versioning Spec**: `knowledge/spec-plugin-abi-version-2026-05-27.md` — ABI versioning requirements and acceptance criteria
+- **ABI Versioning Implementation**: `knowledge/impl-plugin-abi-version-2026-05-27.md` — G-07 gap resolved; version check implemented in all 5 loader functions
 - **Schema Loader**: `engine/core/src/ecs/schema.rs`
 - **UI Factory**: `engine/core/src/presentation/ui/factory.rs`
 - **Job System**: `engine/core/src/systems/job/` (9 subdirectories)

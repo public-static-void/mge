@@ -1,7 +1,7 @@
 ---
 title: "SPEC: Plugin ABI Versioning"
 version: 1.0.0
-status: draft
+status: approved
 type: spec
 created: 2026-05-27
 author: Spec Weaver

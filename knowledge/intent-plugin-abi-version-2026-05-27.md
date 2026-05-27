@@ -1,7 +1,7 @@
 ---
 title: "INTENT: Add ABI Versioning to Plugin System"
 version: 1.0.0
-status: draft
+status: approved
 type: intent
 created: 2026-05-27
 author: Overseer

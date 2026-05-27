@@ -208,5 +208,7 @@ These issues should be addressed before they cause production problems or develo
 - `knowledge/analysis-deep-dive-refresh-2026-05-27.md` — Analyzer: refreshed deep-dive
 - `knowledge/report-project-audit-2026-05-27.md` — Prior report (superseded by this one)
 - `AGENTS.md` — Project identity and conventions
+- `knowledge/spec-plugin-abi-version-2026-05-27.md` — ABI versioning spec (gap resolved)
+- `knowledge/impl-plugin-abi-version-2026-05-27.md` — ABI versioning implementation (12 tests, all passing)
 - `Cargo.toml` — Workspace manifest
 - `Makefile` — Build orchestration

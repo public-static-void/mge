@@ -826,3 +826,5 @@ This is a refresh of the same-day prior audit (`analysis-codebase-map-2026-05-27
 - Test integration tests: `engine/core/tests/` (108 tests)
 - Prior analysis: `knowledge/analysis-codebase-map-2026-05-27.md`
 - Agent instructions: `AGENTS.md`
+- ABI versioning spec: `knowledge/spec-plugin-abi-version-2026-05-27.md` — PluginVTable now has `abi_version` field at offset 0
+- ABI versioning implementation: `knowledge/impl-plugin-abi-version-2026-05-27.md` — Gap resolved: plugin ABI versioning implemented and tested
