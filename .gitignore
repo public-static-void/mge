@@ -57,6 +57,7 @@ target/
 # Project-specific
 test_save.json
 test_job_event_log.json
+knowledge/
 
 # Plugins: ignore build artifacts in all subfolders
 plugins/*/*.so
