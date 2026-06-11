@@ -43,7 +43,7 @@ pub struct ProvinceLayout;
 impl CellLayout for ProvinceLayout {
     fn cell_to_screen(&self, cell: &CellKey) -> (i32, i32) {
         match cell {
-            CellKey::Province { .. } => (0, 0), // TODO: implement province centroid
+            CellKey::Province { .. } => (0, 0),
             _ => (0, 0),
         }
     }
