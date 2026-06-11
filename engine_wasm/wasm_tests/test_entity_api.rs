@@ -1,6 +1,7 @@
 // This file is compiled to WASM and loaded by the Rust host test harness.
 #[no_mangle]
 pub extern "C" fn test_entity_api() -> i32 {
+    #[link(wasm_import_module = "entity")]
     unsafe extern "C" {
         fn spawn_entity() -> u32;
         fn move_entity(entity: u32, dx: f32, dy: f32);
