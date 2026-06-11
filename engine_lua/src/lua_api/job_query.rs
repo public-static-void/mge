@@ -113,7 +113,7 @@ pub fn register_job_query_api(
             .ok_or_else(|| mlua::Error::external(format!("No job with id {job_id}")))?
             .clone();
         let new_job =
-            engine_core::systems::job::system::process::process_job(&mut world, None, job_id, job);
+            engine_core::systems::job::system::process::process_job(&mut world, job_id, job);
         world
             .set_component(job_id, "Job", new_job)
             .map_err(|e| mlua::Error::external(format!("Failed to set job: {e}")))?;

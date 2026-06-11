@@ -10,7 +10,7 @@ impl System for StatCalculationSystem {
         "StatCalculationSystem"
     }
 
-    fn run(&mut self, world: &mut World, _lua: Option<&mlua::Lua>) {
+    fn run(&mut self, world: &mut World) {
         for eid in world.get_entities_with_component("BaseStats") {
             let base = world.get_component(eid, "BaseStats").unwrap();
             let default_effects = JsonValue::Object(Map::new());

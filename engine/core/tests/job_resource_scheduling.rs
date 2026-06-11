@@ -50,7 +50,7 @@ fn test_job_is_assigned_only_if_resources_are_available() {
 
     // Run reservation system before assignment
     let mut reservation_system = ResourceReservationSystem::new();
-    reservation_system.run(&mut world, None);
+    reservation_system.run(&mut world);
 
     let mut job_board = JobBoard::default();
     job_board.update(&world, 0, &[]);
@@ -91,7 +91,7 @@ fn test_job_is_assigned_only_if_resources_are_available() {
         .unwrap();
 
     // Run reservation system again so job2 is considered with released resources
-    reservation_system.run(&mut world, None);
+    reservation_system.run(&mut world);
 
     job_board.update(&world, 0, &[]);
 
@@ -134,7 +134,7 @@ fn test_job_remains_pending_if_resources_unavailable() {
         .unwrap();
 
     let mut reservation_system = ResourceReservationSystem::new();
-    reservation_system.run(&mut world, None);
+    reservation_system.run(&mut world);
 
     let status = reservation_system.check_reservation_status(&world, job_eid);
     assert_eq!(
@@ -175,7 +175,7 @@ fn test_resources_are_released_on_job_cancellation() {
         .unwrap();
 
     let mut reservation_system = ResourceReservationSystem::new();
-    reservation_system.run(&mut world, None);
+    reservation_system.run(&mut world);
 
     // Assign job and reserve resources
     let mut job_board = JobBoard::default();

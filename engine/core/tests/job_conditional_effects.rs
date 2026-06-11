@@ -92,7 +92,7 @@ fn test_job_effect_with_world_state_condition() {
 
     // Run the job system enough times to complete the job (no medkits yet)
     for _ in 0..4 {
-        world.run_system("JobSystem", None).unwrap();
+        world.run_system("JobSystem").unwrap();
     }
 
     let terrain = world.get_component(eid, "Terrain").unwrap();
@@ -120,7 +120,7 @@ fn test_job_effect_with_world_state_condition() {
         .unwrap();
 
     for _ in 0..4 {
-        world.run_system("JobSystem", None).unwrap();
+        world.run_system("JobSystem").unwrap();
     }
 
     let terrain = world.get_component(eid, "Terrain").unwrap();

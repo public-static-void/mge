@@ -59,7 +59,7 @@ fn test_agent_state_and_job_completion() {
     // Let the system process the job to completion
     let mut job_system = JobSystem;
     for _ in 0..5 {
-        job_system.run(&mut world, None);
+        job_system.run(&mut world);
         let job = world.get_component(job_id, "Job").unwrap();
         if job["state"] == "complete" {
             break;
@@ -183,7 +183,7 @@ fn test_job_preemption_and_reassignment() {
         }
 
         let mut job_system = JobSystem;
-        job_system.run(&mut world, None);
+        job_system.run(&mut world);
     }
 
     assert!(preempted, "Agent was never preempted to job 200");
@@ -212,7 +212,7 @@ fn test_job_preemption_and_reassignment() {
             break;
         }
         let mut job_system = JobSystem;
-        job_system.run(&mut world, None);
+        job_system.run(&mut world);
     }
 
     {

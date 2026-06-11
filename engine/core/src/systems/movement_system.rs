@@ -11,7 +11,7 @@ impl System for MovementSystem {
         "MovementSystem"
     }
 
-    fn run(&mut self, world: &mut World, _lua: Option<&mlua::Lua>) {
+    fn run(&mut self, world: &mut World) {
         let agent_eids = world.get_entities_with_component("Agent");
         for eid in agent_eids {
             let mut agent = match world.get_component(eid, "Agent").cloned() {

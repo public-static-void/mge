@@ -5,7 +5,6 @@ use serde_json::Value as JsonValue;
 /// Returns a tuple: (updated children array, all_children_complete: bool)
 pub fn process_job_children(
     world: &mut World,
-    lua: Option<&mlua::Lua>,
     eid: u32,
     children_val: &mut JsonValue,
     parent_is_cancelled: bool,
@@ -47,7 +46,6 @@ pub fn process_job_children(
                     next_child["state"] = JsonValue::from("cancelled");
                     let processed_child = crate::systems::job::system::process::process_job(
                         world,
-                        lua,
                         child_id as u32,
                         next_child,
                     );
@@ -59,7 +57,6 @@ pub fn process_job_children(
                 // Normal processing
                 let processed = crate::systems::job::system::process::process_job(
                     world,
-                    lua,
                     eid,
                     child.clone(),
                 );

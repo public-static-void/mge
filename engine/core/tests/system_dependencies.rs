@@ -17,7 +17,7 @@ impl System for OrderSystem {
     fn name(&self) -> &'static str {
         self.name
     }
-    fn run(&mut self, _world: &mut World, _lua: Option<&mlua::Lua>) {
+    fn run(&mut self, _world: &mut World) {
         self.ran.fetch_add(1, Ordering::SeqCst);
         self.order.lock().unwrap().push(self.name);
     }

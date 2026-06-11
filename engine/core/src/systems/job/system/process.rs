@@ -123,7 +123,6 @@ fn default_job_progress(
 /// Processes a single job, updating its state and handling dependencies, cancellation, and children.
 pub fn process_job(
     world: &mut World,
-    _lua: Option<&mlua::Lua>,
     eid: u32,
     mut job: serde_json::Value,
 ) -> serde_json::Value {
@@ -154,7 +153,6 @@ pub fn process_job(
                     let (new_children, _all_children_complete) =
                         crate::systems::job::children::process_job_children(
                             world,
-                            _lua,
                             eid,
                             children_val,
                             true,
@@ -265,7 +263,6 @@ pub fn process_job(
         let (new_children, all_children_complete) =
             crate::systems::job::children::process_job_children(
                 world,
-                _lua,
                 eid,
                 children_val,
                 state_is_cancelled,

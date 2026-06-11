@@ -69,7 +69,7 @@ impl System for EconomicSystem {
         "EconomicSystem"
     }
 
-    fn run(&mut self, world: &mut World, _lua: Option<&mlua::Lua>) {
+    fn run(&mut self, world: &mut World) {
         let entities = world.get_entities_with_component("ProductionJob");
         for eid in entities {
             let mut job = world.get_component(eid, "ProductionJob").unwrap().clone();

@@ -19,7 +19,7 @@ fn test_systems_execute_in_registered_order() {
         fn name(&self) -> &'static str {
             "A"
         }
-        fn run(&mut self, _world: &mut World, _lua: Option<&mlua::Lua>) {
+        fn run(&mut self, _world: &mut World) {
             self.0.lock().unwrap().push("A");
         }
     }
@@ -28,7 +28,7 @@ fn test_systems_execute_in_registered_order() {
         fn name(&self) -> &'static str {
             "B"
         }
-        fn run(&mut self, _world: &mut World, _lua: Option<&mlua::Lua>) {
+        fn run(&mut self, _world: &mut World) {
             self.0.lock().unwrap().push("B");
         }
     }
@@ -80,7 +80,7 @@ fn test_systems_can_emit_and_receive_events_in_tick() {
         fn name(&self) -> &'static str {
             "Emitter"
         }
-        fn run(&mut self, world: &mut World, _lua: Option<&mlua::Lua>) {
+        fn run(&mut self, world: &mut World) {
             world.send_event("test", json!({"val": 1})).unwrap();
         }
     }
@@ -89,7 +89,7 @@ fn test_systems_can_emit_and_receive_events_in_tick() {
         fn name(&self) -> &'static str {
             "Receiver"
         }
-        fn run(&mut self, world: &mut World, _lua: Option<&mlua::Lua>) {
+        fn run(&mut self, world: &mut World) {
             use engine_core::ecs::event::EventReader;
             let bus = world.get_or_create_event_bus::<serde_json::Value>("test");
             let mut reader = EventReader::default();
@@ -147,7 +147,7 @@ fn test_event_driven_tick_system_runs_in_order_and_processes_events() {
         fn name(&self) -> &'static str {
             "Emitter"
         }
-        fn run(&mut self, world: &mut World, _lua: Option<&mlua::Lua>) {
+        fn run(&mut self, world: &mut World) {
             world.emit_event("TestEvent", json!({"value": 42}));
             self.actions.lock().unwrap().push("emitted".into());
         }
@@ -164,7 +164,7 @@ fn test_event_driven_tick_system_runs_in_order_and_processes_events() {
         fn name(&self) -> &'static str {
             "Receiver"
         }
-        fn run(&mut self, world: &mut World, _lua: Option<&mlua::Lua>) {
+        fn run(&mut self, world: &mut World) {
             let mut received = false;
             world.process_events("TestEvent", |payload| {
                 if payload.get("value") == Some(&json!(42)) {
@@ -204,7 +204,7 @@ fn test_event_driven_tick_system_runs_in_order_and_processes_events() {
             {
                 let mut world_borrow = world_rc.borrow_mut();
                 let mut sys = cell.borrow_mut();
-                sys.run(&mut world_borrow, None);
+                sys.run(&mut world_borrow);
                 world_borrow.update_event_queues();
             }
             // Put the system back in the registry

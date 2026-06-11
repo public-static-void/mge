@@ -31,7 +31,7 @@ impl crate::ecs::system::System for InventoryConstraintSystem {
         "InventoryConstraintSystem"
     }
 
-    fn run(&mut self, world: &mut World, _lua: Option<&mlua::Lua>) {
+    fn run(&mut self, world: &mut World) {
         for eid in world.get_entities_with_component("Inventory") {
             if let Some(inv) = world.get_component(eid, "Inventory").cloned() {
                 let (weight, volume, slots) = aggregate_inventory(&inv);

@@ -103,7 +103,7 @@ impl System for BodyEquipmentSyncSystem {
         "BodyEquipmentSyncSystem"
     }
 
-    fn run(&mut self, world: &mut World, _lua: Option<&mlua::Lua>) {
+    fn run(&mut self, world: &mut World) {
         for eid in world.get_entities_with_component("Body") {
             let mut body = match world.get_component(eid, "Body").cloned() {
                 Some(b) => b,

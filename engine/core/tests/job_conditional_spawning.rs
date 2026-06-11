@@ -139,7 +139,7 @@ fn test_conditional_child_spawn_on_failure() {
     assign_jobs(&mut world, &mut job_board, 0, &[]);
 
     let mut job_system = JobSystem::new();
-    job_system.run(&mut world, None);
+    job_system.run(&mut world);
 
     // Set agent back to idle so it can be assigned to the child job.
     let mut agent = world.get_component(agent_id, "Agent").unwrap().clone();
@@ -153,7 +153,7 @@ fn test_conditional_child_spawn_on_failure() {
     assign_jobs(&mut world, &mut job_board, 0, &[]);
 
     // Run the job system again to process the child job.
-    job_system.run(&mut world, None);
+    job_system.run(&mut world);
 
     // Check that exactly one child job was spawned.
     let spawned_jobs: Vec<_> = world
@@ -292,7 +292,7 @@ fn test_conditional_child_spawn_on_world_state() {
     let mut job_system = JobSystem::new();
 
     for _ in 0..5 {
-        job_system.run(&mut world, None);
+        job_system.run(&mut world);
     }
 
     // Set agent back to idle so it can be assigned to the child job.
@@ -306,7 +306,7 @@ fn test_conditional_child_spawn_on_world_state() {
     assign_jobs(&mut world, &mut job_board, 0, &[]);
 
     for _ in 0..5 {
-        job_system.run(&mut world, None);
+        job_system.run(&mut world);
     }
 
     // Check that exactly one child job was spawned.

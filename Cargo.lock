@@ -673,7 +673,6 @@ dependencies = [
  "jsonschema",
  "lazy_static",
  "libloading",
- "mlua",
  "once_cell",
  "parking_lot",
  "schema_validator",

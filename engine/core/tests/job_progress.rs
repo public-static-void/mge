@@ -51,8 +51,8 @@ fn test_job_progressed_event_emitted_on_progress_change() {
     let mut job_system = JobSystem::new();
 
     // Run system for two ticks to ensure progress and event emission
-    job_system.run(&mut world, None);
-    job_system.run(&mut world, None);
+    job_system.run(&mut world);
+    job_system.run(&mut world);
 
     let event = capture
         .buffer
@@ -127,8 +127,8 @@ fn test_job_progressed_event_emitted_for_custom_handler() {
     let mut job_system = JobSystem::new();
 
     // Run system for two ticks to ensure handler is invoked and event is emitted
-    job_system.run(&mut world, None);
-    job_system.run(&mut world, None);
+    job_system.run(&mut world);
+    job_system.run(&mut world);
 
     let event = capture
         .buffer

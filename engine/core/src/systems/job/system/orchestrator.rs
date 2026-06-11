@@ -55,7 +55,7 @@ pub fn should_spawn_conditional_child(
 /// Processes each job (including children and assigned jobs) exactly once in topological order.
 /// Spawns each conditional child at most once per parent job, robustly tracked in ECS.
 /// Does not guarantee all jobs reach terminal state in a single call; call per tick for simulation.
-pub fn run_job_system(world: &mut World, lua: Option<&mlua::Lua>) {
+pub fn run_job_system(world: &mut World) {
     use crate::systems::job::system::{effects, events, process};
 
     let job_entities: Vec<u32> = world.get_entities_with_component("Job");
@@ -111,7 +111,7 @@ pub fn run_job_system(world: &mut World, lua: Option<&mlua::Lua>) {
             .unwrap_or("")
             .to_string();
 
-        process::process_job(world, lua, eid, job.clone());
+        process::process_job(world, eid, job.clone());
         // Fetch the latest job from ECS after processing
         let mut new_job = world.get_component(eid, "Job").unwrap().clone();
         let new_state = new_job

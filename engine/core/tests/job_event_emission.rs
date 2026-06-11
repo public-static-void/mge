@@ -87,7 +87,7 @@ fn test_job_lifecycle_events_emitted() {
     let mut job_system = JobSystem::new();
     for _ in 0..10 {
         // Increase to 10 ticks to guarantee completion
-        job_system.run(&mut world, None);
+        job_system.run(&mut world);
 
         // Advance event buses after system run, before draining
         world.update_event_buses::<serde_json::Value>();
@@ -175,7 +175,7 @@ fn test_job_cancel_and_failure_events() {
 
     let mut job_system = JobSystem::new();
     for _ in 0..5 {
-        job_system.run(&mut world, None);
+        job_system.run(&mut world);
 
         // Advance event buses after system run, before draining
         world.update_event_buses::<serde_json::Value>();

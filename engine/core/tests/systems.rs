@@ -78,7 +78,7 @@ fn test_process_deaths_creates_corpse_and_decay() {
         .unwrap();
 
     // Run death system
-    world.run_system("ProcessDeaths", None).unwrap();
+    world.run_system("ProcessDeaths").unwrap();
 
     // Assert Corpse and Decay components present
     let corpse = world.get_component(eid, "Corpse");

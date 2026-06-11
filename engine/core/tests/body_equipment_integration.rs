@@ -84,7 +84,7 @@ fn test_body_equipment_sync_enforcement() {
         .unwrap();
 
     // Run the sync system
-    world.run_system("BodyEquipmentSyncSystem", None).unwrap();
+    world.run_system("BodyEquipmentSyncSystem").unwrap();
 
     // The ring should now appear in Body.parts[*].equipped for "left hand"
     let body_after = world.get_component(eid, "Body").unwrap();
@@ -99,7 +99,7 @@ fn test_body_equipment_sync_enforcement() {
         .unwrap();
 
     // Run the sync system again
-    world.run_system("BodyEquipmentSyncSystem", None).unwrap();
+    world.run_system("BodyEquipmentSyncSystem").unwrap();
 
     // The ring should be auto-unequipped from both Equipment and Body
     let equipment_after = world.get_component(eid, "Equipment").unwrap();
@@ -117,7 +117,7 @@ fn test_body_equipment_sync_enforcement() {
         .unwrap();
 
     // Run the sync system
-    world.run_system("BodyEquipmentSyncSystem", None).unwrap();
+    world.run_system("BodyEquipmentSyncSystem").unwrap();
 
     // The effect should be aggregated (dexterity +2)
     let default_stats = json!({});

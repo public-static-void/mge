@@ -46,6 +46,6 @@ pub fn release_job_resource_reservations(pyworld: &PyWorld, entity_id: u32) -> P
 pub fn run_resource_reservation_system(pyworld: &PyWorld) -> PyResult<()> {
     let mut world = pyworld.inner.borrow_mut();
     let mut system = ResourceReservationSystem::new();
-    system.run(&mut world, None);
+    system.run(&mut world);
     Ok(())
 }

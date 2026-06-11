@@ -56,7 +56,7 @@ fn test_job_progression_over_ticks() {
 
     let mut job_system = JobSystem::new();
     for _ in 0..5 {
-        job_system.run(&mut world, None);
+        job_system.run(&mut world);
         let job = world.get_component(job_id, "Job").unwrap();
         let progress = job.get("progress").and_then(|v| v.as_f64()).unwrap_or(0.0);
         let state = job.get("state").and_then(|v| v.as_str()).unwrap();
@@ -131,7 +131,7 @@ fn test_custom_job_handler_overrides_progression() {
     assign_jobs(&mut world, &mut job_board, 0, &[]);
 
     let mut job_system = JobSystem::new();
-    job_system.run(&mut world, None);
+    job_system.run(&mut world);
 
     let job = world.get_component(job_id, "Job").unwrap();
     assert_eq!(
@@ -235,7 +235,7 @@ fn test_effects_applied_only_on_completion_and_rolled_back_on_cancel() {
 
         let mut job_system = JobSystem::new();
         for _ in 0..20 {
-            job_system.run(&mut world, None);
+            job_system.run(&mut world);
             let job = world.get_component(terrain_id, "Job").unwrap();
             if job.get("state") == Some(&serde_json::json!("complete")) {
                 break;
@@ -281,7 +281,7 @@ fn test_effects_applied_only_on_completion_and_rolled_back_on_cancel() {
 
     {
         let mut job_system = JobSystem::new();
-        job_system.run(&mut world, None);
+        job_system.run(&mut world);
 
         let terrain = world.get_component(terrain_id, "Terrain").unwrap();
         assert_eq!(
@@ -393,8 +393,8 @@ fn test_agent_moves_to_job_site_before_progress() {
     let mut _completed = false;
 
     for _tick in 0..40 {
-        world.run_system("MovementSystem", None).unwrap();
-        world.run_system("JobSystem", None).unwrap();
+        world.run_system("MovementSystem").unwrap();
+        world.run_system("JobSystem").unwrap();
 
         let agent_pos_val = world.get_component(agent_id, "Position").unwrap().clone();
         let agent_pos: engine_core::ecs::components::position::PositionComponent =
@@ -510,7 +510,7 @@ fn test_job_blocked_when_path_unreachable() {
 
     // Run the job system for a few ticks
     for _ in 0..3 {
-        world.run_system("JobSystem", None).unwrap();
+        world.run_system("JobSystem").unwrap();
     }
 
     let job = world.get_component(job_id, "Job").unwrap();

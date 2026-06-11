@@ -43,7 +43,7 @@ fn test_can_register_inventory_schema_and_manage_items() {
     let _ = world.set_component(eid, "Inventory", overfilled);
 
     // Run the inventory constraint system
-    world.run_system("InventoryConstraintSystem", None).unwrap();
+    world.run_system("InventoryConstraintSystem").unwrap();
 
     // Check that the encumbered flag is set
     let updated = world.get_component(eid, "Inventory").unwrap();
@@ -74,7 +74,7 @@ fn test_inventory_constraint_system_sets_encumbered_status() {
     world.set_component(eid, "Inventory", inv).unwrap();
 
     // Run the system
-    world.run_system("InventoryConstraintSystem", None).unwrap();
+    world.run_system("InventoryConstraintSystem").unwrap();
 
     let updated = world.get_component(eid, "Inventory").unwrap();
     assert_eq!(updated["encumbered"], true);
@@ -121,7 +121,7 @@ fn test_entity_is_encumbered_if_weight_exceeds_limit() {
     });
     world.set_component(eid, "Inventory", inventory).unwrap();
 
-    world.run_system("InventoryConstraintSystem", None).unwrap();
+    world.run_system("InventoryConstraintSystem").unwrap();
 
     let inv_after = world.get_component(eid, "Inventory").unwrap();
     assert_eq!(inv_after["encumbered"], true);

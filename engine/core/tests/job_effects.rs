@@ -72,7 +72,7 @@ fn test_job_effects_are_processed_on_completion() {
     for _ in 0..4 {
         job_board.update(&world, 0, &[]);
         engine_core::systems::job::ai::logic::assign_jobs(&mut world, &mut job_board, 0, &[]);
-        job_system.run(&mut world, None);
+        job_system.run(&mut world);
     }
 
     // After job completion, the terrain type should be updated by the effect.

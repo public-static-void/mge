@@ -10,7 +10,7 @@ impl System for AiEventReactionSystem {
         "AiEventReactionSystem"
     }
 
-    fn run(&mut self, world: &mut World, _lua: Option<&mlua::Lua>) {
+    fn run(&mut self, world: &mut World) {
         while let Some(intent) = world.ai_event_intents.pop_front() {
             if let Some(kind) = intent.get("kind").and_then(|v| v.as_str()) {
                 // For every agent, enqueue a production job for the scarce resource if not already queued

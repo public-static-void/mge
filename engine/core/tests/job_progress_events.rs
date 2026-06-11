@@ -49,7 +49,7 @@ fn test_job_progressed_event_emitted_on_progress_change() {
     // Run job system for several ticks, capturing progress events
     let mut all_events = Vec::new();
     for _ in 0..5 {
-        job_system.run(&mut world, None);
+        job_system.run(&mut world);
         world.update_event_buses::<serde_json::Value>();
         let bus = world
             .get_event_bus::<serde_json::Value>("job_progressed")
@@ -144,7 +144,7 @@ fn test_job_progressed_event_emitted_for_custom_handler() {
 
     let mut all_events = Vec::new();
     for _ in 0..3 {
-        job_system.run(&mut world, None);
+        job_system.run(&mut world);
         world.update_event_buses::<serde_json::Value>();
         let bus = world
             .get_event_bus::<serde_json::Value>("job_progressed")

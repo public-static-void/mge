@@ -110,27 +110,27 @@ fn test_agent_fetches_and_delivers_resources_for_job() {
     world.register_system(MovementSystem);
 
     // Tick 1: Reservation should occur, job assigned, state set to fetching_resources
-    world.run_system("ResourceReservationSystem", None).unwrap();
+    world.run_system("ResourceReservationSystem").unwrap();
 
     // Assign the job using JobBoard logic
     let mut job_board = JobBoard::default();
     job_board.update(&world, 0, &[]);
     let _ = job_board.claim_job(agent_id, &mut world, 0);
 
-    world.run_system("JobSystem", None).unwrap();
+    world.run_system("JobSystem").unwrap();
 
     let job = world.get_component(job_id, "Job").unwrap();
     assert_eq!(job["state"], "fetching_resources");
     assert_eq!(job["reserved_stockpile"], stockpile_id);
 
     // Tick 2: Agent starts moving toward stockpile
-    world.run_system("MovementSystem", None).unwrap();
+    world.run_system("MovementSystem").unwrap();
     let agent_pos = world.get_component(agent_id, "Position").unwrap();
     let pos = agent_pos.get("pos").unwrap().get("Square").unwrap();
     assert_eq!(pos["x"], 1);
     assert_eq!(pos["y"], 0);
 
-    world.run_system("JobSystem", None).unwrap();
+    world.run_system("JobSystem").unwrap();
 
     // Tick 3: Agent picks up wood, state set to delivering_resources
     // (No movement needed, agent is at stockpile)
@@ -143,13 +143,13 @@ fn test_agent_fetches_and_delivers_resources_for_job() {
     assert_eq!(job["state"], "delivering_resources");
 
     // Tick 4: Agent moves to job site
-    world.run_system("MovementSystem", None).unwrap();
+    world.run_system("MovementSystem").unwrap();
     let agent_pos = world.get_component(agent_id, "Position").unwrap();
     let pos = agent_pos.get("pos").unwrap().get("Square").unwrap();
     assert_eq!(pos["x"], 2);
     assert_eq!(pos["y"], 0);
 
-    world.run_system("JobSystem", None).unwrap();
+    world.run_system("JobSystem").unwrap();
 
     // Tick 5: Agent delivers wood, job state becomes in_progress
     let job = world.get_component(job_id, "Job").unwrap();
@@ -160,7 +160,7 @@ fn test_agent_fetches_and_delivers_resources_for_job() {
 
     // Tick 6+: Job progresses and completes as normal
     for _ in 0..5 {
-        world.run_system("JobSystem", None).unwrap();
+        world.run_system("JobSystem").unwrap();
     }
     let job = world.get_component(job_id, "Job").unwrap();
     assert_eq!(job["state"], "complete");

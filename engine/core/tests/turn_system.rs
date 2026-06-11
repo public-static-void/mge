@@ -55,9 +55,9 @@ fn test_tick_advances_turn_and_runs_systems() {
         }
     }
     world.register_system(ProcessDeaths);
-    world.run_system("ProcessDeaths", None).unwrap();
+    world.run_system("ProcessDeaths").unwrap();
     world.register_system(ProcessDecay);
-    world.run_system("ProcessDecay", None).unwrap();
+    world.run_system("ProcessDecay").unwrap();
     world.turn += 1;
 
     // Position should be x+1, Health should be -1

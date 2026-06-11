@@ -11,7 +11,7 @@ impl System for EquipmentLogicSystem {
         "EquipmentLogicSystem"
     }
 
-    fn run(&mut self, world: &mut World, _lua: Option<&mlua::Lua>) {
+    fn run(&mut self, world: &mut World) {
         for eid in world.get_entities_with_component("Equipment") {
             let equipment = match world.get_component(eid, "Equipment") {
                 Some(e) => e.clone(),
