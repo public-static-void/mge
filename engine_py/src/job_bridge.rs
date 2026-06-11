@@ -1,12 +1,12 @@
-use once_cell::sync::Lazy;
 use pyo3::prelude::*;
 use pythonize::{depythonize, pythonize};
 use std::collections::HashMap;
+use std::sync::LazyLock;
 use std::sync::Mutex;
 
 /// Job handler registry
-pub static PY_JOB_HANDLER_REGISTRY: Lazy<Mutex<HashMap<String, Py<PyAny>>>> =
-    Lazy::new(|| Mutex::new(HashMap::new()));
+pub static PY_JOB_HANDLER_REGISTRY: LazyLock<Mutex<HashMap<String, Py<PyAny>>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
 
 /// Register a job handler
 pub fn py_job_handler(

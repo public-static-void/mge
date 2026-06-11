@@ -9,8 +9,8 @@ use std::sync::{Arc, Mutex};
 
 type EventBusMap = Mutex<HashMap<String, Arc<Mutex<EventBus<Value>>>>>;
 
-static EVENT_BUSES: once_cell::sync::Lazy<EventBusMap> =
-    once_cell::sync::Lazy::new(|| Mutex::new(HashMap::new()));
+static EVENT_BUSES: std::sync::LazyLock<EventBusMap> =
+    std::sync::LazyLock::new(|| Mutex::new(HashMap::new()));
 
 /// Send an event
 pub fn send_event(event_type: String, payload: String) -> PyResult<()> {

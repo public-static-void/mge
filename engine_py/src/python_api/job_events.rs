@@ -1,18 +1,18 @@
 use engine_core::systems::job::system::events::job_event_logger;
-use once_cell::sync::Lazy;
 use pyo3::Bound;
 use pyo3::PyObject;
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict, PyList};
 use std::collections::HashMap;
+use std::sync::LazyLock;
 use std::sync::Mutex;
 
 type JobEventSubscriptions = HashMap<String, Vec<(usize, PyObject)>>;
 
-static JOB_EVENT_SUBSCRIPTIONS: Lazy<Mutex<JobEventSubscriptions>> =
-    Lazy::new(|| Mutex::new(HashMap::new()));
+static JOB_EVENT_SUBSCRIPTIONS: LazyLock<Mutex<JobEventSubscriptions>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
 
-static SUBSCRIPTION_ID_COUNTER: Lazy<Mutex<usize>> = Lazy::new(|| Mutex::new(0));
+static SUBSCRIPTION_ID_COUNTER: LazyLock<Mutex<usize>> = LazyLock::new(|| Mutex::new(0));
 
 // --- Job Event Log Querying ---
 
