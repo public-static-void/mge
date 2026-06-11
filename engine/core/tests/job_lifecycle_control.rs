@@ -93,7 +93,7 @@ fn test_job_can_be_paused_and_resumed() {
     // Tick until progress starts
     let mut progress_after_1 = 0.0;
     for _ in 0..10 {
-        world.run_system("JobSystem", None).unwrap();
+        world.run_system("JobSystem").unwrap();
         let job = world.get_component(job_id, "Job").unwrap();
         progress_after_1 = job.get("progress").and_then(|v| v.as_f64()).unwrap_or(0.0);
         if progress_after_1 > 0.0 {
@@ -112,7 +112,7 @@ fn test_job_can_be_paused_and_resumed() {
 
     // Tick: progress should not advance
     for _ in 0..3 {
-        world.run_system("JobSystem", None).unwrap();
+        world.run_system("JobSystem").unwrap();
     }
     let job = world.get_component(job_id, "Job").unwrap();
     let progress_while_paused = job.get("progress").and_then(|v| v.as_f64()).unwrap_or(0.0);
@@ -129,7 +129,7 @@ fn test_job_can_be_paused_and_resumed() {
     // Tick: progress should resume
     let mut resumed = false;
     for _ in 0..10 {
-        world.run_system("JobSystem", None).unwrap();
+        world.run_system("JobSystem").unwrap();
         let job = world.get_component(job_id, "Job").unwrap();
         if job.get("state") == Some(&json!("complete")) {
             resumed = true;
@@ -262,8 +262,8 @@ fn test_job_is_interrupted_and_resumed_by_another_agent() {
     // Tick: agent1 starts job (simulate movement if needed)
     let mut progressed = false;
     for _ in 0..40 {
-        world.run_system("MovementSystem", None).unwrap();
-        world.run_system("JobSystem", None).unwrap();
+        world.run_system("MovementSystem").unwrap();
+        world.run_system("JobSystem").unwrap();
         let job = world.get_component(job_id, "Job").unwrap();
         if job.get("progress").and_then(|v| v.as_f64()).unwrap_or(0.0) > 0.0 {
             progressed = true;
@@ -291,8 +291,8 @@ fn test_job_is_interrupted_and_resumed_by_another_agent() {
     // Tick: agent2 should resume and complete the job (simulate movement)
     let mut resumed = false;
     for _ in 0..80 {
-        world.run_system("MovementSystem", None).unwrap();
-        world.run_system("JobSystem", None).unwrap();
+        world.run_system("MovementSystem").unwrap();
+        world.run_system("JobSystem").unwrap();
         let job = world.get_component(job_id, "Job").unwrap();
         if job.get("state") == Some(&json!("complete")) {
             resumed = true;
@@ -406,7 +406,7 @@ fn test_job_progression_affected_by_world_conditions() {
     // Tick: progress should be slow due to hazard
     let mut ticks = 0;
     loop {
-        world.run_system("JobSystem", None).unwrap();
+        world.run_system("JobSystem").unwrap();
         ticks += 1;
         let job = world.get_component(job_id, "Job").unwrap();
         if job.get("state") == Some(&json!("complete")) {

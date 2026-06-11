@@ -30,7 +30,7 @@ impl ResourceReservationSystem {
 
     /// Checks all pending jobs, attempts to reserve stockpile resources.
     /// Exclusivity is enforced so each resource instance is only reserved once.
-    pub fn run_reservation(&mut self, world: &mut World, _lua: Option<&mlua::Lua>) {
+    pub fn run_reservation(&mut self, world: &mut World) {
         use std::collections::HashMap;
 
         // Collect all stockpiles and their available resources (working copy for simulation only).
@@ -163,7 +163,7 @@ impl System for ResourceReservationSystem {
         "ResourceReservationSystem"
     }
 
-    fn run(&mut self, world: &mut World, lua: Option<&mlua::Lua>) {
-        self.run_reservation(world, lua);
+    fn run(&mut self, world: &mut World) {
+        self.run_reservation(world);
     }
 }

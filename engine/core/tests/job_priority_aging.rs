@@ -242,7 +242,7 @@ fn test_jobs_get_priority_boost_on_resource_shortage_event() {
     // Reserve resources so all jobs are runnable
     let mut reservation_system =
         engine_core::systems::job::resource_reservation::ResourceReservationSystem::new();
-    reservation_system.run(&mut world, None);
+    reservation_system.run(&mut world);
 
     // Send the shortage event for "wood"
     world

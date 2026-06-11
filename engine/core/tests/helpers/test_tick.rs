@@ -16,7 +16,7 @@ pub fn run_until<F>(
     for tick in 0..max_ticks {
         job_board.update(world, tick as u64, &[]);
         assign_jobs(world, job_board, tick as u64, &[]);
-        job_system.run(world, None);
+        job_system.run(world);
         if pred(world) {
             break;
         }

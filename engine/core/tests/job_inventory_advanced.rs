@@ -173,7 +173,7 @@ fn test_agent_makes_multiple_trips_for_large_job() {
     }
 
     // Reserve resources and assign job
-    world.run_system("ResourceReservationSystem", None).unwrap();
+    world.run_system("ResourceReservationSystem").unwrap();
     let mut job_board = JobBoard::default();
     job_board.update(&world, 0, &[]);
 
@@ -187,9 +187,9 @@ fn test_agent_makes_multiple_trips_for_large_job() {
     let mut trips = 0;
     let mut completed = false;
     for _tick in 0..50 {
-        world.run_system("ResourceReservationSystem", None).unwrap();
-        world.run_system("MovementSystem", None).unwrap();
-        world.run_system("JobSystem", None).unwrap();
+        world.run_system("ResourceReservationSystem").unwrap();
+        world.run_system("MovementSystem").unwrap();
+        world.run_system("JobSystem").unwrap();
 
         let job = world.get_component(job_id, "Job").unwrap();
         let _agent = world.get_component(agent_id, "Agent").unwrap();
@@ -259,7 +259,7 @@ fn test_agent_makes_multiple_trips_for_large_job() {
         println!("Stockpile {stockpile_id} not found.");
     }
 
-    world.run_system("ResourceReservationSystem", None).unwrap();
+    world.run_system("ResourceReservationSystem").unwrap();
     job_board.update(&world, 0, &[]);
     assert_eq!(
         job_board.claim_job(agent_id, &mut world, 0),
@@ -270,9 +270,9 @@ fn test_agent_makes_multiple_trips_for_large_job() {
     let mut trips2 = 0;
     let mut completed2 = false;
     for _tick in 0..50 {
-        world.run_system("ResourceReservationSystem", None).unwrap();
-        world.run_system("MovementSystem", None).unwrap();
-        world.run_system("JobSystem", None).unwrap();
+        world.run_system("ResourceReservationSystem").unwrap();
+        world.run_system("MovementSystem").unwrap();
+        world.run_system("JobSystem").unwrap();
 
         let job = world.get_component(job_id2, "Job").unwrap();
         let _agent = world.get_component(agent_id, "Agent").unwrap();

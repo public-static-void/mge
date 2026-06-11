@@ -130,7 +130,7 @@ fn test_job_chained_effects() {
 
     // Run the job system enough times to complete the job
     for _ in 0..4 {
-        world.run_system("JobSystem", None).unwrap();
+        world.run_system("JobSystem").unwrap();
     }
 
     let first = world.get_component(eid, "FirstApplied").unwrap();

@@ -38,7 +38,7 @@ fn test_job_with_failed_dependency_fails() {
         .unwrap();
 
     let mut job_system = JobSystem::new();
-    job_system.run(&mut world, None);
+    job_system.run(&mut world);
 
     let main_job_after = world.get_component(main_eid, "Job").unwrap();
     assert_eq!(
@@ -81,7 +81,7 @@ fn test_job_with_cancelled_dependency_cancels() {
         .unwrap();
 
     let mut job_system = JobSystem::new();
-    job_system.run(&mut world, None);
+    job_system.run(&mut world);
 
     let main_job_after = world.get_component(main_eid, "Job").unwrap();
     assert_eq!(
@@ -129,7 +129,7 @@ fn test_job_spawns_child_on_dependency_failure() {
         .unwrap();
 
     let mut job_system = JobSystem::new();
-    job_system.run(&mut world, None);
+    job_system.run(&mut world);
 
     let main_job_after = world.get_component(main_eid, "Job").unwrap();
     assert_eq!(

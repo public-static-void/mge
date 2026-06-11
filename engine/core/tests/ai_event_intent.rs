@@ -56,7 +56,7 @@ fn test_event_driven_ai_job_enqueue() {
     // Run the AI event reaction system
     let mut system = AiEventReactionSystem;
     use engine_core::ecs::system::System;
-    system.run(&mut world, None);
+    system.run(&mut world);
 
     // Agent's job queue should now contain the production job for wood
     let agent = world.get_component(agent_id, "Agent").unwrap();
@@ -141,7 +141,7 @@ fn test_event_intent_queue_handles_multiple_events() {
     // Run the AI event reaction system
     let mut system = AiEventReactionSystem;
     use engine_core::ecs::system::System;
-    system.run(&mut world, None);
+    system.run(&mut world);
 
     // Agent's job queue should now contain both jobs
     let agent = world.get_component(agent_id, "Agent").unwrap();

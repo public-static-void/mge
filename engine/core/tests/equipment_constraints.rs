@@ -80,7 +80,7 @@ fn test_cannot_equip_incompatible_item() {
     );
 
     // Run the logic system to enforce slot compatibility
-    world.run_system("EquipmentLogicSystem", None).unwrap();
+    world.run_system("EquipmentLogicSystem").unwrap();
 
     // The system should have auto-unequipped the incompatible item
     let equipment_after = world.get_component(eid, "Equipment").unwrap();
@@ -126,7 +126,7 @@ fn test_equipping_two_handed_weapon_blocks_both_hands() {
     let result = world.set_component(eid, "Equipment", updated.clone());
     assert!(result.is_ok());
 
-    world.run_system("EquipmentLogicSystem", None).unwrap();
+    world.run_system("EquipmentLogicSystem").unwrap();
 
     let equipment_after = world.get_component(eid, "Equipment").unwrap();
     assert_eq!(equipment_after["slots"]["left_hand"], "greatsword");
@@ -179,7 +179,7 @@ fn test_cannot_equip_two_handed_weapon_if_other_hand_occupied() {
     let result = world.set_component(eid, "Equipment", updated.clone());
     assert!(result.is_ok());
 
-    world.run_system("EquipmentLogicSystem", None).unwrap();
+    world.run_system("EquipmentLogicSystem").unwrap();
 
     let equipment_after = world.get_component(eid, "Equipment").unwrap();
     // The two-handed weapon should not be equipped because right_hand is occupied
@@ -230,7 +230,7 @@ fn test_cannot_equip_item_with_unmet_stat_requirement() {
     let result = world.set_component(eid, "Equipment", updated.clone());
     assert!(result.is_ok());
 
-    world.run_system("EquipmentLogicSystem", None).unwrap();
+    world.run_system("EquipmentLogicSystem").unwrap();
 
     let equipment_after = world.get_component(eid, "Equipment").unwrap();
     // The heavy armor should be auto-unequipped due to unmet strength requirement
@@ -280,7 +280,7 @@ fn test_can_equip_item_with_met_stat_requirement() {
     let result = world.set_component(eid, "Equipment", updated.clone());
     assert!(result.is_ok());
 
-    world.run_system("EquipmentLogicSystem", None).unwrap();
+    world.run_system("EquipmentLogicSystem").unwrap();
 
     let equipment_after = world.get_component(eid, "Equipment").unwrap();
     // The light armor should remain equipped

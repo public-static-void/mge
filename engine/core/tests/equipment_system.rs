@@ -30,7 +30,7 @@ fn test_equipping_item_applies_stat_bonuses() {
     updated["slots"]["finger"] = json!("power_ring");
     world.set_component(eid, "Equipment", updated).unwrap();
 
-    world.run_system("EquipmentLogicSystem", None).unwrap();
+    world.run_system("EquipmentLogicSystem").unwrap();
 
     let stats_after = world.get_component(eid, "Stats").unwrap();
     assert_eq!(stats_after["strength"].as_f64().unwrap(), 8.0);
@@ -73,9 +73,9 @@ fn test_unequipping_item_removes_stat_bonuses_modular() {
 
     // Run systems to apply effect
     world
-        .run_system("EquipmentEffectAggregationSystem", None)
+        .run_system("EquipmentEffectAggregationSystem")
         .unwrap();
-    world.run_system("StatCalculationSystem", None).unwrap();
+    world.run_system("StatCalculationSystem").unwrap();
     let strength_after = world.get_component(eid, "Stats").unwrap()["strength"]
         .as_f64()
         .unwrap();
@@ -87,9 +87,9 @@ fn test_unequipping_item_removes_stat_bonuses_modular() {
     world.set_component(eid, "Equipment", unequipped).unwrap();
 
     world
-        .run_system("EquipmentEffectAggregationSystem", None)
+        .run_system("EquipmentEffectAggregationSystem")
         .unwrap();
-    world.run_system("StatCalculationSystem", None).unwrap();
+    world.run_system("StatCalculationSystem").unwrap();
     let strength_after_unequip = world.get_component(eid, "Stats").unwrap()["strength"]
         .as_f64()
         .unwrap();
@@ -138,9 +138,9 @@ fn test_equipping_item_applies_and_removes_effects_modular() {
     world.set_component(eid, "Equipment", updated).unwrap();
 
     world
-        .run_system("EquipmentEffectAggregationSystem", None)
+        .run_system("EquipmentEffectAggregationSystem")
         .unwrap();
-    world.run_system("StatCalculationSystem", None).unwrap();
+    world.run_system("StatCalculationSystem").unwrap();
 
     let stats_after = world.get_component(eid, "Stats").unwrap();
     assert_eq!(stats_after["strength"].as_f64().unwrap(), 8.0);
@@ -152,9 +152,9 @@ fn test_equipping_item_applies_and_removes_effects_modular() {
     world.set_component(eid, "Equipment", unequipped).unwrap();
 
     world
-        .run_system("EquipmentEffectAggregationSystem", None)
+        .run_system("EquipmentEffectAggregationSystem")
         .unwrap();
-    world.run_system("StatCalculationSystem", None).unwrap();
+    world.run_system("StatCalculationSystem").unwrap();
 
     let stats_after_unequip = world.get_component(eid, "Stats").unwrap();
     assert_eq!(stats_after_unequip["strength"].as_f64().unwrap(), 5.0);

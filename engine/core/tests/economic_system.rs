@@ -43,7 +43,7 @@ fn test_workshop_produces_resources_using_recipe() {
 
     // Run the economic system for 2 ticks
     for _tick in 0..2 {
-        econ_system.run(&mut world, None);
+        econ_system.run(&mut world);
     }
 
     // After 2 ticks, wood should be reduced by 1, plank increased by 4 (recipe runs once)

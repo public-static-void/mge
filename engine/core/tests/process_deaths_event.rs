@@ -9,7 +9,7 @@ impl System for DeathDetector {
     fn name(&self) -> &'static str {
         "DeathDetector"
     }
-    fn run(&mut self, world: &mut World, _lua: Option<&mlua::Lua>) {
+    fn run(&mut self, world: &mut World) {
         // Phase 1: Collect dead entities
         let dead_entities: Vec<u32> = world
             .components
@@ -49,7 +49,7 @@ impl System for DeathProcessor {
     fn dependencies(&self) -> &'static [&'static str] {
         &["DeathDetector"]
     }
-    fn run(&mut self, world: &mut World, _lua: Option<&mlua::Lua>) {
+    fn run(&mut self, world: &mut World) {
         // Phase 1: Collect entity IDs from events
         let mut to_process = Vec::new();
         world.process_events("EntityDied", |payload| {
@@ -110,7 +110,7 @@ fn test_death_event_flow() {
     let sorted = sys_registry.sorted_system_names();
     for sys_name in sorted {
         let mut sys = sys_registry.get_system_mut(&sys_name).unwrap();
-        sys.run(&mut world, None);
+        sys.run(&mut world);
         world.update_event_queues();
     }
 

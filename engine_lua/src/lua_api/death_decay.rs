@@ -17,7 +17,7 @@ pub fn register_death_decay_api(
     let process_deaths = lua.create_function_mut(move |_, ()| {
         let mut world = world_deaths.borrow_mut();
         world.register_system(ProcessDeaths);
-        world.run_system("ProcessDeaths", None).unwrap();
+        world.run_system("ProcessDeaths").unwrap();
         Ok(())
     })?;
     globals.set("process_deaths", process_deaths)?;
@@ -27,7 +27,7 @@ pub fn register_death_decay_api(
     let process_decay = lua.create_function_mut(move |_, ()| {
         let mut world = world_decay.borrow_mut();
         world.register_system(ProcessDecay);
-        world.run_system("ProcessDecay", None).unwrap();
+        world.run_system("ProcessDecay").unwrap();
         Ok(())
     })?;
     globals.set("process_decay", process_decay)?;

@@ -10,7 +10,7 @@ impl System for DummySystem {
     fn name(&self) -> &'static str {
         "DummySystem"
     }
-    fn run(&mut self, _world: &mut World, _lua: Option<&mlua::Lua>) {}
+    fn run(&mut self, _world: &mut World) {}
 }
 
 #[test]
@@ -31,7 +31,7 @@ fn test_run_system() {
         fn name(&self) -> &'static str {
             "TestSystem"
         }
-        fn run(&mut self, _world: &mut World, _lua: Option<&mlua::Lua>) {
+        fn run(&mut self, _world: &mut World) {
             self.called.store(true, Ordering::SeqCst);
         }
     }
@@ -43,7 +43,7 @@ fn test_run_system() {
         called: called.clone(),
     });
 
-    world.run_system("TestSystem", None).unwrap();
+    world.run_system("TestSystem").unwrap();
     assert!(called.load(Ordering::SeqCst));
 }
 
@@ -51,7 +51,7 @@ fn test_run_system() {
 fn test_run_nonexistent_system_errors() {
     let component_registry = Arc::new(Mutex::new(ComponentRegistry::new()));
     let mut world = World::new(component_registry.clone());
-    let result = world.run_system("NoSuchSystem", None);
+    let result = world.run_system("NoSuchSystem");
     assert!(result.is_err());
 }
 
@@ -70,7 +70,7 @@ impl System for A {
     fn name(&self) -> &'static str {
         "A"
     }
-    fn run(&mut self, _world: &mut World, _lua: Option<&mlua::Lua>) {}
+    fn run(&mut self, _world: &mut World) {}
     fn dependencies(&self) -> &'static [&'static str] {
         &[]
     }
@@ -81,7 +81,7 @@ impl System for B {
     fn name(&self) -> &'static str {
         "B"
     }
-    fn run(&mut self, _world: &mut World, _lua: Option<&mlua::Lua>) {}
+    fn run(&mut self, _world: &mut World) {}
     fn dependencies(&self) -> &'static [&'static str] {
         &["A"]
     }
@@ -127,7 +127,7 @@ fn test_cycle_detection() {
         fn name(&self) -> &'static str {
             "C"
         }
-        fn run(&mut self, _world: &mut World, _lua: Option<&mlua::Lua>) {}
+        fn run(&mut self, _world: &mut World) {}
         fn dependencies(&self) -> &'static [&'static str] {
             &["D"]
         }
@@ -137,7 +137,7 @@ fn test_cycle_detection() {
         fn name(&self) -> &'static str {
             "D"
         }
-        fn run(&mut self, _world: &mut World, _lua: Option<&mlua::Lua>) {}
+        fn run(&mut self, _world: &mut World) {}
         fn dependencies(&self) -> &'static [&'static str] {
             &["C"]
         }

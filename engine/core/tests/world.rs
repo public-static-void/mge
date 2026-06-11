@@ -36,7 +36,7 @@ fn test_system_existence() {
         fn name(&self) -> &'static str {
             "Dummy"
         }
-        fn run(&mut self, _: &mut World, _: Option<&mlua::Lua>) {}
+        fn run(&mut self, _: &mut World) {}
     }
     let registry = Arc::new(Mutex::new(ComponentRegistry::new()));
     let mut world = World::new(registry);

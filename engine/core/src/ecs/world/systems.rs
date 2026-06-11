@@ -63,9 +63,9 @@ impl World {
     }
 
     /// Run a system
-    pub fn run_system(&mut self, name: &str, lua: Option<&mlua::Lua>) -> Result<(), String> {
+    pub fn run_system(&mut self, name: &str) -> Result<(), String> {
         if let Some(system) = self.systems.take_system(name) {
-            system.borrow_mut().run(self, lua);
+            system.borrow_mut().run(self);
             self.systems.register_system_boxed(name.to_string(), system);
             Ok(())
         } else {
@@ -89,7 +89,7 @@ impl World {
                 {
                     let mut world = world_rc.borrow_mut();
                     let mut system = cell.borrow_mut();
-                    system.run(&mut world, None);
+                    system.run(&mut world);
                 }
                 // Put the system back into the registry
                 let mut world = world_rc.borrow_mut();

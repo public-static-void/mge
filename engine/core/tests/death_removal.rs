@@ -30,7 +30,7 @@ fn test_death_replaces_health_with_corpse_and_decay() {
 
     // Process deaths
     world.register_system(ProcessDeaths);
-    world.run_system("ProcessDeaths", None).unwrap();
+    world.run_system("ProcessDeaths").unwrap();
 
     // Health component should be removed
     assert!(world.get_component(id, "Health").is_none());
@@ -56,12 +56,12 @@ fn test_decay_removes_entity_after_time() {
 
     // Tick 1
     world.register_system(ProcessDecay);
-    world.run_system("ProcessDecay", None).unwrap();
+    world.run_system("ProcessDecay").unwrap();
     let decay = world.get_component(id, "Decay").unwrap();
     assert_eq!(decay["time_remaining"].as_u64().unwrap(), 1);
 
     // Tick 2 - entity should be removed
     world.register_system(ProcessDecay);
-    world.run_system("ProcessDecay", None).unwrap();
+    world.run_system("ProcessDecay").unwrap();
     assert!(world.get_component(id, "Decay").is_none());
 }

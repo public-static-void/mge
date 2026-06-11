@@ -66,7 +66,7 @@ fn test_job_cancellation_cleans_up_agent_and_emits_event() {
 
     // Run job system to process cancellation
     let mut job_system = JobSystem;
-    job_system.run(&mut world, None);
+    job_system.run(&mut world);
 
     let agent = world.get_component(agent_id, "Agent").unwrap();
     let job = world.get_component(job_id, "Job").unwrap();
@@ -176,7 +176,7 @@ fn test_job_effect_rollback_on_cancel() {
 
         // Run system to apply effect
         let mut job_system = JobSystem;
-        job_system.run(&mut world, None);
+        job_system.run(&mut world);
 
         let terrain = world.get_component(entity_id, "Terrain").unwrap();
         assert_eq!(
@@ -208,7 +208,7 @@ fn test_job_effect_rollback_on_cancel() {
     // Run system: effect should not apply, and rollback (UndoModifyTerrain) should be called
     {
         let mut job_system = JobSystem;
-        job_system.run(&mut world, None);
+        job_system.run(&mut world);
 
         let terrain = world.get_component(entity_id, "Terrain").unwrap();
         assert_eq!(
@@ -283,7 +283,7 @@ fn test_job_cancellation_releases_resources_and_cancels_children() {
 
     // Run job system to process cancellation
     let mut job_system = JobSystem;
-    job_system.run(&mut world, None);
+    job_system.run(&mut world);
 
     let stockpile = world.get_component(stockpile_id, "Stockpile").unwrap();
     let parent_job = world.get_component(parent_id, "Job").unwrap();

@@ -9,7 +9,7 @@ impl System for ProcessDeaths {
     fn name(&self) -> &'static str {
         "ProcessDeaths"
     }
-    fn run(&mut self, world: &mut World, _lua: Option<&mlua::Lua>) {
+    fn run(&mut self, world: &mut World) {
         let mut to_process = Vec::new();
 
         // Collect entities with Health <= 0
@@ -45,7 +45,7 @@ impl System for ProcessDecay {
     fn name(&self) -> &'static str {
         "ProcessDecay"
     }
-    fn run(&mut self, world: &mut World, _lua: Option<&mlua::Lua>) {
+    fn run(&mut self, world: &mut World) {
         let mut to_despawn_entities = Vec::new();
         if let Some(decays) = world.components.get_mut("Decay") {
             for (&entity, value) in decays.iter_mut() {

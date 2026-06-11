@@ -113,14 +113,14 @@ fn test_agent_fetches_and_delivers_resources_with_failure_and_interruption() {
     world.register_system(MovementSystem);
 
     // Reserve resources and assign job
-    world.run_system("ResourceReservationSystem", None).unwrap();
+    world.run_system("ResourceReservationSystem").unwrap();
     let mut job_board = JobBoard::default();
     job_board.update(&world, 0, &[]);
     match job_board.claim_job(agent_id, &mut world, 0) {
         JobAssignmentResult::Assigned(_) => (),
         other => panic!("Job assignment failed: {other:?}"),
     }
-    world.run_system("JobSystem", None).unwrap();
+    world.run_system("JobSystem").unwrap();
 
     // Confirm job state is fetching_resources
     {
@@ -132,8 +132,8 @@ fn test_agent_fetches_and_delivers_resources_with_failure_and_interruption() {
     // Run ticks until agent picks up resources
     let mut picked_up = false;
     for _tick in 0..20 {
-        world.run_system("MovementSystem", None).unwrap();
-        world.run_system("JobSystem", None).unwrap();
+        world.run_system("MovementSystem").unwrap();
+        world.run_system("JobSystem").unwrap();
 
         let agent = world.get_component(agent_id, "Agent").unwrap();
         let job = world.get_component(job_id, "Job").unwrap();
@@ -151,8 +151,8 @@ fn test_agent_fetches_and_delivers_resources_with_failure_and_interruption() {
     // Run ticks until job in_progress (delivered)
     let mut delivered = false;
     for _tick in 0..20 {
-        world.run_system("MovementSystem", None).unwrap();
-        world.run_system("JobSystem", None).unwrap();
+        world.run_system("MovementSystem").unwrap();
+        world.run_system("JobSystem").unwrap();
 
         let job = world.get_component(job_id, "Job").unwrap();
 
@@ -169,7 +169,7 @@ fn test_agent_fetches_and_delivers_resources_with_failure_and_interruption() {
     // Run ticks until job complete
     let mut completed = false;
     for _tick in 0..10 {
-        world.run_system("JobSystem", None).unwrap();
+        world.run_system("JobSystem").unwrap();
         let job = world.get_component(job_id, "Job").unwrap();
         if job.get("state") == Some(&json!("complete")) {
             completed = true;
@@ -212,19 +212,19 @@ fn test_agent_fetches_and_delivers_resources_with_failure_and_interruption() {
         )
         .unwrap();
 
-    world.run_system("ResourceReservationSystem", None).unwrap();
+    world.run_system("ResourceReservationSystem").unwrap();
     job_board.update(&world, 0, &[]);
     match job_board.claim_job(agent_id, &mut world, 0) {
         JobAssignmentResult::Assigned(_) => (),
         other => panic!("Job assignment failed: {other:?}"),
     }
-    world.run_system("JobSystem", None).unwrap();
+    world.run_system("JobSystem").unwrap();
 
     // Run ticks until agent picks up resources for second job
     let mut picked_up2 = false;
     for _tick in 0..20 {
-        world.run_system("MovementSystem", None).unwrap();
-        world.run_system("JobSystem", None).unwrap();
+        world.run_system("MovementSystem").unwrap();
+        world.run_system("JobSystem").unwrap();
 
         let agent = world.get_component(agent_id, "Agent").unwrap();
         let job = world.get_component(job_id2, "Job").unwrap();
@@ -249,7 +249,7 @@ fn test_agent_fetches_and_delivers_resources_with_failure_and_interruption() {
     // Poll for loose item dropped on cancellation (do NOT check position, only kind/amount/loose)
     let mut found_loose_item = false;
     for _ in 0..5 {
-        world.run_system("JobSystem", None).unwrap();
+        world.run_system("JobSystem").unwrap();
 
         for eid in world.get_entities_with_component("Item") {
             let item = world.get_component(eid, "Item").unwrap();

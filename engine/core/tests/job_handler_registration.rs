@@ -56,7 +56,7 @@ fn test_register_job_handler_api_invokes_handler() {
 
     // Run the job system, custom handler should immediately complete the job
     let mut job_system = JobSystem::new();
-    job_system.run(&mut world, None);
+    job_system.run(&mut world);
 
     let job = world.get_component(job_id, "Job").unwrap();
     assert_eq!(job.get("progress").unwrap(), 999.0);
@@ -151,7 +151,7 @@ fn test_register_job_handler_multiple_types() {
 
     // Run the job system
     let mut job_system = JobSystem::new();
-    job_system.run(&mut world, None);
+    job_system.run(&mut world);
 
     let job_foo = world.get_component(job_foo_id, "Job").unwrap();
     let job_bar = world.get_component(job_bar_id, "Job").unwrap();

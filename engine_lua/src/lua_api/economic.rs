@@ -138,7 +138,7 @@ pub fn register_economic_api(
         let mut system = ResourceReservationSystem::new();
 
         // Run reservation system to allocate resources if possible
-        system.run_reservation(&mut world, None);
+        system.run_reservation(&mut world);
 
         // Now check reservation status
         let status = system.check_reservation_status(&world, entity);

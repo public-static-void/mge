@@ -79,7 +79,7 @@ fn test_job_system_advances_progress_and_completes_job() {
     world.register_system(JobSystem);
 
     for _ in 0..4 {
-        world.run_system("JobSystem", None).unwrap();
+        world.run_system("JobSystem").unwrap();
     }
 
     let job = world.get_component(eid, "Job").unwrap();
@@ -123,7 +123,7 @@ fn test_job_system_emits_event_on_completion() {
     world.register_system(JobSystem);
 
     for _ in 0..6 {
-        world.run_system("JobSystem", None).unwrap();
+        world.run_system("JobSystem").unwrap();
     }
 
     world.update_event_buses::<serde_json::Value>();
@@ -161,7 +161,7 @@ fn test_job_system_emits_event_on_failure() {
     world.register_system(JobSystem);
 
     for _ in 0..2 {
-        world.run_system("JobSystem", None).unwrap();
+        world.run_system("JobSystem").unwrap();
     }
     world.update_event_buses::<serde_json::Value>();
 
@@ -234,7 +234,7 @@ fn test_job_system_uses_custom_job_type_logic() {
 
     let mut job_system = JobSystem;
     for _ in 0..2 {
-        engine_core::ecs::system::System::run(&mut job_system, &mut world, None);
+        engine_core::ecs::system::System::run(&mut job_system, &mut world);
     }
 
     let job = world.get_component(eid, "Job").unwrap();

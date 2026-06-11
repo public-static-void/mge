@@ -153,7 +153,7 @@ fn test_partial_effect_rollback_on_cancel_and_interruption() {
         .unwrap();
 
     // Run the job system once: should apply first effect only (Step1)
-    world.run_system("JobSystem", None).unwrap();
+    world.run_system("JobSystem").unwrap();
 
     // Check job component presence
     let _job_state = world
@@ -175,7 +175,7 @@ fn test_partial_effect_rollback_on_cancel_and_interruption() {
     world.set_component(eid, "Job", job).unwrap();
 
     // Run the job system again: should rollback the first effect only
-    world.run_system("JobSystem", None).unwrap();
+    world.run_system("JobSystem").unwrap();
 
     // Check Step component after rollback undo on cancellation
     let step = world
@@ -217,7 +217,7 @@ fn test_partial_effect_rollback_on_cancel_and_interruption() {
         .unwrap();
 
     // Run the job system once: first effect applied (Step1)
-    world.run_system("JobSystem", None).unwrap();
+    world.run_system("JobSystem").unwrap();
 
     let _job_state2 = world
         .get_component(eid2, "Job")
@@ -236,7 +236,7 @@ fn test_partial_effect_rollback_on_cancel_and_interruption() {
     assert!(job2_exists, "Job entity should still exist before rollback");
 
     // Run the job system again: should detect missing agent and rollback
-    world.run_system("JobSystem", None).unwrap();
+    world.run_system("JobSystem").unwrap();
 
     // Check Step component after rollback on interruption
     let step_after_interrupt = world

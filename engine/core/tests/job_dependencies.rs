@@ -68,7 +68,7 @@ fn test_job_with_unfinished_dependency_remains_pending() {
             tick as u64,
             &[],
         );
-        job_system.run(&mut world, None);
+        job_system.run(&mut world);
     }
     let main_job_after = world.get_component(main_eid, "Job").unwrap();
     assert_eq!(main_job_after.get("state").unwrap(), "pending");

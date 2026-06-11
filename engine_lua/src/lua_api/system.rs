@@ -72,7 +72,7 @@ pub fn register_system_functions(
     let run_native_system = lua.create_function_mut(move |_, name: String| {
         let mut world = world_native_run.borrow_mut();
         world
-            .run_system(&name, None)
+            .run_system(&name)
             .map_err(|e| lua_error_from_any(&lua_for_native, e))
     })?;
     globals.set("run_native_system", run_native_system)?;

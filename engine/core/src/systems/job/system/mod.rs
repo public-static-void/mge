@@ -29,7 +29,7 @@ impl System for JobSystem {
         "JobSystem"
     }
 
-    fn run(&mut self, world: &mut World, lua: Option<&mlua::Lua>) {
-        crate::systems::job::system::orchestrator::run_job_system(world, lua);
+    fn run(&mut self, world: &mut World) {
+        crate::systems::job::system::orchestrator::run_job_system(world);
     }
 }

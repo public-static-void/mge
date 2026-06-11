@@ -8,7 +8,7 @@ pub trait System: Send + Sync {
     /// Returns the name of the system
     fn name(&self) -> &'static str;
     /// Runs the system
-    fn run(&mut self, world: &mut World, lua: Option<&mlua::Lua>);
+    fn run(&mut self, world: &mut World);
     /// Returns a list of dependencies
     fn dependencies(&self) -> &'static [&'static str] {
         &[]
