@@ -121,11 +121,7 @@ fn default_job_progress(
 }
 
 /// Processes a single job, updating its state and handling dependencies, cancellation, and children.
-pub fn process_job(
-    world: &mut World,
-    eid: u32,
-    mut job: serde_json::Value,
-) -> serde_json::Value {
+pub fn process_job(world: &mut World, eid: u32, mut job: serde_json::Value) -> serde_json::Value {
     let job_type = job
         .get("job_type")
         .and_then(|v| v.as_str())

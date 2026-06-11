@@ -55,11 +55,8 @@ pub fn process_job_children(
                 }
             } else {
                 // Normal processing
-                let processed = crate::systems::job::system::process::process_job(
-                    world,
-                    eid,
-                    child.clone(),
-                );
+                let processed =
+                    crate::systems::job::system::process::process_job(world, eid, child.clone());
                 world
                     .set_component(child_id as u32, "Job", processed.clone())
                     .unwrap();
