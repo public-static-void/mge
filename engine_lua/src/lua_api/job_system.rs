@@ -1,11 +1,11 @@
 use crate::helpers::{json_to_lua_table, lua_error_from_any, lua_table_to_json};
 use engine_core::ecs::world::World;
 use mlua::{Function, Lua, LuaSerdeExt, RegistryKey, Result as LuaResult, Table};
-use once_cell::sync::Lazy;
 use serde_json::Value as JsonValue;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
+use std::sync::LazyLock;
 use std::sync::{Arc, Mutex};
 
 thread_local! {
@@ -28,8 +28,8 @@ pub struct LuaJobCall {
 }
 
 /// Lua job call queue
-pub static LUA_JOB_CALL_QUEUE: Lazy<Arc<Mutex<Vec<LuaJobCall>>>> =
-    Lazy::new(|| Arc::new(Mutex::new(Vec::new())));
+pub static LUA_JOB_CALL_QUEUE: LazyLock<Arc<Mutex<Vec<LuaJobCall>>>> =
+    LazyLock::new(|| Arc::new(Mutex::new(Vec::new())));
 
 /// Registers job system API
 pub fn register_job_system_api(
