@@ -67,8 +67,7 @@ pub fn advance_job_state(pyworld: &PyWorld, job_id: u32) -> PyResult<()> {
             )));
         }
     };
-    let new_job =
-        engine_core::systems::job::system::process::process_job(&mut world, job_id, job);
+    let new_job = engine_core::systems::job::system::process::process_job(&mut world, job_id, job);
     world
         .set_component(job_id, "Job", new_job)
         .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Failed to set job: {e}")))?;
