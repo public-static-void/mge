@@ -2,12 +2,11 @@ use crate::ecs::world::World;
 use crate::systems::job::job_board::JobBoard;
 use serde_json::Value as JsonValue;
 use std::collections::VecDeque;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, LazyLock, Mutex};
 
-lazy_static::lazy_static! {
-    /// Buffer for AI event intents
-    pub static ref AI_EVENT_INTENT_BUFFER: Arc<Mutex<VecDeque<JsonValue>>> = Arc::new(Mutex::new(VecDeque::new()));
-}
+/// Buffer for AI event intents
+pub static AI_EVENT_INTENT_BUFFER: LazyLock<Arc<Mutex<VecDeque<JsonValue>>>> =
+    LazyLock::new(|| Arc::new(Mutex::new(VecDeque::new())));
 
 /// Computes the utility score of a job for a given agent.
 /// Takes into account skills, preferences, specializations, and resource bonuses.

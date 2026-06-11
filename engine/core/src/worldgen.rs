@@ -1,8 +1,8 @@
 use crate::map::deserialize::validate_map_schema;
 use libloading::Library;
-use once_cell::sync::Lazy;
 use serde_json::Value as JsonValue;
 use std::fmt;
+use std::sync::LazyLock;
 use std::sync::{Arc, Mutex};
 
 // --- dyn-clone for trait object cloning ---
@@ -361,5 +361,5 @@ impl Default for WorldgenRegistry {
 
 /// Global thread-safe registry for world generation.
 /// Only the thread-safe registry is global
-pub static GLOBAL_WORLDGEN_REGISTRY: Lazy<Mutex<ThreadSafeWorldgenRegistry>> =
-    Lazy::new(|| Mutex::new(ThreadSafeWorldgenRegistry::new()));
+pub static GLOBAL_WORLDGEN_REGISTRY: LazyLock<Mutex<ThreadSafeWorldgenRegistry>> =
+    LazyLock::new(|| Mutex::new(ThreadSafeWorldgenRegistry::new()));

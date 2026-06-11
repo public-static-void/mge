@@ -310,15 +310,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "codegen"
-version = "0.1.0"
-dependencies = [
- "schemars",
- "serde",
- "serde_json",
-]
-
-[[package]]
 name = "colorchoice"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -671,9 +662,7 @@ dependencies = [
  "engine_macros",
  "indexmap",
  "jsonschema",
- "lazy_static",
  "libloading",
- "once_cell",
  "parking_lot",
  "schema_validator",
  "schemars",
@@ -694,9 +683,7 @@ version = "0.1.0"
 dependencies = [
  "engine_core",
  "gag",
- "lazy_static",
  "mlua",
- "once_cell",
  "regex",
  "serde_json",
  "tempfile",
@@ -722,7 +709,6 @@ name = "engine_py"
 version = "0.1.0"
 dependencies = [
  "engine_core",
- "once_cell",
  "pyo3",
  "pythonize",
  "serde-pyobject",

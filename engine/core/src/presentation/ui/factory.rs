@@ -4,8 +4,8 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::presentation::ui::widget::{UiWidget, WidgetId};
-use once_cell::sync::Lazy;
 use serde_json::Value;
+use std::sync::LazyLock;
 
 /// Widget properties
 pub type WidgetProps = HashMap<String, Value>;
@@ -51,10 +51,10 @@ impl UiFactory {
 }
 
 /// Global UI factory
-/// Use once_cell for a global singleton
-pub static UI_FACTORY: Lazy<Arc<ReentrantMutex<RefCell<UiFactory>>>> =
-    Lazy::new(|| Arc::new(ReentrantMutex::new(RefCell::new(UiFactory::new()))));
+/// Global UI factory
+pub static UI_FACTORY: LazyLock<Arc<ReentrantMutex<RefCell<UiFactory>>>> =
+    LazyLock::new(|| Arc::new(ReentrantMutex::new(RefCell::new(UiFactory::new()))));
 
 /// Global widget registry
-pub static WIDGET_REGISTRY: Lazy<Arc<ReentrantMutex<RefCell<WidgetRegistry>>>> =
-    Lazy::new(|| Arc::new(ReentrantMutex::new(RefCell::new(WidgetRegistry::new()))));
+pub static WIDGET_REGISTRY: LazyLock<Arc<ReentrantMutex<RefCell<WidgetRegistry>>>> =
+    LazyLock::new(|| Arc::new(ReentrantMutex::new(RefCell::new(WidgetRegistry::new()))));
