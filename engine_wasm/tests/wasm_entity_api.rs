@@ -2,11 +2,6 @@ use engine_wasm::{WasmScriptEngine, WasmScriptEngineConfig};
 use std::io::Write;
 use tempfile::NamedTempFile;
 
-// Import the store type used by your engine
-use engine_core::ecs::world::wasm::WasmWorld;
-use std::sync::{Arc, Mutex};
-use wasmtime::Caller;
-
 /// Loads a WASM test artifact from the wasm_tests directory at runtime.
 /// Panics if the file is missing.
 fn load_wasm_test_artifact(name: &str) -> Vec<u8> {
@@ -37,36 +32,7 @@ fn test_wasm_entity_api_bridge() {
 
     let config = WasmScriptEngineConfig {
         module_path: wasm_file.path().to_path_buf(),
-        import_host_functions: Some(Box::new(|linker| {
-            // Explicit type annotation for the store
-            type Store = Arc<Mutex<WasmWorld>>;
-
-            linker
-                .func_wrap("env", "spawn_entity", |_: Caller<'_, Store>| 42u32)
-                .unwrap();
-            linker
-                .func_wrap(
-                    "env",
-                    "move_entity",
-                    |_: Caller<'_, Store>, _: u32, _: f32, _: f32| {},
-                )
-                .unwrap();
-            linker
-                .func_wrap(
-                    "env",
-                    "damage_entity",
-                    |_: Caller<'_, Store>, _: u32, _: f32| {},
-                )
-                .unwrap();
-            linker
-                .func_wrap("env", "is_entity_alive", |_: Caller<'_, Store>, _: u32| {
-                    1i32
-                })
-                .unwrap();
-            linker
-                .func_wrap("env", "despawn_entity", |_: Caller<'_, Store>, _: u32| {})
-                .unwrap();
-        })),
+        import_host_functions: None,
     };
 
     let engine = WasmScriptEngine::new(config).expect("Failed to create WasmScriptEngine");
