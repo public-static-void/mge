@@ -24,8 +24,6 @@ use crate::worldgen_bridge::{
 };
 use api::PyWorld;
 use engine_core::presentation::ui::register_all_widgets;
-use pyo3::prelude::*;
-
 #[pymodule]
 fn engine_py(_py: Python, m: &Bound<'_, pyo3::types::PyModule>) -> PyResult<()> {
     plugin_init::register_plugins();

@@ -26,7 +26,7 @@ use std::rc::Rc;
 
 /// The main Python-side wrapper for the ECS world.
 /// Exposes all core ECS, component, job, inventory, region, and system APIs.
-#[pyclass(unsendable, subclass)]
+#[pyclass(unsendable, subclass, from_py_object)]
 pub struct PyWorld {
     /// The underlying ECS world
     pub inner: Rc<RefCell<World>>,
