@@ -1,3 +1,4 @@
+use crate::PyObject;
 use engine_core::worldgen::{
     GLOBAL_WORLDGEN_REGISTRY, ThreadSafeScriptingWorldgenPlugin, ThreadSafeWorldgenPlugin,
 };
@@ -13,7 +14,7 @@ struct PythonWorldgenPlugin {
 impl Clone for PythonWorldgenPlugin {
     fn clone(&self) -> Self {
         // SAFETY: clone_ref requires the GIL.
-        Python::with_gil(|py| PythonWorldgenPlugin {
+        Python::attach(|py| PythonWorldgenPlugin {
             callback: self.callback.clone_ref(py),
         })
     }
@@ -21,7 +22,7 @@ impl Clone for PythonWorldgenPlugin {
 
 impl ThreadSafeScriptingWorldgenPlugin for PythonWorldgenPlugin {
     fn invoke(&self, params: &Value) -> Result<Value, Box<dyn std::error::Error>> {
-        Python::with_gil(|py| {
+        Python::attach(|py| {
             let arg = to_pyobject(py, params)?;
             let result = self.callback.call1(py, (arg,))?;
             from_pyobject(result.bind(py).clone()).map_err(|e| Box::new(e) as _)
@@ -71,7 +72,7 @@ pub fn register_worldgen_validator(py: Python, callback: Py<PyAny>) -> PyResult<
     let cb = callback.clone_ref(py);
     let mut registry = GLOBAL_WORLDGEN_REGISTRY.lock().unwrap();
     registry.register_validator(move |map| {
-        Python::with_gil(|py| {
+        Python::attach(|py| {
             let arg = to_pyobject(py, map).map_err(|e| e.to_string())?;
             let result = cb.call1(py, (arg,)).map_err(|e| e.to_string())?;
             if result.is_truthy(py).map_err(|e| e.to_string())? {
@@ -89,22 +90,20 @@ pub fn register_worldgen_postprocessor(py: Python, callback: Py<PyAny>) -> PyRes
     let cb = callback.clone_ref(py);
     let mut registry = GLOBAL_WORLDGEN_REGISTRY.lock().unwrap();
     registry.register_postprocessor(move |map| {
-        Python::with_gil(|py| {
+        Python::attach(|py| {
             let arg = to_pyobject(py, map).expect("Failed to convert map to PyObject");
             let result: PyObject = cb
                 .call1(py, (arg.clone(),))
                 .expect("Postprocessor call failed");
             // If the Python function returned a dict, use it to update the map
-            if let Ok(dict) = result.extract::<pyo3::Bound<'_, pyo3::types::PyDict>>(py) {
+            if let Ok(dict_ref) = result.bind(py).cast::<pyo3::types::PyDict>() {
                 let new_map: Value =
-                    from_pyobject(dict).expect("Failed to convert PyDict to Value");
+                    from_pyobject(dict_ref.clone()).expect("Failed to convert PyDict to Value");
                 *map = new_map;
-            } else if let Ok(bound_any) = arg.extract::<pyo3::Bound<'_, pyo3::types::PyAny>>()
-                && let Ok(dict) = bound_any.extract::<pyo3::Bound<'_, pyo3::types::PyDict>>()
-            {
+            } else if let Ok(dict_ref) = arg.cast::<pyo3::types::PyDict>() {
                 // If the user mutated the dict in place, update map from arg
                 let new_map: Value =
-                    from_pyobject(dict).expect("Failed to convert PyDict to Value");
+                    from_pyobject(dict_ref.clone()).expect("Failed to convert PyDict to Value");
                 *map = new_map;
             }
         });

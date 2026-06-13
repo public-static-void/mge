@@ -1,6 +1,6 @@
 use engine_core::systems::job::system::events::job_event_logger;
 use pyo3::Bound;
-use pyo3::PyObject;
+use crate::PyObject;
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict, PyList};
 use std::collections::HashMap;
@@ -128,7 +128,7 @@ pub fn deliver_job_event_bus_callbacks(
     for event_type in subs.keys() {
         let events = world.take_events(event_type);
         if !events.is_empty() {
-            events_by_type.insert(event_type.clone(), events);
+            events_by_type.insert(event_type.to_string(), events);
         }
     }
 
@@ -154,7 +154,7 @@ pub fn deliver_job_event_bus_callbacks(
 /// Saves job event log
 #[pyfunction]
 pub fn save_job_event_log_py(path: String) -> PyResult<()> {
-    Python::with_gil(|_py| {
+    Python::attach(|_py| {
         engine_core::systems::job::system::events::save_job_event_log(&path).map_err(|e| {
             pyo3::exceptions::PyIOError::new_err(format!("Failed to save event log: {e}"))
         })
@@ -164,7 +164,7 @@ pub fn save_job_event_log_py(path: String) -> PyResult<()> {
 /// Loads job event log
 #[pyfunction]
 pub fn load_job_event_log_py(path: String) -> PyResult<()> {
-    Python::with_gil(|_py| {
+    Python::attach(|_py| {
         engine_core::systems::job::system::events::load_job_event_log(&path).map_err(|e| {
             pyo3::exceptions::PyIOError::new_err(format!("Failed to load event log: {e}"))
         })

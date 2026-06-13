@@ -1,4 +1,5 @@
 use super::PyWorld;
+use crate::PyObject;
 use pyo3::prelude::*;
 use serde_json::json;
 

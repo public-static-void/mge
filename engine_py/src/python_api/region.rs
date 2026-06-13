@@ -1,4 +1,5 @@
 use super::PyWorld;
+use crate::PyObject;
 use pyo3::prelude::*;
 
 /// Methods for accessing entities in regions

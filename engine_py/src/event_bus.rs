@@ -1,6 +1,7 @@
 use crate::python_api::world::PyWorld;
 use engine_core::ecs::event::{EventBus, EventReader};
 use pyo3::exceptions::PyValueError;
+use crate::PyObject;
 use pyo3::prelude::*;
 use serde_json::Value;
 use serde_pyobject::to_pyobject;

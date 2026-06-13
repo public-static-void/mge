@@ -1,4 +1,5 @@
 use super::PyWorld;
+use crate::PyObject;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyTuple};
 use serde_json::Value;
@@ -19,9 +20,9 @@ impl EquipmentApi for PyWorld {
         let world = self.inner.borrow();
         if let Some(val) = world.get_component(entity_id, "Equipment") {
             let any = to_pyobject(py, val)?;
-            if let Ok(dict) = any.downcast::<PyDict>()
+            if let Ok(dict) = any.cast::<PyDict>()
                 && let Ok(Some(slots_any)) = dict.get_item("slots")
-                && let Ok(slots) = slots_any.downcast::<PyDict>()
+                && let Ok(slots) = slots_any.cast::<PyDict>()
             {
                 for (k, v) in slots.iter() {
                     if v.is_instance_of::<PyTuple>() && v.len().unwrap_or(1) == 0 {

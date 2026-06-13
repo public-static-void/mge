@@ -1,4 +1,5 @@
 use crate::python_api::world::PyWorld;
+use crate::PyObject;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 

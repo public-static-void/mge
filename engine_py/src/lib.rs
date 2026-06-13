@@ -1,5 +1,11 @@
 //! Engine Python API
 
+use pyo3::prelude::*;
+use pyo3::types::PyAny;
+
+/// Backward-compatible type alias for `Py<PyAny>` (removed from pyo3 0.29).
+pub type PyObject = Py<PyAny>;
+
 /// PyWorld API
 pub mod api;
 mod event_bus;

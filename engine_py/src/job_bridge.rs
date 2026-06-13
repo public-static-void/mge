@@ -15,7 +15,7 @@ pub fn py_job_handler(
     _job_id: u32,
     job_data: &serde_json::Value,
 ) -> serde_json::Value {
-    Python::with_gil(|py| {
+    Python::attach(|py| {
         let job_type = job_data
             .get("job_type")
             .and_then(|v| v.as_str())

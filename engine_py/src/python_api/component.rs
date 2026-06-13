@@ -1,4 +1,5 @@
 use super::PyWorld;
+use crate::PyObject;
 use pyo3::prelude::*;
 use pyo3::types::PyAny;
 use serde_json::Value;
@@ -80,7 +81,7 @@ impl ComponentApi for PyWorld {
         if let Some(schema) = world.registry.lock().unwrap().get_schema_by_name(&name) {
             let json = serde_json::to_value(&schema.schema)
                 .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
-            Python::with_gil(|py| Ok(to_pyobject(py, &json)?.into()))
+            Python::attach(|py| Ok(to_pyobject(py, &json)?.into()))
         } else {
             Err(pyo3::exceptions::PyValueError::new_err(
                 "Component schema not found",

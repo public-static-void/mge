@@ -2,6 +2,7 @@ use crate::python_api::world::PyWorld;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
+use crate::PyObject;
 
 /// Assign jobs to an AI agent using the internal job AI logic.
 pub fn ai_assign_jobs(pyworld: &PyWorld, agent_id: u32, _args: Vec<PyObject>) -> PyResult<()> {

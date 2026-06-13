@@ -1,4 +1,5 @@
 use super::PyWorld;
+use crate::PyObject;
 use pyo3::prelude::*;
 
 /// Economic API
@@ -21,7 +22,7 @@ pub fn get_stockpile_resources(pyworld: &PyWorld, entity_id: u32) -> PyResult<Op
     let world = pyworld.inner.borrow();
     if let Some(stockpile) = world.get_component(entity_id, "Stockpile") {
         if let Some(resources) = stockpile.get("resources") {
-            Python::with_gil(|py| Ok(Some(serde_pyobject::to_pyobject(py, resources)?.into())))
+            Python::attach(|py| Ok(Some(serde_pyobject::to_pyobject(py, resources)?.into())))
         } else {
             Ok(None)
         }

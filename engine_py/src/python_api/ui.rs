@@ -1,6 +1,7 @@
 use engine_core::presentation::ui::factory::{UI_FACTORY, WIDGET_REGISTRY, WidgetProps};
 use engine_core::presentation::ui::schema_loader::load_ui_from_json;
 use engine_core::presentation::ui::widget::UiWidget;
+use crate::PyObject;
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict};
 use serde_json::Value;
@@ -22,7 +23,7 @@ impl UiApi {
 
     /// Create a new widget
     pub fn create_widget(&self, type_name: String, props: Bound<'_, PyAny>) -> PyResult<u64> {
-        let props_dict: &Bound<PyDict> = props.downcast::<PyDict>()?;
+        let props_dict: &Bound<PyDict> = props.cast::<PyDict>()?;
         let mut widget_props = WidgetProps::new();
         for (k, v) in props_dict.iter() {
             let key = k.extract::<String>()?;
@@ -58,7 +59,7 @@ impl UiApi {
 
     /// Set widget props
     pub fn set_widget_props(&self, widget_id: u64, props: Bound<'_, PyAny>) -> PyResult<bool> {
-        let props_dict: &Bound<PyDict> = props.downcast::<PyDict>()?;
+        let props_dict: &Bound<PyDict> = props.cast::<PyDict>()?;
         let mut widget_props = WidgetProps::new();
         for (k, v) in props_dict.iter() {
             let key = k.extract::<String>()?;
@@ -192,7 +193,7 @@ impl UiApi {
         let mut registry = registry_binding.borrow_mut();
         if let Some(widget) = registry.get_mut(&widget_id) {
             let cb = Arc::new(move |w: &mut dyn UiWidget| {
-                Python::with_gil(|py| {
+                Python::attach(|py| {
                     if let Err(e) = callback.call1(py, (w.id(),)) {
                         e.print(py);
                     }
@@ -239,7 +240,7 @@ impl UiApi {
         use engine_core::presentation::ui::UiEvent;
         let event = match event_name.as_str() {
             "click" => {
-                let dict: Bound<'_, PyDict> = args.downcast_into::<PyDict>()?;
+                let dict: Bound<'_, PyDict> = args.cast_into::<PyDict>()?;
                 let x = match dict.get_item("x")? {
                     Some(val) => val.extract::<i32>().unwrap_or(0),
                     None => 0,
@@ -251,7 +252,7 @@ impl UiApi {
                 UiEvent::Click { x, y }
             }
             "key_press" => {
-                let dict: Bound<'_, PyDict> = args.downcast_into::<PyDict>()?;
+                let dict: Bound<'_, PyDict> = args.cast_into::<PyDict>()?;
                 let key = match dict.get_item("key")? {
                     Some(val) => val.extract::<String>().unwrap_or_default(),
                     None => String::new(),
@@ -325,7 +326,7 @@ impl UiApi {
         let type_name_for_ctor = type_name.clone();
 
         let ctor = move |props: WidgetProps| {
-            let id = Python::with_gil(|py| {
+            let id = Python::attach(|py| {
                 let py_props = pyo3::types::PyDict::new(py);
                 for (k, v) in &props {
                     let py_val = serde_pyobject::to_pyobject(py, v).unwrap();

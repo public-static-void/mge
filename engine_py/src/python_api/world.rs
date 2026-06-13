@@ -1,6 +1,7 @@
 use crate::python_api::body::BodyApi;
 use crate::python_api::component::ComponentApi;
 use crate::python_api::death_decay::DeathDecayApi;
+use crate::PyObject;
 use crate::python_api::economic::EconomicApi;
 use crate::python_api::entity::EntityApi;
 use crate::python_api::equipment::EquipmentApi;
@@ -422,12 +423,12 @@ impl PyWorld {
         &self,
         py: pyo3::Python,
         include_terminal: bool,
-    ) -> pyo3::PyResult<pyo3::PyObject> {
+    ) -> pyo3::PyResult<crate::PyObject> {
         JobQueryApi::list_jobs(self, py, Some(include_terminal))
     }
 
     /// Get a job by ID.
-    fn get_job(&self, py: pyo3::Python, job_id: u32) -> pyo3::PyResult<pyo3::PyObject> {
+    fn get_job(&self, py: pyo3::Python, job_id: u32) -> pyo3::PyResult<crate::PyObject> {
         JobQueryApi::get_job(self, py, job_id)
     }
 
