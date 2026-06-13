@@ -95,7 +95,9 @@ pub fn register_job_system_api(
                     job_id,
                     job: job.clone(),
                 };
-                LUA_JOB_CALL_QUEUE.lock().unwrap().push(call);
+                if let Ok(mut queue) = LUA_JOB_CALL_QUEUE.lock() {
+                    queue.push(call);
+                }
                 job.clone()
             });
 
@@ -123,29 +125,36 @@ pub fn register_job_system_api(
 
 /// Processes all queued Lua job handler calls.
 /// This must be called on the main thread, typically once per tick after ECS/job system runs.
-pub fn process_lua_job_calls(lua: &Lua, world: &Rc<RefCell<World>>) {
-    let mut queue = LUA_JOB_CALL_QUEUE.lock().unwrap();
+pub fn process_lua_job_calls(lua: &Lua, world: &Rc<RefCell<World>>) -> LuaResult<()> {
+    let Ok(mut queue) = LUA_JOB_CALL_QUEUE.lock() else {
+        return Err(mlua::Error::external("Mutex poisoned in job call queue"));
+    };
     while let Some(call) = queue.pop() {
-        LUA_JOB_HANDLERS.with(|handlers| {
-            if let Some(key) = handlers.borrow().get(&call.job_type) {
-                let func: Function = lua.registry_value(key).expect("Invalid Lua registry key");
-                let job_table = json_to_lua_table(lua, &call.job).unwrap();
-                let progress_json = call.job.get("progress").cloned().unwrap_or_default();
-                let progress_lua = lua.to_value(&progress_json).unwrap();
-                let result = func.call::<mlua::Value>((job_table, progress_lua)).unwrap();
-                let updated_job = match result {
-                    mlua::Value::Table(table) => {
-                        crate::helpers::lua_table_to_json(lua, &table, None).unwrap()
-                    }
-                    _ => panic!("Lua job handler must return a table"),
-                };
-                let mut world_ref = world.borrow_mut();
-                world_ref
-                    .set_component(call.entity, "Job", updated_job)
-                    .unwrap();
-            }
+        let result: LuaResult<()> = LUA_JOB_HANDLERS.with(|handlers| {
+            let handlers = handlers.borrow();
+            let Some(key) = handlers.get(&call.job_type) else {
+                return Ok(());
+            };
+            let func: Function = lua.registry_value(key)?;
+            let job_table = json_to_lua_table(lua, &call.job)?;
+            let progress_json = call.job.get("progress").cloned().unwrap_or_default();
+            let progress_lua = lua.to_value(&progress_json)?;
+            let result = func.call::<mlua::Value>((job_table, progress_lua))?;
+            let updated_job = match result {
+                mlua::Value::Table(table) => crate::helpers::lua_table_to_json(lua, &table, None)?,
+                _ => return Err(mlua::Error::external("Lua job handler must return a table")),
+            };
+            let mut world_ref = world.borrow_mut();
+            world_ref
+                .set_component(call.entity, "Job", updated_job)
+                .map_err(|e| mlua::Error::external(format!("Failed to set Job component: {e}")))?;
+            Ok(())
         });
+        if let Err(e) = result {
+            eprintln!("Lua job handler error: {e}");
+        }
     }
+    Ok(())
 }
 
 /// Calls a Lua job handler by job type name.

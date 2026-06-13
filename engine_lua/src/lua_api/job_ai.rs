@@ -31,7 +31,9 @@ pub fn register_job_ai_api(lua: &Lua, globals: &Table, world: Rc<RefCell<World>>
             && prev_current_job != Some(current_job_id)
             && let Some(job_json) = world.get_component(current_job_id as u32, "Job")
         {
-            let mut job_json_obj = job_json.as_object().unwrap().clone();
+            let Some(mut job_json_obj) = job_json.as_object().cloned() else {
+                return Err(mlua::Error::external("Job component is not an object"));
+            };
             job_json_obj.insert(
                 "assigned_to".to_string(),
                 JsonValue::Number(agent_id.into()),
@@ -76,7 +78,9 @@ pub fn register_job_ai_api(lua: &Lua, globals: &Table, world: Rc<RefCell<World>>
                         .and_then(|v| v.as_str())
                         .unwrap_or("<no state>");
                     tbl.set("state", state)?;
-                    tbl.set("assigned_to", n.as_u64().unwrap())?;
+                    if let Some(val) = n.as_u64() {
+                        tbl.set("assigned_to", val)?;
+                    }
                     results.push(tbl);
                 }
             }

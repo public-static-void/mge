@@ -17,11 +17,16 @@ fn parse_cell_key(cell_json: serde_json::Value) -> Result<CellKey, mlua::Error> 
         && obj.contains_key("y")
         && obj.contains_key("z")
     {
-        return Ok(CellKey::Square {
-            x: obj["x"].as_i64().unwrap() as i32,
-            y: obj["y"].as_i64().unwrap() as i32,
-            z: obj["z"].as_i64().unwrap() as i32,
-        });
+        let x = obj["x"]
+            .as_i64()
+            .ok_or_else(|| mlua::Error::external("x is not an integer"))? as i32;
+        let y = obj["y"]
+            .as_i64()
+            .ok_or_else(|| mlua::Error::external("y is not an integer"))? as i32;
+        let z = obj["z"]
+            .as_i64()
+            .ok_or_else(|| mlua::Error::external("z is not an integer"))? as i32;
+        return Ok(CellKey::Square { x, y, z });
     }
     Err(mlua::Error::external("Invalid cell key format"))
 }

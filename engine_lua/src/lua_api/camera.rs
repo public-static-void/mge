@@ -16,29 +16,31 @@ pub fn register_camera_api(lua: &Lua, globals: &Table, world: Rc<RefCell<World>>
             .cloned()
             .unwrap_or_else(|| {
                 let id = world.spawn_entity();
-                world
-                    .set_component(id, "Camera", serde_json::json!({ "x": x, "y": y }))
-                    .unwrap();
-                world
-                    .set_component(
-                        id,
-                        "Position",
-                        serde_json::json!({ "pos": { "Square": { "x": x, "y": y, "z": 0 } } }),
-                    )
-                    .unwrap();
+                if let Err(e) =
+                    world.set_component(id, "Camera", serde_json::json!({ "x": x, "y": y }))
+                {
+                    eprintln!("Failed to set Camera component on new entity: {e}");
+                }
+                if let Err(e) = world.set_component(
+                    id,
+                    "Position",
+                    serde_json::json!({ "pos": { "Square": { "x": x, "y": y, "z": 0 } } }),
+                ) {
+                    eprintln!("Failed to set Position component on new entity: {e}");
+                }
                 id
             });
         // Always update Camera component with x and y
         world
             .set_component(camera_id, "Camera", serde_json::json!({ "x": x, "y": y }))
-            .unwrap();
+            .map_err(|e| mlua::Error::external(format!("Failed to set Camera: {e}")))?;
         world
             .set_component(
                 camera_id,
                 "Position",
                 serde_json::json!({ "pos": { "Square": { "x": x, "y": y, "z": 0 } } }),
             )
-            .unwrap();
+            .map_err(|e| mlua::Error::external(format!("Failed to set Position: {e}")))?;
         Ok(())
     })?;
     globals.set("set_camera", set_camera)?;

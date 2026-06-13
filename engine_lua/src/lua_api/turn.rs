@@ -14,7 +14,7 @@ pub fn register_turn_api(lua: &Lua, globals: &Table, world: Rc<RefCell<World>>) 
     let world_ref = world.clone();
     let tick = lua.create_function_mut(move |_, ()| {
         World::tick(Rc::clone(&world_tick));
-        process_lua_job_calls(&lua_ref, &world_ref);
+        process_lua_job_calls(&lua_ref, &world_ref)?;
         Ok(())
     })?;
     globals.set("tick", tick)?;

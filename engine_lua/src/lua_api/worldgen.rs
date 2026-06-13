@@ -101,12 +101,14 @@ pub fn register_worldgen_api(
             .borrow_mut()
             .register_scripting_validator(move |map| {
                 let lua_rc = Rc::clone(&lua_rc_inner);
-                let func: Function = lua_rc.registry_value(&func_key).unwrap();
-                let map_tbl = json_to_lua_table(&lua_rc, map).unwrap();
-                let result: LuaValue = func.call(map_tbl).unwrap();
+                let func: Function = lua_rc
+                    .registry_value(&func_key)
+                    .map_err(|e| e.to_string())?;
+                let map_tbl = json_to_lua_table(&lua_rc, map).map_err(|e| e.to_string())?;
+                let result: LuaValue = func.call(map_tbl).map_err(|e| e.to_string())?;
                 match result {
                     LuaValue::Nil | LuaValue::Boolean(true) => Ok(()),
-                    LuaValue::String(s) => Err(s.to_str().unwrap().to_string()),
+                    LuaValue::String(s) => Err(s.to_str().map_err(|e| e.to_string())?.to_string()),
                     _ => Err("Validator failed".to_string()),
                 }
             });
@@ -124,14 +126,20 @@ pub fn register_worldgen_api(
             .borrow_mut()
             .register_scripting_postprocessor(move |map| {
                 let lua_rc = Rc::clone(&lua_rc_inner);
-                let func: Function = lua_rc.registry_value(&func_key).unwrap();
-                let map_tbl = json_to_lua_table(&lua_rc, map).unwrap();
+                let func: Function = lua_rc
+                    .registry_value(&func_key)
+                    .expect("Worldgen postprocessor registry key invalid");
+                let map_tbl = json_to_lua_table(&lua_rc, map)
+                    .expect("Failed to convert map to Lua table in postprocessor");
                 let map_tbl = match map_tbl {
                     mlua::Value::Table(t) => t,
-                    _ => panic!("Expected Lua Table from json_to_lua_table"),
+                    _ => panic!("Expected Lua Table from json_to_lua_table in postprocessor"),
                 };
-                let _: () = func.call(map_tbl.clone()).unwrap(); // ok: for Lua function call
-                let new_map = lua_table_to_json(&lua_rc, &map_tbl, None).unwrap(); // must be &Table
+                let _: () = func
+                    .call(map_tbl.clone())
+                    .expect("Lua postprocessor function call failed");
+                let new_map = lua_table_to_json(&lua_rc, &map_tbl, None)
+                    .expect("Failed to convert Lua table back to JSON in postprocessor");
                 *map = new_map;
             });
         Ok(())

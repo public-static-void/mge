@@ -33,7 +33,11 @@ pub fn register_job_event_api(
                 let e = lua.create_table()?;
                 e.set("timestamp", event.timestamp)?;
                 e.set("event_type", event.event_type.clone())?;
-                e.set("payload", serde_json::to_string(&event.payload).unwrap())?;
+                e.set(
+                    "payload",
+                    serde_json::to_string(&event.payload)
+                        .map_err(|e| mlua::Error::external(format!("Serialization error: {e}")))?,
+                )?;
                 lua_events.set(i + 1, e)?;
             }
             Ok(lua_events)
@@ -50,7 +54,11 @@ pub fn register_job_event_api(
                 let e = lua.create_table()?;
                 e.set("timestamp", event.timestamp)?;
                 e.set("event_type", event.event_type.clone())?;
-                e.set("payload", serde_json::to_string(&event.payload).unwrap())?;
+                e.set(
+                    "payload",
+                    serde_json::to_string(&event.payload)
+                        .map_err(|e| mlua::Error::external(format!("Serialization error: {e}")))?,
+                )?;
                 lua_events.set(i + 1, e)?;
             }
             Ok(lua_events)
@@ -67,7 +75,11 @@ pub fn register_job_event_api(
                 let e = lua.create_table()?;
                 e.set("timestamp", event.timestamp)?;
                 e.set("event_type", event.event_type.clone())?;
-                e.set("payload", serde_json::to_string(&event.payload).unwrap())?;
+                e.set(
+                    "payload",
+                    serde_json::to_string(&event.payload)
+                        .map_err(|e| mlua::Error::external(format!("Serialization error: {e}")))?,
+                )?;
                 lua_events.set(i + 1, e)?;
             }
             Ok(lua_events)
@@ -85,7 +97,11 @@ pub fn register_job_event_api(
             for (i, event) in events.iter().enumerate() {
                 let e = lua.create_table()?;
                 e.set("event_type", event_type.clone())?;
-                e.set("payload", serde_json::to_string(event).unwrap())?;
+                e.set(
+                    "payload",
+                    serde_json::to_string(event)
+                        .map_err(|e| mlua::Error::external(format!("Serialization error: {e}")))?,
+                )?;
                 lua_events.set(i + 1, e)?;
             }
             Ok(lua_events)
@@ -129,7 +145,7 @@ pub fn register_job_event_api(
         "deliver_callbacks",
         lua.create_function(move |lua, ()| {
             let mut events_by_type: HashMap<String, Vec<serde_json::Value>> = HashMap::new();
-            JOB_EVENT_SUBSCRIPTIONS.with(|subs| {
+            let result: LuaResult<()> = JOB_EVENT_SUBSCRIPTIONS.with(|subs| {
                 let subs = subs.borrow();
                 let mut world = world_ref.borrow_mut();
                 for event_type in subs.keys() {
@@ -142,17 +158,22 @@ pub fn register_job_event_api(
                     if let Some(events) = events_by_type.get(event_type) {
                         for event in events {
                             for (_id, cb) in callbacks {
-                                let e = lua.create_table().unwrap();
-                                e.set("event_type", event_type.clone()).unwrap();
-                                e.set("payload", serde_json::to_string(event).unwrap())
-                                    .unwrap();
-                                cb.call::<()>(e).unwrap();
+                                let e = lua.create_table()?;
+                                e.set("event_type", event_type.clone())?;
+                                e.set(
+                                    "payload",
+                                    serde_json::to_string(event).map_err(|e| {
+                                        mlua::Error::external(format!("Serialization error: {e}"))
+                                    })?,
+                                )?;
+                                cb.call::<()>(e)?;
                             }
                         }
                     }
                 }
+                Ok(())
             });
-            Ok(())
+            result
         })?,
     )?;
 
