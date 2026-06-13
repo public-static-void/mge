@@ -1,6 +1,6 @@
 use super::PyWorld;
-use crate::python_api::component::ComponentApi;
 use crate::PyObject;
+use crate::python_api::component::ComponentApi;
 use pyo3::prelude::*;
 use pyo3::types::PyAny;
 

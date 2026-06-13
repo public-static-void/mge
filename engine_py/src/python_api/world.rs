@@ -1,7 +1,7 @@
+use crate::PyObject;
 use crate::python_api::body::BodyApi;
 use crate::python_api::component::ComponentApi;
 use crate::python_api::death_decay::DeathDecayApi;
-use crate::PyObject;
 use crate::python_api::economic::EconomicApi;
 use crate::python_api::entity::EntityApi;
 use crate::python_api::equipment::EquipmentApi;

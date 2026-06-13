@@ -1,7 +1,7 @@
+use crate::PyObject;
 use engine_core::presentation::ui::factory::{UI_FACTORY, WIDGET_REGISTRY, WidgetProps};
 use engine_core::presentation::ui::schema_loader::load_ui_from_json;
 use engine_core::presentation::ui::widget::UiWidget;
-use crate::PyObject;
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict};
 use serde_json::Value;

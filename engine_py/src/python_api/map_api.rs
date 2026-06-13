@@ -1,5 +1,5 @@
-use crate::python_api::world::PyWorld;
 use crate::PyObject;
+use crate::python_api::world::PyWorld;
 use pyo3::Py;
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyDict};
