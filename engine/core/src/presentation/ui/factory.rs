@@ -51,7 +51,6 @@ impl UiFactory {
 }
 
 /// Global UI factory
-/// Global UI factory
 pub static UI_FACTORY: LazyLock<Arc<ReentrantMutex<RefCell<UiFactory>>>> =
     LazyLock::new(|| Arc::new(ReentrantMutex::new(RefCell::new(UiFactory::new()))));
 
