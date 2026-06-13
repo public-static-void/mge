@@ -170,7 +170,10 @@ fn build_c_plugins() -> Result<(), Box<dyn Error>> {
         }
         if c_files.len() == 1 {
             let c_file = &c_files[0];
-            let base = c_file.file_stem().unwrap().to_str().unwrap();
+            let base = c_file
+                .file_stem()
+                .expect("C source file has no file stem")
+                .to_string_lossy();
             let out_lib = path.join(format!("lib{base}.so"));
             println!("Compiling {} -> {}", c_file.display(), out_lib.display());
 
@@ -179,16 +182,14 @@ fn build_c_plugins() -> Result<(), Box<dyn Error>> {
             for inc in &include_paths {
                 cmd.arg("-I").arg(inc);
             }
-            cmd.args([
-                "-L",
-                "/usr/lib/x86_64-linux-gnu",
-                "-shared",
-                "-fPIC",
-                c_file.to_str().unwrap(),
-                "-o",
-                out_lib.to_str().unwrap(),
-                "-ljansson",
-            ]);
+            cmd.arg("-L")
+                .arg("/usr/lib/x86_64-linux-gnu")
+                .arg("-shared")
+                .arg("-fPIC")
+                .arg(c_file.as_os_str())
+                .arg("-o")
+                .arg(out_lib.as_os_str())
+                .arg("-ljansson");
 
             let status = cmd.status()?;
             if !status.success() {
@@ -212,7 +213,10 @@ fn build_wasm_tests() -> Result<(), Box<dyn Error>> {
         let entry = entry?;
         let path = entry.path();
         if path.extension().and_then(|e| e.to_str()) == Some("rs") {
-            let stem = path.file_stem().unwrap().to_str().unwrap();
+            let stem = path
+                .file_stem()
+                .expect("WASM source file has no file stem")
+                .to_string_lossy();
             // Only compile files starting with "test_"
             if !stem.starts_with("test_") {
                 continue;
@@ -220,15 +224,13 @@ fn build_wasm_tests() -> Result<(), Box<dyn Error>> {
             let wasm_out = test_dir.join(format!("{stem}.wasm"));
             println!("Compiling {} to {}", path.display(), wasm_out.display());
             let status = Command::new("rustc")
-                .args([
-                    "--target",
-                    "wasm32-unknown-unknown",
-                    "-O",
-                    "--crate-type=cdylib",
-                    path.to_str().unwrap(),
-                    "-o",
-                    wasm_out.to_str().unwrap(),
-                ])
+                .arg("--target")
+                .arg("wasm32-unknown-unknown")
+                .arg("-O")
+                .arg("--crate-type=cdylib")
+                .arg(path.as_os_str())
+                .arg("-o")
+                .arg(wasm_out.as_os_str())
                 .status()?;
             if !status.success() {
                 return Err(format!("Failed to compile {} to WASM", path.display()).into());
