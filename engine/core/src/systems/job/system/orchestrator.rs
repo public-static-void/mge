@@ -17,15 +17,14 @@ pub fn cleanup_agent_on_job_state(world: &mut World, job: &serde_json::Value) {
         {
             agent["current_job"] = serde_json::Value::Null;
             agent["state"] = serde_json::json!("idle");
-            world.set_component(agent_id, "Agent", agent).unwrap();
+            let _ = world.set_component(agent_id, "Agent", agent);
         }
     }
-    // Also clear assigned_to on the job itself
     if let Some(job_id) = job.get("id").and_then(|v| v.as_u64()) {
         let job_id = job_id as u32;
         if let Some(mut job_obj) = world.get_component(job_id, "Job").cloned() {
             job_obj["assigned_to"] = serde_json::Value::Null;
-            world.set_component(job_id, "Job", job_obj).unwrap();
+            let _ = world.set_component(job_id, "Job", job_obj);
         }
     }
 }
@@ -66,21 +65,24 @@ pub fn run_job_system(world: &mut World) {
 
     // Build dependency graph for topological sort
     for &eid in &job_entities {
-        let job = world.get_component(eid, "Job").unwrap();
+        let Some(job) = world.get_component(eid, "Job") else {
+            continue;
+        };
         fn collect_job_deps(dep: &serde_json::Value, out: &mut Vec<u32>) {
-            if dep.is_string() {
-                if let Ok(eid) = dep.as_str().unwrap().parse::<u32>() {
+            if let Some(s) = dep.as_str() {
+                if let Ok(eid) = s.parse::<u32>() {
                     out.push(eid);
                 }
-            } else if dep.is_array() {
-                for d in dep.as_array().unwrap() {
+            } else if let Some(arr) = dep.as_array() {
+                for d in arr {
                     collect_job_deps(d, out);
                 }
-            } else if dep.is_object() {
-                let obj = dep.as_object().unwrap();
+            } else if let Some(obj) = dep.as_object() {
                 for key in &["all_of", "any_of", "not"] {
-                    if let Some(arr) = obj.get(*key) {
-                        for d in arr.as_array().unwrap() {
+                    if let Some(arr) = obj.get(*key)
+                        && let Some(arr_val) = arr.as_array()
+                    {
+                        for d in arr_val {
                             collect_job_deps(d, out);
                         }
                     }
@@ -104,16 +106,20 @@ pub fn run_job_system(world: &mut World) {
     };
 
     for eid in sorted_eids.iter().copied() {
-        let job = world.get_component(eid, "Job").unwrap().clone();
+        let Some(job) = world.get_component(eid, "Job").cloned() else {
+            continue;
+        };
         let old_state = job
             .get("state")
             .and_then(|v| v.as_str())
             .unwrap_or("")
             .to_string();
 
-        process::process_job(world, eid, job.clone());
+        process::process_job(world, eid, job);
         // Fetch the latest job from ECS after processing
-        let mut new_job = world.get_component(eid, "Job").unwrap().clone();
+        let Some(mut new_job) = world.get_component(eid, "Job").cloned() else {
+            continue;
+        };
         let new_state = new_job
             .get("state")
             .and_then(|v| v.as_str())
@@ -139,7 +145,7 @@ pub fn run_job_system(world: &mut World) {
                 // Release resource reservation on terminal jobs
                 reservation_system.release_reservation(world, eid);
 
-                // Re-fetch the job after cleanup, as cleanup may have modified it in ECS
+                // Re-fetch the job after cleanup
                 if let Some(updated_job) = world.get_component(eid, "Job") {
                     new_job = updated_job.clone();
                 }
@@ -151,47 +157,43 @@ pub fn run_job_system(world: &mut World) {
                     events::emit_job_event(world, "job_completed", &new_job, None);
                     if let Some(mut obj) = new_job.as_object().cloned() {
                         effects::process_job_effects(world, eid, &job_type, &mut obj, false);
-                        world
-                            .set_component(eid, "Job", serde_json::Value::Object(obj))
-                            .unwrap();
+                        let _ = world.set_component(eid, "Job", serde_json::Value::Object(obj));
                     } else {
-                        world.set_component(eid, "Job", new_job.clone()).unwrap();
+                        let _ = world.set_component(eid, "Job", new_job.clone());
                     }
                 }
                 "failed" => {
                     events::emit_job_event(world, "job_failed", &new_job, None);
                     if let Some(mut obj) = new_job.as_object().cloned() {
                         effects::process_job_effects(world, eid, &job_type, &mut obj, true);
-                        world
-                            .set_component(eid, "Job", serde_json::Value::Object(obj))
-                            .unwrap();
+                        let _ = world.set_component(eid, "Job", serde_json::Value::Object(obj));
                     } else {
-                        world.set_component(eid, "Job", new_job.clone()).unwrap();
+                        let _ = world.set_component(eid, "Job", new_job.clone());
                     }
                 }
                 "cancelled" => {
                     events::emit_job_event(world, "job_cancelled", &new_job, None);
                     if let Some(mut obj) = new_job.as_object().cloned() {
                         effects::process_job_effects(world, eid, &job_type, &mut obj, true);
-                        world
-                            .set_component(eid, "Job", serde_json::Value::Object(obj))
-                            .unwrap();
+                        let _ = world.set_component(eid, "Job", serde_json::Value::Object(obj));
                     } else {
-                        world.set_component(eid, "Job", new_job.clone()).unwrap();
+                        let _ = world.set_component(eid, "Job", new_job.clone());
                     }
                 }
                 _ => {
-                    world.set_component(eid, "Job", new_job.clone()).unwrap();
+                    let _ = world.set_component(eid, "Job", new_job.clone());
                 }
             }
         } else {
-            world.set_component(eid, "Job", new_job.clone()).unwrap();
+            let _ = world.set_component(eid, "Job", new_job.clone());
         }
 
         // Robust ECS-tracked conditional child spawn: only once per job_type/category per parent.
         if let Some(cond_children) = cond_children.and_then(|v| v.as_array().cloned()) {
             for entry in cond_children {
-                let mut parent_job_obj = world.get_component(eid, "Job").unwrap().clone();
+                let Some(mut parent_job_obj) = world.get_component(eid, "Job").cloned() else {
+                    continue;
+                };
 
                 let mut spawned_conditional_children = parent_job_obj
                     .get("spawned_conditional_children")
@@ -203,7 +205,9 @@ pub fn run_job_system(world: &mut World) {
                     .get("spawn_if")
                     .cloned()
                     .unwrap_or_else(|| serde_json::json!({}));
-                let child_job = entry.get("job").expect("conditional child must have job");
+                let Some(child_job) = entry.get("job") else {
+                    continue;
+                };
                 let should_spawn =
                     should_spawn_conditional_child(world, &parent_job_obj, &spawn_if);
 
@@ -244,17 +248,13 @@ pub fn run_job_system(world: &mut World) {
                     new_child["id"] = serde_json::json!(new_child_id);
                     new_child["parent"] = serde_json::json!(eid);
 
-                    world
-                        .set_component(new_child_id, "Job", new_child.clone())
-                        .unwrap();
+                    let _ = world.set_component(new_child_id, "Job", new_child.clone());
 
                     spawned_conditional_children.push(child_key);
 
                     parent_job_obj["spawned_conditional_children"] =
                         serde_json::Value::Array(spawned_conditional_children);
-                    world
-                        .set_component(eid, "Job", parent_job_obj.clone())
-                        .unwrap();
+                    let _ = world.set_component(eid, "Job", parent_job_obj.clone());
                 }
             }
         }
@@ -280,15 +280,11 @@ pub fn run_job_system(world: &mut World) {
             match state.as_str() {
                 "failed" | "cancelled" => {
                     effects::process_job_effects(world, eid, &job_type, obj, true);
-                    world
-                        .set_component(eid, "Job", serde_json::Value::Object(obj.clone()))
-                        .unwrap();
+                    let _ = world.set_component(eid, "Job", serde_json::Value::Object(obj.clone()));
                 }
                 "complete" => {
                     effects::process_job_effects(world, eid, &job_type, obj, false);
-                    world
-                        .set_component(eid, "Job", serde_json::Value::Object(obj.clone()))
-                        .unwrap();
+                    let _ = world.set_component(eid, "Job", serde_json::Value::Object(obj.clone()));
                 }
                 _ => {}
             }

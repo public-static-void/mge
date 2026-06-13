@@ -116,15 +116,16 @@ pub fn apply_pickup(
     stockpile: &serde_json::Map<String, JsonValue>,
 ) {
     // Update agent's carried_resources
-    let mut agent = world.get_component(agent_id, "Agent").cloned().unwrap();
+    let Some(mut agent) = world.get_component(agent_id, "Agent").cloned() else {
+        return;
+    };
     agent["carried_resources"] = json!(pickup);
     let _ = world.set_component(agent_id, "Agent", agent);
 
     // Update stockpile resources
-    let mut stockpile_val = world
-        .get_component(stockpile_id, "Stockpile")
-        .cloned()
-        .unwrap();
+    let Some(mut stockpile_val) = world.get_component(stockpile_id, "Stockpile").cloned() else {
+        return;
+    };
     stockpile_val["resources"] = json!(stockpile);
     let _ = world.set_component(stockpile_id, "Stockpile", stockpile_val);
 }

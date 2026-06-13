@@ -59,10 +59,11 @@ impl ResourceReservationSystem {
                 continue;
             }
             let mut job = job.clone();
-            let obj = job.as_object_mut().unwrap();
-            obj.remove("reserved_resources");
-            obj.remove("reserved_stockpile");
-            world.set_component(job_eid, "Job", job).unwrap();
+            if let Some(obj) = job.as_object_mut() {
+                obj.remove("reserved_resources");
+                obj.remove("reserved_stockpile");
+            }
+            let _ = world.set_component(job_eid, "Job", job);
         }
 
         // Process jobs and allocate resources strictly in this order, so only what is left can be reserved.
@@ -78,12 +79,11 @@ impl ResourceReservationSystem {
 
             let requirements = match job.get("resource_requirements").and_then(|v| v.as_array()) {
                 Some(reqs) if !reqs.is_empty() => reqs,
-                _ => continue, // No requirements, nothing to reserve
+                _ => continue,
             };
 
             for (&stockpile_eid, resources) in stockpile_working.iter_mut() {
                 if Self::can_reserve(resources, requirements) {
-                    // Subtract reserved resources from the working set so following jobs can't claim them (virtual only)
                     for req in requirements {
                         let kind = req.get("kind").and_then(|v| v.as_str()).unwrap_or("");
                         let amount = req.get("amount").and_then(|v| v.as_i64()).unwrap_or(0);
@@ -93,13 +93,11 @@ impl ResourceReservationSystem {
                     let mut job = job.clone();
                     job["reserved_resources"] = JsonValue::from(requirements.clone());
                     job["reserved_stockpile"] = JsonValue::from(stockpile_eid);
-                    // Initialize job state to fetching_resources to trigger resource fetch
                     job["state"] = JsonValue::from("fetching_resources");
-                    world.set_component(job_eid, "Job", job).unwrap();
+                    let _ = world.set_component(job_eid, "Job", job);
                     break;
                 }
             }
-            // If not reserved, do nothing: no marker fields, no status field
         }
     }
 
@@ -114,7 +112,7 @@ impl ResourceReservationSystem {
             None => return ResourceReservationStatus::NotFound,
         };
         let requirements = job.get("resource_requirements").and_then(|v| v.as_array());
-        if requirements.is_none() || requirements.unwrap().is_empty() {
+        if requirements.is_none_or(|r| r.is_empty()) {
             return ResourceReservationStatus::NotRequired;
         }
         if let Some(reserved) = job.get("reserved_resources").and_then(|v| v.as_array())
@@ -135,10 +133,11 @@ impl ResourceReservationSystem {
 
         // Just clear reservation marker fields.
         let mut job = job.clone();
-        let obj = job.as_object_mut().unwrap();
-        obj.remove("reserved_resources");
-        obj.remove("reserved_stockpile");
-        world.set_component(job_eid, "Job", job).unwrap();
+        if let Some(obj) = job.as_object_mut() {
+            obj.remove("reserved_resources");
+            obj.remove("reserved_stockpile");
+        }
+        let _ = world.set_component(job_eid, "Job", job);
     }
 
     /// Internal: checks if all requirements can be reserved from the given resources.

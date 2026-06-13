@@ -87,7 +87,11 @@ impl SystemPlugin {
     ///
     /// # Safety
     /// The caller must ensure that `self.name` is a valid, null-terminated C string.
-    pub unsafe fn name_str(&self) -> &str {
-        unsafe { std::ffi::CStr::from_ptr(self.name).to_str().unwrap() }
+    pub unsafe fn name_str(&self) -> String {
+        unsafe {
+            std::ffi::CStr::from_ptr(self.name)
+                .to_string_lossy()
+                .into_owned()
+        }
     }
 }

@@ -232,9 +232,7 @@ impl JobBoard {
                     {
                         for _req in reserved_resources {}
                     }
-                    world
-                        .set_component(reserved_stockpile as u32, "Stockpile", stockpile)
-                        .unwrap();
+                    let _ = world.set_component(reserved_stockpile as u32, "Stockpile", stockpile);
                 }
                 job["assigned_to"] = JsonValue::from(actor_eid);
                 if job.get("state").and_then(|v| v.as_str()) == Some("interrupted") {
@@ -254,7 +252,7 @@ impl JobBoard {
                         + 1,
                 );
                 job["last_assigned_tick"] = JsonValue::from(current_tick);
-                world.set_component(job_eid, "Job", job).unwrap();
+                let _ = world.set_component(job_eid, "Job", job);
             }
             self.jobs.retain(|&eid| eid != job_eid);
             JobAssignmentResult::Assigned(job_eid)

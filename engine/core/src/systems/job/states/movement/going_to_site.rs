@@ -27,7 +27,7 @@ pub fn handle_going_to_site_state(world: &mut World, eid: u32, mut job: JsonValu
         if let (Some(agent_cell), Some(target_cell)) = (agent_cell, target_cell) {
             if agent_cell == target_cell {
                 job["state"] = serde_json::json!("at_site");
-                world.set_component(eid, "Job", job.clone()).unwrap();
+                let _ = world.set_component(eid, "Job", job.clone());
                 return job;
             } else if movement_ops::is_move_path_empty(world, assigned_to)
                 && let Some(map) = &world.map

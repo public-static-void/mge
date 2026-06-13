@@ -55,7 +55,7 @@ pub fn handle_pending_state(
             .is_some()
     {
         job["state"] = serde_json::json!("fetching_resources");
-        world.set_component(eid, "Job", job.clone()).unwrap();
+        let _ = world.set_component(eid, "Job", job.clone());
         return job;
     }
 
@@ -77,7 +77,7 @@ pub fn handle_pending_state(
                     } else {
                         job["state"] = serde_json::json!("in_progress");
                     }
-                    world.set_component(eid, "Job", job.clone()).unwrap();
+                    let _ = world.set_component(eid, "Job", job.clone());
                     return job;
                 } else {
                     if movement_ops::is_move_path_empty(world, assigned_to) {
@@ -89,7 +89,7 @@ pub fn handle_pending_state(
                         );
                     }
                     job["state"] = serde_json::json!("going_to_site");
-                    world.set_component(eid, "Job", job.clone()).unwrap();
+                    let _ = world.set_component(eid, "Job", job.clone());
                     return job;
                 }
             }
@@ -99,7 +99,7 @@ pub fn handle_pending_state(
 
     if requirements::requirements_are_empty_or_zero(&requirements) {
         job["state"] = serde_json::json!("in_progress");
-        world.set_component(eid, "Job", job.clone()).unwrap();
+        let _ = world.set_component(eid, "Job", job.clone());
         return job;
     }
 

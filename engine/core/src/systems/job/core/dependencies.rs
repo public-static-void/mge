@@ -22,65 +22,55 @@ fn is_forbidden_state(job: &serde_json::Value) -> bool {
 /// Recursively evaluate a dependency expression.
 /// `in_not` is true if we're inside a NOT clause.
 fn evaluate_dependency_expr(world: &World, dep: &JsonValue, in_not: bool) -> bool {
-    if dep.is_string() {
-        let dep_eid = dep.as_str().unwrap();
+    if let Some(dep_eid) = dep.as_str() {
         if let Ok(eid) = dep_eid.parse::<u32>() {
             if let Some(dep_job) = world.get_component(eid, "Job") {
                 if in_not {
-                    // For NOT, forbidden state blocks satisfaction
                     return !is_forbidden_state(dep_job);
                 } else {
-                    // For direct dep, only "complete" is satisfied
                     return dep_job
                         .get("state")
                         .map(|s| s == "complete")
                         .unwrap_or(false);
                 }
             } else {
-                // If job doesn't exist, treat as satisfied if in NOT, else not satisfied
                 return in_not;
             }
         }
-        // Not a valid entity: treat as satisfied if in NOT, else not satisfied
         return in_not;
     }
-    if dep.is_array() {
-        return dep
-            .as_array()
-            .unwrap()
+    if let Some(arr) = dep.as_array() {
+        return arr
             .iter()
             .all(|d| evaluate_dependency_expr(world, d, in_not));
     }
-    if dep.is_object() {
-        let obj = dep.as_object().unwrap();
-        if let Some(all_of) = obj.get("all_of") {
-            return all_of
-                .as_array()
-                .unwrap()
+    if let Some(obj) = dep.as_object() {
+        if let Some(all_of) = obj.get("all_of")
+            && let Some(arr) = all_of.as_array()
+        {
+            return arr
                 .iter()
                 .all(|d| evaluate_dependency_expr(world, d, in_not));
         }
-        if let Some(any_of) = obj.get("any_of") {
-            return any_of
-                .as_array()
-                .unwrap()
+        if let Some(any_of) = obj.get("any_of")
+            && let Some(arr) = any_of.as_array()
+        {
+            return arr
                 .iter()
                 .any(|d| evaluate_dependency_expr(world, d, in_not));
         }
-        if let Some(not) = obj.get("not") {
-            // NOT: satisfied if none inside are in a forbidden state
-            return !not.as_array().unwrap().iter().any(|d| {
-                if d.is_string() {
-                    let dep_eid = d.as_str().unwrap();
-                    if let Ok(eid) = dep_eid.parse::<u32>() {
-                        if let Some(dep_job) = world.get_component(eid, "Job") {
-                            return is_forbidden_state(dep_job);
-                        }
-                        // If job doesn't exist, NOT is satisfied for this dep
-                        return false;
+        if let Some(not) = obj.get("not")
+            && let Some(arr) = not.as_array()
+        {
+            return !arr.iter().any(|d| {
+                if let Some(dep_eid) = d.as_str()
+                    && let Ok(eid) = dep_eid.parse::<u32>()
+                {
+                    if let Some(dep_job) = world.get_component(eid, "Job") {
+                        return is_forbidden_state(dep_job);
                     }
+                    return false;
                 }
-                // For complex expressions, fallback to old logic
                 evaluate_dependency_expr(world, d, true)
             });
         }
@@ -156,42 +146,40 @@ pub fn dependency_failure_state(world: &World, job: &JsonValue) -> Option<&'stat
 /// Recursively checks for dependency failure/cancelled state.
 /// NOTE: NOT clauses do NOT propagate failure/cancelled state from their referenced jobs.
 fn find_failure_state(world: &World, dep: &serde_json::Value) -> Option<&'static str> {
-    if dep.is_string() {
-        let dep_eid = dep.as_str().unwrap();
-        if let Ok(eid) = dep_eid.parse::<u32>() {
-            // Only propagate failure if entity exists
-            if world.entity_exists(eid)
-                && let Some(dep_job) = world.get_component(eid, "Job")
-            {
-                let state = dep_job.get("state").and_then(|v| v.as_str()).unwrap_or("");
-                if state == "failed" {
-                    return Some("failed");
-                }
-                if state == "cancelled" {
-                    return Some("cancelled");
-                }
+    if let Some(dep_eid) = dep.as_str() {
+        let Ok(eid) = dep_eid.parse::<u32>() else {
+            return None;
+        };
+        if world.entity_exists(eid)
+            && let Some(dep_job) = world.get_component(eid, "Job")
+        {
+            let state = dep_job.get("state").and_then(|v| v.as_str()).unwrap_or("");
+            if state == "failed" {
+                return Some("failed");
+            }
+            if state == "cancelled" {
+                return Some("cancelled");
             }
         }
-        // If job doesn't exist, do NOT propagate failure
         return None;
     }
-    if dep.is_array() {
-        for d in dep.as_array().unwrap() {
+    if let Some(arr) = dep.as_array() {
+        for d in arr {
             if let Some(state) = find_failure_state(world, d) {
                 return Some(state);
             }
         }
         return None;
     }
-    if dep.is_object() {
-        let obj = dep.as_object().unwrap();
-        // NOT: do NOT propagate failure/cancelled state from referenced jobs
+    if let Some(obj) = dep.as_object() {
         if obj.get("not").is_some() {
             return None;
         }
         for key in &["all_of", "any_of"] {
-            if let Some(arr) = obj.get(*key) {
-                for d in arr.as_array().unwrap() {
+            if let Some(arr) = obj.get(*key)
+                && let Some(arr_val) = arr.as_array()
+            {
+                for d in arr_val {
                     if let Some(state) = find_failure_state(world, d) {
                         return Some(state);
                     }

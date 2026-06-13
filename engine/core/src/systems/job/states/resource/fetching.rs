@@ -61,21 +61,25 @@ pub fn handle_fetching_resources_state(
                 return job;
             } else {
                 // At stockpile: try to pick up as much as possible
-                let stockpile = world
-                    .get_component(reserved_stockpile, "Stockpile")
-                    .cloned()
-                    .unwrap();
+                let stockpile = match world.get_component(reserved_stockpile, "Stockpile") {
+                    Some(s) => s.clone(),
+                    None => return job,
+                };
+
+                let resources = match stockpile.get("resources").and_then(|v| v.as_object()) {
+                    Some(r) => r,
+                    None => return job,
+                };
 
                 let pickup = resource_ops::calculate_pickup(
                     world,
                     assigned_to,
                     &requirements,
                     &job,
-                    stockpile.get("resources").unwrap().as_object().unwrap(),
+                    resources,
                 );
 
                 if pickup.is_empty() {
-                    // Can't pick up anything (encumbered or nothing available)
                     job["state"] = json!("waiting_for_resources");
                     return job;
                 }
@@ -85,7 +89,7 @@ pub fn handle_fetching_resources_state(
                     assigned_to,
                     &pickup,
                     reserved_stockpile,
-                    stockpile.get("resources").unwrap().as_object().unwrap(),
+                    resources,
                 );
 
                 // Set move_path to job site after pickup

@@ -99,15 +99,19 @@ pub unsafe fn load_plugin_and_register_worldgen_threadsafe<P: AsRef<Path>>(
 
         let name = if let Some(worldgen_name_fn) = worldgen_name_fn {
             let cstr = unsafe { CStr::from_ptr(worldgen_name_fn()) };
-            cstr.to_str().unwrap().to_owned()
+            cstr.to_str().map_err(|e| e.to_string())?.to_owned()
         } else {
             return Err("Plugin does not provide worldgen_name".to_string());
         };
 
         let generate: Arc<dyn Fn(&Value) -> Value + Send + Sync> =
             Arc::new(move |params: &Value| -> Value {
-                let params_json = serde_json::to_string(params).unwrap();
-                let c_params = CString::new(params_json).unwrap();
+                let Ok(params_json) = serde_json::to_string(params) else {
+                    return Value::Null;
+                };
+                let Ok(c_params) = CString::new(params_json) else {
+                    return Value::Null;
+                };
                 let mut out_ptr: *mut c_char = std::ptr::null_mut();
 
                 if let Some(generate_world_fn) = generate_world_fn {
@@ -179,15 +183,19 @@ pub unsafe fn load_plugin_and_register_worldgen<P: AsRef<Path>>(
 
         let name = if let Some(worldgen_name_fn) = worldgen_name_fn {
             let cstr = unsafe { CStr::from_ptr(worldgen_name_fn()) };
-            cstr.to_str().unwrap().to_owned()
+            cstr.to_str().map_err(|e| e.to_string())?.to_owned()
         } else {
             return Err("Plugin does not provide worldgen_name".to_string());
         };
 
         let generate: Arc<dyn Fn(&Value) -> Value + Send + Sync> =
             Arc::new(move |params: &Value| -> Value {
-                let params_json = serde_json::to_string(params).unwrap();
-                let c_params = CString::new(params_json).unwrap();
+                let Ok(params_json) = serde_json::to_string(params) else {
+                    return Value::Null;
+                };
+                let Ok(c_params) = CString::new(params_json) else {
+                    return Value::Null;
+                };
                 let mut out_ptr: *mut c_char = std::ptr::null_mut();
 
                 if let Some(generate_world_fn) = generate_world_fn {
@@ -261,7 +269,7 @@ pub unsafe fn load_plugin_and_register_systems<P: AsRef<Path>>(
         if res == 0 && !systems_ptr.is_null() && count > 0 {
             let systems_slice = unsafe { std::slice::from_raw_parts(systems_ptr, count as usize) };
             for sys in systems_slice {
-                let name = unsafe { sys.name_str().to_string() };
+                let name = unsafe { sys.name_str() };
                 let run_fn = sys.run;
                 // Wrap the C function pointer into a Rust closure
                 let run_closure = Box::new(move |world: &mut World, delta_time: f32| unsafe {

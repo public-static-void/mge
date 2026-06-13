@@ -90,7 +90,9 @@ impl World {
         let mut res_map = serde_json::Map::new();
         res_map.insert(kind.to_string(), serde_json::json!(amount));
         let stockpile = serde_json::json!({ "resources": res_map });
-        self.set_component(eid, "Stockpile", stockpile).unwrap();
+        if let Err(e) = self.set_component(eid, "Stockpile", stockpile) {
+            eprintln!("Failed to set Stockpile component: {e}");
+        }
     }
 
     /// Returns a scarcity score for a resource kind (higher = more scarce).

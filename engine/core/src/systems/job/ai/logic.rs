@@ -107,11 +107,11 @@ pub fn assign_jobs(
                 let mut agent_obj = agent.clone();
                 agent_obj["current_job"] = serde_json::Value::Null;
                 agent_obj["state"] = serde_json::json!("idle");
-                world.set_component(agent_id, "Agent", agent_obj).unwrap();
+                let _ = world.set_component(agent_id, "Agent", agent_obj);
                 if let Some(job) = world.get_component(job_eid, "Job").cloned() {
                     let mut job_obj = job;
                     job_obj["assigned_to"] = serde_json::Value::Null;
-                    world.set_component(job_eid, "Job", job_obj).unwrap();
+                    let _ = world.set_component(job_eid, "Job", job_obj);
                 }
             }
         }
@@ -164,16 +164,16 @@ pub fn assign_jobs(
 
         let mut preempted_this_tick = false;
         if agent_state == "working" && has_current_job {
-            let current_job_eid_val = current_job_eid.unwrap();
+            let Some(current_job_eid_val) = current_job_eid else {
+                continue;
+            };
             let current_job = world.get_component(current_job_eid_val, "Job");
             let current_priority = current_job
                 .and_then(|job| job.get("priority").and_then(|v| v.as_i64()))
                 .unwrap_or(0);
-            let agent = world
-                .components
-                .get("Agent")
-                .and_then(|m| m.get(agent_id))
-                .unwrap();
+            let Some(agent) = world.components.get("Agent").and_then(|m| m.get(agent_id)) else {
+                continue;
+            };
 
             let mut best_job = None;
             let mut best_utility = f64::MIN;
@@ -242,16 +242,14 @@ pub fn assign_jobs(
                         let mut job_clone = job.clone();
                         job_clone["assigned_to"] = serde_json::Value::Null;
                         job_clone["state"] = serde_json::json!("pending");
-                        world
-                            .set_component(current_job_eid_val, "Job", job_clone)
-                            .unwrap();
+                        let _ = world.set_component(current_job_eid_val, "Job", job_clone);
                         preempted_jobs.insert(*agent_id, current_job_eid_val);
                     }
                 }
                 if let Some(job) = world.get_component(new_job_eid, "Job") {
                     let mut job_clone = job.clone();
                     job_clone["assigned_to"] = serde_json::json!(*agent_id);
-                    world.set_component(new_job_eid, "Job", job_clone).unwrap();
+                    let _ = world.set_component(new_job_eid, "Job", job_clone);
                 }
                 if let Some(agent_entry) =
                     world.components.get("Agent").and_then(|m| m.get(agent_id))
@@ -259,7 +257,7 @@ pub fn assign_jobs(
                     let mut agent_obj = agent_entry.clone();
                     agent_obj["current_job"] = serde_json::json!(new_job_eid);
                     agent_obj["state"] = serde_json::json!("working");
-                    world.set_component(*agent_id, "Agent", agent_obj).unwrap();
+                    let _ = world.set_component(*agent_id, "Agent", agent_obj);
                 }
                 jobs_to_remove.push(new_job_eid);
                 assigned_jobs.insert(new_job_eid);
@@ -290,7 +288,9 @@ pub fn assign_jobs(
 
         let mut assigned_job = None;
         let mut new_queue = agent_queue.clone();
-        let agent = world.get_component(*agent_id, "Agent").unwrap();
+        let Some(agent) = world.get_component(*agent_id, "Agent") else {
+            continue;
+        };
         let specializations = agent
             .get("specializations")
             .and_then(|v| v.as_array())
@@ -355,9 +355,7 @@ pub fn assign_jobs(
             if let Some(job) = world.get_component(job_eid, "Job") {
                 let mut job_clone = job.clone();
                 job_clone["assigned_to"] = serde_json::json!(*agent_id);
-                world
-                    .set_component(job_eid, "Job", job_clone.clone())
-                    .unwrap();
+                let _ = world.set_component(job_eid, "Job", job_clone.clone());
 
                 crate::systems::job::system::events::emit_job_event(
                     world,
@@ -371,7 +369,7 @@ pub fn assign_jobs(
                 agent_obj["current_job"] = serde_json::json!(job_eid);
                 agent_obj["state"] = serde_json::json!("working");
                 agent_obj["job_queue"] = serde_json::json!(new_queue);
-                world.set_component(*agent_id, "Agent", agent_obj).unwrap();
+                let _ = world.set_component(*agent_id, "Agent", agent_obj);
             }
             jobs_to_remove.push(job_eid);
             assigned_jobs.insert(job_eid);
@@ -422,9 +420,7 @@ pub fn assign_jobs(
             if let Some(job) = world.get_component(job_eid, "Job") {
                 let mut job_clone = job.clone();
                 job_clone["assigned_to"] = serde_json::json!(*agent_id);
-                world
-                    .set_component(job_eid, "Job", job_clone.clone())
-                    .unwrap();
+                let _ = world.set_component(job_eid, "Job", job_clone.clone());
 
                 crate::systems::job::system::events::emit_job_event(
                     world,
@@ -437,7 +433,7 @@ pub fn assign_jobs(
                 let mut agent_obj = agent_entry.clone();
                 agent_obj["current_job"] = serde_json::json!(job_eid);
                 agent_obj["state"] = serde_json::json!("working");
-                world.set_component(*agent_id, "Agent", agent_obj).unwrap();
+                let _ = world.set_component(*agent_id, "Agent", agent_obj);
             }
             jobs_to_remove.push(job_eid);
             assigned_jobs.insert(job_eid);
@@ -454,7 +450,7 @@ pub fn assign_jobs(
                 .is_some();
             if !has_job {
                 agent_obj["current_job"] = serde_json::Value::Null;
-                world.set_component(*agent_id, "Agent", agent_obj).unwrap();
+                let _ = world.set_component(*agent_id, "Agent", agent_obj);
             }
         }
     }

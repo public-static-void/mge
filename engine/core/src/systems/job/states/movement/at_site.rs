@@ -32,6 +32,6 @@ pub fn handle_at_site_state(world: &mut World, eid: u32, mut job: JsonValue) -> 
         job["state"] = json!("in_progress");
     }
 
-    world.set_component(eid, "Job", job.clone()).unwrap();
+    let _ = world.set_component(eid, "Job", job.clone());
     job
 }

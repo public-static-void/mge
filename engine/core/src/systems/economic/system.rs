@@ -72,32 +72,39 @@ impl System for EconomicSystem {
     fn run(&mut self, world: &mut World) {
         let entities = world.get_entities_with_component("ProductionJob");
         for eid in entities {
-            let mut job = world.get_component(eid, "ProductionJob").unwrap().clone();
+            let Some(mut job) = world.get_component(eid, "ProductionJob").cloned() else {
+                continue;
+            };
             let state = job
                 .get("state")
                 .and_then(|v| v.as_str())
                 .unwrap_or("pending");
 
-            // Only skip if complete; process pending and in_progress
             if state == "complete" {
                 continue;
             }
 
-            // Allow pending jobs to start only if assigned
             if state == "pending" && job.get("assigned_to").and_then(|v| v.as_u64()).is_some() {
                 job["state"] = json!("in_progress");
             }
 
-            let recipe_name = job.get("recipe").and_then(|v| v.as_str()).unwrap();
+            let recipe_name = match job.get("recipe").and_then(|v| v.as_str()) {
+                Some(r) => r,
+                None => continue,
+            };
             let recipe = match self.recipes.get(recipe_name) {
                 Some(r) => r,
                 None => continue,
             };
-            let mut stockpile = world.get_component(eid, "Stockpile").unwrap().clone();
-            let stock_map = stockpile
+            let Some(mut stockpile) = world.get_component(eid, "Stockpile").cloned() else {
+                continue;
+            };
+            let Some(stock_map) = stockpile
                 .get_mut("resources")
                 .and_then(|v| v.as_object_mut())
-                .unwrap();
+            else {
+                continue;
+            };
 
             if Self::can_consume_inputs(stock_map, &recipe.inputs) {
                 Self::consume_inputs(stock_map, &recipe.inputs);
@@ -115,8 +122,8 @@ impl System for EconomicSystem {
                 job["state"] = json!("waiting_for_inputs");
             }
 
-            world.set_component(eid, "ProductionJob", job).unwrap();
-            world.set_component(eid, "Stockpile", stockpile).unwrap();
+            let _ = world.set_component(eid, "ProductionJob", job);
+            let _ = world.set_component(eid, "Stockpile", stockpile);
         }
     }
 }

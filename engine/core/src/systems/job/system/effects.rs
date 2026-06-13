@@ -21,7 +21,10 @@ pub fn process_job_effects(
         .map(|jt| jt.effects.clone())
         .unwrap_or_else(|| empty.clone());
 
-    let effect_registry = world.effect_processor_registry.as_ref().unwrap().clone();
+    let effect_registry = match world.effect_processor_registry.as_ref() {
+        Some(r) => r.clone(),
+        None => return,
+    };
 
     // Extract applied_effects BEFORE mutable borrow
     let mut applied_effect_indices = job

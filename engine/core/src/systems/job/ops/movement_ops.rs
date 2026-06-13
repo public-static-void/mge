@@ -19,9 +19,12 @@ pub fn assign_move_path(
     {
         if pathfinding.path.len() <= 1 {
             // Already at destination or path empty; clear move_path if any
-            let mut agent = world.get_component(agent_id, "Agent").cloned().unwrap();
-            agent.as_object_mut().unwrap().remove("move_path");
-            let _ = world.set_component(agent_id, "Agent", agent);
+            if let Some(mut agent) = world.get_component(agent_id, "Agent").cloned() {
+                if let Some(obj) = agent.as_object_mut() {
+                    obj.remove("move_path");
+                }
+                let _ = world.set_component(agent_id, "Agent", agent);
+            }
             return;
         }
         let move_path: Vec<JsonValue> = pathfinding
@@ -40,7 +43,9 @@ pub fn assign_move_path(
                 }
             })
             .collect();
-        let mut agent = world.get_component(agent_id, "Agent").cloned().unwrap();
+        let Some(mut agent) = world.get_component(agent_id, "Agent").cloned() else {
+            return;
+        };
         agent["move_path"] = json!(move_path);
         let _ = world.set_component(agent_id, "Agent", agent);
     }

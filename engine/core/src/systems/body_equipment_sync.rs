@@ -115,11 +115,10 @@ impl System for BodyEquipmentSyncSystem {
                 None => continue,
             };
 
-            let slots = equipment.get("slots").and_then(|v| v.as_object()).cloned();
-            if slots.is_none() {
+            let Some(mut slots) = equipment.get("slots").and_then(|v| v.as_object()).cloned()
+            else {
                 continue;
-            }
-            let mut slots = slots.unwrap();
+            };
 
             // Step 0: Always clear equipped on unhealthy parts
             if let Some(parts) = body.get_mut("parts").and_then(|v| v.as_array_mut()) {
@@ -142,14 +141,15 @@ impl System for BodyEquipmentSyncSystem {
                         if !part.get("equipped").is_some_and(|v| v.is_array()) {
                             part["equipped"] = json!([]);
                         }
-                        let equipped = part
-                            .get_mut("equipped")
-                            .and_then(|v| v.as_array_mut())
-                            .unwrap();
-                        // Always clear equipped first
+                        let Some(equipped) =
+                            part.get_mut("equipped").and_then(|v| v.as_array_mut())
+                        else {
+                            continue;
+                        };
                         equipped.clear();
-                        if status == "healthy" && !item_id_val.is_null() {
-                            let item_id = item_id_val.as_str().unwrap();
+                        if status == "healthy"
+                            && let Some(item_id) = item_id_val.as_str()
+                        {
                             equipped.push(json!(item_id));
                         }
                         // If not healthy, forcibly clear the Equipment slot too

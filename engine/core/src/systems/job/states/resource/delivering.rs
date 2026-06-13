@@ -43,7 +43,9 @@ pub fn handle_delivering_resources_state(
                 return job;
             } else {
                 // At job site: deliver resources and update delivered_resources
-                let mut agent = world.get_component(assigned_to, "Agent").cloned().unwrap();
+                let Some(mut agent) = world.get_component(assigned_to, "Agent").cloned() else {
+                    return job;
+                };
                 let carried = agent.get("carried_resources").cloned().unwrap_or(json!([]));
                 let delivered = job
                     .get("delivered_resources")
@@ -59,7 +61,9 @@ pub fn handle_delivering_resources_state(
                 job["delivered_resources"] = JsonValue::Array(new_delivered);
 
                 // Clear agent's carried resources after delivery
-                agent.as_object_mut().unwrap().remove("carried_resources");
+                if let Some(obj) = agent.as_object_mut() {
+                    obj.remove("carried_resources");
+                }
                 let _ = world.set_component(assigned_to, "Agent", agent);
 
                 // If all requirements are delivered, transition to in_progress for job completion work

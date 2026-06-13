@@ -32,10 +32,9 @@ pub fn process_job_progress(
                     None,
                 );
             }
-            world.set_component(eid, "Job", result.clone()).unwrap();
+            let _ = world.set_component(eid, "Job", result.clone());
 
-            // If a handler is registered and handled the state, do NOT apply default progress again!
-            // The handler is fully responsible for progress of this job_type and state.
+            // Handler is fully responsible for progress of this job_type and state.
             return result;
         }
     }
@@ -144,8 +143,7 @@ pub fn process_job(world: &mut World, eid: u32, mut job: serde_json::Value) -> s
             "cancelled" | "complete" | "failed" | "interrupted" | "blocked"
         ) {
             if state == "cancelled" && !cancelled_cleanup_done {
-                if job.get("children").is_some() {
-                    let children_val = job.get_mut("children").unwrap();
+                if let Some(children_val) = job.get_mut("children") {
                     let (new_children, _all_children_complete) =
                         crate::systems::job::children::process_job_children(
                             world,
@@ -157,7 +155,7 @@ pub fn process_job(world: &mut World, eid: u32, mut job: serde_json::Value) -> s
                 }
                 crate::systems::job::states::handle_job_cancellation_cleanup(world, &job);
                 crate::systems::job::system::orchestrator::cleanup_agent_on_job_state(world, &job);
-                world.set_component(eid, "Job", job.clone()).unwrap();
+                let _ = world.set_component(eid, "Job", job.clone());
                 crate::systems::job::system::events::emit_job_event(
                     world,
                     "job_cancelled",
@@ -171,9 +169,7 @@ pub fn process_job(world: &mut World, eid: u32, mut job: serde_json::Value) -> s
             {
                 agent["current_job"] = serde_json::Value::Null;
                 agent["state"] = serde_json::json!("idle");
-                world
-                    .set_component(agent_id as u32, "Agent", agent)
-                    .unwrap();
+                let _ = world.set_component(agent_id as u32, "Agent", agent);
             }
             return job;
         }
@@ -191,7 +187,7 @@ pub fn process_job(world: &mut World, eid: u32, mut job: serde_json::Value) -> s
                 );
             }
             job["assigned_to"] = serde_json::Value::Null;
-            world.set_component(eid, "Job", job.clone()).unwrap();
+            let _ = world.set_component(eid, "Job", job.clone());
             return job;
         }
     }
@@ -217,7 +213,7 @@ pub fn process_job(world: &mut World, eid: u32, mut job: serde_json::Value) -> s
             }
             job["children"] = serde_json::Value::Array(children);
         }
-        world.set_component(eid, "Job", job.clone()).unwrap();
+        let _ = world.set_component(eid, "Job", job.clone());
         return job;
     }
 
@@ -226,7 +222,7 @@ pub fn process_job(world: &mut World, eid: u32, mut job: serde_json::Value) -> s
         if job.get("state").and_then(|v| v.as_str()) != Some("pending") {
             job["state"] = serde_json::json!("pending");
         }
-        world.set_component(eid, "Job", job.clone()).unwrap();
+        let _ = world.set_component(eid, "Job", job.clone());
         return job;
     }
 
@@ -254,8 +250,7 @@ pub fn process_job(world: &mut World, eid: u32, mut job: serde_json::Value) -> s
     };
 
     // Update children array if present.
-    if job.get("children").is_some() {
-        let children_val = job.get_mut("children").unwrap();
+    if let Some(children_val) = job.get_mut("children") {
         let (new_children, all_children_complete) =
             crate::systems::job::children::process_job_children(
                 world,
@@ -267,9 +262,9 @@ pub fn process_job(world: &mut World, eid: u32, mut job: serde_json::Value) -> s
         if all_children_complete {
             job["state"] = serde_json::json!("complete");
         }
-        world.set_component(eid, "Job", job.clone()).unwrap();
+        let _ = world.set_component(eid, "Job", job.clone());
     } else {
-        world.set_component(eid, "Job", job.clone()).unwrap();
+        let _ = world.set_component(eid, "Job", job.clone());
     }
 
     // Fail job if should_fail flag is set.
@@ -279,7 +274,7 @@ pub fn process_job(world: &mut World, eid: u32, mut job: serde_json::Value) -> s
         .unwrap_or(false)
     {
         job["state"] = serde_json::json!("failed");
-        world.set_component(eid, "Job", job.clone()).unwrap();
+        let _ = world.set_component(eid, "Job", job.clone());
         return job;
     }
 
@@ -295,7 +290,7 @@ pub fn process_job(world: &mut World, eid: u32, mut job: serde_json::Value) -> s
 
         if !has_assigned_to && !has_effects {
             job["state"] = serde_json::json!("pending");
-            world.set_component(eid, "Job", job.clone()).unwrap();
+            let _ = world.set_component(eid, "Job", job.clone());
             return job;
         }
     }
@@ -323,7 +318,7 @@ pub fn process_job(world: &mut World, eid: u32, mut job: serde_json::Value) -> s
         Some("at_site") => crate::systems::job::states::handle_at_site_state(world, eid, job),
         _ => job,
     };
-    world.set_component(eid, "Job", job.clone()).unwrap();
+    let _ = world.set_component(eid, "Job", job.clone());
 
     // If job just transitioned to "complete", cleanup agent assignment and unassign job
     let current_state = job.get("state").and_then(|v| v.as_str());
@@ -333,16 +328,14 @@ pub fn process_job(world: &mut World, eid: u32, mut job: serde_json::Value) -> s
         {
             agent["current_job"] = serde_json::Value::Null;
             agent["state"] = serde_json::json!("idle");
-            world
-                .set_component(agent_id as u32, "Agent", agent)
-                .unwrap();
+            let _ = world.set_component(agent_id as u32, "Agent", agent);
         }
         job["assigned_to"] = serde_json::Value::Null;
-        world.set_component(eid, "Job", job.clone()).unwrap();
+        let _ = world.set_component(eid, "Job", job.clone());
     }
 
     let job = process_job_progress(world, eid, job_type, job);
-    world.set_component(eid, "Job", job.clone()).unwrap();
+    let _ = world.set_component(eid, "Job", job.clone());
 
     job
 }

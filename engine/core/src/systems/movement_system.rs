@@ -46,8 +46,10 @@ impl System for MovementSystem {
             let _ = world.set_component(eid, "Position", new_position);
 
             // If move_path is now empty, remove it
-            if move_path.is_empty() {
-                agent.as_object_mut().unwrap().remove("move_path");
+            if move_path.is_empty()
+                && let Some(obj) = agent.as_object_mut()
+            {
+                obj.remove("move_path");
             }
             let _ = world.set_component(eid, "Agent", agent);
         }

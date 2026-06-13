@@ -32,13 +32,13 @@ impl System for EquipmentLogicSystem {
 
             // Collect changes to apply after validation
             let mut new_equipment = equipment.clone();
-            let slots_mut = new_equipment
+            let slots_mut = match new_equipment
                 .get_mut("slots")
-                .and_then(JsonValue::as_object_mut);
-            if slots_mut.is_none() {
-                continue;
-            }
-            let slots_mut = slots_mut.unwrap();
+                .and_then(JsonValue::as_object_mut)
+            {
+                Some(s) => s,
+                None => continue,
+            };
 
             // Helper closure to get item metadata by ID
             let mut get_item_metadata = |item_id: &str| -> Option<JsonValue> {

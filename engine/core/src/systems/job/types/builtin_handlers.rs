@@ -23,7 +23,17 @@ pub fn register_builtin_job_handlers(
             world.job_handler_registry.lock().unwrap().register_handler(
                 &job_type_name,
                 move |world, _agent_id, job_id, _data| {
-                    let mut job = world.get_component(job_id, "Job").cloned().unwrap();
+                    let mut job =
+                        world
+                            .get_component(job_id, "Job")
+                            .cloned()
+                            .unwrap_or_else(|| {
+                                serde_json::json!({
+                                    "id": job_id,
+                                    "state": "failed",
+                                    "progress": 0.0
+                                })
+                            });
                     let progress =
                         job.get("progress").and_then(|v| v.as_f64()).unwrap_or(0.0) + 1.0;
                     job["progress"] = serde_json::json!(progress);

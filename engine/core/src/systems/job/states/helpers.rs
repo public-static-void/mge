@@ -54,39 +54,36 @@ pub fn handle_job_cancellation_cleanup(world: &mut World, job: &JsonValue) {
                         .unwrap_or("unknown");
                     let amount = res.get("amount").and_then(|v| v.as_i64()).unwrap_or(0);
                     let item_id = world.spawn_entity();
-                    world
-                        .set_component(
-                            item_id,
-                            "Item",
-                            serde_json::json!({
-                                "id": item_id.to_string(),
-                                "name": format!("{} (loose)", kind),
-                                "kind": kind,
-                                "amount": amount,
-                                "loose": true,
-                                "slot": "loose"
-                            }),
-                        )
-                        .unwrap();
+                    let _ = world.set_component(
+                        item_id,
+                        "Item",
+                        serde_json::json!({
+                            "id": item_id.to_string(),
+                            "name": format!("{} (loose)", kind),
+                            "kind": kind,
+                            "amount": amount,
+                            "loose": true,
+                            "slot": "loose"
+                        }),
+                    );
                     if let Some(pos) = &agent_pos {
-                        world
-                            .set_component(item_id, "Position", pos.clone())
-                            .unwrap();
+                        let _ = world.set_component(item_id, "Position", pos.clone());
                     }
                 }
             }
-            agent.as_object_mut().unwrap().remove("carried_resources");
+            if let Some(obj) = agent.as_object_mut() {
+                obj.remove("carried_resources");
+            }
         }
-        // Unassign agent from job if assigned
         if let Some(current_job_id) = agent.get("current_job").and_then(|v| v.as_u64())
             && Some(current_job_id) == job.get("id").and_then(|v| v.as_u64())
         {
-            agent.as_object_mut().unwrap().remove("current_job");
+            if let Some(obj) = agent.as_object_mut() {
+                obj.remove("current_job");
+            }
             agent["state"] = serde_json::json!("idle");
         }
-        world
-            .set_component(assigned_to, "Agent", agent.clone())
-            .unwrap();
+        let _ = world.set_component(assigned_to, "Agent", agent.clone());
     }
 }
 
@@ -101,7 +98,9 @@ pub fn handle_pathfinding_failure(
     if let Some(agent_id) = job.get("assigned_to").and_then(|v| v.as_u64()) {
         let agent_id = agent_id as u32;
         if let Some(mut agent) = world.get_component(agent_id, "Agent").cloned() {
-            agent.as_object_mut().unwrap().remove("current_job");
+            if let Some(obj) = agent.as_object_mut() {
+                obj.remove("current_job");
+            }
             agent["state"] = serde_json::json!("idle");
             let _ = world.set_component(agent_id, "Agent", agent.clone());
         }

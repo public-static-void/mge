@@ -12,13 +12,15 @@ impl System for StatCalculationSystem {
 
     fn run(&mut self, world: &mut World) {
         for eid in world.get_entities_with_component("BaseStats") {
-            let base = world.get_component(eid, "BaseStats").unwrap();
+            let Some(base) = world.get_component(eid, "BaseStats").cloned() else {
+                continue;
+            };
             let default_effects = JsonValue::Object(Map::new());
             let effects = world
                 .get_component(eid, "EquipmentEffects")
                 .unwrap_or(&default_effects);
 
-            let mut result = base.clone();
+            let mut result = base;
 
             if let Some(effects_obj) = effects.as_object() {
                 for (k, v) in effects_obj {
@@ -27,7 +29,7 @@ impl System for StatCalculationSystem {
                     result[k] = JsonValue::from(base_val + delta);
                 }
             }
-            world.set_component(eid, "Stats", result).unwrap();
+            let _ = world.set_component(eid, "Stats", result);
         }
     }
 }

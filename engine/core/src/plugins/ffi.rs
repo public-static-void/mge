@@ -26,9 +26,18 @@ pub unsafe extern "C" fn ffi_set_component(
     json_value: *const c_char,
 ) -> i32 {
     let world = unsafe { &mut *(world as *mut World) };
-    let name = unsafe { CStr::from_ptr(name) }.to_str().unwrap();
-    let json_value = unsafe { CStr::from_ptr(json_value) }.to_str().unwrap();
-    let value: serde_json::Value = serde_json::from_str(json_value).unwrap();
+    let name = match unsafe { CStr::from_ptr(name) }.to_str() {
+        Ok(s) => s,
+        Err(_) => return -1,
+    };
+    let json_value = match unsafe { CStr::from_ptr(json_value) }.to_str() {
+        Ok(s) => s,
+        Err(_) => return -1,
+    };
+    let value: serde_json::Value = match serde_json::from_str(json_value) {
+        Ok(v) => v,
+        Err(_) => return -1,
+    };
     match world.set_component(entity, name, value) {
         Ok(_) => 0,
         Err(_) => -1,

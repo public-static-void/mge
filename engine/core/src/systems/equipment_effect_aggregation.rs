@@ -52,9 +52,7 @@ impl System for EquipmentEffectAggregationSystem {
             for (k, v) in effects {
                 effect_map.insert(k, JsonValue::from(v));
             }
-            world
-                .set_component(eid, "EquipmentEffects", JsonValue::Object(effect_map))
-                .unwrap();
+            let _ = world.set_component(eid, "EquipmentEffects", JsonValue::Object(effect_map));
         }
     }
 }
