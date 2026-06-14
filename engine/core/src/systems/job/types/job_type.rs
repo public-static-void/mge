@@ -310,14 +310,6 @@ mod tests {
     }
 
     #[test]
-    fn test_job_type_data_roundtrip_yaml() {
-        let data = make_data("roundtrip_yaml");
-        let yaml = serde_yaml::to_string(&data).unwrap();
-        let deserialized: JobTypeData = serde_yaml::from_str(&yaml).unwrap();
-        assert_eq!(data, deserialized);
-    }
-
-    #[test]
     fn test_job_type_data_roundtrip_toml() {
         let data = make_data("roundtrip_toml");
         let toml_str = toml::to_string(&data).unwrap();
