@@ -1,2 +1,2 @@
-[target.'cfg(all)']
+[target.'cfg(all())']
 rustflags = ["-C", "link-arg=-fuse-ld=gold"]
