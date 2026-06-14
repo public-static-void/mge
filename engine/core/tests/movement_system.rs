@@ -33,7 +33,7 @@ fn test_move_all_moves_positions() {
         .unwrap();
 
     if let Some(positions) = world.components.get_mut("Position") {
-        for (_eid, value) in positions.iter_mut() {
+        for value in positions.values_mut() {
             if let Ok(mut pos_comp) = serde_json::from_value::<PositionComponent>(value.clone()) {
                 if let Position::Square { x, y, z: _ } = &mut pos_comp.pos {
                     *x += 1;
@@ -72,7 +72,7 @@ fn test_move_all_square() {
         .unwrap();
 
     if let Some(positions) = world.components.get_mut("Position") {
-        for (_eid, value) in positions.iter_mut() {
+        for value in positions.values_mut() {
             if let Ok(mut pos_comp) = serde_json::from_value::<PositionComponent>(value.clone()) {
                 if let Position::Square { x, y: _, z: _ } = &mut pos_comp.pos {
                     *x += 1;
@@ -106,7 +106,7 @@ fn test_move_all_hex() {
         .unwrap();
 
     if let Some(positions) = world.components.get_mut("Position") {
-        for (_eid, value) in positions.iter_mut() {
+        for value in positions.values_mut() {
             if let Ok(mut pos_comp) = serde_json::from_value::<PositionComponent>(value.clone()) {
                 if let Position::Hex { q, r: _, z: _ } = &mut pos_comp.pos {
                     *q += 1;
@@ -140,7 +140,7 @@ fn test_move_all_province() {
         .unwrap();
 
     if let Some(positions) = world.components.get_mut("Position") {
-        for (_eid, value) in positions.iter_mut() {
+        for value in positions.values_mut() {
             if let Ok(mut pos_comp) = serde_json::from_value::<PositionComponent>(value.clone()) {
                 if let Position::Province { id } = &mut pos_comp.pos {
                     *id = "B".into();

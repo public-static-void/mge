@@ -253,7 +253,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         // Move all: increment x for all entities with Position
         if let Some(positions) = world.borrow_mut().components.get_mut("Position") {
-            for (_eid, value) in positions.iter_mut() {
+            for value in positions.values_mut() {
                 if let Some(obj) = value.as_object_mut()
                     && let Some(x) = obj.get_mut("x")
                     && let Some(x_val) = x.as_f64()
@@ -264,7 +264,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         // Damage all: decrement health for all entities with Health
         if let Some(healths) = world.borrow_mut().components.get_mut("Health") {
-            for (_eid, value) in healths.iter_mut() {
+            for value in healths.values_mut() {
                 if let Some(obj) = value.as_object_mut()
                     && let Some(current) = obj.get_mut("current")
                     && let Some(cur_val) = current.as_f64()

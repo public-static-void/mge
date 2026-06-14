@@ -26,7 +26,7 @@ fn test_move_all_system_moves_entities() {
 
     // Move all: increment x, y for all entities with Position
     if let Some(positions) = world.components.get_mut("Position") {
-        for (_eid, value) in positions.iter_mut() {
+        for value in positions.values_mut() {
             if let Some(obj) = value.as_object_mut()
                 && let Some(pos) = obj.get_mut("pos")
                 && let Some(square) = pos.as_object_mut().unwrap().get_mut("Square")

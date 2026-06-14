@@ -35,7 +35,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: moonrepo/setup-rust@v1
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2026-06-01
 
       - uses: Swatinem/rust-cache@v2
 
@@ -66,8 +68,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: moonrepo/setup-rust@v1
+      - uses: dtolnay/rust-toolchain@master
         with:
+          toolchain: nightly-2026-06-01
           targets: wasm32-unknown-unknown
 
       - uses: Swatinem/rust-cache@v2
