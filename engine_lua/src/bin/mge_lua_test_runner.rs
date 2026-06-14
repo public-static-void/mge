@@ -323,6 +323,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         })?;
         lua.globals().set("require", require_fn)?;
 
+        // Register safe timestamp function (ms since epoch) for tests
+        lua.globals().set(
+            "timestamp",
+            lua.create_function(|_, ()| {
+                Ok(std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_millis() as u64)
+            })?,
+        )?;
+
         // Prepare Lua code: require the module and call only the test function
         let script = format!(
             r#"
