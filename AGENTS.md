@@ -155,10 +155,6 @@ xtask builds each Rust plugin crate in release mode, then copies `target/release
 
 `make test-python` creates a venv in `engine_py/.venv/`, runs `maturin develop --release`, then `pytest`. The `.so` only exists inside the venv. Re-run after any `engine_core` changes.
 
-### Codegen Tool
-
-`engine/tools/codegen/` exists but is **not wired into any build step**. Generated code may need explicit regeneration.
-
 ---
 
 ## Testing Quirks
