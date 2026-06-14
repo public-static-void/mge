@@ -32,7 +32,7 @@ fn find_config_file() -> PathBuf {
         return PathBuf::from(path);
     }
     // Default: project root
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../game.toml")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../game.toml")
 }
 
 fn main() {
