@@ -18,7 +18,7 @@ use engine_lua::ScriptEngine;
 use gag::BufferRedirect;
 use regex::Regex;
 use std::cell::RefCell;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::env;
 use std::fs;
 use std::io::Read;
@@ -304,14 +304,35 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .register_world(world.clone())
             .expect("Failed to register ECS API");
 
-        // --- Set Lua package.path to include the tests directory ---
+        // --- Register custom require since StdLib blocks package/require ---
         let lua = Rc::clone(&engine.lua);
-        let package: mlua::Table = lua.globals().get("package")?;
-        let old_path: String = package.get("path")?;
         let tests_dir = lua_tests_dir();
-        let tests_dir_str = tests_dir.to_str().unwrap();
-        let new_path = format!("{tests_dir_str}/?.lua;{tests_dir_str}/?.lua;{old_path}");
-        package.set("path", new_path)?;
+        let loaded: Rc<RefCell<HashMap<String, mlua::Value>>> =
+            Rc::new(RefCell::new(HashMap::new()));
+        let loaded_clone = loaded.clone();
+        let require_fn = lua.create_function(move |lua, name: String| {
+            if let Some(val) = loaded_clone.borrow().get(&name) {
+                return Ok(val.clone());
+            }
+            let path = tests_dir.join(format!("{}.lua", name.replace('.', "/")));
+            let content = std::fs::read_to_string(&path)
+                .map_err(|e| mlua::Error::external(format!("module '{name}' not found: {e}")))?;
+            let val: mlua::Value = lua.load(&content).eval()?;
+            loaded_clone.borrow_mut().insert(name, val.clone());
+            Ok(val)
+        })?;
+        lua.globals().set("require", require_fn)?;
+
+        // Register safe timestamp function (ms since epoch) for tests
+        lua.globals().set(
+            "timestamp",
+            lua.create_function(|_, ()| {
+                Ok(std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_millis() as u64)
+            })?,
+        )?;
 
         // Prepare Lua code: require the module and call only the test function
         let script = format!(

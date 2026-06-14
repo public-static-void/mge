@@ -38,7 +38,7 @@ local function test_job_event_log_querying()
 		assert.equals("job_assigned", e.event_type)
 	end
 
-	local now = os.time() * 1000
+	local now = timestamp()
 	local job3 = spawn_entity()
 	local agent3 = spawn_entity()
 	set_component(agent3, "Agent", { entity_id = agent3, skills = { TestJob = 1.0 } })

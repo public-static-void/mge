@@ -35,14 +35,28 @@ fn lua_get_user_input_returns_mocked_value() {
         .set("TEST_EXPECTED_INPUT", expected.clone())
         .unwrap();
 
-    // Set Lua's package.path so 'require' works for test modules
+    // Register custom require since StdLib blocks package/require
     let lua_tests_dir =
         std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../engine/scripts/lua/tests");
-    let lua_tests_dir_str = lua_tests_dir.to_str().unwrap();
-    let package: mlua::Table = engine.lua.globals().get("package").unwrap();
-    let old_path: String = package.get("path").unwrap();
-    let new_path = format!("{lua_tests_dir_str}/?.lua;{old_path}");
-    package.set("path", new_path).unwrap();
+    let lua_tests_dir_for_require = lua_tests_dir.clone();
+    let loaded: Rc<RefCell<std::collections::HashMap<String, mlua::Value>>> =
+        Rc::new(RefCell::new(std::collections::HashMap::new()));
+    let loaded_clone = loaded.clone();
+    let require_fn = engine
+        .lua
+        .create_function(move |lua, name: String| {
+            if let Some(val) = loaded_clone.borrow().get(&name) {
+                return Ok(val.clone());
+            }
+            let path = lua_tests_dir_for_require.join(format!("{name}.lua"));
+            let content = std::fs::read_to_string(&path)
+                .map_err(|e| mlua::Error::external(format!("module '{name}' not found: {e}")))?;
+            let val: mlua::Value = lua.load(&content).eval()?;
+            loaded_clone.borrow_mut().insert(name, val.clone());
+            Ok(val)
+        })
+        .unwrap();
+    engine.lua.globals().set("require", require_fn).unwrap();
 
     let script_path = lua_tests_dir.join("test_input.lua");
     let script = std::fs::read_to_string(&script_path).unwrap();
