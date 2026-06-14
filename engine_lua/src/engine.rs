@@ -44,8 +44,13 @@ impl ScriptEngine {
     pub fn new_with_input(input_provider: Box<dyn InputProvider + Send + Sync>) -> Self {
         use mlua::{Lua, LuaOptions, StdLib};
 
-        // Create Lua-VM with all standard libs (incl. debug)
-        let lua = unsafe { Lua::unsafe_new_with(StdLib::ALL, LuaOptions::default()) };
+        // Restricted stdlib — block os, io, debug, package/require
+        let lua = unsafe {
+            Lua::unsafe_new_with(
+                StdLib::MATH | StdLib::STRING | StdLib::TABLE | StdLib::BIT,
+                LuaOptions::default(),
+            )
+        };
 
         {
             let globals = lua.globals();
