@@ -79,7 +79,7 @@ impl World {
 
     /// Swap event buffers and clear the old read buffer.
     pub fn update_event_queues(&mut self) {
-        for (_event_type, (write, read)) in self.event_queues.iter_mut() {
+        for (write, read) in self.event_queues.values_mut() {
             std::mem::swap(write, read);
             write.clear();
         }

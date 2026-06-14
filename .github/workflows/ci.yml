@@ -12,9 +12,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: moonrepo/setup-rust@v1
+      - uses: dtolnay/rust-toolchain@master
         with:
-          components: rustfmt, clippy
+          toolchain: nightly-2026-06-01
+          components: rustfmt clippy
+
+      - uses: Swatinem/rust-cache@v2
 
       - name: Install LuaJIT and pkg-config
         run: sudo apt-get update && sudo apt-get install -y libluajit-5.1-dev pkg-config && sudo apt-get clean
@@ -28,15 +31,16 @@ jobs:
       - name: Clippy
         run: cargo clippy --all-targets --all-features -- -D warnings
 
-      - name: Clean up Rust build artifacts
-        run: cargo clean
-
   validate-schema:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - uses: moonrepo/setup-rust@v1
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2026-06-01
+
+      - uses: Swatinem/rust-cache@v2
 
       - name: Validate schemas (xtask via Makefile)
         run: cargo run --bin schema_validator --release -- engine/assets/schemas
@@ -48,6 +52,8 @@ jobs:
 
       - name: Install deps
         run: sudo apt-get update && sudo apt-get install -y build-essential libjansson-dev && sudo apt-get clean
+
+      - uses: Swatinem/rust-cache@v2
 
       - name: Build all C plugins (xtask via Makefile)
         run: cargo run -p xtask -- build-c-plugins
@@ -63,9 +69,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: moonrepo/setup-rust@v1
+      - uses: dtolnay/rust-toolchain@master
         with:
+          toolchain: nightly-2026-06-01
           targets: wasm32-unknown-unknown
+
+      - uses: Swatinem/rust-cache@v2
 
       - name: Build WASM test modules (xtask via Makefile)
         run: cargo run -p xtask -- build-wasm-tests
@@ -85,7 +94,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: moonrepo/setup-rust@v1
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2026-06-01
+
+      - uses: Swatinem/rust-cache@v2
 
       - name: Install deps
         run: sudo apt-get update && sudo apt-get install -y build-essential libjansson-dev && sudo apt-get clean
@@ -114,15 +127,15 @@ jobs:
       - name: Build all (xtask via Makefile)
         run: cargo run -p xtask -- build-all
 
-      - name: Clean up Rust build artifacts
-        run: cargo clean
-
   test-rust:
     runs-on: ubuntu-latest
     needs: build-all
     steps:
       - uses: actions/checkout@v4
-      - uses: moonrepo/setup-rust@v1
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2026-06-01
+      - uses: Swatinem/rust-cache@v2
       - name: Install wasm32-unknown-unknown target
         run: rustup target add wasm32-unknown-unknown
       - name: Install LuaJIT and pkg-config
@@ -145,8 +158,6 @@ jobs:
         run: |
           export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(pwd)/plugins
           cargo test --all
-      - name: Clean up Rust build artifacts
-        run: cargo clean
 
   test-lua:
     runs-on: ubuntu-latest
@@ -165,6 +176,8 @@ jobs:
 
       - name: Install Lua
         run: sudo apt-get update && sudo apt-get install -y lua5.1 && sudo apt-get clean
+
+      - uses: Swatinem/rust-cache@v2
 
       - name: Build Lua test runner
         run: cargo build --package engine_lua --bin mge_lua_test_runner
@@ -191,6 +204,8 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
+      - uses: Swatinem/rust-cache@v2
 
       - name: Create and activate virtualenv, install Python deps
         run: |

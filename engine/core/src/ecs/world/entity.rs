@@ -12,7 +12,7 @@ impl World {
 
     /// Despawn an entity
     pub fn despawn_entity(&mut self, entity: u32) {
-        for (_comp_name, comps) in self.components.iter_mut() {
+        for comps in self.components.values_mut() {
             let _existed = comps.remove(&entity).is_some();
         }
         self.entities.retain(|&id| id != entity);

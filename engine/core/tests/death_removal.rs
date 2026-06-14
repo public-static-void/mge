@@ -16,7 +16,7 @@ fn test_death_replaces_health_with_corpse_and_decay() {
 
     // Simulate damage that kills the entity
     if let Some(healths) = world.components.get_mut("Health") {
-        for (_eid, value) in healths.iter_mut() {
+        for value in healths.values_mut() {
             if let Some(obj) = value.as_object_mut()
                 && let Some(current) = obj.get_mut("current")
                 && let Some(cur_val) = current.as_f64()

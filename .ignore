@@ -1,4 +1,1 @@
-target/
-.git/
-node_modules/
-__pycache__/
+!knowledge/

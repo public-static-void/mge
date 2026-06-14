@@ -31,7 +31,7 @@ fn test_tick_advances_turn_and_runs_systems() {
 
     // Move all: increment x for all entities with Position (Square)
     if let Some(positions) = world.components.get_mut("Position") {
-        for (_eid, value) in positions.iter_mut() {
+        for value in positions.values_mut() {
             if let Some(obj) = value.as_object_mut()
                 && let Some(pos) = obj.get_mut("pos")
                 && let Some(square) = pos.get_mut("Square")
@@ -44,7 +44,7 @@ fn test_tick_advances_turn_and_runs_systems() {
     }
     // Damage all: decrement health for all entities with Health
     if let Some(healths) = world.components.get_mut("Health") {
-        for (_eid, value) in healths.iter_mut() {
+        for value in healths.values_mut() {
             if let Some(obj) = value.as_object_mut()
                 && let Some(current) = obj.get_mut("current")
                 && let Some(cur_val) = current.as_f64()
