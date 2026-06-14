@@ -98,8 +98,6 @@ engine_macros ← engine_core ← engine_lua
 | `schema_validator` | `schema_validator` | `tools/schema_validator/src/main.rs` | Validate all JSON schemas |
 | `xtask` | `xtask` | `src/main.rs` | Plugin build/deploy orchestrator |
 
-Note: `engine/core/src/main.rs` is a **plugin subprocess handler** (Unix socket protocol), not the game CLI.
-
 ### Feature flags on `engine_core`
 
 ```toml
