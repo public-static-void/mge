@@ -310,18 +310,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let loaded: Rc<RefCell<HashMap<String, mlua::Value>>> =
             Rc::new(RefCell::new(HashMap::new()));
         let loaded_clone = loaded.clone();
-        let require_fn = lua
-            .create_function(move |lua, name: String| {
-                if let Some(val) = loaded_clone.borrow().get(&name) {
-                    return Ok(val.clone());
-                }
-                let path = tests_dir.join(format!("{name}.lua"));
-                let content = std::fs::read_to_string(&path)
-                    .map_err(|e| mlua::Error::external(format!("module '{name}' not found: {e}")))?;
-                let val: mlua::Value = lua.load(&content).eval()?;
-                loaded_clone.borrow_mut().insert(name, val.clone());
-                Ok(val)
-            })?;
+        let require_fn = lua.create_function(move |lua, name: String| {
+            if let Some(val) = loaded_clone.borrow().get(&name) {
+                return Ok(val.clone());
+            }
+            let path = tests_dir.join(format!("{}.lua", name.replace('.', "/")));
+            let content = std::fs::read_to_string(&path)
+                .map_err(|e| mlua::Error::external(format!("module '{name}' not found: {e}")))?;
+            let val: mlua::Value = lua.load(&content).eval()?;
+            loaded_clone.borrow_mut().insert(name, val.clone());
+            Ok(val)
+        })?;
         lua.globals().set("require", require_fn)?;
 
         // Prepare Lua code: require the module and call only the test function
