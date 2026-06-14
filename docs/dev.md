@@ -61,8 +61,6 @@ cargo clippy --all-targets --all-features -- -D warnings
 - **CLI Runner (`bin/mge_cli.rs`)**: Main entry point for running mods, Lua scripts, or games.
 - **Test Runner (`bin/mge_lua_test_runner.rs`)**: Runs all Lua integration tests.
 - **Schema Validator (`bin/schema_validator.rs`)**: Validates all component schemas.
-- **Plugin Handler (`src/main.rs`)**: Handles plugin protocol (not for direct engine execution).
-- **Codegen Tool (`tools/codegen/src/main.rs`)**: Generates Rust/Lua/Python/C code from schemas.
 
 ---
 

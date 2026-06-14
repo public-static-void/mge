@@ -98,8 +98,6 @@ engine_macros ← engine_core ← engine_lua
 | `schema_validator` | `schema_validator` | `tools/schema_validator/src/main.rs` | Validate all JSON schemas |
 | `xtask` | `xtask` | `src/main.rs` | Plugin build/deploy orchestrator |
 
-Note: `engine/core/src/main.rs` is a **plugin subprocess handler** (Unix socket protocol), not the game CLI.
-
 ### Feature flags on `engine_core`
 
 ```toml
@@ -156,10 +154,6 @@ xtask builds each Rust plugin crate in release mode, then copies `target/release
 ### Python
 
 `make test-python` creates a venv in `engine_py/.venv/`, runs `maturin develop --release`, then `pytest`. The `.so` only exists inside the venv. Re-run after any `engine_core` changes.
-
-### Codegen Tool
-
-`engine/tools/codegen/` exists but is **not wired into any build step**. Generated code may need explicit regeneration.
 
 ---
 
