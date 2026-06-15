@@ -11,19 +11,9 @@
 //!
 //! ## Usage
 //!
-//! ```ignore
-//! // This example assumes you are inside the main game engine crate with ECS and modes modules defined.
-//! use engine_macros::component;
-//!
-//! #[component(modes(Single, Multi), version = "1.2.3", schema)]
-//! #[derive(Debug, PartialEq)]
-//! struct Position {
-//!     x: f32,
-//!     y: f32,
-//! }
-//! ```
-//!
-//! See the main project README for more context.
+//! See
+//! [`tests/component_macro.rs`](https://github.com/ruthless/mge/blob/main/engine_macros/tests/component_macro.rs)
+//! for complete working examples with mock `ecs` and `modes` modules.
 
 use proc_macro::TokenStream;
 use quote::quote;
