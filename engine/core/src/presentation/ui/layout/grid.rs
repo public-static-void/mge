@@ -102,7 +102,7 @@ impl GridLayout {
         self.children.push(widget);
     }
 
-    fn grid_size(&self) -> (usize, usize) {
+    pub fn grid_size(&self) -> (usize, usize) {
         let cols = self.columns;
         let len = self.children.len();
         let rows = len.div_ceil(cols);
@@ -127,7 +127,7 @@ impl GridLayout {
         )
     }
 
-    fn alignment_offset(&self) -> (i32, i32) {
+    pub fn alignment_offset(&self) -> (i32, i32) {
         let (widget_w, widget_h) = self.widget_area();
         let (grid_w, grid_h) = self.grid_area();
         let offset_x = match self.alignment {
@@ -141,7 +141,7 @@ impl GridLayout {
         (offset_x, offset_y)
     }
 
-    fn child_position(&self, index: usize) -> (i32, i32) {
+    pub fn child_position(&self, index: usize) -> (i32, i32) {
         let (cols, _) = self.grid_size();
         let (cell_w, cell_h) = self.cell_size;
         let (space_x, space_y) = self.spacing;
@@ -153,7 +153,7 @@ impl GridLayout {
         (x, y)
     }
 
-    fn child_at(&self, x: i32, y: i32) -> Option<usize> {
+    pub fn child_at(&self, x: i32, y: i32) -> Option<usize> {
         let (cols, rows) = self.grid_size();
         let (cell_w, cell_h) = self.cell_size;
         let (space_x, space_y) = self.spacing;

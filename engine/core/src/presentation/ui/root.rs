@@ -140,6 +140,11 @@ impl UiRoot {
     pub fn focused_index(&self) -> Option<usize> {
         self.focused
     }
+
+    /// Set the focused index directly
+    pub fn set_focused_index(&mut self, idx: Option<usize>) {
+        self.focused = idx;
+    }
 }
 
 impl Default for UiRoot {
@@ -162,7 +167,7 @@ pub enum Direction {
 }
 
 // Returns true if `to` is in the requested direction from `from`
-fn is_in_direction(from: (i32, i32), to: (i32, i32), dir: Direction) -> bool {
+pub fn is_in_direction(from: (i32, i32), to: (i32, i32), dir: Direction) -> bool {
     match dir {
         Direction::Right => to.0 > from.0,
         Direction::Left => to.0 < from.0,
@@ -172,7 +177,7 @@ fn is_in_direction(from: (i32, i32), to: (i32, i32), dir: Direction) -> bool {
 }
 
 // Lower score = better candidate
-fn navigation_score(from: (i32, i32), to: (i32, i32), dir: Direction) -> f32 {
+pub fn navigation_score(from: (i32, i32), to: (i32, i32), dir: Direction) -> f32 {
     let dx = to.0 - from.0;
     let dy = to.1 - from.1;
     match dir {

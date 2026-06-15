@@ -96,6 +96,11 @@ impl FocusGrid {
     pub fn focused_index(&self) -> Option<usize> {
         self.focused
     }
+
+    /// Set the focused index directly (for testing).
+    pub fn set_focused_debug(&mut self, idx: Option<usize>) {
+        self.focused = idx;
+    }
 }
 
 impl Default for FocusGrid {
