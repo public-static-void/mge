@@ -22,6 +22,18 @@ parking_lot = "0.12"
 walkdir = "2.5.0"
 dyn-clone = "1.0.19"
 
+[[test]]
+name = "mods_manifest_test"
+path = "tests/mods/manifest_test.rs"
+
+[[test]]
+name = "mods_loader_test"
+path = "tests/mods/loader_test.rs"
+
+[[test]]
+name = "schema_loader_test"
+path = "tests/ui/schema_loader_test.rs"
+
 [dev-dependencies]
 tempfile = "3.20.0"
 
