@@ -4,7 +4,7 @@
 
 Rust workspace monorepo (9 crates) — cross-language game engine. Languages: Rust (edition "2024"), Lua, Python, C, WASM.
 
-**Rust edition 2024 requires nightly Rust.** 8 of 9 crates use `edition = "2024"`. The only exception is `plugins/rust_test_plugin/` (edition "2021").
+**Rust edition 2024 requires nightly Rust.** All 9 crates use `edition = "2024"`.
 
 Build system: Cargo + Makefile (orchestration) + xtask (plugin deploy).
 
