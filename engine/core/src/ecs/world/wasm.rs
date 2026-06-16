@@ -266,6 +266,71 @@ impl WasmWorld {
         self.time_of_day
     }
 
+    /// Reads a line of user input from stdin.
+    pub fn get_user_input(&mut self) -> Option<String> {
+        let mut input = String::new();
+        match std::io::stdin().read_line(&mut input) {
+            Ok(0) => None,
+            Ok(_) => {
+                let trimmed = input.trim().to_string();
+                if trimmed.is_empty() { None } else { Some(trimmed) }
+            }
+            Err(_) => None,
+        }
+    }
+
+    /// Gets the Inventory component of an entity as a JSON string.
+    pub fn get_inventory(&self, entity_id: u32) -> Option<String> {
+        self.get_component(entity_id, "Inventory")
+    }
+
+    /// Sets the Inventory component on an entity from a JSON string.
+    pub fn set_inventory(&mut self, entity_id: u32, json_data: &str) -> Result<(), String> {
+        self.set_component(entity_id, "Inventory", json_data)
+    }
+
+    /// Adds an item (JSON value) to an entity's Inventory slots.
+    pub fn add_item_to_inventory(&mut self, entity_id: u32, item_json: &str) -> Result<(), String> {
+        let item_value: JsonValue = serde_json::from_str(item_json)
+            .map_err(|e| format!("Failed to parse item JSON: {e}"))?;
+
+        let inv = self
+            .components
+            .entry("Inventory".to_string())
+            .or_default()
+            .entry(entity_id)
+            .or_insert_with(|| serde_json::json!({"slots": []}));
+
+        let slots = inv
+            .get_mut("slots")
+            .and_then(|v| v.as_array_mut())
+            .ok_or_else(|| "Inventory has no slots array".to_string())?;
+
+        slots.push(item_value);
+        Ok(())
+    }
+
+    /// Removes an item from an entity's Inventory at the given slot index.
+    pub fn remove_item_from_inventory(&mut self, entity_id: u32, slot_id: i32) -> Result<(), String> {
+        let comps = self
+            .components
+            .get_mut("Inventory")
+            .ok_or_else(|| "No Inventory component found".to_string())?;
+        let inv = comps
+            .get_mut(&entity_id)
+            .ok_or_else(|| format!("Entity {entity_id} has no Inventory component"))?;
+        let slots = inv
+            .get_mut("slots")
+            .and_then(|v| v.as_array_mut())
+            .ok_or_else(|| "No slots array in Inventory".to_string())?;
+        let idx = slot_id as usize;
+        if idx >= slots.len() {
+            return Err("Slot index out of bounds".to_string());
+        }
+        slots.remove(idx);
+        Ok(())
+    }
+
     fn advance_time_of_day(&mut self) {
         self.time_of_day.minute += 1;
         if self.time_of_day.minute >= 60 {

@@ -19,3 +19,9 @@ pub mod death_decay;
 
 /// Time of day module
 pub mod time_of_day;
+
+/// Input module
+pub mod input;
+
+/// Inventory module
+pub mod inventory;
