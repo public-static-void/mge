@@ -103,6 +103,7 @@ function register_walls_with_pathfinder()
 end
 
 local function create_map()
+	world:apply_generated_map({ topology = "square", cells = { { x = 0, y = 0, z = 0 } } })
 	build_grid_map(MAP_W, MAP_H)
 
 	for x = 0, MAP_W - 1 do
@@ -477,7 +478,7 @@ function process_enemy_turn()
 					if result and result.path and #result.path >= 2 then
 						local next_step = result.path[2]
 						if next_step then
-							local nx, ny = next_step.x, next_step.y
+							local nx, ny = next_step.Square.x, next_step.Square.y
 							if nx == px and ny == py then
 								attack_entity(eid, player, 1)
 							else
@@ -714,7 +715,6 @@ function main()
 					tick()
 					process_enemy_turn()
 
-					update_event_buses()
 					for _, ev in ipairs(poll_event("combat")) do
 						if ev.message then
 							add_message(ev.message)
