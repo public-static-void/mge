@@ -31,3 +31,9 @@ pub mod save_load;
 
 /// Camera module
 pub mod camera;
+
+/// Event bus module
+pub mod event_bus;
+
+/// System module
+pub mod system;

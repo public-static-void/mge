@@ -41,6 +41,15 @@ pub struct WasmWorld {
     /// Camera state
     #[serde(default)]
     pub camera: Option<Camera>,
+    /// Event buses — maps event type → list of event payloads
+    #[serde(default)]
+    pub event_buses: HashMap<String, Vec<JsonValue>>,
+    /// Reader positions per event bus for poll_event tracking
+    #[serde(default)]
+    event_reader_positions: HashMap<String, usize>,
+    /// Registered systems — maps name → system type
+    #[serde(default)]
+    pub systems: HashMap<String, String>,
 }
 
 impl WasmWorld {
@@ -54,6 +63,9 @@ impl WasmWorld {
             turn: 0,
             time_of_day: TimeOfDay { hour: 6, minute: 0 },
             camera: None,
+            event_buses: HashMap::new(),
+            event_reader_positions: HashMap::new(),
+            systems: HashMap::new(),
         }
     }
 
@@ -391,6 +403,58 @@ impl WasmWorld {
         self.camera
             .as_ref()
             .map(|c| serde_json::to_string(c).unwrap_or_default())
+    }
+
+    /// Sends an event to the given event bus.
+    pub fn send_event(&mut self, event_type: &str, event_data: &str) -> Result<(), String> {
+        let value: JsonValue = serde_json::from_str(event_data)
+            .map_err(|e| format!("Failed to parse event JSON: {e}"))?;
+        self.event_buses
+            .entry(event_type.to_string())
+            .or_default()
+            .push(value);
+        Ok(())
+    }
+
+    /// Returns all unconsumed events for the given type as a JSON array string.
+    pub fn poll_event(&self, event_type: &str) -> String {
+        let pos = self
+            .event_reader_positions
+            .get(event_type)
+            .copied()
+            .unwrap_or(0);
+        let events = self
+            .event_buses
+            .get(event_type)
+            .map(|v| &v[pos..])
+            .unwrap_or(&[]);
+        serde_json::to_string(events).unwrap_or_else(|_| "[]".to_string())
+    }
+
+    /// Advances all event reader positions to the end, consuming all events.
+    pub fn update_event_buses(&mut self) {
+        for (name, bus) in &self.event_buses {
+            self.event_reader_positions
+                .entry(name.clone())
+                .or_insert(bus.len());
+            *self.event_reader_positions.get_mut(name).unwrap() = bus.len();
+        }
+    }
+
+    /// Registers a system with the given name and type.
+    pub fn register_system(&mut self, name: &str, system_type: &str) {
+        self.systems
+            .insert(name.to_string(), system_type.to_string());
+    }
+
+    /// Runs a registered system by name.
+    /// Currently checks for system existence; execution stub for WASM callback integration.
+    pub fn run_system(&self, name: &str) -> Result<(), String> {
+        if self.systems.contains_key(name) {
+            Ok(())
+        } else {
+            Err(format!("System '{name}' not found"))
+        }
     }
 
     fn advance_time_of_day(&mut self) {
