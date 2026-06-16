@@ -25,7 +25,21 @@ MGE is a modular, cross-language game engine blueprint for rapid prototyping, ex
 cargo run --bin mge_cli -- engine/scripts/lua/demos/roguelike_mvp.lua
 ```
 
-Controls: `w/a/s/d` = move, `e` = attack, `q` = quit
+A fully playable roguelike demo showcasing 8+ engine subsystems:
+
+| Subsystem       | What it demonstrates                                         |
+| --------------- | ------------------------------------------------------------ |
+| Grid map        | 40×25 tile map with rooms, corridors, walls                  |
+| Pathfinding     | AI enemies navigate using `find_path()`                      |
+| Camera          | Viewport follows player                                      |
+| ECS + Schemas   | Schema-defined Health, Position, Type, Renderable components |
+| Inventory       | Pickup, use, drop items with visible inventory screen        |
+| Simulation tick | Structured `tick()` + `get_turn()` game loop                 |
+| Event bus       | Combat/death events displayed as message log                 |
+| Death/decay     | Corpses, decay timer, loot drops on kill                     |
+| Save/load       | 4 save slots with menu-driven save/load                      |
+
+Controls: `WASD/hjkl` move · `.` wait · `e/g` pickup · `q/u` use · `i` inventory · `d` drop · `S` save · `L` load · `Q` quit
 
 ### Terminal Viewport Rendering Example:
 
@@ -53,7 +67,7 @@ Example output:
 cargo run --bin mge_cli -- --mod mvp_roguelike
 ```
 
-Controls: `w/a/s/d` = move, `e` = attack, `q` = quit
+Controls: `WASD` = move, `e` = attack, `.` = wait, `q` = quit
 
 ---
 
