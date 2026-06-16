@@ -1,4 +1,15 @@
+use crate::host_api::camera::register_camera_api;
+use crate::host_api::component::register_component_api;
+use crate::host_api::death_decay::register_death_decay_api;
 use crate::host_api::entity::register_entity_api;
+use crate::host_api::event_bus::register_event_bus_api;
+use crate::host_api::input::register_input_api;
+use crate::host_api::inventory::register_inventory_api;
+use crate::host_api::mode::register_mode_api;
+use crate::host_api::save_load::register_save_load_api;
+use crate::host_api::system::register_system_api;
+use crate::host_api::time_of_day::register_time_of_day_api;
+use crate::host_api::turn::register_turn_api;
 use anyhow::Result;
 use engine_core::ecs::world::wasm::WasmWorld;
 use std::path::PathBuf;
@@ -94,6 +105,17 @@ impl WasmScriptEngine {
 
         let mut linker = Linker::new(&engine);
         register_entity_api(&mut linker)?;
+        register_component_api(&mut linker)?;
+        register_turn_api(&mut linker)?;
+        register_mode_api(&mut linker)?;
+        register_death_decay_api(&mut linker)?;
+        register_time_of_day_api(&mut linker)?;
+        register_input_api(&mut linker)?;
+        register_inventory_api(&mut linker)?;
+        register_save_load_api(&mut linker)?;
+        register_camera_api(&mut linker)?;
+        register_event_bus_api(&mut linker)?;
+        register_system_api(&mut linker)?;
 
         if let Some(imports) = config.import_host_functions {
             imports(&mut linker);
