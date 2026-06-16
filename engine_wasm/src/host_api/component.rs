@@ -69,7 +69,7 @@ pub fn register_component_api(linker: &mut Linker<Arc<Mutex<WasmWorld>>>) -> any
     Ok(())
 }
 
-fn read_wasm_string<T>(caller: &mut Caller<T>, ptr: i32, len: i32) -> anyhow::Result<String> {
+pub fn read_wasm_string<T>(caller: &mut Caller<T>, ptr: i32, len: i32) -> anyhow::Result<String> {
     let mem = caller
         .get_export("memory")
         .and_then(|e| e.into_memory())
@@ -79,7 +79,7 @@ fn read_wasm_string<T>(caller: &mut Caller<T>, ptr: i32, len: i32) -> anyhow::Re
     Ok(String::from_utf8(buf)?)
 }
 
-fn write_string_to_wasm<T>(caller: &mut Caller<T>, ptr: i32, max_len: i32, data: &str) -> usize {
+pub fn write_string_to_wasm<T>(caller: &mut Caller<T>, ptr: i32, max_len: i32, data: &str) -> usize {
     let mem = caller
         .get_export("memory")
         .and_then(|e| e.into_memory())

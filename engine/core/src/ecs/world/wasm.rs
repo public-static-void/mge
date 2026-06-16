@@ -2,6 +2,15 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use std::collections::{HashMap, HashSet};
 
+/// Time of day
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct TimeOfDay {
+    /// Current hour.
+    pub hour: u8,
+    /// Current minute.
+    pub minute: u8,
+}
+
 /// Wasm implementation of a world
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct WasmWorld {
@@ -14,6 +23,8 @@ pub struct WasmWorld {
     pub current_mode: String,
     /// Current turn
     pub turn: u32,
+    /// Time of day
+    pub time_of_day: TimeOfDay,
 }
 
 impl WasmWorld {
@@ -25,6 +36,7 @@ impl WasmWorld {
             next_id: 1,
             current_mode: "colony".to_string(),
             turn: 0,
+            time_of_day: TimeOfDay { hour: 6, minute: 0 },
         }
     }
 
@@ -143,5 +155,125 @@ impl WasmWorld {
             self.components.remove(component_name);
         }
         Ok(())
+    }
+
+    /// Advance the simulation by one tick.
+    pub fn tick(&mut self) {
+        self.turn += 1;
+        self.advance_time_of_day();
+    }
+
+    /// Returns the current turn number.
+    pub fn get_turn(&self) -> i32 {
+        self.turn as i32
+    }
+
+    /// Sets the current game mode.
+    pub fn set_mode(&mut self, mode: &str) {
+        self.current_mode = mode.to_string();
+    }
+
+    /// Returns the current game mode.
+    pub fn get_mode(&self) -> &str {
+        &self.current_mode
+    }
+
+    /// Returns the list of available game modes.
+    pub fn get_available_modes(&self) -> Vec<String> {
+        let mut modes = vec!["colony".to_string()];
+        for comps in self.components.values() {
+            for value in comps.values() {
+                if let Some(obj) = value.as_object()
+                    && let Some(mode) = obj.get("_mode").and_then(|v| v.as_str())
+                    && !modes.contains(&mode.to_string())
+                {
+                    modes.push(mode.to_string());
+                }
+            }
+        }
+        modes
+    }
+
+    /// Process deaths: entities with Health.current <= 0 become Corpses with Decay.
+    pub fn process_deaths(&mut self) {
+        let entity_ids: Vec<u32> = self.entities.clone();
+        let mut to_convert = Vec::new();
+
+        if let Some(healths) = self.components.get("Health") {
+            for entity in &entity_ids {
+                if let Some(value) = healths.get(entity) {
+                    let current = value
+                        .get("current")
+                        .and_then(|v| v.as_f64())
+                        .unwrap_or(1.0);
+                    if current <= 0.0 {
+                        to_convert.push(*entity);
+                    }
+                }
+            }
+        }
+
+        for entity in to_convert {
+            if let Some(healths) = self.components.get_mut("Health") {
+                healths.remove(&entity);
+            }
+            self.components
+                .entry("Corpse".to_string())
+                .or_default()
+                .insert(entity, serde_json::json!({}));
+            self.components
+                .entry("Decay".to_string())
+                .or_default()
+                .insert(entity, serde_json::json!({"time_remaining": 5}));
+        }
+    }
+
+    /// Process decay: decrement Decay.time_remaining, despawn entities when it reaches 0.
+    pub fn process_decay(&mut self) {
+        let mut to_despawn = Vec::new();
+
+        if let Some(decays) = self.components.get("Decay") {
+            for (&entity, value) in decays.iter() {
+                let remaining = value
+                    .get("time_remaining")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(0);
+                if remaining <= 1 {
+                    to_despawn.push(entity);
+                }
+            }
+        }
+
+        if let Some(decays) = self.components.get_mut("Decay") {
+            for (&entity, value) in decays.iter_mut() {
+                if !to_despawn.contains(&entity)
+                    && let Some(obj) = value.as_object_mut()
+                    && let Some(tr) = obj.get_mut("time_remaining")
+                    && let Some(t) = tr.as_u64()
+                {
+                    *tr = serde_json::json!(t - 1);
+                }
+            }
+        }
+
+        for entity in to_despawn {
+            self.despawn_entity(entity);
+        }
+    }
+
+    /// Returns the current time of day.
+    pub fn get_time_of_day(&self) -> TimeOfDay {
+        self.time_of_day
+    }
+
+    fn advance_time_of_day(&mut self) {
+        self.time_of_day.minute += 1;
+        if self.time_of_day.minute >= 60 {
+            self.time_of_day.minute = 0;
+            self.time_of_day.hour += 1;
+            if self.time_of_day.hour >= 24 {
+                self.time_of_day.hour = 0;
+            }
+        }
     }
 }
