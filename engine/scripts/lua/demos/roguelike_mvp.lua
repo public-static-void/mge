@@ -190,6 +190,7 @@ enemies = {}
 items = {}
 message_log = {}
 game_state = "play"
+save_slots = {}
 
 function add_message(msg)
 	table.insert(message_log, msg)
@@ -473,7 +474,7 @@ function process_enemy_turn()
 				local dist = math.abs(px - ex) + math.abs(py - ey)
 				if dist == 1 then
 					attack_entity(eid, player, 1)
-				elseif dist > 1 then
+				elseif dist > 1 and dist <= 5 then
 					local result = find_path(flat_cell(ex, ey), flat_cell(px, py))
 					if result and result.path and #result.path >= 2 then
 						local next_step = result.path[2]
@@ -610,50 +611,104 @@ function show_inventory_screen()
 	end
 end
 
--- SECTION 11: Save/Load Menus
+-- SECTION 11: Save/Load Slots
+function list_save_slots()
+	local lines = {}
+	for i = 1, 4 do
+		local slot = save_slots[i]
+		if slot then
+			table.insert(lines, tostring(i) .. ". Slot " .. i .. " — Turn " .. slot.turn .. ", HP " .. slot.hp)
+		else
+			table.insert(lines, tostring(i) .. ". Slot " .. i .. " — (empty)")
+		end
+	end
+	return lines
+end
+
 function show_save_menu()
 	print("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n")
 	print("=== SAVE GAME ===\n")
-	print("Save current game? (y/n)")
-	local cmd = get_user_input("> ")
-	if cmd == "y" or cmd == "Y" then
-		save_to_file("roguelike_save.json")
-		add_message("Game saved!")
-	else
+	local lines = list_save_slots()
+	for _, line in ipairs(lines) do
+		print(line)
+	end
+	print("q — Cancel")
+	local cmd = get_user_input("Select slot (1-4): ")
+	if cmd == "q" or cmd == "Q" then
 		add_message("Save cancelled.")
+		return
+	end
+	local n = tonumber(cmd)
+	if n and n >= 1 and n <= 4 then
+		local filename = "mge_demo_save_" .. n .. ".json"
+		local ok, err = pcall(function()
+			save_to_file(filename)
+		end)
+		if ok then
+			local hp = get_component(player, "Health")
+			local hp_str = "?"
+			if hp then
+				hp_str = math.floor(hp.current) .. "/" .. math.floor(hp.max)
+			end
+			save_slots[n] = { turn = get_turn(), hp = hp_str }
+			add_message("Game saved to slot " .. n .. "!")
+		else
+			add_message("Failed to save: " .. tostring(err))
+		end
+	else
+		add_message("Invalid slot.")
 	end
 end
 
 function show_load_menu()
 	print("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n")
 	print("=== LOAD GAME ===\n")
-	print("Load saved game? (y/n)")
-	local cmd = get_user_input("> ")
-	if cmd == "y" or cmd == "Y" then
-		local ok, err = pcall(function()
-			load_from_file("roguelike_save.json")
-		end)
-		if ok then
-			player = find_entity_by_kind("player")
-			enemies = collect_entities_by_kind("enemy")
-			items = {}
-			for _, eid in ipairs(get_entities_with_component("Item")) do
-				table.insert(items, eid)
-			end
-			if player then
-				local px, py = get_xy(player)
-				if px then
-					set_camera(px, py)
+	local lines = list_save_slots()
+	for _, line in ipairs(lines) do
+		print(line)
+	end
+	print("q — Cancel")
+	local cmd = get_user_input("Select slot (1-4): ")
+	if cmd == "q" or cmd == "Q" then
+		add_message("Load cancelled.")
+		return
+	end
+	local n = tonumber(cmd)
+	if n and n >= 1 and n <= 4 then
+		if not save_slots[n] then
+			add_message("Slot " .. n .. " is empty.")
+			return
+		end
+		local confirm = get_user_input("Load slot " .. n .. "? (y/n): ")
+		if confirm == "y" or confirm == "Y" then
+			local filename = "mge_demo_save_" .. n .. ".json"
+			local ok, err = pcall(function()
+				load_from_file(filename)
+			end)
+			if ok then
+				player = find_entity_by_kind("player")
+				enemies = collect_entities_by_kind("enemy")
+				items = {}
+				for _, eid in ipairs(get_entities_with_component("Item")) do
+					table.insert(items, eid)
 				end
-				add_message("Game loaded!")
+				if player then
+					local px, py = get_xy(player)
+					if px then
+						set_camera(px, py)
+					end
+					add_message("Game loaded from slot " .. n .. "!")
+				else
+					add_message("Save corrupted: no player entity.")
+				end
 			else
-				add_message("Save corrupted: no player entity.")
+				add_message("Failed to load: " .. tostring(err))
 			end
 		else
-			add_message("Failed to load save: " .. tostring(err))
+			add_message("Load cancelled.")
 		end
 	else
-		add_message("Load cancelled.")
+		add_message("Invalid slot.")
 	end
 end
 
