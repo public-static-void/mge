@@ -3,7 +3,7 @@
 -- Cell coordinate formats used:
 --   entities_in_cell(cell)    -> { Square = { x, y, z } }  (table with Square wrapper)
 --   add_neighbor(from, to)    -> { x, y, z }               (flat table)
---   find_path(start, goal)    -> { x, y, z }               (flat table)
+--   find_path(start, goal)    -> { .path = { { Square = { x, y, z } }, ... }, .total_cost }
 --   set_cell_metadata(cell,_) -> { x, y, z }               (flat table)
 --   get_cell_metadata(cell)   -> { x, y, z }               (flat table)
 
@@ -89,6 +89,19 @@ function carve_room(x1, y1, x2, y2, doors)
 	end
 end
 
+function register_walls_with_pathfinder()
+	for key, _ in pairs(wall_data) do
+		local comma = key:find(",")
+		if comma then
+			local x = tonumber(key:sub(1, comma - 1))
+			local y = tonumber(key:sub(comma + 1))
+			if x and y then
+				set_cell_metadata(flat_cell(x, y), { walkable = false })
+			end
+		end
+	end
+end
+
 local function create_map()
 	build_grid_map(MAP_W, MAP_H)
 
@@ -129,6 +142,8 @@ local function create_map()
 	for x = 25, 27 do
 		wall_data[wall_key(x, 16)] = nil
 	end
+
+	register_walls_with_pathfinder()
 end
 
 -- SECTION 4: Entity Factories
@@ -159,11 +174,21 @@ function spawn_item(item_id, item_name, glyph, color, x, y)
 	return eid
 end
 
+function spawn_health_potion_entity(x, y)
+	local eid = spawn_entity()
+	set_component(eid, "Type", { kind = "item" })
+	set_component(eid, "Position", make_pos(x, y, 0))
+	set_component(eid, "Renderable", { glyph = "!", color = COLOR_GREEN })
+	set_component(eid, "Item", { id = "health_potion", name = "Health Potion", slot = "none" })
+	return eid
+end
+
 -- SECTION 5: Game State
 player = nil
 enemies = {}
 items = {}
 message_log = {}
+game_state = "play"
 
 function add_message(msg)
 	table.insert(message_log, msg)
@@ -197,22 +222,40 @@ end
 function get_tile_glyph(mx, my)
 	local cell = sq_cell(mx, my)
 	local occupants = entities_in_cell(cell)
+	local corpse_glyph = nil
+	local item_glyph = nil
+	local item_color = nil
+	local alive_glyph = nil
+	local alive_color = nil
 	for _, eid in ipairs(occupants) do
-		local corpse = get_component(eid, "Corpse")
-		if corpse then
-			return "%", COLOR_DGRAY
+		local rend = get_component(eid, "Renderable")
+		if rend and is_entity_alive(eid) then
+			alive_glyph = rend.glyph
+			alive_color = rend.color
 		end
 		local item = get_component(eid, "Item")
 		if item then
 			if item.id == "health_potion" or item.id == "potion" then
-				return "!", COLOR_GREEN
+				item_glyph = "!"
+				item_color = COLOR_GREEN
+			else
+				item_glyph = "?"
+				item_color = COLOR_WHITE
 			end
-			return "?", COLOR_WHITE
 		end
-		local rend = get_component(eid, "Renderable")
-		if rend and is_entity_alive(eid) then
-			return rend.glyph, rend.color
+		local corpse = get_component(eid, "Corpse")
+		if corpse then
+			corpse_glyph = "%"
 		end
+	end
+	if alive_glyph then
+		return alive_glyph, alive_color
+	end
+	if item_glyph then
+		return item_glyph, item_color
+	end
+	if corpse_glyph then
+		return "%", COLOR_DGRAY
 	end
 	if is_wall(mx, my) then
 		return "#", COLOR_DGRAY
@@ -394,48 +437,21 @@ function drop_item()
 end
 
 function handle_player_action(cmd)
-	-- Save/load first (return false = no action tick)
-	if cmd == "s" then
-		save_to_file("roguelike_save.json")
-		add_message("Game saved!")
-		return false
-	elseif cmd == "L" then
-		local ok, err = pcall(function()
-			load_from_file("roguelike_save.json")
-		end)
-		if ok then
-			player = find_entity_by_kind("player")
-			enemies = collect_entities_by_kind("enemy")
-			items = {}
-			for _, eid in ipairs(get_entities_with_component("Item")) do
-				table.insert(items, eid)
-			end
-			if player then
-				local px, py = get_xy(player)
-				if px then
-					set_camera(px, py)
-				end
-				add_message("Game loaded!")
-			else
-				add_message("Save corrupted: no player entity.")
-			end
-		else
-			add_message("Failed to load save: " .. tostring(err))
-		end
-		return false
-	end
-	-- Movement, combat, and actions (return true = advance turn)
-	if cmd == "h" or cmd == "left" or cmd == "H" then
+	-- Movement (return true = advance turn)
+	if cmd == "h" or cmd == "left" or cmd == "a" then
 		return move_player(-1, 0)
-	elseif cmd == "j" or cmd == "down" or cmd == "J" then
+	elseif cmd == "j" or cmd == "down" or cmd == "s" then
 		return move_player(0, 1)
-	elseif cmd == "k" or cmd == "up" or cmd == "K" then
+	elseif cmd == "k" or cmd == "up" or cmd == "w" then
 		return move_player(0, -1)
-	elseif cmd == "l" or cmd == "right" then
+	elseif cmd == "l" or cmd == "right" or cmd == "d" then
 		return move_player(1, 0)
-	elseif cmd == "g" then
+	elseif cmd == "." then
+		-- Wait: advance turn without action
+		return true
+	elseif cmd == "g" or cmd == "e" then
 		return pickup_item()
-	elseif cmd == "u" then
+	elseif cmd == "u" or cmd == "q" then
 		return use_item()
 	elseif cmd == "d" then
 		return drop_item()
@@ -461,7 +477,7 @@ function process_enemy_turn()
 					if result and result.path and #result.path >= 2 then
 						local next_step = result.path[2]
 						if next_step then
-							local nx, ny = next_step.x, next_step.y
+							local nx, ny = next_step.Square.x, next_step.Square.y
 							if nx == px and ny == py then
 								attack_entity(eid, player, 1)
 							else
@@ -528,7 +544,119 @@ function check_win_lose()
 	return true
 end
 
--- SECTION 10: Game Loop
+-- SECTION 10: Inventory Screen
+function show_inventory_screen()
+	local selected = 1
+	while true do
+		os.execute("clear")
+		print("=== INVENTORY ===\n")
+		local inv = get_inventory(player)
+		if not inv or #inv.slots == 0 then
+			print("  (empty)")
+		else
+			if selected > #inv.slots then
+				selected = #inv.slots
+			end
+			for i, item_id in ipairs(inv.slots) do
+				local marker = (i == selected) and " >" or "  "
+				print(marker .. " " .. i .. ". " .. item_id)
+			end
+		end
+		print("")
+		print("[u] use item  [d] drop item  [i] close")
+		local cmd = get_user_input("> ")
+		if cmd == "i" then
+			return
+		elseif cmd == "u" and inv and #inv.slots > 0 then
+			local item_id = inv.slots[selected]
+			if item_id == "health_potion" or item_id == "potion" then
+				local hp = get_component(player, "Health")
+				hp.current = math.min(hp.current + 5, hp.max)
+				set_component(player, "Health", hp)
+				remove_item_from_inventory(player, selected - 1)
+				add_message("You drink a potion and heal 5 HP!")
+				inv = get_inventory(player)
+				if not inv or #inv.slots == 0 then
+					return
+				end
+			else
+				add_message("Cannot use that item.")
+			end
+		elseif cmd == "d" and inv and #inv.slots > 0 then
+			local item_id = inv.slots[selected]
+			local px, py = get_xy(player)
+			if px then
+				local drop_x, drop_y = find_adjacent_free_cell(px, py)
+				if drop_x then
+					remove_item_from_inventory(player, selected - 1)
+					local eid = spawn_item(item_id, item_id, "?", COLOR_WHITE, drop_x, drop_y)
+					table.insert(items, eid)
+					add_message("You drop " .. item_id .. ".")
+					inv = get_inventory(player)
+					if not inv or #inv.slots == 0 then
+						return
+					end
+				else
+					add_message("No space to drop items.")
+				end
+			end
+		elseif cmd >= "1" and cmd <= "9" then
+			local n = tonumber(cmd)
+			if n and inv and n <= #inv.slots then
+				selected = n
+			end
+		end
+	end
+end
+
+-- SECTION 11: Save/Load Menus
+function show_save_menu()
+	os.execute("clear")
+	print("=== SAVE GAME ===\n")
+	print("Save current game? (y/n)")
+	local cmd = get_user_input("> ")
+	if cmd == "y" or cmd == "Y" then
+		save_to_file("roguelike_save.json")
+		add_message("Game saved!")
+	else
+		add_message("Save cancelled.")
+	end
+end
+
+function show_load_menu()
+	os.execute("clear")
+	print("=== LOAD GAME ===\n")
+	print("Load saved game? (y/n)")
+	local cmd = get_user_input("> ")
+	if cmd == "y" or cmd == "Y" then
+		local ok, err = pcall(function()
+			load_from_file("roguelike_save.json")
+		end)
+		if ok then
+			player = find_entity_by_kind("player")
+			enemies = collect_entities_by_kind("enemy")
+			items = {}
+			for _, eid in ipairs(get_entities_with_component("Item")) do
+				table.insert(items, eid)
+			end
+			if player then
+				local px, py = get_xy(player)
+				if px then
+					set_camera(px, py)
+				end
+				add_message("Game loaded!")
+			else
+				add_message("Save corrupted: no player entity.")
+			end
+		else
+			add_message("Failed to load save: " .. tostring(err))
+		end
+	else
+		add_message("Load cancelled.")
+	end
+end
+
+-- SECTION 12: Game Loop
 function main()
 	create_map()
 
@@ -560,46 +688,66 @@ function main()
 	add_message("Welcome to the MGE Roguelike!")
 	add_message("Explore the dungeon and defeat all enemies.")
 
+	game_state = "play"
+
 	while true do
-		render_viewport()
-		render_hud()
-		render_log()
-		print("[arrows/hjkl=move g=get u=use d=drop s=save L=load q=quit]")
+		if game_state == "play" then
+			render_viewport()
+			render_hud()
+			render_log()
+			print("[WASD/hjkl=move .=wait e/g=get q/u=use d=drop i=inv S=save L=load Q=quit]")
 
-		local cmd = get_user_input("> ")
-		if cmd == "q" then
-			add_message("Goodbye!")
-			break
-		end
-
-		local acted = handle_player_action(cmd)
-
-		if acted then
-			tick()
-			process_enemy_turn()
-
-			update_event_buses()
-			for _, ev in ipairs(poll_event("combat")) do
-				if ev.message then
-					add_message(ev.message)
-				end
-			end
-			for _, ev in ipairs(poll_event("death")) do
-				if ev.message then
-					add_message(ev.message)
-				end
-			end
-
-			process_deaths()
-			process_decay()
-
-			local px, py = get_xy(player)
-			if px then
-				set_camera(px, py)
-			end
-
-			if check_win_lose() then
+			local cmd = get_user_input("> ")
+			if cmd == "Q" then
+				add_message("Goodbye!")
 				break
+			elseif cmd == "S" then
+				show_save_menu()
+			elseif cmd == "L" then
+				show_load_menu()
+			elseif cmd == "i" then
+				show_inventory_screen()
+			else
+				local acted = handle_player_action(cmd)
+
+				if acted then
+					tick()
+					process_enemy_turn()
+
+					update_event_buses()
+					for _, ev in ipairs(poll_event("combat")) do
+						if ev.message then
+							add_message(ev.message)
+						end
+					end
+					for _, ev in ipairs(poll_event("death")) do
+						if ev.message then
+							add_message(ev.message)
+						end
+						-- Spawn loot at dead entity's position
+						if ev.entity_id then
+							local corpse_pos = get_component(ev.entity_id, "Position")
+							if corpse_pos and corpse_pos.pos and corpse_pos.pos.Square then
+								local cx = corpse_pos.pos.Square.x
+								local cy = corpse_pos.pos.Square.y
+								local potion = spawn_health_potion_entity(cx, cy)
+								table.insert(items, potion)
+							end
+						end
+					end
+
+					process_deaths()
+					process_decay()
+
+					local px, py = get_xy(player)
+					if px then
+						set_camera(px, py)
+					end
+
+					if check_win_lose() then
+						break
+					end
+				end
 			end
 		end
 	end
