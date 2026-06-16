@@ -25,3 +25,9 @@ pub mod input;
 
 /// Inventory module
 pub mod inventory;
+
+/// Save/Load module
+pub mod save_load;
+
+/// Camera module
+pub mod camera;
