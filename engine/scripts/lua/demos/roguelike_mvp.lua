@@ -498,6 +498,24 @@ function process_enemy_turn()
 							end
 						end
 					end
+				else
+					local dirs = { {0,-1}, {0,1}, {-1,0}, {1,0} }
+					local r = math.random(1, 4)
+					local nx, ny = ex + dirs[r][1], ey + dirs[r][2]
+					if is_walkable(nx, ny) then
+						local cell = sq_cell(nx, ny)
+						local occupants = entities_in_cell(cell)
+						local blocked = false
+						for _, occ in ipairs(occupants) do
+							if occ ~= eid and is_entity_alive(occ) then
+								blocked = true
+								break
+							end
+						end
+						if not blocked then
+							set_component(eid, "Position", make_pos(nx, ny, 0))
+						end
+					end
 				end
 			end
 		end
