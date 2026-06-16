@@ -56,7 +56,9 @@ target/
 
 # Project-specific
 test_save.json
+roguelike_save.json
 test_job_event_log.json
+mge_demo_save_*.json
 knowledge/
 
 # Plugins: ignore build artifacts in all subfolders
