@@ -126,7 +126,12 @@ impl WasmWorld {
     }
 
     /// Set a component on an entity from a JSON string.
-    pub fn set_component(&mut self, entity_id: u32, component_name: &str, json_data: &str) -> Result<(), String> {
+    pub fn set_component(
+        &mut self,
+        entity_id: u32,
+        component_name: &str,
+        json_data: &str,
+    ) -> Result<(), String> {
         let value: JsonValue = serde_json::from_str(json_data)
             .map_err(|e| format!("Failed to parse component JSON: {e}"))?;
         self.components
@@ -146,9 +151,12 @@ impl WasmWorld {
 
     /// Remove a component from an entity.
     pub fn remove_component(&mut self, entity_id: u32, component_name: &str) -> Result<(), String> {
-        let comps = self.components.get_mut(component_name)
+        let comps = self
+            .components
+            .get_mut(component_name)
             .ok_or_else(|| format!("Component '{component_name}' not found"))?;
-        comps.remove(&entity_id)
+        comps
+            .remove(&entity_id)
             .ok_or_else(|| format!("Entity {entity_id} has no component '{component_name}'"))?;
         // Clean up empty component type maps
         if comps.is_empty() {
@@ -202,10 +210,7 @@ impl WasmWorld {
         if let Some(healths) = self.components.get("Health") {
             for entity in &entity_ids {
                 if let Some(value) = healths.get(entity) {
-                    let current = value
-                        .get("current")
-                        .and_then(|v| v.as_f64())
-                        .unwrap_or(1.0);
+                    let current = value.get("current").and_then(|v| v.as_f64()).unwrap_or(1.0);
                     if current <= 0.0 {
                         to_convert.push(*entity);
                     }
@@ -273,7 +278,11 @@ impl WasmWorld {
             Ok(0) => None,
             Ok(_) => {
                 let trimmed = input.trim().to_string();
-                if trimmed.is_empty() { None } else { Some(trimmed) }
+                if trimmed.is_empty() {
+                    None
+                } else {
+                    Some(trimmed)
+                }
             }
             Err(_) => None,
         }
@@ -311,7 +320,11 @@ impl WasmWorld {
     }
 
     /// Removes an item from an entity's Inventory at the given slot index.
-    pub fn remove_item_from_inventory(&mut self, entity_id: u32, slot_id: i32) -> Result<(), String> {
+    pub fn remove_item_from_inventory(
+        &mut self,
+        entity_id: u32,
+        slot_id: i32,
+    ) -> Result<(), String> {
         let comps = self
             .components
             .get_mut("Inventory")

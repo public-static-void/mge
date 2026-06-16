@@ -8,9 +8,7 @@ pub fn register_mode_api(linker: &mut Linker<Arc<Mutex<WasmWorld>>>) -> anyhow::
     linker.func_wrap(
         "mode",
         "set_mode",
-        |mut caller: Caller<'_, Arc<Mutex<WasmWorld>>>,
-         mode_ptr: i32,
-         mode_len: i32| {
+        |mut caller: Caller<'_, Arc<Mutex<WasmWorld>>>, mode_ptr: i32, mode_len: i32| {
             let mode = read_wasm_string(&mut caller, mode_ptr, mode_len)
                 .expect("Failed to read mode string from WASM memory");
             let mut world = caller.data().lock().unwrap();

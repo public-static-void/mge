@@ -5,9 +5,7 @@ use wasmtime::{Caller, Linker};
 
 /// Registers the inventory API (get_inventory, set_inventory, add_item_to_inventory,
 /// remove_item_from_inventory).
-pub fn register_inventory_api(
-    linker: &mut Linker<Arc<Mutex<WasmWorld>>>,
-) -> anyhow::Result<()> {
+pub fn register_inventory_api(linker: &mut Linker<Arc<Mutex<WasmWorld>>>) -> anyhow::Result<()> {
     linker.func_wrap(
         "inventory",
         "get_inventory",
