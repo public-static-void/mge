@@ -11,6 +11,19 @@ pub struct TimeOfDay {
     pub minute: u8,
 }
 
+/// Camera state for the WASM world.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct Camera {
+    /// X position of the camera viewport.
+    pub x: i32,
+    /// Y position of the camera viewport.
+    pub y: i32,
+    /// Width of the camera viewport.
+    pub width: i32,
+    /// Height of the camera viewport.
+    pub height: i32,
+}
+
 /// Wasm implementation of a world
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct WasmWorld {
@@ -25,6 +38,9 @@ pub struct WasmWorld {
     pub turn: u32,
     /// Time of day
     pub time_of_day: TimeOfDay,
+    /// Camera state
+    #[serde(default)]
+    pub camera: Option<Camera>,
 }
 
 impl WasmWorld {
@@ -37,6 +53,7 @@ impl WasmWorld {
             current_mode: "colony".to_string(),
             turn: 0,
             time_of_day: TimeOfDay { hour: 6, minute: 0 },
+            camera: None,
         }
     }
 
@@ -342,6 +359,38 @@ impl WasmWorld {
         }
         slots.remove(idx);
         Ok(())
+    }
+
+    /// Serializes world state to a JSON file.
+    pub fn save_to_file(&self, path: &str) -> Result<(), String> {
+        let json = serde_json::to_string(self).map_err(|e| e.to_string())?;
+        std::fs::write(path, &json).map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    /// Deserializes world state from a JSON file, replacing current state.
+    pub fn load_from_file(&mut self, path: &str) -> Result<(), String> {
+        let json = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
+        let loaded: WasmWorld = serde_json::from_str(&json).map_err(|e| e.to_string())?;
+        *self = loaded;
+        Ok(())
+    }
+
+    /// Sets the camera viewport position and dimensions.
+    pub fn set_camera(&mut self, x: i32, y: i32, width: i32, height: i32) {
+        self.camera = Some(Camera {
+            x,
+            y,
+            width,
+            height,
+        });
+    }
+
+    /// Returns the current camera state as a JSON string, or None if unset.
+    pub fn get_camera(&self) -> Option<String> {
+        self.camera
+            .as_ref()
+            .map(|c| serde_json::to_string(c).unwrap_or_default())
     }
 
     fn advance_time_of_day(&mut self) {
