@@ -4,3 +4,6 @@
 
 /// Entity module
 pub mod entity;
+
+/// Component module
+pub mod component;

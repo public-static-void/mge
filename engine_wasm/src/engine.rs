@@ -1,3 +1,4 @@
+use crate::host_api::component::register_component_api;
 use crate::host_api::entity::register_entity_api;
 use anyhow::Result;
 use engine_core::ecs::world::wasm::WasmWorld;
@@ -94,6 +95,7 @@ impl WasmScriptEngine {
 
         let mut linker = Linker::new(&engine);
         register_entity_api(&mut linker)?;
+        register_component_api(&mut linker)?;
 
         if let Some(imports) = config.import_host_functions {
             imports(&mut linker);

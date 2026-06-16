@@ -112,4 +112,36 @@ impl WasmWorld {
         let hp = health.get("hp").and_then(|v| v.as_f64()).unwrap_or(100.0) - amount as f64;
         *health = serde_json::json!({"hp": hp.max(0.0)});
     }
+
+    /// Set a component on an entity from a JSON string.
+    pub fn set_component(&mut self, entity_id: u32, component_name: &str, json_data: &str) -> Result<(), String> {
+        let value: JsonValue = serde_json::from_str(json_data)
+            .map_err(|e| format!("Failed to parse component JSON: {e}"))?;
+        self.components
+            .entry(component_name.to_string())
+            .or_default()
+            .insert(entity_id, value);
+        Ok(())
+    }
+
+    /// Get a component from an entity as a JSON string.
+    pub fn get_component(&self, entity_id: u32, component_name: &str) -> Option<String> {
+        self.components
+            .get(component_name)?
+            .get(&entity_id)
+            .map(|v| serde_json::to_string(v).unwrap_or_default())
+    }
+
+    /// Remove a component from an entity.
+    pub fn remove_component(&mut self, entity_id: u32, component_name: &str) -> Result<(), String> {
+        let comps = self.components.get_mut(component_name)
+            .ok_or_else(|| format!("Component '{component_name}' not found"))?;
+        comps.remove(&entity_id)
+            .ok_or_else(|| format!("Entity {entity_id} has no component '{component_name}'"))?;
+        // Clean up empty component type maps
+        if comps.is_empty() {
+            self.components.remove(component_name);
+        }
+        Ok(())
+    }
 }
