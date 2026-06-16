@@ -3,7 +3,7 @@
 -- Cell coordinate formats used:
 --   entities_in_cell(cell)    -> { Square = { x, y, z } }  (table with Square wrapper)
 --   add_neighbor(from, to)    -> { x, y, z }               (flat table)
---   find_path(start, goal)    -> { .path = { { Square = { x, y, z } }, ... }, .total_cost }
+--   find_path(start, goal)    -> { .path = { { x, y, z }, ... }, .total_cost }
 --   set_cell_metadata(cell,_) -> { x, y, z }               (flat table)
 --   get_cell_metadata(cell)   -> { x, y, z }               (flat table)
 
@@ -477,7 +477,7 @@ function process_enemy_turn()
 					if result and result.path and #result.path >= 2 then
 						local next_step = result.path[2]
 						if next_step then
-							local nx, ny = next_step.Square.x, next_step.Square.y
+							local nx, ny = next_step.x, next_step.y
 							if nx == px and ny == py then
 								attack_entity(eid, player, 1)
 							else
@@ -548,7 +548,7 @@ end
 function show_inventory_screen()
 	local selected = 1
 	while true do
-		os.execute("clear")
+		print("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n")
 		print("=== INVENTORY ===\n")
 		local inv = get_inventory(player)
 		if not inv or #inv.slots == 0 then
@@ -611,7 +611,7 @@ end
 
 -- SECTION 11: Save/Load Menus
 function show_save_menu()
-	os.execute("clear")
+	print("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n")
 	print("=== SAVE GAME ===\n")
 	print("Save current game? (y/n)")
 	local cmd = get_user_input("> ")
@@ -624,7 +624,7 @@ function show_save_menu()
 end
 
 function show_load_menu()
-	os.execute("clear")
+	print("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n")
 	print("=== LOAD GAME ===\n")
 	print("Load saved game? (y/n)")
 	local cmd = get_user_input("> ")
