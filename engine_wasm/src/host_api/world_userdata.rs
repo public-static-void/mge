@@ -8,59 +8,71 @@ pub fn register_world_userdata_api(
     linker: &mut Linker<Arc<Mutex<WasmWorld>>>,
 ) -> anyhow::Result<()> {
     linker.func_wrap(
-        "wasm_world_userdata",
+        "wasm_map",
         "register_map_validator",
         |mut caller: Caller<'_, Arc<Mutex<WasmWorld>>>, name_ptr: i32, name_len: i32| -> i32 {
             let name = match read_wasm_string(&mut caller, name_ptr, name_len) {
                 Ok(n) => n,
                 Err(_) => return -1,
             };
-            let mut world = caller.data().lock().unwrap();
-            if !world.discovered_export_names.contains(&name) {
+            // Use caller.get_export() to verify the export exists and is a function
+            if caller
+                .get_export(&name)
+                .and_then(|e| e.into_func())
+                .is_none()
+            {
                 return -1;
             }
-            world.register_map_validator(&name);
+            let mut world = caller.data().lock().unwrap();
+            let _ = world.register_map_validator(&name);
             0
         },
     )?;
 
     linker.func_wrap(
-        "wasm_world_userdata",
+        "wasm_map",
         "clear_map_validators",
-        |caller: Caller<'_, Arc<Mutex<WasmWorld>>>| {
+        |caller: Caller<'_, Arc<Mutex<WasmWorld>>>| -> i32 {
             let mut world = caller.data().lock().unwrap();
             world.clear_map_validators();
+            0
         },
     )?;
 
     linker.func_wrap(
-        "wasm_world_userdata",
+        "wasm_map",
         "register_map_postprocessor",
         |mut caller: Caller<'_, Arc<Mutex<WasmWorld>>>, name_ptr: i32, name_len: i32| -> i32 {
             let name = match read_wasm_string(&mut caller, name_ptr, name_len) {
                 Ok(n) => n,
                 Err(_) => return -1,
             };
-            let mut world = caller.data().lock().unwrap();
-            if !world.discovered_export_names.contains(&name) {
+            // Use caller.get_export() to verify the export exists and is a function
+            if caller
+                .get_export(&name)
+                .and_then(|e| e.into_func())
+                .is_none()
+            {
                 return -1;
             }
-            world.register_map_postprocessor(&name);
+            let mut world = caller.data().lock().unwrap();
+            let _ = world.register_map_postprocessor(&name);
             0
         },
     )?;
 
     linker.func_wrap(
-        "wasm_world_userdata",
+        "wasm_map",
         "clear_map_postprocessors",
-        |caller: Caller<'_, Arc<Mutex<WasmWorld>>>| {
+        |caller: Caller<'_, Arc<Mutex<WasmWorld>>>| -> i32 {
             let mut world = caller.data().lock().unwrap();
             world.clear_map_postprocessors();
+            0
         },
     )?;
 
     linker.func_wrap(
-        "wasm_world_userdata",
+        "wasm_map",
         "apply_chunk",
         |mut caller: Caller<'_, Arc<Mutex<WasmWorld>>>, chunk_ptr: i32, chunk_len: i32| -> i32 {
             let chunk_json = match read_wasm_string(&mut caller, chunk_ptr, chunk_len) {
