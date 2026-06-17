@@ -40,6 +40,8 @@ pub extern "C" fn test_economic_api() -> i32 {
             delta: f64,
         );
         fn get_job_resource_reservations(entity: u32, out_ptr: *mut u8, out_len: i32) -> i32;
+        fn reserve_job_resources();
+        fn release_job_resource_reservations(entity: u32);
     }
 
     unsafe {
@@ -93,6 +95,33 @@ pub extern "C" fn test_economic_api() -> i32 {
         let mut buf4 = [0u8; 128];
         let w4 = get_job_resource_reservations(eid, buf4.as_mut_ptr(), buf4.len() as i32);
         if w4 != -1 { return 0; }
+
+        // ---- Test reserve/release job resources ----
+        // Create a stockpile entity with resources
+        let stockpile_eid = spawn_entity();
+        let stock_json = "{\"resources\":{\"iron_ore\":100.0}}";
+        set_component(stockpile_eid, "Stockpile".as_ptr(), "Stockpile".len() as i32, stock_json.as_ptr(), stock_json.len() as i32);
+
+        // Create a job entity with resource_requirements
+        let job_eid = spawn_entity();
+        let job_json = "{\"state\":\"pending\",\"resource_requirements\":[{\"kind\":\"iron_ore\",\"amount\":10}]}";
+        set_component(job_eid, "Job".as_ptr(), "Job".len() as i32, job_json.as_ptr(), job_json.len() as i32);
+
+        // Run reservation
+        reserve_job_resources();
+
+        // Job should now have reserved_resources
+        let mut buf5 = [0u8; 4096];
+        let w5 = get_job_resource_reservations(job_eid, buf5.as_mut_ptr(), buf5.len() as i32);
+        if w5 < 0 { return 0; }
+
+        // Release reservation
+        release_job_resource_reservations(job_eid);
+
+        // Reservation should be cleared
+        let mut buf6 = [0u8; 128];
+        let w6 = get_job_resource_reservations(job_eid, buf6.as_mut_ptr(), buf6.len() as i32);
+        if w6 != -1 { return 0; }
 
         1
     }
