@@ -1,19 +1,25 @@
+use crate::host_api::body::register_body_api;
 use crate::host_api::camera::register_camera_api;
 use crate::host_api::component::register_component_api;
 use crate::host_api::death_decay::register_death_decay_api;
+use crate::host_api::economic::register_economic_api;
 use crate::host_api::entity::register_entity_api;
 use crate::host_api::equipment::register_equipment_api;
 use crate::host_api::event_bus::register_event_bus_api;
 use crate::host_api::input::register_input_api;
 use crate::host_api::inventory::register_inventory_api;
+use crate::host_api::map::register_map_api;
 use crate::host_api::mode::register_mode_api;
 use crate::host_api::movement_ops::register_movement_ops_api;
+use crate::host_api::region::register_region_api;
 use crate::host_api::save_load::register_save_load_api;
 use crate::host_api::system::register_system_api;
 use crate::host_api::time_of_day::register_time_of_day_api;
 use crate::host_api::turn::register_turn_api;
+use crate::host_api::worldgen::register_worldgen_api;
 use anyhow::Result;
-use engine_core::ecs::world::wasm::WasmWorld;
+use engine_core::ecs::world::wasm::{WasmWorld, load_schemas_from_dir};
+use engine_core::worldgen::ThreadSafeWorldgenRegistry;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use wasmtime::error::Context as WasmContext;
@@ -84,6 +90,10 @@ impl TryFrom<Val> for WasmValue {
 pub struct WasmScriptEngineConfig {
     /// Path to the WASM module
     pub module_path: PathBuf,
+    /// Optional path to schema directory (loads *.json files into WasmWorld.component_schemas)
+    pub schema_path: Option<PathBuf>,
+    /// Optional worldgen registry for list/invoke host functions
+    pub worldgen_registry: Option<Arc<Mutex<ThreadSafeWorldgenRegistry>>>,
     /// Optional host function registrar
     pub import_host_functions: Option<HostImportRegistrar>,
 }
@@ -120,12 +130,31 @@ impl WasmScriptEngine {
         register_system_api(&mut linker)?;
         register_movement_ops_api(&mut linker)?;
         register_equipment_api(&mut linker)?;
+        register_region_api(&mut linker)?;
+        register_body_api(&mut linker)?;
+        register_economic_api(&mut linker)?;
+        register_map_api(&mut linker)?;
+
+        // Load schemas if schema_path is provided
+        let schemas = config
+            .schema_path
+            .as_ref()
+            .map(|p| load_schemas_from_dir(p))
+            .unwrap_or_default();
+
+        // Register worldgen API (uses provided registry or empty default)
+        let worldgen_registry = config
+            .worldgen_registry
+            .unwrap_or_else(|| Arc::new(Mutex::new(ThreadSafeWorldgenRegistry::default())));
+        register_worldgen_api(&mut linker, worldgen_registry)?;
 
         if let Some(imports) = config.import_host_functions {
             imports(&mut linker);
         }
 
-        let world = Arc::new(Mutex::new(WasmWorld::new()));
+        let mut world = WasmWorld::new();
+        world.component_schemas = schemas;
+        let world = Arc::new(Mutex::new(world));
         let mut store = Store::new(&engine, world.clone());
         let instance = linker
             .instantiate(&mut store, &module)

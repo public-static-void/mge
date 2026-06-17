@@ -2,8 +2,6 @@ use engine_wasm::{WasmScriptEngine, WasmScriptEngineConfig};
 use std::io::Write;
 use tempfile::NamedTempFile;
 
-/// Loads a WASM test artifact from the wasm_tests directory at runtime.
-/// Panics if the file is missing.
 fn load_wasm_test_artifact(name: &str) -> Vec<u8> {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("wasm_tests")
@@ -17,9 +15,8 @@ fn load_wasm_test_artifact(name: &str) -> Vec<u8> {
     })
 }
 
-/// Writes the loaded WASM bytes to a temporary file and returns the file handle.
 fn compile_test_wasm() -> NamedTempFile {
-    let wasm_bytes = load_wasm_test_artifact("test_time_of_day_api.wasm");
+    let wasm_bytes = load_wasm_test_artifact("test_region_api.wasm");
     let mut file = NamedTempFile::new().expect("Failed to create temp file");
     file.write_all(&wasm_bytes)
         .expect("Failed to write WASM module");
@@ -27,7 +24,7 @@ fn compile_test_wasm() -> NamedTempFile {
 }
 
 #[test]
-fn test_wasm_time_of_day_api_bridge() {
+fn test_wasm_region_api_bridge() {
     let wasm_file = compile_test_wasm();
 
     let config = WasmScriptEngineConfig {
@@ -40,7 +37,7 @@ fn test_wasm_time_of_day_api_bridge() {
     let engine = WasmScriptEngine::new(config).expect("Failed to create WasmScriptEngine");
 
     let result = engine
-        .invoke_exported_function("test_time_of_day_api", &[])
-        .expect("Failed to call test_time_of_day_api");
+        .invoke_exported_function("test_region_api", &[])
+        .expect("Failed to call test_region_api");
     assert_eq!(result, Some(1i32.into()));
 }

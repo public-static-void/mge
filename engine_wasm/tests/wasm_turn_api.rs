@@ -32,6 +32,8 @@ fn test_wasm_turn_api_bridge() {
 
     let config = WasmScriptEngineConfig {
         module_path: wasm_file.path().to_path_buf(),
+        schema_path: None,
+        worldgen_registry: None,
         import_host_functions: None,
     };
 

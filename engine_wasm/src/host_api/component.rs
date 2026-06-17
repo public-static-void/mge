@@ -66,6 +66,41 @@ pub fn register_component_api(linker: &mut Linker<Arc<Mutex<WasmWorld>>>) -> any
         },
     )?;
 
+    linker.func_wrap(
+        "component",
+        "list_components",
+        |mut caller: Caller<'_, Arc<Mutex<WasmWorld>>>, out_ptr: i32, out_len: i32| -> i32 {
+            let names = {
+                let world = caller.data().lock().unwrap();
+                world.list_components()
+            };
+            let json = serde_json::to_string(&names).unwrap_or_else(|_| "[]".to_string());
+            write_string_to_wasm(&mut caller, out_ptr, out_len, &json) as i32
+        },
+    )?;
+
+    linker.func_wrap(
+        "component",
+        "get_component_schema",
+        |mut caller: Caller<'_, Arc<Mutex<WasmWorld>>>,
+         name_ptr: i32,
+         name_len: i32,
+         out_ptr: i32,
+         out_len: i32|
+         -> i32 {
+            let name = read_wasm_string(&mut caller, name_ptr, name_len)
+                .expect("Failed to read component name from WASM memory");
+            let schema = {
+                let world = caller.data().lock().unwrap();
+                world.get_component_schema(&name)
+            };
+            match schema {
+                Some(data) => write_string_to_wasm(&mut caller, out_ptr, out_len, &data) as i32,
+                None => -1,
+            }
+        },
+    )?;
+
     Ok(())
 }
 

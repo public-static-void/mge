@@ -1,6 +1,8 @@
+use crate::map::CellKey;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use std::collections::{HashMap, HashSet};
+use std::path::Path;
 
 /// Time of day
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -22,6 +24,19 @@ pub struct Camera {
     pub width: i32,
     /// Height of the camera viewport.
     pub height: i32,
+}
+
+/// Simplified serializable map data for the WASM world.
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+pub struct WasmMap {
+    /// Topology type: "square", "hex", "province", or "none"
+    pub topology_type: String,
+    /// All cells in the map
+    pub cells: Vec<CellKey>,
+    /// Adjacency list: canonical CellKey JSON string → Vec of neighbor canonical CellKey JSON strings
+    pub neighbors: HashMap<String, Vec<String>>,
+    /// Per-cell metadata: canonical CellKey JSON string → metadata JSON
+    pub cell_metadata: HashMap<String, JsonValue>,
 }
 
 /// Wasm implementation of a world
@@ -50,6 +65,36 @@ pub struct WasmWorld {
     /// Registered systems — maps name → system type
     #[serde(default)]
     pub systems: HashMap<String, String>,
+    /// Component schemas loaded at initialization: name → JSON Schema
+    #[serde(default)]
+    pub component_schemas: HashMap<String, JsonValue>,
+    /// Map data for spatial operations
+    #[serde(default)]
+    pub map: Option<WasmMap>,
+}
+
+/// Load all JSON schema files from a directory.
+/// Returns a map from schema name (using the "name" field if present, otherwise the filename stem) to parsed JSON schema.
+/// Missing or invalid JSON files are silently skipped.
+pub fn load_schemas_from_dir(schema_dir: &Path) -> HashMap<String, JsonValue> {
+    let mut schemas = HashMap::new();
+    if let Ok(entries) = std::fs::read_dir(schema_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.extension().is_some_and(|e| e == "json")
+                && let Ok(content) = std::fs::read_to_string(&path)
+                && let Ok(value) = serde_json::from_str::<JsonValue>(&content)
+            {
+                let name = value
+                    .get("name")
+                    .and_then(|n| n.as_str())
+                    .map(|n| n.to_string())
+                    .unwrap_or_else(|| path.file_stem().unwrap().to_string_lossy().to_string());
+                schemas.insert(name, value);
+            }
+        }
+    }
+    schemas
 }
 
 impl WasmWorld {
@@ -66,6 +111,8 @@ impl WasmWorld {
             event_buses: HashMap::new(),
             event_reader_positions: HashMap::new(),
             systems: HashMap::new(),
+            component_schemas: HashMap::new(),
+            map: None,
         }
     }
 
@@ -570,10 +617,10 @@ impl WasmWorld {
             .and_then(|v| v.as_object_mut())
             .ok_or_else(|| "Equipment slots field is missing or not an object".to_string())?;
 
-        if let Some(existing) = slots.get(slot) {
-            if !existing.is_null() {
-                return Err(format!("Slot '{slot}' is already occupied"));
-            }
+        if let Some(existing) = slots.get(slot)
+            && !existing.is_null()
+        {
+            return Err(format!("Slot '{slot}' is already occupied"));
         }
 
         slots.insert(
@@ -598,6 +645,518 @@ impl WasmWorld {
 
         slots.insert(slot.to_string(), serde_json::Value::Null);
         Ok(())
+    }
+
+    // ---- Component Introspection ----
+
+    /// Returns all known component names, combining schema names and stored component names.
+    pub fn list_components(&self) -> Vec<String> {
+        let mut names: Vec<String> = self.component_schemas.keys().cloned().collect();
+        for name in self.components.keys() {
+            if !names.contains(name) {
+                names.push(name.clone());
+            }
+        }
+        names.sort();
+        names
+    }
+
+    /// Returns the JSON schema for a named component, or None if not found.
+    pub fn get_component_schema(&self, name: &str) -> Option<String> {
+        self.component_schemas
+            .get(name)
+            .map(|schema| serde_json::to_string(schema).unwrap_or_default())
+    }
+
+    // ---- Region API ----
+
+    /// Returns all entities whose Region component has the given id.
+    pub fn entities_in_region(&self, region_id: &str) -> Vec<u32> {
+        self.get_entities_with_component("Region")
+            .into_iter()
+            .filter(|&eid| {
+                self.components
+                    .get("Region")
+                    .and_then(|m| m.get(&eid))
+                    .and_then(|val| val.get("id"))
+                    .map(|id_val| match id_val {
+                        JsonValue::String(s) => s == region_id,
+                        JsonValue::Array(arr) => arr.iter().any(|v| v.as_str() == Some(region_id)),
+                        _ => false,
+                    })
+                    .unwrap_or(false)
+            })
+            .collect()
+    }
+
+    /// Returns all entities whose Region component has the given kind.
+    pub fn entities_in_region_kind(&self, kind: &str) -> Vec<u32> {
+        self.get_entities_with_component("Region")
+            .into_iter()
+            .filter(|&eid| {
+                self.components
+                    .get("Region")
+                    .and_then(|m| m.get(&eid))
+                    .and_then(|val| val.get("kind"))
+                    .and_then(|k| k.as_str())
+                    .map(|k| k == kind)
+                    .unwrap_or(false)
+            })
+            .collect()
+    }
+
+    /// Returns all cells (from RegionAssignment component) assigned to the given region_id.
+    pub fn cells_in_region(&self, region_id: &str) -> Vec<JsonValue> {
+        self.get_entities_with_component("RegionAssignment")
+            .into_iter()
+            .filter_map(|eid| {
+                self.components
+                    .get("RegionAssignment")
+                    .and_then(|m| m.get(&eid))
+                    .and_then(|val| {
+                        let cell = val.get("cell").cloned()?;
+                        let rid = val.get("region_id");
+                        match rid {
+                            Some(JsonValue::String(s)) if s == region_id => Some(cell),
+                            Some(JsonValue::Array(arr))
+                                if arr.iter().any(|v| v.as_str() == Some(region_id)) =>
+                            {
+                                Some(cell)
+                            }
+                            _ => None,
+                        }
+                    })
+            })
+            .collect()
+    }
+
+    /// Returns all cells (from RegionAssignment component) assigned to regions of the given kind.
+    pub fn cells_in_region_kind(&self, kind: &str) -> Vec<JsonValue> {
+        self.get_entities_with_component("RegionAssignment")
+            .into_iter()
+            .filter_map(|eid| {
+                self.components
+                    .get("RegionAssignment")
+                    .and_then(|m| m.get(&eid))
+                    .and_then(|val| {
+                        let k = val.get("kind").and_then(|v| v.as_str());
+                        let cell = val.get("cell").cloned()?;
+                        if k == Some(kind) { Some(cell) } else { None }
+                    })
+            })
+            .collect()
+    }
+
+    // ---- Economic API ----
+
+    /// Returns the stockpile resources JSON for an entity, or None if missing.
+    pub fn get_stockpile_resources(&self, entity_id: u32) -> Option<String> {
+        self.components
+            .get("Stockpile")
+            .and_then(|m| m.get(&entity_id))
+            .and_then(|v| v.get("resources"))
+            .map(|r| serde_json::to_string(r).unwrap_or_default())
+    }
+
+    /// Returns the full ProductionJob component for an entity, or None.
+    pub fn get_production_job(&self, entity_id: u32) -> Option<String> {
+        self.get_component(entity_id, "ProductionJob")
+    }
+
+    /// Returns the progress field from a ProductionJob, defaulting to 0.0.
+    pub fn get_production_job_progress(&self, entity_id: u32) -> f64 {
+        self.components
+            .get("ProductionJob")
+            .and_then(|m| m.get(&entity_id))
+            .and_then(|v| v.get("progress"))
+            .and_then(|v| v.as_f64())
+            .unwrap_or(0.0)
+    }
+
+    /// Sets the progress field on a ProductionJob.
+    pub fn set_production_job_progress(&mut self, entity_id: u32, value: f64) {
+        if let Some(job) = self
+            .components
+            .get_mut("ProductionJob")
+            .and_then(|m| m.get_mut(&entity_id))
+        {
+            job["progress"] = serde_json::json!(value);
+        }
+    }
+
+    /// Returns the state field from a ProductionJob, defaulting to "pending".
+    pub fn get_production_job_state(&self, entity_id: u32) -> String {
+        self.components
+            .get("ProductionJob")
+            .and_then(|m| m.get(&entity_id))
+            .and_then(|v| v.get("state"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("pending")
+            .to_string()
+    }
+
+    /// Sets the state field on a ProductionJob.
+    pub fn set_production_job_state(&mut self, entity_id: u32, value: &str) {
+        if let Some(job) = self
+            .components
+            .get_mut("ProductionJob")
+            .and_then(|m| m.get_mut(&entity_id))
+        {
+            job["state"] = serde_json::json!(value);
+        }
+    }
+
+    /// Modifies a stockpile resource by delta. Returns error if balance would go negative.
+    pub fn modify_stockpile_resource(
+        &mut self,
+        entity_id: u32,
+        kind: &str,
+        delta: f64,
+    ) -> Result<(), String> {
+        let stockpile = self
+            .components
+            .get_mut("Stockpile")
+            .and_then(|m| m.get_mut(&entity_id));
+        if let Some(obj) = stockpile.and_then(|v| v.as_object_mut())
+            && let Some(resources) = obj.get_mut("resources").and_then(|v| v.as_object_mut())
+        {
+            let current = resources.get(kind).and_then(|v| v.as_f64()).unwrap_or(0.0);
+            let new_amount = current + delta;
+            if new_amount < 0.0 {
+                return Err("Not enough resource".to_string());
+            }
+            resources.insert(kind.to_string(), serde_json::json!(new_amount));
+            Ok(())
+        } else {
+            Err("Stockpile component not found".to_string())
+        }
+    }
+
+    /// Returns the reserved_resources from a Job component, or None if absent/empty.
+    pub fn get_job_resource_reservations(&self, entity_id: u32) -> Option<String> {
+        self.components
+            .get("Job")
+            .and_then(|m| m.get(&entity_id))
+            .and_then(|v| v.get("reserved_resources"))
+            .and_then(|arr| {
+                if arr.as_array().is_none_or(|a| a.is_empty()) {
+                    None
+                } else {
+                    Some(serde_json::to_string(arr).unwrap_or_default())
+                }
+            })
+    }
+
+    // ---- Body API ----
+
+    /// Returns the Body component for an entity, or None.
+    pub fn get_body(&self, entity_id: u32) -> Option<String> {
+        self.get_component(entity_id, "Body")
+    }
+
+    /// Sets the Body component on an entity from a JSON string.
+    pub fn set_body(&mut self, entity_id: u32, json_data: &str) -> Result<(), String> {
+        self.set_component(entity_id, "Body", json_data)
+    }
+
+    /// Adds a body part (JSON) to an entity's Body. Creates the Body component if absent.
+    pub fn add_body_part(&mut self, entity_id: u32, part_json: &str) -> Result<(), String> {
+        let part_value: JsonValue = serde_json::from_str(part_json)
+            .map_err(|e| format!("Failed to parse part JSON: {e}"))?;
+        let body = self
+            .components
+            .entry("Body".to_string())
+            .or_default()
+            .entry(entity_id)
+            .or_insert_with(|| serde_json::json!({"parts": []}));
+        let parts = body
+            .get_mut("parts")
+            .and_then(|v| v.as_array_mut())
+            .ok_or_else(|| "Body has no parts array".to_string())?;
+        parts.push(part_value);
+        Ok(())
+    }
+
+    /// Recursively finds and removes a body part by name. Returns error if not found.
+    pub fn remove_body_part(&mut self, entity_id: u32, name: &str) -> Result<(), String> {
+        let body = self
+            .components
+            .get_mut("Body")
+            .and_then(|m| m.get_mut(&entity_id))
+            .ok_or_else(|| "No Body component found".to_string())?;
+
+        fn remove_recursive(parts: &mut Vec<JsonValue>, name: &str) -> bool {
+            let mut i = 0;
+            while i < parts.len() {
+                if parts[i].get("name").and_then(|n| n.as_str()) == Some(name) {
+                    parts.remove(i);
+                    return true;
+                }
+                if let Some(children) = parts[i].get_mut("children").and_then(|v| v.as_array_mut())
+                    && remove_recursive(children, name)
+                {
+                    return true;
+                }
+                i += 1;
+            }
+            false
+        }
+
+        let parts = body
+            .get_mut("parts")
+            .and_then(|v| v.as_array_mut())
+            .ok_or_else(|| "No parts array in Body".to_string())?;
+
+        if remove_recursive(parts, name) {
+            Ok(())
+        } else {
+            Err("Body part not found".to_string())
+        }
+    }
+
+    /// Recursively finds a body part by name and returns its JSON. Returns None if not found.
+    pub fn get_body_part(&self, entity_id: u32, name: &str) -> Option<String> {
+        let body = self.components.get("Body")?.get(&entity_id)?;
+
+        fn find_recursive(parts: &[JsonValue], name: &str) -> Option<JsonValue> {
+            for part in parts {
+                if part.get("name").and_then(|n| n.as_str()) == Some(name) {
+                    return Some(part.clone());
+                }
+                if let Some(children) = part.get("children").and_then(|v| v.as_array())
+                    && let Some(found) = find_recursive(children, name)
+                {
+                    return Some(found);
+                }
+            }
+            None
+        }
+
+        let parts = body.get("parts")?.as_array()?;
+        find_recursive(parts, name).map(|v| serde_json::to_string(&v).unwrap_or_default())
+    }
+
+    // ---- Map API ----
+
+    /// Returns the map topology type, or "none" if no map is initialized.
+    pub fn get_map_topology_type(&self) -> String {
+        self.map
+            .as_ref()
+            .map(|m| m.topology_type.clone())
+            .unwrap_or_else(|| "none".to_string())
+    }
+
+    /// Returns all cells in the map.
+    pub fn get_all_cells(&self) -> Vec<CellKey> {
+        self.map
+            .as_ref()
+            .map(|m| m.cells.clone())
+            .unwrap_or_default()
+    }
+
+    /// Adds a square cell at (x, y, z). Sets topology type to "square" if unset.
+    pub fn add_cell(&mut self, x: i32, y: i32, z: i32) {
+        let map = self.map.get_or_insert_with(WasmMap::default);
+        if map.topology_type.is_empty() || map.topology_type == "none" {
+            map.topology_type = "square".to_string();
+        }
+        let cell = CellKey::Square { x, y, z };
+        if !map.cells.contains(&cell) {
+            map.cells.push(cell);
+        }
+    }
+
+    /// Returns neighbors of a cell as a JSON array string.
+    pub fn get_neighbors(&self, cell_json: &str) -> String {
+        let map = match self.map.as_ref() {
+            Some(m) => m,
+            None => return "[]".to_string(),
+        };
+        let cell_key: CellKey = match serde_json::from_str(cell_json) {
+            Ok(k) => k,
+            Err(_) => return "[]".to_string(),
+        };
+        let key = serde_json::to_string(&cell_key).unwrap_or_default();
+        map.neighbors
+            .get(&key)
+            .map(|neighbors| {
+                let cells: Vec<CellKey> = neighbors
+                    .iter()
+                    .filter_map(|n| serde_json::from_str(n).ok())
+                    .collect();
+                serde_json::to_string(&cells).unwrap_or_else(|_| "[]".to_string())
+            })
+            .unwrap_or_else(|| "[]".to_string())
+    }
+
+    /// Adds a bidirectional neighbor edge between two cells.
+    pub fn add_neighbor(&mut self, from_json: &str, to_json: &str) -> Result<(), String> {
+        let from_key: CellKey =
+            serde_json::from_str(from_json).map_err(|e| format!("Invalid from cell: {e}"))?;
+        let to_key: CellKey =
+            serde_json::from_str(to_json).map_err(|e| format!("Invalid to cell: {e}"))?;
+
+        let map = self.map.get_or_insert_with(WasmMap::default);
+        let from_str = serde_json::to_string(&from_key).unwrap();
+        let to_str = serde_json::to_string(&to_key).unwrap();
+
+        if !map.cells.contains(&from_key) {
+            map.cells.push(from_key);
+        }
+        if !map.cells.contains(&to_key) {
+            map.cells.push(to_key);
+        }
+
+        map.neighbors
+            .entry(from_str.clone())
+            .or_default()
+            .push(to_str.clone());
+        map.neighbors.entry(to_str).or_default().push(from_str);
+        Ok(())
+    }
+
+    /// Returns entity IDs whose Position component matches the given cell.
+    pub fn entities_in_cell(&self, cell_json: &str) -> Vec<u32> {
+        let cell_key: CellKey = match serde_json::from_str(cell_json) {
+            Ok(k) => k,
+            Err(_) => return vec![],
+        };
+        self.entities
+            .iter()
+            .copied()
+            .filter(|&eid| {
+                self.components
+                    .get("Position")
+                    .and_then(|m| m.get(&eid))
+                    .is_some_and(|pos| match &cell_key {
+                        CellKey::Square {
+                            x: cx,
+                            y: cy,
+                            z: cz,
+                        } => {
+                            let px = pos.get("x").and_then(|v| v.as_f64()).unwrap_or(0.0) as i32;
+                            let py = pos.get("y").and_then(|v| v.as_f64()).unwrap_or(0.0) as i32;
+                            let pz = pos.get("z").and_then(|v| v.as_f64()).unwrap_or(0.0) as i32;
+                            *cx == px && *cy == py && *cz == pz
+                        }
+                        CellKey::Hex {
+                            q: cq,
+                            r: cr,
+                            z: cz,
+                        } => {
+                            let pq = pos.get("q").and_then(|v| v.as_f64()).unwrap_or(0.0) as i32;
+                            let pr = pos.get("r").and_then(|v| v.as_f64()).unwrap_or(0.0) as i32;
+                            let pz = pos.get("z").and_then(|v| v.as_f64()).unwrap_or(0.0) as i32;
+                            *cq == pq && *cr == pr && *cz == pz
+                        }
+                        CellKey::Province { id: cid } => pos
+                            .get("id")
+                            .and_then(|v| v.as_str())
+                            .is_some_and(|pid| pid == cid),
+                    })
+            })
+            .collect()
+    }
+
+    /// Returns cell metadata for a cell, or None if absent.
+    pub fn get_cell_metadata(&self, cell_json: &str) -> Option<String> {
+        let cell_key: CellKey = serde_json::from_str(cell_json).ok()?;
+        let key = serde_json::to_string(&cell_key).ok()?;
+        self.map
+            .as_ref()?
+            .cell_metadata
+            .get(&key)
+            .map(|v| serde_json::to_string(v).unwrap_or_default())
+    }
+
+    /// Sets metadata for a cell.
+    pub fn set_cell_metadata(&mut self, cell_json: &str, meta_json: &str) {
+        if let Ok(cell_key) = serde_json::from_str::<CellKey>(cell_json)
+            && let Ok(meta) = serde_json::from_str::<JsonValue>(meta_json)
+        {
+            let key = serde_json::to_string(&cell_key).unwrap();
+            let map = self.map.get_or_insert_with(WasmMap::default);
+            map.cell_metadata.insert(key, meta);
+        }
+    }
+
+    /// BFS shortest path between two cells. Returns None if no path exists.
+    pub fn find_path(&self, start_json: &str, goal_json: &str) -> Option<String> {
+        use std::collections::VecDeque;
+
+        let start: CellKey = serde_json::from_str(start_json).ok()?;
+        let goal: CellKey = serde_json::from_str(goal_json).ok()?;
+        let map = self.map.as_ref()?;
+
+        let start_key = serde_json::to_string(&start).ok()?;
+        let goal_key = serde_json::to_string(&goal).ok()?;
+
+        if start_key == goal_key {
+            let result = serde_json::json!({
+                "path": [start],
+                "total_cost": 0
+            });
+            return serde_json::to_string(&result).ok();
+        }
+
+        let mut queue = VecDeque::new();
+        let mut visited = HashSet::new();
+        let mut parent: HashMap<String, String> = HashMap::new();
+
+        queue.push_back(start_key.clone());
+        visited.insert(start_key.clone());
+        let mut found = false;
+
+        while let Some(current) = queue.pop_front() {
+            if current == goal_key {
+                found = true;
+                break;
+            }
+            if let Some(neighbors) = map.neighbors.get(&current) {
+                for neighbor_key in neighbors {
+                    if !visited.contains(neighbor_key) {
+                        visited.insert(neighbor_key.clone());
+                        parent.insert(neighbor_key.clone(), current.clone());
+                        queue.push_back(neighbor_key.clone());
+                    }
+                }
+            }
+        }
+
+        if !found {
+            return None;
+        }
+
+        let mut path_keys = Vec::new();
+        let mut cur = goal_key;
+        loop {
+            let cell: CellKey = serde_json::from_str(&cur).ok()?;
+            path_keys.push(cell);
+            if cur == start_key {
+                break;
+            }
+            cur = parent.get(&cur)?.clone();
+        }
+        path_keys.reverse();
+
+        let result = serde_json::json!({
+            "path": path_keys,
+            "total_cost": (path_keys.len() - 1) as f64
+        });
+        serde_json::to_string(&result).ok()
+    }
+
+    /// Replaces the entire WasmMap with parsed JSON.
+    pub fn apply_generated_map(&mut self, map_json: &str) -> Result<(), String> {
+        let parsed: WasmMap =
+            serde_json::from_str(map_json).map_err(|e| format!("Failed to parse map JSON: {e}"))?;
+        self.map = Some(parsed);
+        Ok(())
+    }
+
+    /// Returns the number of cells in the map, or 0 if no map.
+    pub fn get_map_cell_count(&self) -> i32 {
+        self.map.as_ref().map(|m| m.cells.len() as i32).unwrap_or(0)
     }
 
     fn advance_time_of_day(&mut self) {
