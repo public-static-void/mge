@@ -37,3 +37,27 @@ pub mod event_bus;
 
 /// System module
 pub mod system;
+
+/// Movement operations module
+pub mod movement_ops;
+
+/// Equipment module
+pub mod equipment;
+
+/// Region module
+pub mod region;
+
+/// Body module
+pub mod body;
+
+/// Economic module
+pub mod economic;
+
+/// Map module
+pub mod map;
+
+/// Worldgen module
+pub mod worldgen;
+
+/// World userdata module (map chunk API, validators, postprocessors)
+pub mod world_userdata;

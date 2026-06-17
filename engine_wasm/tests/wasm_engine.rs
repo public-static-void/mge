@@ -25,6 +25,8 @@ fn test_wasm_script_engine_can_instantiate_and_run() {
 
     let config = WasmScriptEngineConfig {
         module_path: wasm_file.path().to_path_buf(),
+        schema_path: None,
+        worldgen_registry: None,
         import_host_functions: None,
     };
     let engine = WasmScriptEngine::new(config).expect("Failed to create WasmScriptEngine");
@@ -51,6 +53,8 @@ fn test_wasm_script_engine_can_instantiate_with_wasi() {
     // Should fail if WASI is not enabled
     let config_no_wasi = WasmScriptEngineConfig {
         module_path: wasm_file.path().to_path_buf(),
+        schema_path: None,
+        worldgen_registry: None,
         import_host_functions: None,
     };
     let result = WasmScriptEngine::new(config_no_wasi);
@@ -65,6 +69,8 @@ fn test_wasm_script_engine_can_instantiate_with_wasi() {
     /*
     let config_with_wasi = WasmScriptEngineConfig {
         module_path: wasm_file.path().to_path_buf(),
+        schema_path: None,
+        worldgen_registry: None,
         import_host_functions: None,
     };
     let result = WasmScriptEngine::new(config_with_wasi);
@@ -94,6 +100,8 @@ fn test_wasm_script_engine_can_register_and_call_host_function() {
 
     let config = WasmScriptEngineConfig {
         module_path: wasm_file.path().to_path_buf(),
+        schema_path: None,
+        worldgen_registry: None,
         import_host_functions: Some(Box::new(move |linker| {
             let called = called_clone.clone();
             linker

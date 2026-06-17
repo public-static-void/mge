@@ -2,6 +2,7 @@
 
 use crate::ecs::system::System;
 use crate::ecs::world::World;
+use crate::systems::job::reservation::resource_reservation_ops::ResourceReservationOps;
 use serde_json::Value as JsonValue;
 
 /// Status of resource reservation for a job.
@@ -30,7 +31,7 @@ impl ResourceReservationSystem {
 
     /// Checks all pending jobs, attempts to reserve stockpile resources.
     /// Exclusivity is enforced so each resource instance is only reserved once.
-    pub fn run_reservation(&mut self, world: &mut World) {
+    pub fn run_reservation<W: ResourceReservationOps>(&mut self, world: &mut W) {
         use std::collections::HashMap;
 
         // Collect all stockpiles and their available resources (working copy for simulation only).
@@ -38,7 +39,7 @@ impl ResourceReservationSystem {
         let mut stockpile_working: HashMap<u32, serde_json::Map<String, JsonValue>> =
             HashMap::new();
         for &stockpile_eid in &stockpile_eids {
-            if let Some(stockpile) = world.get_component(stockpile_eid, "Stockpile")
+            if let Some(stockpile) = world.get_component_value(stockpile_eid, "Stockpile")
                 && let Some(res) = stockpile.get("resources").and_then(|v| v.as_object())
             {
                 stockpile_working.insert(stockpile_eid, res.clone());
@@ -51,25 +52,25 @@ impl ResourceReservationSystem {
 
         // Clear previous reservations for all pending jobs.
         for &job_eid in &job_eids {
-            let job = match world.get_component(job_eid, "Job") {
-                Some(j) => j.clone(),
+            let job = match world.get_component_value(job_eid, "Job") {
+                Some(j) => j,
                 None => continue,
             };
             if job.get("state").and_then(|v| v.as_str()) != Some("pending") {
                 continue;
             }
-            let mut job = job.clone();
+            let mut job = job;
             if let Some(obj) = job.as_object_mut() {
                 obj.remove("reserved_resources");
                 obj.remove("reserved_stockpile");
             }
-            let _ = world.set_component(job_eid, "Job", job);
+            let _ = world.set_component_value(job_eid, "Job", job);
         }
 
         // Process jobs and allocate resources strictly in this order, so only what is left can be reserved.
         for &job_eid in &job_eids {
-            let job = match world.get_component(job_eid, "Job") {
-                Some(j) => j.clone(),
+            let job = match world.get_component_value(job_eid, "Job") {
+                Some(j) => j,
                 None => continue,
             };
 
@@ -78,23 +79,23 @@ impl ResourceReservationSystem {
             }
 
             let requirements = match job.get("resource_requirements").and_then(|v| v.as_array()) {
-                Some(reqs) if !reqs.is_empty() => reqs,
+                Some(reqs) if !reqs.is_empty() => reqs.clone(),
                 _ => continue,
             };
 
             for (&stockpile_eid, resources) in stockpile_working.iter_mut() {
-                if Self::can_reserve(resources, requirements) {
-                    for req in requirements {
+                if Self::can_reserve(resources, &requirements) {
+                    for req in &requirements {
                         let kind = req.get("kind").and_then(|v| v.as_str()).unwrap_or("");
-                        let amount = req.get("amount").and_then(|v| v.as_i64()).unwrap_or(0);
-                        let available = resources.get(kind).and_then(|v| v.as_i64()).unwrap_or(0);
+                        let amount = req.get("amount").and_then(|v| v.as_f64()).unwrap_or(0.0);
+                        let available = resources.get(kind).and_then(|v| v.as_f64()).unwrap_or(0.0);
                         resources.insert(kind.to_string(), JsonValue::from(available - amount));
                     }
-                    let mut job = job.clone();
-                    job["reserved_resources"] = JsonValue::from(requirements.clone());
+                    let mut job = job;
+                    job["reserved_resources"] = JsonValue::from(requirements);
                     job["reserved_stockpile"] = JsonValue::from(stockpile_eid);
                     job["state"] = JsonValue::from("fetching_resources");
-                    let _ = world.set_component(job_eid, "Job", job);
+                    let _ = world.set_component_value(job_eid, "Job", job);
                     break;
                 }
             }
@@ -102,13 +103,13 @@ impl ResourceReservationSystem {
     }
 
     /// Checks reservation status for a job.
-    pub fn check_reservation_status(
+    pub fn check_reservation_status<W: ResourceReservationOps>(
         &self,
-        world: &World,
+        world: &W,
         job_eid: u32,
     ) -> ResourceReservationStatus {
-        let job = match world.get_component(job_eid, "Job") {
-            Some(j) => j.clone(),
+        let job = match world.get_component_value(job_eid, "Job") {
+            Some(j) => j,
             None => return ResourceReservationStatus::NotFound,
         };
         let requirements = job.get("resource_requirements").and_then(|v| v.as_array());
@@ -125,30 +126,32 @@ impl ResourceReservationSystem {
     }
 
     /// Releases reserved resources for a job (on completion/cancellation).
-    pub fn release_reservation(&self, world: &mut World, job_eid: u32) {
-        let job = match world.get_component(job_eid, "Job") {
-            Some(j) => j.clone(),
+    pub fn release_reservation<W: ResourceReservationOps>(&self, world: &mut W, job_eid: u32) {
+        let job = match world.get_component_value(job_eid, "Job") {
+            Some(j) => j,
             None => return,
         };
 
         // Just clear reservation marker fields.
-        let mut job = job.clone();
+        let mut job = job;
         if let Some(obj) = job.as_object_mut() {
             obj.remove("reserved_resources");
             obj.remove("reserved_stockpile");
         }
-        let _ = world.set_component(job_eid, "Job", job);
+        let _ = world.set_component_value(job_eid, "Job", job);
     }
 
     /// Internal: checks if all requirements can be reserved from the given resources.
+    /// Uses `as_f64` for cross-compatibility: serde_json 1.0.116+ changed `as_i64` to return
+    /// `None` for float-number variants, while stockpile values are commonly floats (e.g. 100.0).
     fn can_reserve(
         resources: &serde_json::Map<String, JsonValue>,
         requirements: &[JsonValue],
     ) -> bool {
         for req in requirements {
             let kind = req.get("kind").and_then(|v| v.as_str()).unwrap_or("");
-            let amount = req.get("amount").and_then(|v| v.as_i64()).unwrap_or(0);
-            let available = resources.get(kind).and_then(|v| v.as_i64()).unwrap_or(0);
+            let amount = req.get("amount").and_then(|v| v.as_f64()).unwrap_or(0.0);
+            let available = resources.get(kind).and_then(|v| v.as_f64()).unwrap_or(0.0);
             if available < amount {
                 return false;
             }
