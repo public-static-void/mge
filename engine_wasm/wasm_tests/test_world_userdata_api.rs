@@ -23,12 +23,12 @@ pub extern "C" fn mge_postprocess_map(_map_ptr: i32, _map_len: i32) -> i32 {
 
 #[no_mangle]
 pub extern "C" fn test_world_userdata_api() -> i32 {
-    #[link(wasm_import_module = "wasm_world_userdata")]
+    #[link(wasm_import_module = "wasm_map")]
     unsafe extern "C" {
         fn register_map_validator(name_ptr: *const u8, name_len: i32) -> i32;
-        fn clear_map_validators();
+        fn clear_map_validators() -> i32;
         fn register_map_postprocessor(name_ptr: *const u8, name_len: i32) -> i32;
-        fn clear_map_postprocessors();
+        fn clear_map_postprocessors() -> i32;
         fn apply_chunk(chunk_ptr: *const u8, chunk_len: i32) -> i32;
     }
 
@@ -48,10 +48,16 @@ pub extern "C" fn test_world_userdata_api() -> i32 {
         }
 
         // Clear map validators
-        clear_map_validators();
+        let clear_res = clear_map_validators();
+        if clear_res != 0 {
+            return 0;
+        }
 
         // Clear map postprocessors
-        clear_map_postprocessors();
+        let clear_res = clear_map_postprocessors();
+        if clear_res != 0 {
+            return 0;
+        }
 
         // Apply a chunk
         let chunk_json = r#"{"cells":[{"x":0,"y":0,"z":0}],"neighbors":[],"metadata":{}}"#;

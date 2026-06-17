@@ -28,7 +28,7 @@ pub extern "C" fn test_poll_ecs_event() -> i32 {
             event_data.len() as i32,
         );
 
-        // Poll the event — should return JSON array with the event
+        // Poll the event — should return JSON array with the event (bytes written > 0)
         let mut buf = [0u8; 4096];
         let written = poll_ecs_event(
             event_type.as_ptr(),
@@ -36,22 +36,22 @@ pub extern "C" fn test_poll_ecs_event() -> i32 {
             buf.as_mut_ptr(),
             buf.len() as i32,
         );
-        if written < 0 {
+        if written <= 0 {
             return 0;
         }
 
-        // Poll again — should return "[]" (consumed)
+        // Poll again — should return -1 because bus was consumed/removed
         let written2 = poll_ecs_event(
             event_type.as_ptr(),
             event_type.len() as i32,
             buf.as_mut_ptr(),
             buf.len() as i32,
         );
-        if written2 < 0 {
+        if written2 >= 0 {
             return 0;
         }
 
-        // Poll unknown event type — should return "[]" (not crash)
+        // Poll unknown event type — should return -1 (event type never existed)
         let unknown = "unknown_event";
         let written3 = poll_ecs_event(
             unknown.as_ptr(),
@@ -59,7 +59,7 @@ pub extern "C" fn test_poll_ecs_event() -> i32 {
             buf.as_mut_ptr(),
             buf.len() as i32,
         );
-        if written3 < 0 {
+        if written3 >= 0 {
             return 0;
         }
 

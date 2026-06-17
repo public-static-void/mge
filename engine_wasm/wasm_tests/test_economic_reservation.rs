@@ -18,7 +18,7 @@ pub extern "C" fn test_reserve_job_resources_only() -> i32 {
 
     #[link(wasm_import_module = "economic")]
     unsafe extern "C" {
-        fn reserve_job_resources();
+        fn reserve_job_resources(entity_id: i32) -> i32;
     }
 
     unsafe {
@@ -30,7 +30,8 @@ pub extern "C" fn test_reserve_job_resources_only() -> i32 {
         let job_json = "{\"state\":\"pending\",\"resource_requirements\":[{\"kind\":\"iron_ore\",\"amount\":10}]}";
         set_component(job_eid, "Job".as_ptr(), 3, job_json.as_ptr(), job_json.len() as i32);
 
-        reserve_job_resources();
+        let result = reserve_job_resources(job_eid as i32);
+        if result != 1 { return 0; }
         1
     }
 }
@@ -97,7 +98,7 @@ pub extern "C" fn test_reserve_then_query() -> i32 {
     #[link(wasm_import_module = "economic")]
     unsafe extern "C" {
         fn get_job_resource_reservations(entity: u32, out_ptr: *mut u8, out_len: i32) -> i32;
-        fn reserve_job_resources();
+        fn reserve_job_resources(entity_id: i32) -> i32;
     }
 
     unsafe {
@@ -115,7 +116,8 @@ pub extern "C" fn test_reserve_then_query() -> i32 {
         if w_verify < 0 { return 0; }
 
         // Run reservation
-        reserve_job_resources();
+        let res = reserve_job_resources(job_eid as i32);
+        if res != 1 { return 0; }
 
         // Check job resource reservations
         let mut buf1 = [0u8; 4096];
@@ -147,8 +149,8 @@ pub extern "C" fn test_reserve_and_release() -> i32 {
     #[link(wasm_import_module = "economic")]
     unsafe extern "C" {
         fn get_job_resource_reservations(entity: u32, out_ptr: *mut u8, out_len: i32) -> i32;
-        fn reserve_job_resources();
-        fn release_job_resource_reservations(entity: u32);
+        fn reserve_job_resources(entity_id: i32) -> i32;
+        fn release_job_resource_reservations(entity_id: i32) -> i32;
     }
 
     unsafe {
@@ -161,7 +163,8 @@ pub extern "C" fn test_reserve_and_release() -> i32 {
         set_component(job_eid, "Job".as_ptr(), 3, job_json.as_ptr(), job_json.len() as i32);
 
         // Reserve
-        reserve_job_resources();
+        let res = reserve_job_resources(job_eid as i32);
+        if res != 1 { return 0; }
 
         // Verify reservation exists
         let mut buf1 = [0u8; 4096];
@@ -169,7 +172,8 @@ pub extern "C" fn test_reserve_and_release() -> i32 {
         if w1 < 0 { return 0; }
 
         // Release
-        release_job_resource_reservations(job_eid);
+        let release_res = release_job_resource_reservations(job_eid as i32);
+        if release_res != 0 { return 0; }
 
         // Verify reservation cleared
         let mut buf2 = [0u8; 128];

@@ -40,8 +40,8 @@ pub extern "C" fn test_economic_api() -> i32 {
             delta: f64,
         );
         fn get_job_resource_reservations(entity: u32, out_ptr: *mut u8, out_len: i32) -> i32;
-        fn reserve_job_resources();
-        fn release_job_resource_reservations(entity: u32);
+        fn reserve_job_resources(entity_id: i32) -> i32;
+        fn release_job_resource_reservations(entity_id: i32) -> i32;
     }
 
     unsafe {
@@ -108,7 +108,8 @@ pub extern "C" fn test_economic_api() -> i32 {
         set_component(job_eid, "Job".as_ptr(), "Job".len() as i32, job_json.as_ptr(), job_json.len() as i32);
 
         // Run reservation
-        reserve_job_resources();
+        let res_res = reserve_job_resources(job_eid as i32);
+        if res_res != 1 { return 0; }
 
         // Job should now have reserved_resources
         let mut buf5 = [0u8; 4096];
@@ -116,7 +117,8 @@ pub extern "C" fn test_economic_api() -> i32 {
         if w5 < 0 { return 0; }
 
         // Release reservation
-        release_job_resource_reservations(job_eid);
+        let rel_res = release_job_resource_reservations(job_eid as i32);
+        if rel_res != 0 { return 0; }
 
         // Reservation should be cleared
         let mut buf6 = [0u8; 128];

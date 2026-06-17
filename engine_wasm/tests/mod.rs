@@ -19,3 +19,4 @@ mod wasm_time_of_day_api;
 mod wasm_turn_api;
 mod wasm_world_userdata_api;
 mod wasm_worldgen_api;
+mod wasm_worldgen_registration;
