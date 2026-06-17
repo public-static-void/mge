@@ -71,6 +71,15 @@ pub struct WasmWorld {
     /// Map data for spatial operations
     #[serde(default)]
     pub map: Option<WasmMap>,
+    /// Export names discovered during WASM module instantiation
+    #[serde(default)]
+    pub discovered_export_names: Vec<String>,
+    /// Export names registered as map validators
+    #[serde(default)]
+    pub map_validators: Vec<String>,
+    /// Export names registered as map postprocessors
+    #[serde(default)]
+    pub map_postprocessors: Vec<String>,
 }
 
 /// Load all JSON schema files from a directory.
@@ -113,6 +122,9 @@ impl WasmWorld {
             systems: HashMap::new(),
             component_schemas: HashMap::new(),
             map: None,
+            discovered_export_names: Vec::new(),
+            map_validators: Vec::new(),
+            map_postprocessors: Vec::new(),
         }
     }
 
@@ -476,6 +488,14 @@ impl WasmWorld {
             .map(|v| &v[pos..])
             .unwrap_or(&[]);
         serde_json::to_string(events).unwrap_or_else(|_| "[]".to_string())
+    }
+
+    /// Returns all events for the given type as a JSON array string, removing the bus entry.
+    /// Returns "[]" if no events exist for that type.
+    pub fn take_events(&mut self, event_type: &str) -> String {
+        let events = self.event_buses.remove(event_type).unwrap_or_default();
+        self.event_reader_positions.remove(event_type);
+        serde_json::to_string(&events).unwrap_or_else(|_| "[]".to_string())
     }
 
     /// Advances all event reader positions to the end, consuming all events.
@@ -1154,9 +1174,112 @@ impl WasmWorld {
         Ok(())
     }
 
+    /// Register a discovered export as a map validator.
+    pub fn register_map_validator(&mut self, name: &str) {
+        if !self.map_validators.contains(&name.to_string()) {
+            self.map_validators.push(name.to_string());
+        }
+    }
+
+    /// Clear all registered map validators.
+    pub fn clear_map_validators(&mut self) {
+        self.map_validators.clear();
+    }
+
+    /// Register a discovered export as a map postprocessor.
+    pub fn register_map_postprocessor(&mut self, name: &str) {
+        if !self.map_postprocessors.contains(&name.to_string()) {
+            self.map_postprocessors.push(name.to_string());
+        }
+    }
+
+    /// Clear all registered map postprocessors.
+    pub fn clear_map_postprocessors(&mut self) {
+        self.map_postprocessors.clear();
+    }
+
+    /// Apply a chunk of map data (cells + neighbors + metadata) to the world.
+    /// The `chunk_json` format:
+    /// ```json
+    /// {
+    ///   "cells": [{"x": 0, "y": 0, "z": 0}, ...],
+    ///   "neighbors": [{"from": {"x": 0, "y": 0, "z": 0}, "to": {"x": 1, "y": 0, "z": 0}}, ...],
+    ///   "metadata": {"(0,0,0)": {"terrain": "grass"}}
+    /// }
+    /// ```
+    pub fn apply_chunk(&mut self, chunk_json: &str) -> Result<(), String> {
+        let chunk: JsonValue = serde_json::from_str(chunk_json)
+            .map_err(|e| format!("Failed to parse chunk JSON: {e}"))?;
+
+        // Parse and add cells
+        if let Some(cells) = chunk.get("cells").and_then(|v| v.as_array()) {
+            for cell in cells {
+                let x = cell.get("x").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
+                let y = cell.get("y").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
+                let z = cell.get("z").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
+                self.add_cell(x, y, z);
+            }
+        }
+
+        // Parse and add neighbors
+        if let Some(neighbors) = chunk.get("neighbors").and_then(|v| v.as_array()) {
+            for n in neighbors {
+                let from = n.get("from");
+                let to = n.get("to");
+                if let (Some(f), Some(t)) = (from, to) {
+                    let fx = f.get("x").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
+                    let fy = f.get("y").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
+                    let fz = f.get("z").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
+                    let tx = t.get("x").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
+                    let ty = t.get("y").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
+                    let tz = t.get("z").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
+                    let from_key = CellKey::Square {
+                        x: fx,
+                        y: fy,
+                        z: fz,
+                    };
+                    let to_key = CellKey::Square {
+                        x: tx,
+                        y: ty,
+                        z: tz,
+                    };
+                    self.add_neighbor(
+                        &serde_json::to_string(&from_key).map_err(|e| e.to_string())?,
+                        &serde_json::to_string(&to_key).map_err(|e| e.to_string())?,
+                    )?;
+                }
+            }
+        }
+
+        // Parse and add metadata
+        if let Some(metadata) = chunk.get("metadata").and_then(|v| v.as_object()) {
+            let map = self.map.get_or_insert_with(WasmMap::default);
+            for (cell_key_str, meta) in metadata {
+                map.cell_metadata.insert(cell_key_str.clone(), meta.clone());
+            }
+        }
+
+        Ok(())
+    }
+
     /// Returns the number of cells in the map, or 0 if no map.
     pub fn get_map_cell_count(&self) -> i32 {
         self.map.as_ref().map(|m| m.cells.len() as i32).unwrap_or(0)
+    }
+
+    // ---- Economic Reservation API ----
+
+    /// Runs resource reservation for all pending jobs.
+    /// Uses ResourceReservationSystem internally; WasmWorld implements ResourceReservationOps.
+    pub fn reserve_job_resources(&mut self) {
+        let mut system = crate::systems::job::reservation::ResourceReservationSystem::new();
+        system.run_reservation(self);
+    }
+
+    /// Releases reserved resources for a specific job.
+    pub fn release_job_resource_reservations(&mut self, entity_id: u32) {
+        let system = crate::systems::job::reservation::ResourceReservationSystem::new();
+        system.release_reservation(self, entity_id);
     }
 
     fn advance_time_of_day(&mut self) {
@@ -1168,5 +1291,158 @@ impl WasmWorld {
                 self.time_of_day.hour = 0;
             }
         }
+    }
+}
+
+use crate::systems::job::reservation::resource_reservation_ops::ResourceReservationOps;
+
+impl ResourceReservationOps for WasmWorld {
+    fn get_entities_with_component(&self, name: &str) -> Vec<u32> {
+        WasmWorld::get_entities_with_component(self, name)
+    }
+
+    fn get_component_value(&self, entity: u32, name: &str) -> Option<JsonValue> {
+        self.get_component(entity, name)
+            .and_then(|s| serde_json::from_str(&s).ok())
+    }
+
+    fn set_component_value(
+        &mut self,
+        entity: u32,
+        name: &str,
+        value: JsonValue,
+    ) -> Result<(), String> {
+        let json_str = serde_json::to_string(&value).map_err(|e| e.to_string())?;
+        self.set_component(entity, name, &json_str)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_wasm_world_reservation_flow() {
+        let mut world = WasmWorld::new();
+
+        // Create a stockpile entity
+        let stockpile_eid = world.spawn_entity();
+        let stockpile_data = serde_json::json!({"resources": {"iron_ore": 100.0}});
+        world
+            .set_component(
+                stockpile_eid,
+                "Stockpile",
+                &serde_json::to_string(&stockpile_data).unwrap(),
+            )
+            .unwrap();
+
+        // Verify stockpile was stored
+        let stockpile_str = world.get_component(stockpile_eid, "Stockpile").unwrap();
+        let stockpile_val: JsonValue = serde_json::from_str(&stockpile_str).unwrap();
+        assert_eq!(
+            stockpile_val["resources"]["iron_ore"], 100.0,
+            "Stockpile should have iron_ore 100.0"
+        );
+
+        // Create a job entity
+        let job_eid = world.spawn_entity();
+        let job_data = serde_json::json!({
+            "state": "pending",
+            "resource_requirements": [{"kind": "iron_ore", "amount": 10}]
+        });
+        world
+            .set_component(job_eid, "Job", &serde_json::to_string(&job_data).unwrap())
+            .unwrap();
+
+        // Verify job was stored
+        let job_str = world.get_component(job_eid, "Job").unwrap();
+        let job_val: JsonValue = serde_json::from_str(&job_str).unwrap();
+        assert_eq!(job_val["state"], "pending", "Job state should be pending");
+        assert!(
+            job_val.get("resource_requirements").is_some(),
+            "Job should have resource_requirements"
+        );
+
+        // Verify entity lists
+        let stockpile_entities = world.get_entities_with_component("Stockpile");
+        assert_eq!(
+            stockpile_entities,
+            vec![stockpile_eid],
+            "Should find stockpile entity"
+        );
+        let job_entities = world.get_entities_with_component("Job");
+        assert_eq!(job_entities, vec![job_eid], "Should find job entity");
+
+        // Check: no reservations yet
+        let reservations = world.get_job_resource_reservations(job_eid);
+        assert!(
+            reservations.is_none(),
+            "Should have no reservations before reserve"
+        );
+
+        // Run reservation
+        world.reserve_job_resources();
+
+        // Check: should have reservations
+        let reservations = world.get_job_resource_reservations(job_eid);
+        assert!(
+            reservations.is_some(),
+            "Should have reservations after reserve"
+        );
+        let reservations_str = reservations.unwrap();
+        let res_value: JsonValue = serde_json::from_str(&reservations_str).unwrap();
+        assert!(
+            res_value.is_array(),
+            "Reserved resources should be an array"
+        );
+        assert!(
+            !res_value.as_array().unwrap().is_empty(),
+            "Reserved resources should not be empty"
+        );
+
+        // Release reservation
+        world.release_job_resource_reservations(job_eid);
+
+        // Check: reservations cleared
+        let reservations = world.get_job_resource_reservations(job_eid);
+        assert!(
+            reservations.is_none(),
+            "Should have no reservations after release"
+        );
+    }
+
+    #[test]
+    fn test_wasm_world_reservation_insufficient_resources() {
+        let mut world = WasmWorld::new();
+
+        // Stockpile with insufficient resources
+        let stockpile_eid = world.spawn_entity();
+        let stockpile_data = serde_json::json!({"resources": {"iron_ore": 5.0}});
+        world
+            .set_component(
+                stockpile_eid,
+                "Stockpile",
+                &serde_json::to_string(&stockpile_data).unwrap(),
+            )
+            .unwrap();
+
+        // Job needs 10 iron_ore
+        let job_eid = world.spawn_entity();
+        let job_data = serde_json::json!({
+            "state": "pending",
+            "resource_requirements": [{"kind": "iron_ore", "amount": 10}]
+        });
+        world
+            .set_component(job_eid, "Job", &serde_json::to_string(&job_data).unwrap())
+            .unwrap();
+
+        world.reserve_job_resources();
+
+        // Should still have no reservations (insufficient resources)
+        let reservations = world.get_job_resource_reservations(job_eid);
+        assert!(
+            reservations.is_none(),
+            "Should have no reservations with insufficient resources"
+        );
     }
 }

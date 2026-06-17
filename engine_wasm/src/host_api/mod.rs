@@ -58,3 +58,6 @@ pub mod map;
 
 /// Worldgen module
 pub mod worldgen;
+
+/// World userdata module (map chunk API, validators, postprocessors)
+pub mod world_userdata;
