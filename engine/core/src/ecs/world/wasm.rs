@@ -76,10 +76,19 @@ pub struct WasmWorld {
     pub discovered_export_names: Vec<String>,
     /// Export names registered as map validators
     #[serde(default)]
-    pub map_validators: Vec<String>,
+    pub map_validator_names: Vec<String>,
     /// Export names registered as map postprocessors
     #[serde(default)]
-    pub map_postprocessors: Vec<String>,
+    pub map_postprocessor_names: Vec<String>,
+    /// WASM worldgen plugin names registered by the guest module
+    #[serde(default)]
+    pub wasm_worldgen_plugins: Vec<String>,
+    /// WASM worldgen validator export names
+    #[serde(default)]
+    pub wasm_worldgen_validators: Vec<String>,
+    /// WASM worldgen postprocessor export names
+    #[serde(default)]
+    pub wasm_worldgen_postprocessors: Vec<String>,
 }
 
 /// Load all JSON schema files from a directory.
@@ -123,8 +132,11 @@ impl WasmWorld {
             component_schemas: HashMap::new(),
             map: None,
             discovered_export_names: Vec::new(),
-            map_validators: Vec::new(),
-            map_postprocessors: Vec::new(),
+            map_validator_names: Vec::new(),
+            map_postprocessor_names: Vec::new(),
+            wasm_worldgen_plugins: Vec::new(),
+            wasm_worldgen_validators: Vec::new(),
+            wasm_worldgen_postprocessors: Vec::new(),
         }
     }
 
@@ -1175,27 +1187,31 @@ impl WasmWorld {
     }
 
     /// Register a discovered export as a map validator.
-    pub fn register_map_validator(&mut self, name: &str) {
-        if !self.map_validators.contains(&name.to_string()) {
-            self.map_validators.push(name.to_string());
+    pub fn register_map_validator(&mut self, name: &str) -> Result<(), String> {
+        if self.map_validator_names.contains(&name.to_string()) {
+            return Err(format!("Map validator '{}' already registered", name));
         }
+        self.map_validator_names.push(name.to_string());
+        Ok(())
     }
 
     /// Clear all registered map validators.
     pub fn clear_map_validators(&mut self) {
-        self.map_validators.clear();
+        self.map_validator_names.clear();
     }
 
     /// Register a discovered export as a map postprocessor.
-    pub fn register_map_postprocessor(&mut self, name: &str) {
-        if !self.map_postprocessors.contains(&name.to_string()) {
-            self.map_postprocessors.push(name.to_string());
+    pub fn register_map_postprocessor(&mut self, name: &str) -> Result<(), String> {
+        if self.map_postprocessor_names.contains(&name.to_string()) {
+            return Err(format!("Map postprocessor '{}' already registered", name));
         }
+        self.map_postprocessor_names.push(name.to_string());
+        Ok(())
     }
 
     /// Clear all registered map postprocessors.
     pub fn clear_map_postprocessors(&mut self) {
-        self.map_postprocessors.clear();
+        self.map_postprocessor_names.clear();
     }
 
     /// Apply a chunk of map data (cells + neighbors + metadata) to the world.
