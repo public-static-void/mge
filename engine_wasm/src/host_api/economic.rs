@@ -127,5 +127,23 @@ pub fn register_economic_api(linker: &mut Linker<Arc<Mutex<WasmWorld>>>) -> anyh
         },
     )?;
 
+    linker.func_wrap(
+        "economic",
+        "reserve_job_resources",
+        |caller: Caller<'_, Arc<Mutex<WasmWorld>>>| {
+            let mut world = caller.data().lock().unwrap();
+            world.reserve_job_resources();
+        },
+    )?;
+
+    linker.func_wrap(
+        "economic",
+        "release_job_resource_reservations",
+        |caller: Caller<'_, Arc<Mutex<WasmWorld>>>, entity_id: u32| {
+            let mut world = caller.data().lock().unwrap();
+            world.release_job_resource_reservations(entity_id);
+        },
+    )?;
+
     Ok(())
 }
