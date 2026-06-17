@@ -36,6 +36,7 @@ pub extern "C" fn test_body_api() -> i32 {
             out_ptr: *mut u8,
             out_len: i32,
         ) -> i32;
+        fn remove_body_part(entity: u32, name_ptr: *const u8, name_len: i32);
     }
 
     unsafe {
@@ -59,6 +60,9 @@ pub extern "C" fn test_body_api() -> i32 {
         let mut buf2 = [0u8; 4096];
         let written2 = get_body_part(eid, part_name.as_ptr(), part_name.len() as i32, buf2.as_mut_ptr(), buf2.len() as i32);
         if written2 < 0 { return 0; }
+
+        // Remove body part by name
+        remove_body_part(eid, part_name.as_ptr(), part_name.len() as i32);
 
         1
     }
