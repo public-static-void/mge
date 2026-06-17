@@ -1,5 +1,8 @@
 use crate::host_api::component::{read_wasm_string, write_string_to_wasm};
 use engine_core::ecs::world::wasm::WasmWorld;
+use engine_core::systems::job::reservation::resource_reservation::{
+    ResourceReservationStatus, ResourceReservationSystem,
+};
 use std::sync::{Arc, Mutex};
 use wasmtime::{Caller, Linker};
 
@@ -130,18 +133,26 @@ pub fn register_economic_api(linker: &mut Linker<Arc<Mutex<WasmWorld>>>) -> anyh
     linker.func_wrap(
         "economic",
         "reserve_job_resources",
-        |caller: Caller<'_, Arc<Mutex<WasmWorld>>>| {
+        |caller: Caller<'_, Arc<Mutex<WasmWorld>>>, entity_id: i32| -> i32 {
             let mut world = caller.data().lock().unwrap();
-            world.reserve_job_resources();
+            let mut system = ResourceReservationSystem::new();
+            system.run_reservation(&mut *world);
+            let status = system.check_reservation_status(&*world, entity_id as u32);
+            match status {
+                ResourceReservationStatus::Reserved => 1,
+                _ => 0,
+            }
         },
     )?;
 
     linker.func_wrap(
         "economic",
         "release_job_resource_reservations",
-        |caller: Caller<'_, Arc<Mutex<WasmWorld>>>, entity_id: u32| {
+        |caller: Caller<'_, Arc<Mutex<WasmWorld>>>, entity_id: i32| -> i32 {
             let mut world = caller.data().lock().unwrap();
-            world.release_job_resource_reservations(entity_id);
+            let system = ResourceReservationSystem::new();
+            system.release_reservation(&mut *world, entity_id as u32);
+            0
         },
     )?;
 
