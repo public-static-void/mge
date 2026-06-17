@@ -37,3 +37,9 @@ pub mod event_bus;
 
 /// System module
 pub mod system;
+
+/// Movement operations module
+pub mod movement_ops;
+
+/// Equipment module
+pub mod equipment;

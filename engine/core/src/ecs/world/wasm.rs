@@ -457,6 +457,149 @@ impl WasmWorld {
         }
     }
 
+    /// Assigns a move path (JSON array) to an agent's Agent component.
+    pub fn assign_move_path(&mut self, agent_id: u32, path_json: &str) -> Result<(), String> {
+        let path_value: JsonValue = serde_json::from_str(path_json)
+            .map_err(|e| format!("Failed to parse move path JSON: {e}"))?;
+
+        let agent = self
+            .components
+            .entry("Agent".to_string())
+            .or_default()
+            .entry(agent_id)
+            .or_insert_with(|| serde_json::json!({"entity_id": agent_id}));
+
+        agent["move_path"] = path_value;
+        Ok(())
+    }
+
+    /// Checks if an agent's Position matches the given cell coordinates.
+    /// `cell_json` must be a JSON object with one key identifying the cell kind
+    /// (e.g. `{"Square": {"x": 0, "y": 0, "z": 0}}`).
+    pub fn is_agent_at_cell(&self, agent_id: u32, cell_json: &str) -> bool {
+        let pos = match self.components.get("Position") {
+            Some(comps) => match comps.get(&agent_id) {
+                Some(p) => p,
+                None => return false,
+            },
+            None => return false,
+        };
+
+        let cell: JsonValue = match serde_json::from_str(cell_json) {
+            Ok(c) => c,
+            Err(_) => return false,
+        };
+
+        let cell_obj = match cell.as_object() {
+            Some(o) => o,
+            None => return false,
+        };
+
+        let (kind, coords) = match cell_obj.iter().next() {
+            Some((k, v)) => (k.as_str(), v),
+            None => return false,
+        };
+
+        match kind {
+            "Square" => {
+                let cx = coords.get("x").and_then(|v| v.as_i64()).unwrap_or(0) as f64;
+                let cy = coords.get("y").and_then(|v| v.as_i64()).unwrap_or(0) as f64;
+                let cz = coords.get("z").and_then(|v| v.as_i64()).unwrap_or(0) as f64;
+                let px = pos.get("x").and_then(|v| v.as_f64()).unwrap_or(0.0);
+                let py = pos.get("y").and_then(|v| v.as_f64()).unwrap_or(0.0);
+                let pz = pos.get("z").and_then(|v| v.as_f64()).unwrap_or(0.0);
+                (px - cx).abs() < f64::EPSILON
+                    && (py - cy).abs() < f64::EPSILON
+                    && (pz - cz).abs() < f64::EPSILON
+            }
+            "Hex" => {
+                let cq = coords.get("q").and_then(|v| v.as_i64()).unwrap_or(0) as f64;
+                let cr = coords.get("r").and_then(|v| v.as_i64()).unwrap_or(0) as f64;
+                let cz = coords.get("z").and_then(|v| v.as_i64()).unwrap_or(0) as f64;
+                let pq = pos.get("q").and_then(|v| v.as_f64()).unwrap_or(0.0);
+                let pr = pos.get("r").and_then(|v| v.as_f64()).unwrap_or(0.0);
+                let pz = pos.get("z").and_then(|v| v.as_f64()).unwrap_or(0.0);
+                (pq - cq).abs() < f64::EPSILON
+                    && (pr - cr).abs() < f64::EPSILON
+                    && (pz - cz).abs() < f64::EPSILON
+            }
+            "Province" => {
+                let cid = coords.get("id").and_then(|v| v.as_str()).unwrap_or("");
+                let pid = pos.get("id").and_then(|v| v.as_str()).unwrap_or("");
+                cid == pid
+            }
+            _ => false,
+        }
+    }
+
+    /// Returns true if the agent has no `move_path` or the path array is empty.
+    pub fn is_move_path_empty(&self, agent_id: u32) -> bool {
+        match self.components.get("Agent") {
+            Some(agents) => match agents.get(&agent_id) {
+                Some(agent) => match agent.get("move_path") {
+                    Some(path) => !path.as_array().is_some_and(|a| !a.is_empty()),
+                    None => true,
+                },
+                None => true,
+            },
+            None => true,
+        }
+    }
+
+    /// Gets the Equipment component of an entity as a JSON string.
+    pub fn get_equipment(&self, entity_id: u32) -> Option<String> {
+        self.get_component(entity_id, "Equipment")
+    }
+
+    /// Sets the Equipment component on an entity from a JSON string.
+    pub fn set_equipment(&mut self, entity_id: u32, json_data: &str) -> Result<(), String> {
+        self.set_component(entity_id, "Equipment", json_data)
+    }
+
+    /// Equips an item into a slot on the entity's Equipment component.
+    pub fn equip_item(&mut self, entity_id: u32, item_id: &str, slot: &str) -> Result<(), String> {
+        let equipment = self
+            .components
+            .entry("Equipment".to_string())
+            .or_default()
+            .entry(entity_id)
+            .or_insert_with(|| serde_json::json!({"slots": {}}));
+
+        let slots = equipment
+            .get_mut("slots")
+            .and_then(|v| v.as_object_mut())
+            .ok_or_else(|| "Equipment slots field is missing or not an object".to_string())?;
+
+        if let Some(existing) = slots.get(slot) {
+            if !existing.is_null() {
+                return Err(format!("Slot '{slot}' is already occupied"));
+            }
+        }
+
+        slots.insert(
+            slot.to_string(),
+            serde_json::Value::String(item_id.to_string()),
+        );
+        Ok(())
+    }
+
+    /// Unequips an item from a slot on the entity's Equipment component.
+    pub fn unequip_item(&mut self, entity_id: u32, slot: &str) -> Result<(), String> {
+        let equipment = self
+            .components
+            .get_mut("Equipment")
+            .ok_or_else(|| "No Equipment component found".to_string())?;
+        let slots = equipment
+            .get_mut(&entity_id)
+            .ok_or_else(|| format!("Entity {entity_id} has no Equipment component"))?
+            .get_mut("slots")
+            .and_then(|v| v.as_object_mut())
+            .ok_or_else(|| "Equipment slots field is missing or not an object".to_string())?;
+
+        slots.insert(slot.to_string(), serde_json::Value::Null);
+        Ok(())
+    }
+
     fn advance_time_of_day(&mut self) {
         self.time_of_day.minute += 1;
         if self.time_of_day.minute >= 60 {
