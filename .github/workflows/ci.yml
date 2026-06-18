@@ -184,3 +184,22 @@ jobs:
           source .venv/bin/activate
           export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(pwd)/../plugins
           pytest tests/ -v
+
+  release:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [fmt, clippy, validate-schema, build-c-plugins, build-wasm-tests, test-rust, test-lua, test-python]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: moonrepo/setup-rust@v1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci
+      - run: npx semantic-release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
