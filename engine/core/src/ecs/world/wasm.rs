@@ -26,6 +26,17 @@ pub struct Camera {
     pub height: i32,
 }
 
+/// A simplified job event record stored in WasmWorld.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WasmJobEvent {
+    /// Timestamp of the event (milliseconds since UNIX epoch).
+    pub timestamp: u128,
+    /// Type of the event (e.g., "job_progressed", "job_completed").
+    pub event_type: String,
+    /// Payload of the event as arbitrary JSON.
+    pub payload: serde_json::Value,
+}
+
 /// Simplified serializable map data for the WASM world.
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct WasmMap {
@@ -89,6 +100,26 @@ pub struct WasmWorld {
     /// WASM worldgen postprocessor export names
     #[serde(default)]
     pub wasm_worldgen_postprocessors: Vec<String>,
+
+    /// Registered job type metadata: job_type_name → JSON metadata.
+    #[serde(default)]
+    pub job_type_data: HashMap<String, JsonValue>,
+
+    /// Registered job type names (for get_job_types, insertion order preserved).
+    #[serde(default)]
+    pub job_type_names: Vec<String>,
+
+    /// Current job board policy name (default: "priority").
+    #[serde(default)]
+    pub job_board_policy: String,
+
+    /// Entity IDs of jobs currently on the board.
+    #[serde(default)]
+    pub job_board_jobs: Vec<u32>,
+
+    /// Instance-local job event log.
+    #[serde(default)]
+    pub job_event_log: Vec<WasmJobEvent>,
 }
 
 /// Load all JSON schema files from a directory.
@@ -137,6 +168,11 @@ impl WasmWorld {
             wasm_worldgen_plugins: Vec::new(),
             wasm_worldgen_validators: Vec::new(),
             wasm_worldgen_postprocessors: Vec::new(),
+            job_type_data: HashMap::new(),
+            job_type_names: Vec::new(),
+            job_board_policy: "priority".to_string(),
+            job_board_jobs: Vec::new(),
+            job_event_log: Vec::new(),
         }
     }
 
@@ -1296,6 +1332,288 @@ impl WasmWorld {
     pub fn release_job_resource_reservations(&mut self, entity_id: u32) {
         let system = crate::systems::job::reservation::ResourceReservationSystem::new();
         system.release_reservation(self, entity_id);
+    }
+
+    // ---- Job System Core API (Module 1) ----
+
+    /// Returns the list of registered job type names.
+    pub fn get_job_type_names(&self) -> Vec<String> {
+        self.job_type_names.clone()
+    }
+
+    /// Registers a job type with a name and metadata JSON string.
+    /// Metadata is parsed as JSON and stored in `job_type_data`.
+    pub fn register_job_type(&mut self, name: &str, metadata: &str) -> Result<(), String> {
+        let meta_val: JsonValue =
+            serde_json::from_str(metadata).map_err(|e| format!("Invalid metadata JSON: {e}"))?;
+        if !self.job_type_names.contains(&name.to_string()) {
+            self.job_type_names.push(name.to_string());
+        }
+        self.job_type_data.insert(name.to_string(), meta_val);
+        Ok(())
+    }
+
+    /// Returns the metadata JSON for a job type, or None if not found.
+    pub fn get_job_type_metadata(&self, name: &str) -> Option<String> {
+        self.job_type_data
+            .get(name)
+            .map(|v| serde_json::to_string(v).unwrap_or_default())
+    }
+
+    // ---- Job Board API (Module 2) ----
+
+    /// Returns the full job board as a JSON array of `{eid, priority, state}` entries.
+    pub fn get_job_board(&self) -> String {
+        let entries: Vec<JsonValue> = self
+            .job_board_jobs
+            .iter()
+            .filter_map(|&eid| {
+                self.get_component(eid, "Job").and_then(|job_str| {
+                    let job: JsonValue = serde_json::from_str(&job_str).ok()?;
+                    Some(serde_json::json!({
+                        "eid": eid,
+                        "priority": job.get("priority").and_then(|v| v.as_i64()).unwrap_or(0),
+                        "state": job.get("state").and_then(|v| v.as_str()).unwrap_or(""),
+                    }))
+                })
+            })
+            .collect();
+        serde_json::to_string(&entries).unwrap_or_else(|_| "[]".to_string())
+    }
+
+    /// Sets the job board scheduling policy. Valid policies: "priority", "fifo", "lifo".
+    pub fn set_job_board_policy(&mut self, policy: &str) -> Result<(), String> {
+        match policy {
+            "priority" | "fifo" | "lifo" => {
+                self.job_board_policy = policy.to_string();
+                Ok(())
+            }
+            _ => Err(format!("Unknown policy: {policy}")),
+        }
+    }
+
+    /// Adds a job entity ID to the job board.
+    pub fn add_job_to_job_board(&mut self, job_id: u32) {
+        self.job_board_jobs.push(job_id);
+    }
+
+    // ---- Job Query API (Module 3) ----
+
+    /// Lists all jobs, optionally including terminal states (complete, failed, cancelled).
+    /// Returns a JSON array of job objects with an injected `id` field.
+    pub fn list_jobs(&self, include_terminal: bool) -> String {
+        let mut jobs: Vec<JsonValue> = Vec::new();
+        if let Some(job_map) = self.components.get("Job") {
+            for (&eid, job) in job_map {
+                let mut j = job.clone();
+                j["id"] = serde_json::json!(eid);
+                let is_terminal = matches!(
+                    j.get("state").and_then(|v| v.as_str()),
+                    Some("complete") | Some("failed") | Some("cancelled")
+                );
+                if !include_terminal && is_terminal {
+                    continue;
+                }
+                jobs.push(j);
+            }
+        }
+        serde_json::to_string(&jobs).unwrap_or_else(|_| "[]".to_string())
+    }
+
+    /// Finds jobs matching the given filter criteria. filter is a JSON string with optional
+    /// fields: `state`, `job_type`, `assigned_to`, `category`.
+    pub fn find_jobs(&self, filter_str: &str) -> String {
+        let filter: JsonValue = serde_json::from_str(filter_str).unwrap_or(JsonValue::Null);
+        let state = filter.get("state").and_then(|v| v.as_str());
+        let job_type = filter.get("job_type").and_then(|v| v.as_str());
+        let assigned_to = filter.get("assigned_to").and_then(|v| v.as_u64());
+        let category = filter.get("category").and_then(|v| v.as_str());
+
+        let mut jobs: Vec<JsonValue> = Vec::new();
+        if let Some(job_map) = self.components.get("Job") {
+            for (&eid, job) in job_map {
+                if let Some(s) = state
+                    && job.get("state").and_then(|v| v.as_str()) != Some(s)
+                {
+                    continue;
+                }
+                if let Some(jt) = job_type
+                    && job.get("job_type").and_then(|v| v.as_str()) != Some(jt)
+                {
+                    continue;
+                }
+                if let Some(at) = assigned_to
+                    && job.get("assigned_to").and_then(|v| v.as_u64()) != Some(at)
+                {
+                    continue;
+                }
+                if let Some(cat) = category
+                    && job.get("category").and_then(|v| v.as_str()) != Some(cat)
+                {
+                    continue;
+                }
+                let mut j = job.clone();
+                j["id"] = serde_json::json!(eid);
+                jobs.push(j);
+            }
+        }
+        serde_json::to_string(&jobs).unwrap_or_else(|_| "[]".to_string())
+    }
+
+    /// Advances a job's state through the simplified state machine:
+    /// `pending → going_to_site → at_site → in_progress → complete`.
+    /// Emits a `job_progressed` event on each advancement.
+    pub fn advance_job_state(&mut self, job_id: u32) -> Result<(), String> {
+        let job_str = self
+            .get_component(job_id, "Job")
+            .ok_or_else(|| format!("No job with id {job_id}"))?;
+        let mut job: JsonValue =
+            serde_json::from_str(&job_str).map_err(|e| format!("Invalid job JSON: {e}"))?;
+        let state = job
+            .get("state")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+        let new_state = match state.as_str() {
+            "pending" => "going_to_site",
+            "going_to_site" => "at_site",
+            "at_site" => "in_progress",
+            "in_progress" => {
+                let progress = job.get("progress").and_then(|v| v.as_f64()).unwrap_or(0.0);
+                job["progress"] = serde_json::json!(progress + 0.1);
+                if progress + 0.1 >= 1.0 {
+                    "complete"
+                } else {
+                    "in_progress"
+                }
+            }
+            other => return Err(format!("Cannot advance job from state '{other}'")),
+        };
+        job["state"] = serde_json::json!(new_state);
+        let json_str = serde_json::to_string(&job).map_err(|e| e.to_string())?;
+        // Emit job_progressed event
+        self.job_event_log.push(WasmJobEvent {
+            timestamp: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_millis(),
+            event_type: "job_progressed".to_string(),
+            payload: job.clone(),
+        });
+        self.set_component(job_id, "Job", &json_str)?;
+        Ok(())
+    }
+
+    // ---- Job AI API (Module 6) ----
+
+    /// Simplified AI job assignment: scans all unassigned pending jobs and assigns the
+    /// highest-priority job to the given agent. Does NOT use engine_core's assign_jobs logic.
+    pub fn ai_assign_jobs(&mut self, agent_id: u32) -> Result<(), String> {
+        let agent_str = self
+            .get_component(agent_id, "Agent")
+            .ok_or_else(|| format!("No Agent component on entity {agent_id}"))?;
+        let mut agent: JsonValue =
+            serde_json::from_str(&agent_str).map_err(|e| format!("Invalid Agent JSON: {e}"))?;
+
+        // Skip if agent already has a current job
+        if agent
+            .get("current_job")
+            .and_then(|v| v.as_u64())
+            .is_some_and(|id| id > 0)
+        {
+            return Ok(());
+        }
+
+        // Scan all unassigned pending jobs, pick highest priority
+        let mut best_job_id = None;
+        let mut best_utility = f64::NEG_INFINITY;
+
+        if let Some(job_map) = self.components.get("Job") {
+            for (&eid, job) in job_map {
+                let assigned = job.get("assigned_to").and_then(|v| v.as_u64()).unwrap_or(0);
+                let state = job.get("state").and_then(|v| v.as_str()).unwrap_or("");
+                if assigned == 0 && state == "pending" {
+                    let utility = job.get("priority").and_then(|v| v.as_f64()).unwrap_or(0.0);
+                    if utility > best_utility {
+                        best_utility = utility;
+                        best_job_id = Some(eid);
+                    }
+                }
+            }
+        }
+
+        if let Some(job_id) = best_job_id {
+            // Update Job component: set assigned_to, assignment_count, last_assigned_tick
+            let mut job = self
+                .get_component(job_id, "Job")
+                .and_then(|s| serde_json::from_str::<JsonValue>(&s).ok())
+                .unwrap_or_default();
+            job["assigned_to"] = serde_json::json!(agent_id);
+            job["assignment_count"] = serde_json::json!(
+                job.get("assignment_count")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(0)
+                    + 1
+            );
+            job["last_assigned_tick"] = serde_json::json!(self.turn);
+            let json_str = serde_json::to_string(&job).map_err(|e| e.to_string())?;
+            self.set_component(job_id, "Job", &json_str)?;
+
+            // Update Agent component: set current_job
+            agent["current_job"] = serde_json::json!(job_id);
+            let agent_str = serde_json::to_string(&agent).map_err(|e| e.to_string())?;
+            self.set_component(agent_id, "Agent", &agent_str)?;
+        }
+
+        Ok(())
+    }
+
+    /// Returns a JSON array of jobs assigned to the given agent.
+    pub fn ai_query_jobs(&self, agent_id: u32) -> String {
+        let mut jobs: Vec<JsonValue> = Vec::new();
+        if let Some(job_map) = self.components.get("Job") {
+            for (&eid, job) in job_map {
+                if job.get("assigned_to").and_then(|v| v.as_u64()) == Some(agent_id as u64) {
+                    let mut j = job.clone();
+                    j["id"] = serde_json::json!(eid);
+                    j["state"] = j.get("state").cloned().unwrap_or(JsonValue::Null);
+                    jobs.push(j);
+                }
+            }
+        }
+        serde_json::to_string(&jobs).unwrap_or_else(|_| "[]".to_string())
+    }
+
+    // ---- Job Events API (Module 7) ----
+
+    /// Returns the full job event log as a JSON array.
+    pub fn get_job_event_log(&self) -> String {
+        serde_json::to_string(&self.job_event_log).unwrap_or_else(|_| "[]".to_string())
+    }
+
+    /// Returns events filtered by event type as a JSON array.
+    pub fn get_job_events_by_type(&self, event_type: &str) -> String {
+        let filtered: Vec<&WasmJobEvent> = self
+            .job_event_log
+            .iter()
+            .filter(|e| e.event_type == event_type)
+            .collect();
+        serde_json::to_string(&filtered).unwrap_or_else(|_| "[]".to_string())
+    }
+
+    /// Returns events with timestamp >= the given tick as a JSON array.
+    pub fn get_job_events_since(&self, tick: u32) -> String {
+        let filtered: Vec<&WasmJobEvent> = self
+            .job_event_log
+            .iter()
+            .filter(|e| e.timestamp >= tick as u128)
+            .collect();
+        serde_json::to_string(&filtered).unwrap_or_else(|_| "[]".to_string())
+    }
+
+    /// Clears the job event log.
+    pub fn clear_job_event_log(&mut self) {
+        self.job_event_log.clear();
     }
 
     fn advance_time_of_day(&mut self) {
