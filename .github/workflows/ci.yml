@@ -154,10 +154,23 @@ jobs:
           path: engine_wasm/wasm_tests
       - name: Build and deploy plugins
         run: cargo run -p xtask -- build-plugins
+      - name: Free disk space
+        run: |
+          sudo apt clean
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          df -h
       - name: Test Rust
         run: |
           export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(pwd)/plugins
-          cargo test --all
+          # Test smaller crates first to free resources
+          cargo test -p engine_macros --no-fail-fast
+          cargo test -p engine_core --no-fail-fast
+          cargo test -p engine_lua --no-fail-fast
+          cargo test -p xtask --no-fail-fast
+          # engine_wasm last due to large wasmtime-linked binaries
+          cargo test -p engine_wasm --no-fail-fast
 
   test-lua:
     runs-on: ubuntu-latest
