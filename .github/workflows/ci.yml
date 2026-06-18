@@ -15,7 +15,6 @@ env:
   PKG_CONFIG_PATH: /usr/lib/x86_64-linux-gnu/pkgconfig
 
 jobs:
-  # ── Fast checks ──────────────────────────────────────────────
   fmt:
     runs-on: ubuntu-latest
     steps:
@@ -36,7 +35,6 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo run --bin schema_validator --release -- engine/assets/schemas
 
-  # ── Artifact builders ────────────────────────────────────────
   build-c-plugins:
     runs-on: ubuntu-latest
     steps:
@@ -75,7 +73,6 @@ jobs:
           path: engine_wasm/wasm_tests/
           retention-days: 1
 
-  # ── Quality ──────────────────────────────────────────────────
   clippy:
     runs-on: ubuntu-latest
     needs: fmt
@@ -92,7 +89,6 @@ jobs:
       - name: Clippy
         run: cargo clippy --all-targets --all-features -- -D warnings
 
-  # ── Tests — merge build + test into single pass ──────────────
   test-rust:
     runs-on: ubuntu-latest
     needs: [validate-schema, build-c-plugins, build-wasm-tests]
