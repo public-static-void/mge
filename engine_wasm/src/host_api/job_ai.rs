@@ -43,11 +43,11 @@ pub fn register_job_ai_api(linker: &mut Linker<Arc<Mutex<WasmWorld>>>) -> anyhow
     linker.func_wrap(
         "job_ai",
         "ai_modify_job_assignment",
-         |mut caller: Caller<'_, Arc<Mutex<WasmWorld>>>,
-          _entity_id: i32,
-          job_id: i32,
-          action_ptr: i32,
-          action_len: i32|
+        |mut caller: Caller<'_, Arc<Mutex<WasmWorld>>>,
+         _entity_id: i32,
+         job_id: i32,
+         action_ptr: i32,
+         action_len: i32|
          -> i32 {
             let action = match read_wasm_string(&mut caller, action_ptr, action_len) {
                 Ok(s) => s,

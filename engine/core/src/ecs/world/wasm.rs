@@ -1344,8 +1344,8 @@ impl WasmWorld {
     /// Registers a job type with a name and metadata JSON string.
     /// Metadata is parsed as JSON and stored in `job_type_data`.
     pub fn register_job_type(&mut self, name: &str, metadata: &str) -> Result<(), String> {
-        let meta_val: JsonValue = serde_json::from_str(metadata)
-            .map_err(|e| format!("Invalid metadata JSON: {e}"))?;
+        let meta_val: JsonValue =
+            serde_json::from_str(metadata).map_err(|e| format!("Invalid metadata JSON: {e}"))?;
         if !self.job_type_names.contains(&name.to_string()) {
             self.job_type_names.push(name.to_string());
         }
@@ -1423,8 +1423,7 @@ impl WasmWorld {
     /// Finds jobs matching the given filter criteria. filter is a JSON string with optional
     /// fields: `state`, `job_type`, `assigned_to`, `category`.
     pub fn find_jobs(&self, filter_str: &str) -> String {
-        let filter: JsonValue =
-            serde_json::from_str(filter_str).unwrap_or(JsonValue::Null);
+        let filter: JsonValue = serde_json::from_str(filter_str).unwrap_or(JsonValue::Null);
         let state = filter.get("state").and_then(|v| v.as_str());
         let job_type = filter.get("job_type").and_then(|v| v.as_str());
         let assigned_to = filter.get("assigned_to").and_then(|v| v.as_u64());
@@ -1433,25 +1432,25 @@ impl WasmWorld {
         let mut jobs: Vec<JsonValue> = Vec::new();
         if let Some(job_map) = self.components.get("Job") {
             for (&eid, job) in job_map {
-                if let Some(s) = state {
-                    if job.get("state").and_then(|v| v.as_str()) != Some(s) {
-                        continue;
-                    }
+                if let Some(s) = state
+                    && job.get("state").and_then(|v| v.as_str()) != Some(s)
+                {
+                    continue;
                 }
-                if let Some(jt) = job_type {
-                    if job.get("job_type").and_then(|v| v.as_str()) != Some(jt) {
-                        continue;
-                    }
+                if let Some(jt) = job_type
+                    && job.get("job_type").and_then(|v| v.as_str()) != Some(jt)
+                {
+                    continue;
                 }
-                if let Some(at) = assigned_to {
-                    if job.get("assigned_to").and_then(|v| v.as_u64()) != Some(at) {
-                        continue;
-                    }
+                if let Some(at) = assigned_to
+                    && job.get("assigned_to").and_then(|v| v.as_u64()) != Some(at)
+                {
+                    continue;
                 }
-                if let Some(cat) = category {
-                    if job.get("category").and_then(|v| v.as_str()) != Some(cat) {
-                        continue;
-                    }
+                if let Some(cat) = category
+                    && job.get("category").and_then(|v| v.as_str()) != Some(cat)
+                {
+                    continue;
                 }
                 let mut j = job.clone();
                 j["id"] = serde_json::json!(eid);
@@ -1468,8 +1467,8 @@ impl WasmWorld {
         let job_str = self
             .get_component(job_id, "Job")
             .ok_or_else(|| format!("No job with id {job_id}"))?;
-        let mut job: JsonValue = serde_json::from_str(&job_str)
-            .map_err(|e| format!("Invalid job JSON: {e}"))?;
+        let mut job: JsonValue =
+            serde_json::from_str(&job_str).map_err(|e| format!("Invalid job JSON: {e}"))?;
         let state = job
             .get("state")
             .and_then(|v| v.as_str())
@@ -1513,8 +1512,8 @@ impl WasmWorld {
         let agent_str = self
             .get_component(agent_id, "Agent")
             .ok_or_else(|| format!("No Agent component on entity {agent_id}"))?;
-        let mut agent: JsonValue = serde_json::from_str(&agent_str)
-            .map_err(|e| format!("Invalid Agent JSON: {e}"))?;
+        let mut agent: JsonValue =
+            serde_json::from_str(&agent_str).map_err(|e| format!("Invalid Agent JSON: {e}"))?;
 
         // Skip if agent already has a current job
         if agent

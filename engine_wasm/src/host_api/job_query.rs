@@ -5,9 +5,7 @@ use std::sync::{Arc, Mutex};
 use wasmtime::{Caller, Linker};
 
 /// Registers the job query API (8 host functions) under the "job_query" import module.
-pub fn register_job_query_api(
-    linker: &mut Linker<Arc<Mutex<WasmWorld>>>,
-) -> anyhow::Result<()> {
+pub fn register_job_query_api(linker: &mut Linker<Arc<Mutex<WasmWorld>>>) -> anyhow::Result<()> {
     linker.func_wrap(
         "job_query",
         "list_jobs",
@@ -39,13 +37,11 @@ pub fn register_job_query_api(
             match json {
                 Some(data) => {
                     // Inject the id field into the job JSON
-                    let mut job: JsonValue =
-                        serde_json::from_str(&data).unwrap_or(JsonValue::Null);
+                    let mut job: JsonValue = serde_json::from_str(&data).unwrap_or(JsonValue::Null);
                     if let Some(obj) = job.as_object_mut() {
                         obj.insert("id".to_string(), serde_json::json!(job_id));
                     }
-                    let enriched =
-                        serde_json::to_string(&job).unwrap_or_else(|_| data.clone());
+                    let enriched = serde_json::to_string(&job).unwrap_or_else(|_| data.clone());
                     write_string_to_wasm(&mut caller, out_ptr, out_len, &enriched) as i32
                 }
                 None => -1,
@@ -98,12 +94,8 @@ pub fn register_job_query_api(
             };
             match json {
                 Some(data) => {
-                    let job: JsonValue =
-                        serde_json::from_str(&data).unwrap_or(JsonValue::Null);
-                    let field = job
-                        .get("children")
-                        .cloned()
-                        .unwrap_or(JsonValue::Null);
+                    let job: JsonValue = serde_json::from_str(&data).unwrap_or(JsonValue::Null);
+                    let field = job.get("children").cloned().unwrap_or(JsonValue::Null);
                     let json_str =
                         serde_json::to_string(&field).unwrap_or_else(|_| "null".to_string());
                     write_string_to_wasm(&mut caller, out_ptr, out_len, &json_str) as i32
@@ -128,10 +120,8 @@ pub fn register_job_query_api(
                 Some(s) => s,
                 None => return -1,
             };
-            let mut job: JsonValue =
-                serde_json::from_str(&job_str).unwrap_or(JsonValue::Null);
-            let parsed: JsonValue =
-                serde_json::from_str(&children_json).unwrap_or(JsonValue::Null);
+            let mut job: JsonValue = serde_json::from_str(&job_str).unwrap_or(JsonValue::Null);
+            let parsed: JsonValue = serde_json::from_str(&children_json).unwrap_or(JsonValue::Null);
             if let Some(obj) = job.as_object_mut() {
                 obj.insert("children".to_string(), parsed);
             }
@@ -155,12 +145,8 @@ pub fn register_job_query_api(
             };
             match json {
                 Some(data) => {
-                    let job: JsonValue =
-                        serde_json::from_str(&data).unwrap_or(JsonValue::Null);
-                    let field = job
-                        .get("dependencies")
-                        .cloned()
-                        .unwrap_or(JsonValue::Null);
+                    let job: JsonValue = serde_json::from_str(&data).unwrap_or(JsonValue::Null);
+                    let field = job.get("dependencies").cloned().unwrap_or(JsonValue::Null);
                     let json_str =
                         serde_json::to_string(&field).unwrap_or_else(|_| "null".to_string());
                     write_string_to_wasm(&mut caller, out_ptr, out_len, &json_str) as i32
@@ -185,10 +171,8 @@ pub fn register_job_query_api(
                 Some(s) => s,
                 None => return -1,
             };
-            let mut job: JsonValue =
-                serde_json::from_str(&job_str).unwrap_or(JsonValue::Null);
-            let parsed: JsonValue =
-                serde_json::from_str(&deps_json).unwrap_or(JsonValue::Null);
+            let mut job: JsonValue = serde_json::from_str(&job_str).unwrap_or(JsonValue::Null);
+            let parsed: JsonValue = serde_json::from_str(&deps_json).unwrap_or(JsonValue::Null);
             if let Some(obj) = job.as_object_mut() {
                 obj.insert("dependencies".to_string(), parsed);
             }
