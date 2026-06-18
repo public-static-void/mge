@@ -150,7 +150,7 @@ jobs:
       - name: Run Lua tests
         run: |
           export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(pwd)/plugins
-          cargo run --bin mge_lua_test_runner -- engine/scripts/lua/tests
+          ./run_lua_tests.sh
 
   test-python:
     runs-on: ubuntu-latest
