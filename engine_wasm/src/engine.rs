@@ -8,6 +8,13 @@ use crate::host_api::equipment::register_equipment_api;
 use crate::host_api::event_bus::register_event_bus_api;
 use crate::host_api::input::register_input_api;
 use crate::host_api::inventory::register_inventory_api;
+use crate::host_api::job_board::register_job_board_api;
+use crate::host_api::job_ai::register_job_ai_api;
+use crate::host_api::job_cancel::register_job_cancel_api;
+use crate::host_api::job_events::register_job_events_api;
+use crate::host_api::job_mutation::register_job_mutation_api;
+use crate::host_api::job_query::register_job_query_api;
+use crate::host_api::job_system::register_job_system_api;
 use crate::host_api::map::register_map_api;
 use crate::host_api::mode::register_mode_api;
 use crate::host_api::movement_ops::register_movement_ops_api;
@@ -144,6 +151,13 @@ impl WasmScriptEngine {
         register_region_api(&mut linker)?;
         register_body_api(&mut linker)?;
         register_economic_api(&mut linker)?;
+        register_job_system_api(&mut linker)?;
+        register_job_board_api(&mut linker)?;
+        register_job_query_api(&mut linker)?;
+        register_job_mutation_api(&mut linker)?;
+        register_job_cancel_api(&mut linker)?;
+        register_job_ai_api(&mut linker)?;
+        register_job_events_api(&mut linker)?;
         register_map_api(&mut linker)?;
         register_world_userdata_api(&mut linker)?;
 
