@@ -51,5 +51,4 @@
 - [x] API reference (Rust, Lua, Python, C ABI)
 - [x] Plugin authoring guide
 - [x] World generation documentation
-- [ ] Architecture Decision Records (ADRs)
 - [ ] CONTRIBUTING.md
