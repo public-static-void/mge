@@ -8,13 +8,16 @@ This mirrors the CI pipeline so all checks can be reproduced locally.
 
 ## Prerequisites
 
-- **Rust** (latest stable, with `cargo`)
+- **Rust nightly-2026-06-01** (edition 2024 requires nightly)
+  ```sh
+  rustup toolchain install nightly-2026-06-01
+  rustup override set nightly-2026-06-01
+  ```
 - **Python 3.8+** (for Python scripting/tests)
 - **Lua 5.1 or LuaJIT** (for Lua scripting/tests)
 - **GCC/Clang** (for C ABI plugins)
 - **Maturin** (`pip install maturin`) for Python bindings
 - **pytest** (`pip install pytest`) for Python tests
-- **WebAssembly** (`rustup target add wasm32-unknown-unknown`) for WASM
 
 ---
 
@@ -34,6 +37,7 @@ All major build, test, and validation tasks are automated via the project `Makef
 | `make test-rust`       | Build and run all Rust tests                           |
 | `make test-lua`        | Run all Lua scripting tests                            |
 | `make clean`           | Clean Rust build artifacts                             |
+| `make version`         | Show current release version from git tags             |
 | `make help`            | Show a summary of available targets                    |
 
 ### Notes
@@ -41,6 +45,27 @@ All major build, test, and validation tasks are automated via the project `Makef
 - The Makefile will automatically set up Python virtual environments, install dependencies, and build Rust and C Plugins as needed.
 - All Makefile targets are idempotent and can be safely re-run.
 - The Makefile is the **single source of truth** for build and test orchestration; all CI steps use these targets.
+
+---
+
+## Development Workflow
+
+### Branching
+
+Feature branches branch from `main` and are merged back via pull requests. Follow the semantic commit format: `<type>(<scope>): <subject>` (e.g., `feat(core): add spatial index`, `fix(lua): correct entity lookup`).
+
+### Knowledge Document (KD) Lifecycle
+
+The project uses Knowledge Documents for structured development. The lifecycle follows this sequence:
+
+1. **Intent** — capture what to do and why
+2. **Spec** — define acceptance criteria and requirements
+3. **Plan** — break work into verifiable steps
+4. **Implementation** — execute each step (tests first)
+5. **Review** — verify against spec and acceptance criteria
+6. **Commit** — stage and commit with a semantic message
+
+KDs are runtime artifacts stored in `knowledge/` and are never committed to the repository.
 
 ---
 
@@ -57,10 +82,12 @@ cargo clippy --all-targets --all-features -- -D warnings
 
 ## Engine Entrypoints
 
-- **Library API (`lib.rs`)**: Use this for embedding, scripting, or integrating the engine in other projects.
-- **CLI Runner (`bin/mge_cli.rs`)**: Main entry point for running mods, Lua scripts, or games.
-- **Test Runner (`bin/mge_lua_test_runner.rs`)**: Runs all Lua integration tests.
-- **Schema Validator (`bin/schema_validator.rs`)**: Validates all component schemas.
+| Binary | Crate | Purpose |
+|---|---|---|
+| `mge_cli` | `engine_lua` | Main game CLI — run Lua scripts directly or via `--mod <name>` for mod-based content |
+| `mge_lua_test_runner` | `engine_lua` | Lua integration test harness |
+| `schema_validator` | `schema_validator` | Validate all JSON schemas in `engine/assets/schemas/` |
+| `xtask` | `xtask` | Plugin build/deploy orchestrator (build-plugins, build-c-plugins, build-wasm-tests, build-all) |
 
 ---
 
