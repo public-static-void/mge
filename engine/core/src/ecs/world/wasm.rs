@@ -1652,12 +1652,7 @@ impl WasmWorld {
 
     /// Dispatches an event to a widget, pushing to event queue.
     /// Returns false if widget not found.
-    pub fn ui_trigger_event(
-        &mut self,
-        widget_id: u32,
-        event_type: &str,
-        event_data: &str,
-    ) -> bool {
+    pub fn ui_trigger_event(&mut self, widget_id: u32, event_type: &str, event_data: &str) -> bool {
         if !self.widget_registry.contains_key(&widget_id) {
             return false;
         }
@@ -1687,7 +1682,11 @@ impl WasmWorld {
     /// Recursive helper for ui_present: renders a widget and its children.
     fn render_widget(&self, id: u32, depth: usize) {
         let indent = "  ".repeat(depth);
-        let type_name = self.widget_types.get(&id).map(|s| s.as_str()).unwrap_or("?");
+        let type_name = self
+            .widget_types
+            .get(&id)
+            .map(|s| s.as_str())
+            .unwrap_or("?");
         let props = self.widget_registry.get(&id);
         let summary = props
             .and_then(|p| p.get("text").and_then(|v| v.as_str()))

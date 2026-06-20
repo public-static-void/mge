@@ -4,9 +4,7 @@ use std::sync::{Arc, Mutex};
 use wasmtime::{Caller, Linker};
 
 /// Registers the UI events API (interaction and callbacks) on the "ui_events" import module.
-pub fn register_ui_events_api(
-    linker: &mut Linker<Arc<Mutex<WasmWorld>>>,
-) -> anyhow::Result<()> {
+pub fn register_ui_events_api(linker: &mut Linker<Arc<Mutex<WasmWorld>>>) -> anyhow::Result<()> {
     // 1. set_callback(widget_id: i32, event_type_ptr: i32, event_type_len: i32) -> i32
     //    No-op stub: callbacks are not used in WASM (AD007 poll-based design).
     linker.func_wrap(
