@@ -20,6 +20,12 @@ pub mod death_decay;
 /// Time of day module
 pub mod time_of_day;
 
+/// UI module
+pub mod ui;
+
+/// UI tree module
+pub mod ui_tree;
+
 /// Input module
 pub mod input;
 
