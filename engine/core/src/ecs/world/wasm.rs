@@ -120,6 +120,22 @@ pub struct WasmWorld {
     /// Instance-local job event log.
     #[serde(default)]
     pub job_event_log: Vec<WasmJobEvent>,
+
+    /// Widget registry: widget_id → serialized widget properties as JSON
+    #[serde(default)]
+    pub widget_registry: HashMap<u32, JsonValue>,
+
+    /// Widget types: widget_id → type name string
+    #[serde(default)]
+    pub widget_types: HashMap<u32, String>,
+
+    /// Parent lookup: widget_id → parent_id (reverse of widget_tree)
+    #[serde(default)]
+    pub widget_parents: HashMap<u32, u32>,
+
+    /// Registered custom widget type names (for register_widget dedup)
+    #[serde(default)]
+    pub widget_types_set: HashSet<String>,
 }
 
 /// Load all JSON schema files from a directory.
@@ -173,6 +189,10 @@ impl WasmWorld {
             job_board_policy: "priority".to_string(),
             job_board_jobs: Vec::new(),
             job_event_log: Vec::new(),
+            widget_registry: HashMap::new(),
+            widget_types: HashMap::new(),
+            widget_parents: HashMap::new(),
+            widget_types_set: HashSet::new(),
         }
     }
 
@@ -1317,6 +1337,47 @@ impl WasmWorld {
     /// Returns the number of cells in the map, or 0 if no map.
     pub fn get_map_cell_count(&self) -> i32 {
         self.map.as_ref().map(|m| m.cells.len() as i32).unwrap_or(0)
+    }
+
+    // ---- UI Widget API ----
+
+    /// Get widget type name. Returns None if not found.
+    pub fn ui_get_widget_type(&self, id: u32) -> Option<String> {
+        self.widget_types.get(&id).cloned()
+    }
+
+    /// Get parent widget ID. Returns None if root/not found.
+    pub fn ui_get_parent(&self, id: u32) -> Option<u32> {
+        self.widget_parents.get(&id).copied()
+    }
+
+    /// Set widget z-order. Returns false if widget not found.
+    pub fn ui_set_z_order(&mut self, id: u32, z: i32) -> bool {
+        if let Some(props) = self.widget_registry.get_mut(&id) {
+            if let serde_json::Value::Object(obj) = props {
+                obj.insert("z_order".to_string(), serde_json::Value::Number(serde_json::Number::from(z)));
+            }
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Get widget z-order. Returns 0 if widget not found or no z-order set.
+    pub fn ui_get_z_order(&self, id: u32) -> i32 {
+        self.widget_registry.get(&id)
+            .and_then(|props| props.get("z_order"))
+            .and_then(|v| v.as_i64())
+            .unwrap_or(0) as i32
+    }
+
+    /// Register a custom widget type. Returns false if already registered.
+    pub fn ui_register_widget_type(&mut self, type_name: &str) -> bool {
+        if self.widget_types_set.contains(type_name) {
+            return false;
+        }
+        self.widget_types_set.insert(type_name.to_string());
+        true
     }
 
     // ---- Economic Reservation API ----
