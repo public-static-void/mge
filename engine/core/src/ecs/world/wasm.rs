@@ -37,6 +37,17 @@ pub struct WasmJobEvent {
     pub payload: serde_json::Value,
 }
 
+/// A UI event record stored in the poll-based event queue.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WasmUiEvent {
+    /// Widget ID that generated the event
+    pub widget_id: u32,
+    /// Event type string (e.g. "click", "key_press")
+    pub event_type: String,
+    /// Event data as arbitrary JSON
+    pub event_data: serde_json::Value,
+}
+
 /// Simplified serializable map data for the WASM world.
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct WasmMap {
@@ -148,6 +159,14 @@ pub struct WasmWorld {
     /// Top-level widget IDs (no parent).
     #[serde(default)]
     pub widget_roots: Vec<u32>,
+
+    /// UI event queue: pushed by trigger_event, drained by poll_ui_events
+    #[serde(default)]
+    pub ui_event_queue: Vec<WasmUiEvent>,
+
+    /// Currently focused widget ID (0 = none)
+    #[serde(default)]
+    pub focused_widget: u32,
 }
 
 /// Load all JSON schema files from a directory.
@@ -208,6 +227,8 @@ impl WasmWorld {
             next_widget_id: 1,
             widget_tree: HashMap::new(),
             widget_roots: Vec::new(),
+            ui_event_queue: Vec::new(),
+            focused_widget: 0,
         }
     }
 
@@ -1370,7 +1391,10 @@ impl WasmWorld {
     pub fn ui_set_z_order(&mut self, id: u32, z: i32) -> bool {
         if let Some(props) = self.widget_registry.get_mut(&id) {
             if let serde_json::Value::Object(obj) = props {
-                obj.insert("z_order".to_string(), serde_json::Value::Number(serde_json::Number::from(z)));
+                obj.insert(
+                    "z_order".to_string(),
+                    serde_json::Value::Number(serde_json::Number::from(z)),
+                );
             }
             true
         } else {
@@ -1380,7 +1404,8 @@ impl WasmWorld {
 
     /// Get widget z-order. Returns 0 if widget not found or no z-order set.
     pub fn ui_get_z_order(&self, id: u32) -> i32 {
-        self.widget_registry.get(&id)
+        self.widget_registry
+            .get(&id)
             .and_then(|props| props.get("z_order"))
             .and_then(|v| v.as_i64())
             .unwrap_or(0) as i32
@@ -1399,11 +1424,16 @@ impl WasmWorld {
     /// Returns the auto-assigned widget ID, or 0 on failure (unknown widget type or bad props).
     pub fn ui_create_widget(&mut self, widget_type: &str, props: &str) -> u32 {
         const VALID_TYPES: &[&str] = &[
-            "Button", "Label", "Panel", "Checkbox",
-            "Dropdown", "TextInput", "ContextMenu",
+            "Button",
+            "Label",
+            "Panel",
+            "Checkbox",
+            "Dropdown",
+            "TextInput",
+            "ContextMenu",
         ];
-        let is_valid = VALID_TYPES.contains(&widget_type)
-            || self.widget_types_set.contains(widget_type);
+        let is_valid =
+            VALID_TYPES.contains(&widget_type) || self.widget_types_set.contains(widget_type);
         if !is_valid {
             return 0;
         }
@@ -1458,9 +1488,9 @@ impl WasmWorld {
             Err(_) => return false,
         };
         if let Some(existing) = self.widget_registry.get_mut(&id) {
-        if let (Some(existing_map), Some(props_map)) =
-            (existing.as_object_mut(), props_value.as_object())
-        {
+            if let (Some(existing_map), Some(props_map)) =
+                (existing.as_object_mut(), props_value.as_object())
+            {
                 for (key, value) in props_map {
                     existing_map.insert(key.clone(), value.clone());
                 }
@@ -1607,6 +1637,68 @@ impl WasmWorld {
         }
 
         serde_json::to_string(&created_ids).ok()
+    }
+
+    // ---- UI Events (Module 3) ----
+
+    /// Sets keyboard focus to a widget. Returns false if not found.
+    pub fn ui_focus_widget(&mut self, widget_id: u32) -> bool {
+        if !self.widget_registry.contains_key(&widget_id) {
+            return false;
+        }
+        self.focused_widget = widget_id;
+        true
+    }
+
+    /// Dispatches an event to a widget, pushing to event queue.
+    /// Returns false if widget not found.
+    pub fn ui_trigger_event(
+        &mut self,
+        widget_id: u32,
+        event_type: &str,
+        event_data: &str,
+    ) -> bool {
+        if !self.widget_registry.contains_key(&widget_id) {
+            return false;
+        }
+        let data: serde_json::Value =
+            serde_json::from_str(event_data).unwrap_or(serde_json::Value::Null);
+        self.ui_event_queue.push(WasmUiEvent {
+            widget_id,
+            event_type: event_type.to_string(),
+            event_data: data,
+        });
+        true
+    }
+
+    /// Drains the UI event queue and returns events as JSON array string.
+    pub fn ui_poll_events(&mut self) -> String {
+        let events = std::mem::take(&mut self.ui_event_queue);
+        serde_json::to_string(&events).unwrap_or_else(|_| "[]".to_string())
+    }
+
+    /// Renders the widget tree to terminal output.
+    pub fn ui_present(&self) {
+        for &root_id in &self.widget_roots {
+            self.render_widget(root_id, 0);
+        }
+    }
+
+    /// Recursive helper for ui_present: renders a widget and its children.
+    fn render_widget(&self, id: u32, depth: usize) {
+        let indent = "  ".repeat(depth);
+        let type_name = self.widget_types.get(&id).map(|s| s.as_str()).unwrap_or("?");
+        let props = self.widget_registry.get(&id);
+        let summary = props
+            .and_then(|p| p.get("text").and_then(|v| v.as_str()))
+            .or_else(|| props.and_then(|p| p.get("label").and_then(|v| v.as_str())))
+            .unwrap_or("");
+        println!("{}{} #{} \"{}\"", indent, type_name, id, summary);
+        if let Some(children) = self.widget_tree.get(&id) {
+            for &child_id in children {
+                self.render_widget(child_id, depth + 1);
+            }
+        }
     }
 
     // ---- Economic Reservation API ----
@@ -1875,6 +1967,12 @@ impl WasmWorld {
     }
 
     // ---- Job Events API (Module 7) ----
+
+    /// No-op: deliver callbacks is a no-op in WASM since callbacks don't exist.
+    /// Returns true for API parity with Lua/Python.
+    pub fn deliver_callbacks(&self) -> bool {
+        true
+    }
 
     /// Returns the full job event log as a JSON array.
     pub fn get_job_event_log(&self) -> String {
