@@ -86,6 +86,31 @@ pub fn register_job_event_api(
         })?,
     )?;
 
+    // get_where: returns job events matching a predicate function
+    job_events.set(
+        "get_where",
+        lua.create_function(|lua, predicate: Function| {
+            let events = job_event_logger().all();
+            let lua_events = lua.create_table()?;
+            let mut idx = 1;
+            for event in events.iter() {
+                let e = lua.create_table()?;
+                e.set("timestamp", event.timestamp)?;
+                e.set("event_type", event.event_type.clone())?;
+                e.set(
+                    "payload",
+                    serde_json::to_string(&event.payload)
+                        .map_err(|e| mlua::Error::external(format!("Serialization error: {e}")))?,
+                )?;
+                if predicate.call::<bool>(e.clone())? {
+                    lua_events.set(idx, e)?;
+                    idx += 1;
+                }
+            }
+            Ok(lua_events)
+        })?,
+    )?;
+
     // poll_bus: poll job event bus for a specific event type
     let world_ref = world.clone();
     job_events.set(
