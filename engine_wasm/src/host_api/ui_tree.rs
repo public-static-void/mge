@@ -55,7 +55,7 @@ pub fn register_ui_tree_api(linker: &mut Linker<Arc<Mutex<WasmWorld>>>) -> anyho
     )?;
 
     // 4. get_parent(widget_id: i32) -> i32
-    //    Returns parent_id (positive) or -1 if no parent / not found.
+    //    Returns parent_id (positive) or 0 if no parent / not found.
     linker.func_wrap(
         "ui_tree",
         "get_parent",
@@ -63,7 +63,7 @@ pub fn register_ui_tree_api(linker: &mut Linker<Arc<Mutex<WasmWorld>>>) -> anyho
             let world = caller.data().lock().unwrap();
             match world.ui_get_parent(widget_id as u32) {
                 Some(parent_id) => parent_id as i32,
-                None => -1,
+                None => 0,
             }
         },
     )?;
