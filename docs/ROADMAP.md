@@ -1,80 +1,55 @@
-# MGE v1.0.0 Milestone Checklist
+# Project Roadmap
 
 ## Core Engine & ECS
-
 - [x] ECS framework (entity, component, system, event)
 - [x] Component registry (schema-driven, hot-reloadable)
-- [x] Entity manager (unique IDs, lifecycle)
+- [x] Entity manager with lifecycle
 - [x] System scheduler (dependency-aware, deterministic)
 - [x] Serialization & deserialization (save/load, versioning)
 - [x] Mode controller (mode switching, mode-specific logic)
+- [x] Component macro system (derive macros, migration, schema parsing)
+- [x] Deterministic tick loop and event bus
+- [x] mlua decoupled from engine_core
 
 ## Scripting & Language Bridges
+- [x] Lua bridge — full ECS/world API
+- [x] Python bridge — full ECS/world API
+- [x] WASM bridge — 100% parity with Lua
+- [x] All 3 backends at identical API surface (full scripting parity)
+- [x] C ABI plugin system with versioned vtable
+- [x] Python sandboxing
+- [x] Lua StdLib restricted (safe subset, no os/io/package/require)
 
-- [x] Lua bridge (full ECS/world API, modding support)
-- [x] Python bridge (full ECS/world API, data pipeline)
-- [x] C ABI bridge (plugin system, FFI)
-- [ ] WASM runtime integration (for web/hosted scripting)
+## Game Systems
+- [x] Grid map with pathfinding
+- [x] Cell/region management and metadata
+- [x] Inventory, equipment, body management
+- [x] Job system (board, query, AI assignment, events, dependencies)
+- [x] Economic engine (stockpile, production, resource reservations)
+- [x] Combat and death/decay systems
+- [x] Terminal UI framework (7+ widget types, events, z-order)
+- [x] UI test suite (widget rendering, layout, events)
+- [x] Movement system
+- [x] Camera and viewport
 
-## Component Model & Schema
+## World Generation
+- [x] Modular world generation plugin system
+- [x] Multi-language support (Rust, Lua, Python, C ABI)
+- [x] Map generation, validation, and postprocessing hooks
 
-- [x] JSON/YAML schema-driven components
-- [x] Mode-specific component availability & enforcement
-- [x] Schema validation (in CI)
-- [x] Component versioning & migration (data evolution)
-- [x] Data-driven field constraints (min/max, enums, etc.)
-- [x] Component macro system (Rust derive macros, migration, schema parsing)
-- [x] Code generation tools (for components, schemas, bindings)
-
-## Map, World, and Simulation
-
-- [x] Map/cell/region management (add/remove/query)
-- [x] Entity queries by cell, region, type, and multi-cell
-- [x] Pathfinding API (exposed to scripting)
-- [x] Cell/region metadata (terrain, tags, properties)
-- [x] Region/zone support (multi-region, region kinds)
-- [x] Deterministic tick & event loop
-- [x] Modular world generation system (plugin/scriptable, documented)
-
-## Systems & Simulation Layer
-
-- [x] Core systems: movement, health, inventory, jobs, events
-- [x] Stockpile/resource/inventory management systems
-- [x] Dynamic system registration (from scripting/plugins)
-- [x] Event bus (inter-system comms)
-- [x] World generator (data-driven, pluggable)
-- [x] Economic engine
-- [x] Temporal system (turns, ticks, time-of-day)
-
-## Plugin/Extensibility
-
-- [x] Plugin/mod loader (Rust and C ABI, hot-reloadable, manifest support)
-- [x] C ABI plugin loader (with example)
-- [x] Rust dynamic plugin loader
-- [x] Hot-reloadable plugins, systems, and components
-
-## Tooling & Testing
-
+## Tooling & CI
+- [x] Custom xtask build orchestrator
+- [x] CI pipeline with caching (~3-5 min on cache hit)
+- [x] Toolchain pinned to nightly (edition 2024)
+- [x] Schema validation in CI
+- [x] Release automation (semantic-release, changelog)
 - [x] Rust unit/integration tests (ECS, systems, registry)
-- [x] Scripting (Lua/Python) test suites
-- [x] Schema validator (already in CI)
-- [x] Example mods/plugins/scripts
+- [x] Lua test suite
+- [x] Python test suite
 
 ## Documentation
-
 - [x] API reference (Rust, Lua, Python, C ABI)
-- [ ] Quickstart and usage guides (WIP)
-- [ ] Component schema authoring guide
-- [ ] Plugin authoring guide (WIP)
+- [x] Plugin authoring guide
 - [x] World generation documentation
-
-## Packaging & Distribution
-
-- [ ] Python wheel packaging (portable, pip-installable)
-- [x] Release automation (semantic-release, changelog)
-- [ ] Code coverage reporting (Rust, Lua, Python)
-
-## Presentation Layer
-
-- [x] Render adapter (graphics API abstraction)
-- [x] UI framework (for in-game and editor UI)
+- [ ] Architecture Decision Records (ADRs)
+- [ ] CONTRIBUTING.md
