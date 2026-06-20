@@ -1,6 +1,7 @@
 use engine_core::presentation::ui::factory::{UI_FACTORY, WIDGET_REGISTRY, WidgetProps};
 use engine_core::presentation::ui::schema_loader::load_ui_from_json;
 use engine_core::presentation::ui::widget::UiWidget;
+use engine_core::presentation::ui::widget::dynamic::DynamicWidget;
 use mlua::{
     Function as LuaFunction, Lua, LuaSerdeExt, Result as LuaResult, Table, Value as LuaValue,
 };
@@ -22,7 +23,21 @@ pub fn register_ui_api(lua: &Lua, globals: &Table) -> LuaResult<()> {
 
     ui.set(
         "create_widget",
-        lua.create_function(|_, (type_name, props): (String, Table)| {
+        lua.create_function(|lua, (type_name, props): (String, Table)| {
+            // Check for custom widget type registered via register_widget
+            let callbacks: Table = lua.globals().get::<Table>("_ui_callbacks")?;
+            let ctor_key = format!("_custom_widget_ctor_{type_name}");
+            if let Some(ctor) = callbacks.get::<Option<LuaFunction>>(ctor_key.as_str())? {
+                let widget_id: u64 = ctor.call(props)?;
+                let binding = WIDGET_REGISTRY.lock();
+                let mut registry = binding.borrow_mut();
+                if let Some(widget) = registry.remove(&widget_id) {
+                    let dynamic_widget = DynamicWidget::new(type_name, widget);
+                    registry.insert(widget_id, Box::new(dynamic_widget));
+                }
+                return Ok(widget_id);
+            }
+
             let mut rust_props = WidgetProps::new();
             for pair in props.pairs::<String, LuaValue>() {
                 let (k, v) = pair?;
@@ -129,9 +144,12 @@ pub fn register_ui_api(lua: &Lua, globals: &Table) -> LuaResult<()> {
         lua.create_function(|_, (parent_id, child_id): (u64, u64)| {
             let binding = WIDGET_REGISTRY.lock();
             let mut registry = binding.borrow_mut();
-            let child = registry.remove(&child_id);
-            if let (Some(parent), Some(child)) = (registry.get_mut(&parent_id), child) {
-                parent.add_child(child);
+            let mut child = registry.remove(&child_id);
+            if let Some(ref mut c) = child {
+                c.set_parent(Some(parent_id));
+            }
+            if let (Some(parent), Some(c)) = (registry.get_mut(&parent_id), child) {
+                parent.add_child(c);
                 Ok(true)
             } else {
                 Ok(false)
@@ -165,7 +183,9 @@ pub fn register_ui_api(lua: &Lua, globals: &Table) -> LuaResult<()> {
                     .downcast_mut::<engine_core::presentation::ui::widget::panel::Panel>(
                 ) && let Some(pos) = panel.children.iter().position(|c| c.id() == child_id)
                 {
-                    removed_child = Some(panel.children.remove(pos));
+                    let mut child = panel.children.remove(pos);
+                    child.set_parent(None);
+                    removed_child = Some(child);
                 }
                 if removed_child.is_none()
                     && let Some(grid) = parent
@@ -174,7 +194,9 @@ pub fn register_ui_api(lua: &Lua, globals: &Table) -> LuaResult<()> {
                     )
                     && let Some(pos) = grid.children.iter().position(|c| c.id() == child_id)
                 {
-                    removed_child = Some(grid.children.remove(pos));
+                    let mut child = grid.children.remove(pos);
+                    child.set_parent(None);
+                    removed_child = Some(child);
                 }
             }
 
@@ -255,6 +277,70 @@ pub fn register_ui_api(lua: &Lua, globals: &Table) -> LuaResult<()> {
                 }
             },
         )?,
+    )?;
+
+    ui.set(
+        "get_widget_type",
+        lua.create_function(|_, widget_id: u64| {
+            let binding = WIDGET_REGISTRY.lock();
+            let registry = binding.borrow();
+            Ok(registry
+                .get(&widget_id)
+                .map(|w| w.widget_type().to_string()))
+        })?,
+    )?;
+
+    ui.set(
+        "get_parent",
+        lua.create_function(|_, widget_id: u64| {
+            let binding = WIDGET_REGISTRY.lock();
+            let registry = binding.borrow();
+            Ok(registry.get(&widget_id).and_then(|w| w.get_parent()))
+        })?,
+    )?;
+
+    ui.set(
+        "set_z_order",
+        lua.create_function(|_, (widget_id, z): (u64, i32)| {
+            let binding = WIDGET_REGISTRY.lock();
+            let mut registry = binding.borrow_mut();
+            if let Some(widget) = registry.get_mut(&widget_id) {
+                widget.set_z_order(z);
+                Ok(true)
+            } else {
+                Ok(false)
+            }
+        })?,
+    )?;
+
+    ui.set(
+        "get_z_order",
+        lua.create_function(|_, widget_id: u64| {
+            let binding = WIDGET_REGISTRY.lock();
+            let registry = binding.borrow();
+            Ok(registry
+                .get(&widget_id)
+                .map(|w| w.get_z_order())
+                .unwrap_or(0))
+        })?,
+    )?;
+
+    ui.set(
+        "register_widget",
+        lua.create_function(|lua, (type_name, ctor_fn): (String, LuaFunction)| {
+            let callbacks: Table = lua.globals().get::<Table>("_ui_callbacks")?;
+            let ctor_key = format!("_custom_widget_ctor_{type_name}");
+
+            if callbacks
+                .get::<Option<LuaFunction>>(ctor_key.as_str())?
+                .is_some()
+            {
+                return Ok(false);
+            }
+
+            callbacks.set(ctor_key.as_str(), ctor_fn)?;
+            Ok(true)
+        })?,
     )?;
 
     globals.set("ui", ui)?;

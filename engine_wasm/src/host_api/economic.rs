@@ -6,7 +6,7 @@ use engine_core::systems::job::reservation::resource_reservation::{
 use std::sync::{Arc, Mutex};
 use wasmtime::{Caller, Linker};
 
-/// Registers the economic API (8 host functions).
+/// Registers the economic API (9 host functions).
 pub fn register_economic_api(linker: &mut Linker<Arc<Mutex<WasmWorld>>>) -> anyhow::Result<()> {
     linker.func_wrap(
         "economic",
@@ -153,6 +153,21 @@ pub fn register_economic_api(linker: &mut Linker<Arc<Mutex<WasmWorld>>>) -> anyh
             let system = ResourceReservationSystem::new();
             system.release_reservation(&mut *world, entity_id as u32);
             0
+        },
+    )?;
+
+    linker.func_wrap(
+        "economic",
+        "run_resource_reservation_system",
+        |caller: Caller<'_, Arc<Mutex<WasmWorld>>>| -> i32 {
+            let mut world = caller.data().lock().unwrap();
+            if world.systems.contains_key("ResourceReservationSystem") {
+                let mut system = ResourceReservationSystem::new();
+                system.run_reservation(&mut *world);
+                1
+            } else {
+                0
+            }
         },
     )?;
 

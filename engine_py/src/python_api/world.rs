@@ -346,9 +346,18 @@ impl PyWorld {
 
     // ---- SYSTEM REGISTRATION/BRIDGE ----
 
-    /// Register a system
-    fn register_system(&self, py: Python, name: String, callback: Py<PyAny>) -> PyResult<()> {
-        self.systems.register_system(py, name, callback)
+    /// Register a system with optional dependency configuration.
+    /// `opts` is an optional dict with optional key "dependencies" (list of system name strings).
+    #[pyo3(signature = (name, callback, opts=None))]
+    fn register_system(
+        &self,
+        py: Python,
+        name: String,
+        callback: Py<PyAny>,
+        opts: Option<&Bound<'_, PyDict>>,
+    ) -> PyResult<()> {
+        self.systems
+            .register_system(py, name, callback, opts, self.inner.clone())
     }
 
     /// Run a system
