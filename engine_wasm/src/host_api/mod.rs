@@ -26,6 +26,9 @@ pub mod ui;
 /// UI tree module
 pub mod ui_tree;
 
+/// UI events module
+pub mod ui_events;
+
 /// Input module
 pub mod input;
 

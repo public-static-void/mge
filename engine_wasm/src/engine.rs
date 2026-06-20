@@ -23,9 +23,10 @@ use crate::host_api::save_load::register_save_load_api;
 use crate::host_api::system::register_system_api;
 use crate::host_api::time_of_day::register_time_of_day_api;
 use crate::host_api::turn::register_turn_api;
-use crate::host_api::world_userdata::register_world_userdata_api;
 use crate::host_api::ui::register_ui_api;
+use crate::host_api::ui_events::register_ui_events_api;
 use crate::host_api::ui_tree::register_ui_tree_api;
+use crate::host_api::world_userdata::register_world_userdata_api;
 use crate::host_api::worldgen::register_worldgen_api;
 use anyhow::Result;
 use engine_core::ecs::world::wasm::{WasmWorld, load_schemas_from_dir};
@@ -164,6 +165,7 @@ impl WasmScriptEngine {
         register_world_userdata_api(&mut linker)?;
         register_ui_api(&mut linker)?;
         register_ui_tree_api(&mut linker)?;
+        register_ui_events_api(&mut linker)?;
 
         // Load schemas if schema_path is provided
         let schemas = config
