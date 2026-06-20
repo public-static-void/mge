@@ -136,6 +136,18 @@ pub struct WasmWorld {
     /// Registered custom widget type names (for register_widget dedup)
     #[serde(default)]
     pub widget_types_set: HashSet<String>,
+
+    /// Auto-incrementing widget ID counter.
+    #[serde(default)]
+    pub next_widget_id: u32,
+
+    /// Parent widget ID -> list of child widget IDs (forward tree lookup).
+    #[serde(default)]
+    pub widget_tree: HashMap<u32, Vec<u32>>,
+
+    /// Top-level widget IDs (no parent).
+    #[serde(default)]
+    pub widget_roots: Vec<u32>,
 }
 
 /// Load all JSON schema files from a directory.
@@ -193,6 +205,9 @@ impl WasmWorld {
             widget_types: HashMap::new(),
             widget_parents: HashMap::new(),
             widget_types_set: HashSet::new(),
+            next_widget_id: 1,
+            widget_tree: HashMap::new(),
+            widget_roots: Vec::new(),
         }
     }
 
@@ -1378,6 +1393,220 @@ impl WasmWorld {
         }
         self.widget_types_set.insert(type_name.to_string());
         true
+    }
+
+    /// Creates a new widget with the given type and props JSON string.
+    /// Returns the auto-assigned widget ID, or 0 on failure (unknown widget type or bad props).
+    pub fn ui_create_widget(&mut self, widget_type: &str, props: &str) -> u32 {
+        const VALID_TYPES: &[&str] = &[
+            "Button", "Label", "Panel", "Checkbox",
+            "Dropdown", "TextInput", "ContextMenu",
+        ];
+        let is_valid = VALID_TYPES.contains(&widget_type)
+            || self.widget_types_set.contains(widget_type);
+        if !is_valid {
+            return 0;
+        }
+        let mut props_value: JsonValue = match serde_json::from_str(props) {
+            Ok(v) => v,
+            Err(_) => return 0,
+        };
+        if let Some(obj) = props_value.as_object_mut() {
+            obj.insert("_type".to_string(), serde_json::json!(widget_type));
+        } else {
+            props_value = serde_json::json!({"_type": widget_type});
+        }
+        let id = self.next_widget_id;
+        self.next_widget_id += 1;
+        self.widget_registry.insert(id, props_value);
+        self.widget_types.insert(id, widget_type.to_string());
+        self.widget_tree.insert(id, Vec::new());
+        self.widget_roots.push(id);
+        id
+    }
+
+    /// Removes a widget and all its descendants recursively.
+    /// Returns true if the widget was found and removed.
+    pub fn ui_remove_widget(&mut self, id: u32) -> bool {
+        if !self.widget_registry.contains_key(&id) {
+            return false;
+        }
+        if let Some(children) = self.widget_tree.remove(&id) {
+            for &child_id in &children {
+                self.ui_remove_widget(child_id);
+            }
+        }
+        self.widget_registry.remove(&id);
+        self.widget_types.remove(&id);
+        if let Some(parent_id) = self.widget_parents.remove(&id)
+            && let Some(children) = self.widget_tree.get_mut(&parent_id)
+        {
+            children.retain(|&c| c != id);
+        }
+        self.widget_roots.retain(|&r| r != id);
+        true
+    }
+
+    /// Merges props JSON into an existing widget's properties.
+    /// Returns true if the widget was found and updated.
+    pub fn ui_set_widget_props(&mut self, id: u32, props: &str) -> bool {
+        if !self.widget_registry.contains_key(&id) {
+            return false;
+        }
+        let props_value: JsonValue = match serde_json::from_str(props) {
+            Ok(v) => v,
+            Err(_) => return false,
+        };
+        if let Some(existing) = self.widget_registry.get_mut(&id) {
+        if let (Some(existing_map), Some(props_map)) =
+            (existing.as_object_mut(), props_value.as_object())
+        {
+                for (key, value) in props_map {
+                    existing_map.insert(key.clone(), value.clone());
+                }
+            } else {
+                self.widget_registry.insert(id, props_value);
+            }
+        }
+        true
+    }
+
+    /// Returns the props JSON string for a widget, or None if not found.
+    pub fn ui_get_widget_props(&self, id: u32) -> Option<String> {
+        let props = self.widget_registry.get(&id)?;
+        serde_json::to_string(props).ok()
+    }
+
+    /// Adds an existing widget as a child of another widget.
+    /// Returns true on success, false if either widget not found.
+    pub fn ui_add_child(&mut self, parent_id: u32, child_id: u32) -> bool {
+        if !self.widget_registry.contains_key(&parent_id) {
+            return false;
+        }
+        if !self.widget_registry.contains_key(&child_id) {
+            return false;
+        }
+        if let Some(&old_parent) = self.widget_parents.get(&child_id)
+            && let Some(children) = self.widget_tree.get_mut(&old_parent)
+        {
+            children.retain(|&c| c != child_id);
+        }
+        self.widget_roots.retain(|&r| r != child_id);
+        self.widget_tree
+            .entry(parent_id)
+            .or_default()
+            .push(child_id);
+        self.widget_parents.insert(child_id, parent_id);
+        true
+    }
+
+    /// Returns the list of child widget IDs for a parent as a JSON array string.
+    /// Returns None if the widget is not found.
+    pub fn ui_get_children(&self, parent_id: u32) -> Option<String> {
+        if !self.widget_registry.contains_key(&parent_id) {
+            return None;
+        }
+        let children = self
+            .widget_tree
+            .get(&parent_id)
+            .cloned()
+            .unwrap_or_default();
+        Some(serde_json::to_string(&children).unwrap_or_else(|_| "[]".to_string()))
+    }
+
+    /// Removes a child from a parent, making the child a root widget.
+    /// Returns true on success, false if not a valid parent-child pair.
+    pub fn ui_remove_child(&mut self, parent_id: u32, child_id: u32) -> bool {
+        if !self.widget_registry.contains_key(&parent_id) {
+            return false;
+        }
+        if !self.widget_registry.contains_key(&child_id) {
+            return false;
+        }
+        let actual_parent = match self.widget_parents.get(&child_id) {
+            Some(&p) => p,
+            None => return false,
+        };
+        if actual_parent != parent_id {
+            return false;
+        }
+        if let Some(children) = self.widget_tree.get_mut(&parent_id) {
+            children.retain(|&c| c != child_id);
+        }
+        self.widget_parents.remove(&child_id);
+        self.widget_roots.push(child_id);
+        true
+    }
+
+    /// Loads a widget tree from a JSON string.
+    /// Expected format: `{"widgets": [{"id": 1, "type": "Button", "props": {...}, "children": [2, 3]}, ...]}`
+    /// Returns a JSON array of created widget IDs, or None on failure.
+    pub fn ui_load_json(&mut self, json_str: &str) -> Option<String> {
+        let value: JsonValue = serde_json::from_str(json_str).ok()?;
+        let widgets = value.get("widgets")?.as_array()?;
+
+        if widgets.is_empty() {
+            return None;
+        }
+
+        let mut max_id = 0u32;
+        let mut widget_entries: Vec<(u32, String, JsonValue, Vec<u32>)> = Vec::new();
+
+        for w in widgets {
+            let wid = w.get("id")?.as_u64()? as u32;
+            let w_type = w.get("type")?.as_str()?.to_string();
+            let props = w
+                .get("props")
+                .cloned()
+                .unwrap_or(JsonValue::Object(serde_json::Map::new()));
+            let children: Vec<u32> = w
+                .get("children")
+                .and_then(|v| v.as_array())
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|v| v.as_u64().map(|v| v as u32))
+                        .collect()
+                })
+                .unwrap_or_default();
+
+            if self.widget_registry.contains_key(&wid) {
+                return None;
+            }
+
+            widget_entries.push((wid, w_type, props, children));
+            max_id = max_id.max(wid);
+        }
+
+        if max_id >= self.next_widget_id {
+            self.next_widget_id = max_id + 1;
+        }
+
+        let created_ids: Vec<u32> = widget_entries.iter().map(|(id, _, _, _)| *id).collect();
+
+        for (wid, w_type, props, _) in &widget_entries {
+            self.widget_registry.insert(*wid, props.clone());
+            self.widget_types.insert(*wid, w_type.clone());
+            self.widget_tree.insert(*wid, Vec::new());
+            self.widget_roots.push(*wid);
+        }
+
+        for (wid, _w_type, _props, children) in &widget_entries {
+            for &child_id in children {
+                if !self.widget_registry.contains_key(&child_id) {
+                    return None;
+                }
+                self.widget_roots.retain(|&r| r != child_id);
+                if let Some(&old_parent) = self.widget_parents.get(&child_id)
+                    && let Some(old_children) = self.widget_tree.get_mut(&old_parent)
+                {
+                    old_children.retain(|&c| c != child_id);
+                }
+                self.widget_tree.entry(*wid).or_default().push(child_id);
+                self.widget_parents.insert(child_id, *wid);
+            }
+        }
+
+        serde_json::to_string(&created_ids).ok()
     }
 
     // ---- Economic Reservation API ----
