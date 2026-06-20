@@ -162,5 +162,16 @@ pub fn register_economic_api(
         release_job_resource_reservations,
     )?;
 
+    // run_resource_reservation_system()
+    let world_run_res = world.clone();
+    let run_resource_reservation_system = lua.create_function_mut(move |_, ()| {
+        let mut world = world_run_res.borrow_mut();
+        Ok(world.run_system("ResourceReservationSystem").is_ok())
+    })?;
+    globals.set(
+        "run_resource_reservation_system",
+        run_resource_reservation_system,
+    )?;
+
     Ok(())
 }
