@@ -166,10 +166,7 @@ pub fn register_ui_api(linker: &mut Linker<Arc<Mutex<WasmWorld>>>) -> anyhow::Re
     linker.func_wrap(
         "ui",
         "register_widget",
-        |mut caller: Caller<'_, Arc<Mutex<WasmWorld>>>,
-         type_ptr: i32,
-         type_len: i32|
-         -> i32 {
+        |mut caller: Caller<'_, Arc<Mutex<WasmWorld>>>, type_ptr: i32, type_len: i32| -> i32 {
             let type_name = match read_wasm_string(&mut caller, type_ptr, type_len) {
                 Ok(s) => s,
                 Err(_) => return 0,

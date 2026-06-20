@@ -1,7 +1,7 @@
 use engine_core::presentation::ui::factory::{UI_FACTORY, WIDGET_REGISTRY, WidgetProps};
 use engine_core::presentation::ui::schema_loader::load_ui_from_json;
-use engine_core::presentation::ui::widget::dynamic::DynamicWidget;
 use engine_core::presentation::ui::widget::UiWidget;
+use engine_core::presentation::ui::widget::dynamic::DynamicWidget;
 use mlua::{
     Function as LuaFunction, Lua, LuaSerdeExt, Result as LuaResult, Table, Value as LuaValue,
 };
@@ -144,9 +144,12 @@ pub fn register_ui_api(lua: &Lua, globals: &Table) -> LuaResult<()> {
         lua.create_function(|_, (parent_id, child_id): (u64, u64)| {
             let binding = WIDGET_REGISTRY.lock();
             let mut registry = binding.borrow_mut();
-            let child = registry.remove(&child_id);
-            if let (Some(parent), Some(child)) = (registry.get_mut(&parent_id), child) {
-                parent.add_child(child);
+            let mut child = registry.remove(&child_id);
+            if let Some(ref mut c) = child {
+                c.set_parent(Some(parent_id));
+            }
+            if let (Some(parent), Some(c)) = (registry.get_mut(&parent_id), child) {
+                parent.add_child(c);
                 Ok(true)
             } else {
                 Ok(false)
@@ -180,7 +183,9 @@ pub fn register_ui_api(lua: &Lua, globals: &Table) -> LuaResult<()> {
                     .downcast_mut::<engine_core::presentation::ui::widget::panel::Panel>(
                 ) && let Some(pos) = panel.children.iter().position(|c| c.id() == child_id)
                 {
-                    removed_child = Some(panel.children.remove(pos));
+                    let mut child = panel.children.remove(pos);
+                    child.set_parent(None);
+                    removed_child = Some(child);
                 }
                 if removed_child.is_none()
                     && let Some(grid) = parent
@@ -189,7 +194,9 @@ pub fn register_ui_api(lua: &Lua, globals: &Table) -> LuaResult<()> {
                     )
                     && let Some(pos) = grid.children.iter().position(|c| c.id() == child_id)
                 {
-                    removed_child = Some(grid.children.remove(pos));
+                    let mut child = grid.children.remove(pos);
+                    child.set_parent(None);
+                    removed_child = Some(child);
                 }
             }
 
@@ -324,7 +331,10 @@ pub fn register_ui_api(lua: &Lua, globals: &Table) -> LuaResult<()> {
             let callbacks: Table = lua.globals().get::<Table>("_ui_callbacks")?;
             let ctor_key = format!("_custom_widget_ctor_{type_name}");
 
-            if callbacks.get::<Option<LuaFunction>>(ctor_key.as_str())?.is_some() {
+            if callbacks
+                .get::<Option<LuaFunction>>(ctor_key.as_str())?
+                .is_some()
+            {
                 return Ok(false);
             }
 

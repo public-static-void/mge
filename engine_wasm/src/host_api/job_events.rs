@@ -95,6 +95,17 @@ pub fn register_job_events_api(linker: &mut Linker<Arc<Mutex<WasmWorld>>>) -> an
         },
     )?;
 
+    // deliver_callbacks: no-op in WASM (callbacks don't exist in sandbox).
+    // Returns 1 always for API parity with Lua/Python.
+    linker.func_wrap(
+        "job_events",
+        "deliver_callbacks",
+        |caller: Caller<'_, Arc<Mutex<WasmWorld>>>| -> i32 {
+            let world = caller.data().lock().unwrap();
+            if world.deliver_callbacks() { 1 } else { 0 }
+        },
+    )?;
+
     linker.func_wrap(
         "job_events",
         "get_where",
@@ -128,12 +139,9 @@ pub fn register_job_events_api(linker: &mut Linker<Arc<Mutex<WasmWorld>>>) -> an
                             return false;
                         }
                         if let Some(eid) = entity_id {
-                            let matches_payload = e
-                                .payload
-                                .get("entity_id")
-                                .and_then(|v| v.as_u64())
-                                == Some(eid)
-                                || e.payload.get("id").and_then(|v| v.as_u64()) == Some(eid);
+                            let matches_payload =
+                                e.payload.get("entity_id").and_then(|v| v.as_u64()) == Some(eid)
+                                    || e.payload.get("id").and_then(|v| v.as_u64()) == Some(eid);
                             if !matches_payload {
                                 return false;
                             }
