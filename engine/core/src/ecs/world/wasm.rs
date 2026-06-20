@@ -2037,4 +2037,3 @@ impl ResourceReservationOps for WasmWorld {
         self.set_component(entity, name, &json_str)
     }
 }
-
