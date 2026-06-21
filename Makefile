@@ -1,7 +1,7 @@
 # ====== PHONY TARGETS ======
 .PHONY: all build-plugins build-c-plugins build-wasm-tests build-all \
 	test test-rust test-python test-lua test-all \
-	setup-python build-python clean validate-schema help version
+	setup-python build-python clean validate-schema help
 
 # ====== CONFIGURABLE VARIABLES ======
 SCHEMA_DIR := engine/assets/schemas
@@ -16,14 +16,6 @@ help:
 	@echo "  make test-rust       - Run Rust tests"
 	@echo "  make test-lua        - Run Lua tests"
 	@echo "  make clean           - Clean Rust build artifacts"
-	@echo "  make version         - Show latest git tag / current version"
-
-# ====== VERSION TARGET ======
-# {{LATEST_TAG}} — Placeholder for latest git tag.
-# Substituted at build/release time. Never hardcode version numbers.
-version:
-	@tag=$$(git describe --tags --always 2>/dev/null || git rev-parse --short HEAD); \
-	echo "$$tag"
 
 # ====== SCHEMA VALIDATION ======
 validate-schema:
