@@ -1,63 +1,82 @@
 # Project Roadmap
 
 ## Core Engine & ECS
-- [x] ECS framework (entity, component, system, event)
-- [x] Component registry (schema-driven, hot-reloadable)
-- [x] Entity manager with lifecycle
-- [x] System scheduler (dependency-aware, deterministic)
-- [x] Serialization & deserialization (save/load, versioning)
-- [x] Mode controller (mode switching, mode-specific logic)
-- [x] Component macro system (derive macros, migration, schema parsing)
-- [x] Deterministic tick loop and event bus
-- [x] mlua decoupled from engine_core
-- [x] Demo rewrite (roguelike_mvp.lua ~608 lines, 8 feature clusters)
+
+- [x] Schema-driven ECS (component registry, schemas, entity lifecycle)
+- [x] Event bus (publish, subscribe, poll)
+- [x] Save/load persistence (full state round-trip serialization)
+- [x] Simulation tick (deterministic turn-based loop)
+- [x] Death/decay processing cycle
+- [x] Mode switching (query and change between game modes)
+- [x] Component macros for automated schema generation, versioning, and migration
 
 ## Scripting & Language Bridges
-- [x] Lua bridge — full ECS/world API
-- [x] Python bridge — full ECS/world API
-- [x] WASM baseline (Batch 1, 32 functions)
-- [x] WASM worldgen/economic (Batch 2, 11 functions)
-- [x] WASM job system (Batch 3, 29 functions)
-- [x] WASM UI API (Batch 4, 14 functions)
-- [x] All 3 backends at identical API surface (full scripting parity)
-- [x] C ABI plugin system with versioned vtable
-- [x] Python sandboxing
-- [x] pyo3 upgraded to 0.29.0
-- [x] Lua StdLib restricted (safe subset, no os/io/package/require)
+
+- [x] Lua scripting backend with complete ECS and world API
+- [x] Python scripting backend with complete ECS and world API
+- [x] WASM scripting backend with complete ECS and world API
+- [x] Identical API surface across all three scripting backends (~139 functions each)
+- [x] C ABI plugin system with versioned PluginVTable (init, shutdown, update, worldgen)
+- [x] Modular world generation plugin system supporting multiple backends (Rust, Lua, Python, C ABI)
+- [x] Python sandbox support (restricted execution environment)
+- [x] Lua StdLib restricted to safe subset (no os, io, package, require)
 
 ## Game Systems
-- [x] Grid map with pathfinding
-- [x] Cell/region management and metadata
-- [x] Inventory, equipment, body management
-- [x] Job system (board, query, AI assignment, events, dependencies)
-- [x] Economic engine (stockpile, production, resource reservations)
-- [x] Combat and death/decay systems
-- [x] Terminal UI framework (7+ widget types, events, z-order)
-- [x] UI test suite (widget rendering, layout, events)
-- [x] Movement system
-- [x] Camera and viewport
 
-## World Generation
-- [x] Modular world generation plugin system
-- [x] Multi-language support (Rust, Lua, Python, C ABI)
+- [x] Grid map with pathfinding (square, hex, province topologies)
+- [x] Inventory management (pickup, use, drop)
+- [x] Equipment and gear system (wield, wear, inventory slots)
+- [x] Body management and equipment synchronization
+- [x] Combat and damage system
+- [x] Job system (job board, query, mutation, AI assignment, events, dependency chains)
+- [x] Economic engine (stockpile management, production recipes, resource reservations)
+- [x] Movement system (entity positioning and translation)
+- [x] Region, province, and territory map system
 - [x] Map generation, validation, and postprocessing hooks
+- [ ] Procedural dungeon generation
+- [ ] Field-of-view and lighting simulation
+- [ ] AI behaviors (enemy tactics, patrol routes)
+- [ ] Item generation and loot tables
+- [ ] Time-of-day and season cycle
+- [ ] Building and construction system
+- [ ] Temperature and environment simulation
+- [ ] Vehicle support
+- [ ] Crafting system (recipes, tools, materials)
+- [ ] Diplomacy AI (relationships, treaties, war)
+- [ ] Event-driven narrative engine (scenarios, decision events)
+- [ ] Tech tree and research system
+- [ ] Resource economy (production, trade, consumption)
+
+## Presentation Layer
+
+- [x] Camera viewport (scrollable camera with world-space mapping)
+- [x] Terminal UI widget library (button, label, checkbox, dropdown, text input, context menu, panel, event log)
+- [x] UI layout system (linear arrangement, z-ordering)
+- [x] UI event handling and propagation
+- [x] UI test suite (widget rendering, layout, events)
 
 ## Tooling & CI
-- [x] Custom xtask build orchestrator
-- [x] CI pipeline with caching (~3-5 min on cache hit)
+
+- [x] Makefile orchestration (validate-schema, build, test, lint targets)
+- [x] Custom xtask build orchestrator (plugin deploy, C plugin compilation, WASM test builds)
+- [x] CI pipeline with caching (Swatinem/rust-cache, toolchain pinning, ~3-5 min on cache hit)
 - [x] Toolchain pinned to nightly (edition 2024)
-- [x] Schema validation in CI
-- [x] Release automation (semantic-release, changelog)
-- [x] Rust unit/integration tests (ECS, systems, registry)
-- [x] Lua test suite
-- [x] Python test suite
-- [x] Clippy cleanup and safety improvements
-- [x] CI fix and consolidation
+- [x] Schema validation tooling
+- [x] Release automation (semantic-release, changelog generation)
+- [x] Rust unit and integration test suite
+- [x] Lua test suite (47 test files, source-parsing discovery, isolated world per test)
+- [x] Python test suite (44 test files, maturin-based build)
 - [ ] Python wheel packaging
 - [ ] Code coverage reporting
 
 ## Documentation
-- [x] API reference (Rust, Lua, Python, C ABI)
-- [x] Plugin authoring guide
-- [x] World generation documentation
+
+- [ ] README.md (project overview, quick start, build/test instructions)
+- [ ] docs/dev.md (developer documentation, toolchain setup)
+- [ ] docs/ROADMAP.md (capability roadmap)
+- [ ] docs/api.md (scripting API reference)
+- [ ] docs/idea.md (architecture vision)
+- [ ] docs/plugin_abi.md (C plugin ABI reference)
+- [ ] docs/examples.md (demo walkthrough)
+- [ ] docs/worldgen.md (worldgen pipeline)
 - [ ] CONTRIBUTING.md
