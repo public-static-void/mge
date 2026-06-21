@@ -16,6 +16,20 @@ cargo run --bin mge_cli -- engine/scripts/lua/demos/roguelike_mvp.lua
 
 ---
 
+## Development Workflow
+
+MGE development is driven by targeting game genres. The process:
+1. Choose a target genre
+2. Identify what engine features it requires
+3. Check what's already implemented
+4. Build what's missing
+
+See [docs/process.md](docs/process.md) for the full methodology.
+Genre requirement documents: [docs/genres/colony-sim.md](docs/genres/colony-sim.md), [docs/genres/survival.md](docs/genres/survival.md), [docs/genres/grand-strategy.md](docs/genres/grand-strategy.md), [docs/genres/4x.md](docs/genres/4x.md).
+Project roadmap: [docs/ROADMAP.md](docs/ROADMAP.md).
+
+---
+
 ## Architecture
 
 9 crates in a Rust workspace (`edition = "2024"`, nightly toolchain):
@@ -44,7 +58,7 @@ engine_macros (proc-macro)
 
 ## Current State
 
-**Full scripting parity (milestone):** All 3 backends (Lua, Python, WASM) expose ~139 functions each with identical API surfaces:
+**Full scripting parity (milestone):** All 3 scripting backends (Lua, Python, WASM) expose an identical API surface with full feature parity:
 
 - Entity lifecycle — `spawn_entity`, `despawn_entity`
 - Component CRUD — `set_component`, `get_component`, `remove_component`, `list_components`
@@ -140,3 +154,5 @@ Controls: `WASD` move · `e` attack · `.` wait · `q` quit
 | [docs/examples.md](docs/examples.md) | Usage examples (Lua, Python, Rust, C) |
 | [docs/worldgen.md](docs/worldgen.md) | Worldgen plugin system |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | Project roadmap |
+| [docs/process.md](docs/process.md) | Development workflow |
+| [docs/genres/](docs/genres/) | Genre requirement definitions |
