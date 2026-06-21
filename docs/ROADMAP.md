@@ -69,3 +69,19 @@
 - [x] Terminal UI widget library (button, label, checkbox, dropdown, text input, context menu, panel, event log)
 - [x] UI layout system (linear arrangement, z-ordering)
 - [x] UI event handling and propagation
+
+## Tooling & Documentation
+
+- [x] Makefile orchestration
+- [x] Custom xtask build orchestrator
+- [x] Schema validation tooling
+- [x] Release automation
+- [x] Rust unit + integration test suite
+- [x] Lua test suite
+- [x] Python test suite
+- [ ] Python wheel packaging
+- [x] API reference documentation
+- [x] Plugin authoring guide
+- [x] World generation documentation
+- [x] Development guide
+- [x] README
