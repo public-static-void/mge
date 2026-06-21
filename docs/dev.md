@@ -8,13 +8,20 @@ This mirrors the CI pipeline so all checks can be reproduced locally.
 
 ## Prerequisites
 
-- **Rust** (latest stable, with `cargo`)
+- **Rust nightly-2026-06-01** (edition 2024 requires nightly)
+  ```sh
+  rustup toolchain install nightly-2026-06-01
+  rustup default nightly-2026-06-01
+  ```
 - **Python 3.8+** (for Python scripting/tests)
 - **Lua 5.1 or LuaJIT** (for Lua scripting/tests)
 - **GCC/Clang** (for C ABI plugins)
 - **Maturin** (`pip install maturin`) for Python bindings
 - **pytest** (`pip install pytest`) for Python tests
-- **WebAssembly** (`rustup target add wasm32-unknown-unknown`) for WASM
+- **WASM** — built via xtask:
+  ```sh
+  cargo run -p xtask -- build-wasm-tests
+  ```
 
 ---
 
@@ -44,6 +51,25 @@ All major build, test, and validation tasks are automated via the project `Makef
 
 ---
 
+## Development Workflow
+
+### Recommended Iteration Loop
+
+The standard technical iteration cycle for MGE development:
+
+1. **Validate schemas** — `make validate-schema` checks all JSON component schemas.
+2. **Build** — `make all` validates schemas and builds Rust crates, C plugins, and WASM tests.
+3. **Test** — `make test` runs schema validation + Rust + Python + Lua tests. Use individual targets (`make test-rust`, `make test-python`, `make test-lua`) for faster feedback on backend-specific changes.
+4. **Lint** — `cargo fmt --all --check` and `cargo clippy --all-targets --all-features -- -D warnings`.
+
+CI enforces this sequence: `validate-schema → build-c-plugins → build-wasm-tests → build-all → test-rust → test-python → test-lua`.
+
+### Branching
+
+Feature branches branch from `main` and are merged back via pull requests. Follow the semantic commit format: `<type>(<scope>): <subject>` (e.g., `feat(core): add spatial index`, `fix(lua): correct entity lookup`).
+
+---
+
 ## Linting
 
 ### Rust Formatting and Linting
@@ -57,10 +83,12 @@ cargo clippy --all-targets --all-features -- -D warnings
 
 ## Engine Entrypoints
 
-- **Library API (`lib.rs`)**: Use this for embedding, scripting, or integrating the engine in other projects.
-- **CLI Runner (`bin/mge_cli.rs`)**: Main entry point for running mods, Lua scripts, or games.
-- **Test Runner (`bin/mge_lua_test_runner.rs`)**: Runs all Lua integration tests.
-- **Schema Validator (`bin/schema_validator.rs`)**: Validates all component schemas.
+| Binary | Crate | Purpose |
+|---|---|---|
+| `mge_cli` | `engine_lua` | Main game CLI — run Lua scripts directly or via `--mod <name>` for mod-based content |
+| `mge_lua_test_runner` | `engine_lua` | Lua integration test harness |
+| `schema_validator` | `schema_validator` | Validate all JSON schemas in `engine/assets/schemas/` |
+| `xtask` | `xtask` | Plugin build/deploy orchestrator (build-plugins, build-c-plugins, build-wasm-tests, build-all) |
 
 ---
 

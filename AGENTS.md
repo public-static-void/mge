@@ -8,6 +8,12 @@ Rust workspace monorepo (9 crates) — cross-language game engine. Languages: Ru
 
 Build system: Cargo + Makefile (orchestration) + xtask (plugin deploy).
 
+## Workflow
+
+Development is driven by targeting game genres. See [docs/process.md](docs/process.md) for the methodology.
+Genre requirement docs: [docs/genres/colony-sim.md](docs/genres/colony-sim.md), [docs/genres/survival.md](docs/genres/survival.md), [docs/genres/grand-strategy.md](docs/genres/grand-strategy.md), [docs/genres/4x.md](docs/genres/4x.md).
+Project roadmap: [docs/ROADMAP.md](docs/ROADMAP.md).
+
 ---
 
 ## Quick Start
@@ -161,13 +167,13 @@ xtask builds each Rust plugin crate in release mode, then copies `target/release
 
 ### Rust Tests
 
-- 108 integration tests in `engine/core/tests/`.
+- Integration tests in `engine/core/tests/`.
 - Require pre-built C plugins and WASM test modules to exist.
 - CI workflow: build-all → download artifacts → `cargo run -p xtask -- build-plugins` → `export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(pwd)/plugins` → `cargo test --all`.
 
 ### Lua Tests
 
-- 47 test files in `engine/scripts/lua/tests/`.
+- Test files in `engine/scripts/lua/tests/`.
 - Test discovery is **source-parsing based** — the Rust test runner (`mge_lua_test_runner`) reads each `.lua` file, strips comments, and parses `return { test_xxx = function() ... end }` patterns statically. Does NOT require the Lua module at parse time.
 - Each test gets a **fresh World instance** — full state isolation.
 - Requires C plugin at `plugins/simple_square_plugin/libsimple_square_plugin.so`.
@@ -176,17 +182,24 @@ xtask builds each Rust plugin crate in release mode, then copies `target/release
 
 ### Python Tests
 
-- 44 test files in `engine_py/tests/`.
+- Test files in `engine_py/tests/`.
 - Fixture via `conftest.py`: `make_world()` creates `PyWorld(schema_dir)` with job event logger initialized.
 - Schema dir is relative: `../../engine/assets/schemas` from `engine_py/tests/`.
 - Requires `maturin develop` first (handled by `make test-python`).
+
+### WASM Tests
+
+- Build via `cargo run -p xtask -- build-wasm-tests`.
+- Requires `wasmtime` (managed via Cargo, no system dependency).
+- Test modules in `engine_wasm/tests/`.
+- Loaded into the WASM runtime and executed with full state isolation.
 
 ---
 
 ## Repo Conventions
 
 - **Commit format:** `<type>(<scope>): <subject>` — enforced by `.gitmessage` and used by `semantic-release` via `.releaserc.json`.
-- **Schema-driven ECS:** All components defined as JSON schemas in `engine/assets/schemas/` (25 files). Loaded dynamically into `ComponentRegistry`. Rust-side components use `#[component]` macro for auto-generated versioning/migration/serde/schema.
+- **Schema-driven ECS:** All components defined as JSON schemas in `engine/assets/schemas/`. Loaded dynamically into `ComponentRegistry`. Rust-side components use `#[component]` macro for auto-generated versioning/migration/serde/schema.
 - **Game config:** `game.toml` at workspace root defines title, version, allowed game modes, and native plugin paths.
 - **Plugin ABI:** C ABI defined in `engine/engine_plugin_abi.h`. Exports `PluginVTable` with init, shutdown, update, worldgen, system registration, hot-reload.
 - **Presentation layer:** Terminal-based renderer with viewport support (terminal roguelike-style output). Demo: `cargo run --example viewport_demo -p engine_core`.
@@ -195,7 +208,7 @@ xtask builds each Rust plugin crate in release mode, then copies `target/release
 
 ## Cross-Language Scripting API
 
-Identical API surface in Lua and Python:
+Identical API surface in Lua, Python, and WASM:
 
 - **Entity:** `spawn_entity()`, `despawn_entity(id)`
 - **Components:** `set_component(id, name, data)`, `get_component(id, name)`, `remove_component(id, name)`, `list_components()`, `get_component_schema(name)`
