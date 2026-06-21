@@ -53,8 +53,8 @@
 - [x] Python test suite
 - [x] Clippy cleanup and safety improvements
 - [x] CI fix and consolidation
-- [ ] Python wheel packaging (in progress)
-- [ ] Code coverage reporting (not started)
+- [ ] Python wheel packaging
+- [ ] Code coverage reporting
 
 ## Documentation
 - [x] API reference (Rust, Lua, Python, C ABI)
