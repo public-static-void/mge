@@ -11,13 +11,17 @@ This mirrors the CI pipeline so all checks can be reproduced locally.
 - **Rust nightly-2026-06-01** (edition 2024 requires nightly)
   ```sh
   rustup toolchain install nightly-2026-06-01
-  rustup override set nightly-2026-06-01
+  rustup default nightly-2026-06-01
   ```
 - **Python 3.8+** (for Python scripting/tests)
 - **Lua 5.1 or LuaJIT** (for Lua scripting/tests)
 - **GCC/Clang** (for C ABI plugins)
 - **Maturin** (`pip install maturin`) for Python bindings
 - **pytest** (`pip install pytest`) for Python tests
+- **WASM** — built via xtask:
+  ```sh
+  cargo run -p xtask -- build-wasm-tests
+  ```
 
 ---
 
@@ -37,7 +41,6 @@ All major build, test, and validation tasks are automated via the project `Makef
 | `make test-rust`       | Build and run all Rust tests                           |
 | `make test-lua`        | Run all Lua scripting tests                            |
 | `make clean`           | Clean Rust build artifacts                             |
-| `make version`         | Show current release version from git tags             |
 | `make help`            | Show a summary of available targets                    |
 
 ### Notes
@@ -50,22 +53,20 @@ All major build, test, and validation tasks are automated via the project `Makef
 
 ## Development Workflow
 
+### Recommended Iteration Loop
+
+The standard technical iteration cycle for MGE development:
+
+1. **Validate schemas** — `make validate-schema` checks all JSON component schemas.
+2. **Build** — `make all` validates schemas and builds Rust crates, C plugins, and WASM tests.
+3. **Test** — `make test` runs schema validation + Rust + Python + Lua tests. Use individual targets (`make test-rust`, `make test-python`, `make test-lua`) for faster feedback on backend-specific changes.
+4. **Lint** — `cargo fmt --all --check` and `cargo clippy --all-targets --all-features -- -D warnings`.
+
+CI enforces this sequence: `validate-schema → build-c-plugins → build-wasm-tests → build-all → test-rust → test-python → test-lua`.
+
 ### Branching
 
 Feature branches branch from `main` and are merged back via pull requests. Follow the semantic commit format: `<type>(<scope>): <subject>` (e.g., `feat(core): add spatial index`, `fix(lua): correct entity lookup`).
-
-### Knowledge Document (KD) Lifecycle
-
-The project uses Knowledge Documents for structured development. The lifecycle follows this sequence:
-
-1. **Intent** — capture what to do and why
-2. **Spec** — define acceptance criteria and requirements
-3. **Plan** — break work into verifiable steps
-4. **Implementation** — execute each step (tests first)
-5. **Review** — verify against spec and acceptance criteria
-6. **Commit** — stage and commit with a semantic message
-
-KDs are runtime artifacts stored in `knowledge/` and are never committed to the repository.
 
 ---
 
