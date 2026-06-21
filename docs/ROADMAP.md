@@ -10,14 +10,19 @@
 - [x] Component macro system (derive macros, migration, schema parsing)
 - [x] Deterministic tick loop and event bus
 - [x] mlua decoupled from engine_core
+- [x] Demo rewrite (roguelike_mvp.lua ~608 lines, 8 feature clusters)
 
 ## Scripting & Language Bridges
 - [x] Lua bridge — full ECS/world API
 - [x] Python bridge — full ECS/world API
-- [x] WASM bridge — 100% parity with Lua
+- [x] WASM baseline (Batch 1, 32 functions)
+- [x] WASM worldgen/economic (Batch 2, 11 functions)
+- [x] WASM job system (Batch 3, 29 functions)
+- [x] WASM UI API (Batch 4, 14 functions)
 - [x] All 3 backends at identical API surface (full scripting parity)
 - [x] C ABI plugin system with versioned vtable
 - [x] Python sandboxing
+- [x] pyo3 upgraded to 0.29.0
 - [x] Lua StdLib restricted (safe subset, no os/io/package/require)
 
 ## Game Systems
@@ -46,6 +51,10 @@
 - [x] Rust unit/integration tests (ECS, systems, registry)
 - [x] Lua test suite
 - [x] Python test suite
+- [x] Clippy cleanup and safety improvements
+- [x] CI fix and consolidation
+- [ ] Python wheel packaging (in progress)
+- [ ] Code coverage reporting (not started)
 
 ## Documentation
 - [x] API reference (Rust, Lua, Python, C ABI)
