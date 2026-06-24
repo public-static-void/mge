@@ -53,10 +53,11 @@ make clean                  # cargo clean
 |---|---|
 | All tests | `make test` |
 | Rust only | `make test-rust` (alias: `cargo test --all`) |
-| Single Rust test | `cargo test -p engine_core --test <test_file> <test_name>` |
 | Python tests | `cd engine_py && source .venv/bin/activate && pytest tests/ -k <filter>` |
 | Lua tests | `./run_lua_tests.sh <module_filter> [function_filter]` |
+| WASM tests | `make test-wasm` (alias: `cargo test -p engine_wasm`) |
 | Schema validation | `make validate-schema` |
+| Single Rust test | `cargo test -p engine_core --test <test_file> <test_name>` |
 
 ### Lint
 

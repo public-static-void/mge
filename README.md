@@ -98,6 +98,7 @@ rustup toolchain install nightly-2026-06-01 && rustup default nightly-2026-06-01
 | `make test-rust` | `cargo test --all` |
 | `make test-python` | Setup venv → `maturin develop` → `pytest` |
 | `make test-lua` | Build test runner → run Lua test suite |
+| `make test-wasm` | `cargo test -p engine_wasm` |
 | `make clean` | `cargo clean` |
 | `make help` | Show a summary of available targets |
 

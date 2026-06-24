@@ -1,6 +1,6 @@
 # ====== PHONY TARGETS ======
 .PHONY: all build-plugins build-c-plugins build-wasm-tests build-all \
-	test test-rust test-python test-lua test-all \
+	test test-rust test-python test-lua test-wasm test-all \
 	setup-python build-python clean validate-schema help
 
 # ====== CONFIGURABLE VARIABLES ======
@@ -15,6 +15,7 @@ help:
 	@echo "  make test-python     - Run Python tests (with venv/maturin setup)"
 	@echo "  make test-rust       - Run Rust tests"
 	@echo "  make test-lua        - Run Lua tests"
+	@echo "  make test-wasm      - Run WASM tests"
 	@echo "  make clean           - Clean Rust build artifacts"
 
 # ====== SCHEMA VALIDATION ======
@@ -65,6 +66,10 @@ test-lua:
 	@echo "Running Lua tests..."
 	cargo build --package engine_lua --bin mge_lua_test_runner
 	./run_lua_tests.sh
+
+# ====== WASM TEST TARGET ======
+test-wasm:
+	cargo test -p engine_wasm
 
 # ====== AGGREGATED TEST TARGETS ======
 test-all: validate-schema test-rust test-python test-lua
