@@ -1,5 +1,6 @@
 use super::PyWorld;
 use crate::PyObject;
+use engine_core::ecs::world::Season;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
@@ -16,6 +17,9 @@ impl TimeOfDayApi for PyWorld {
         let dict = PyDict::new(py);
         dict.set_item("hour", tod.hour).unwrap();
         dict.set_item("minute", tod.minute).unwrap();
+        dict.set_item("day", tod.day).unwrap();
+        dict.set_item("season", Season::from_day(tod.day).to_string())
+            .unwrap();
         dict.into_pyobject(py).unwrap().unbind().into()
     }
 }

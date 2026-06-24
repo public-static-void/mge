@@ -17,8 +17,8 @@ pub extern "C" fn test_time_of_day_api() -> i32 {
         if result.is_empty() {
             return 0;
         }
-        // Verify it contains hour and minute fields
-        if !result.contains("hour") || !result.contains("minute") {
+        // Verify it contains hour, minute, day, and season fields
+        if !result.contains("hour") || !result.contains("minute") || !result.contains("day") || !result.contains("season") {
             return 0;
         }
 
