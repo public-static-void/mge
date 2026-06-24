@@ -14,8 +14,12 @@ use std::sync::{Arc, Mutex};
 
 /// Job handler modules
 pub mod job_handlers;
+/// Season enum for time-of-day season cycle
+pub mod season;
 /// Wasm exports
 pub mod wasm;
+
+pub use season::Season;
 
 mod component;
 mod entity;
@@ -39,6 +43,9 @@ pub struct TimeOfDay {
     pub hour: u8,
     /// Current minute.
     pub minute: u8,
+    /// Current day (0-indexed, incremented on hour wrap 23→0).
+    #[serde(default)]
+    pub day: u64,
 }
 
 /// The ECS world, which holds all entities, components, systems, and loaded assets.

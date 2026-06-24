@@ -1,5 +1,6 @@
 //! Time of Day API: get the current time of day.
 
+use engine_core::ecs::world::Season;
 use engine_core::ecs::world::World;
 use mlua::{Lua, Result as LuaResult, Table};
 use std::cell::RefCell;
@@ -19,6 +20,8 @@ pub fn register_time_of_day_api(
         let tbl = lua.create_table()?;
         tbl.set("hour", time.hour)?;
         tbl.set("minute", time.minute)?;
+        tbl.set("day", time.day)?;
+        tbl.set("season", Season::from_day(time.day).to_string())?;
         Ok(tbl)
     })?;
     globals.set("get_time_of_day", get_time_of_day)?;

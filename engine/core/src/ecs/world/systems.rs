@@ -125,6 +125,7 @@ impl World {
             self.time_of_day.hour += 1;
             if self.time_of_day.hour >= 24 {
                 self.time_of_day.hour = 0;
+                self.time_of_day.day += 1;
             }
         }
     }

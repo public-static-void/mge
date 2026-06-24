@@ -11,6 +11,9 @@ pub struct TimeOfDay {
     pub hour: u8,
     /// Current minute.
     pub minute: u8,
+    /// Current day (0-indexed, incremented on hour wrap 23→0).
+    #[serde(default)]
+    pub day: u64,
 }
 
 /// Camera state for the WASM world.
@@ -202,7 +205,11 @@ impl WasmWorld {
             next_id: 1,
             current_mode: "colony".to_string(),
             turn: 0,
-            time_of_day: TimeOfDay { hour: 6, minute: 0 },
+            time_of_day: TimeOfDay {
+                hour: 6,
+                minute: 0,
+                day: 0,
+            },
             camera: None,
             event_buses: HashMap::new(),
             event_reader_positions: HashMap::new(),
@@ -2010,6 +2017,7 @@ impl WasmWorld {
             self.time_of_day.hour += 1;
             if self.time_of_day.hour >= 24 {
                 self.time_of_day.hour = 0;
+                self.time_of_day.day += 1;
             }
         }
     }
