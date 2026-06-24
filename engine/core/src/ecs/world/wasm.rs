@@ -205,7 +205,11 @@ impl WasmWorld {
             next_id: 1,
             current_mode: "colony".to_string(),
             turn: 0,
-            time_of_day: TimeOfDay { hour: 6, minute: 0, day: 0 },
+            time_of_day: TimeOfDay {
+                hour: 6,
+                minute: 0,
+                day: 0,
+            },
             camera: None,
             event_buses: HashMap::new(),
             event_reader_positions: HashMap::new(),

@@ -1,6 +1,6 @@
 use crate::host_api::component::write_string_to_wasm;
-use engine_core::ecs::world::wasm::WasmWorld;
 use engine_core::ecs::world::Season;
+use engine_core::ecs::world::wasm::WasmWorld;
 use std::sync::{Arc, Mutex};
 use wasmtime::{Caller, Linker};
 
@@ -14,16 +14,15 @@ pub fn register_time_of_day_api(linker: &mut Linker<Arc<Mutex<WasmWorld>>>) -> a
                 let world = caller.data().lock().unwrap();
                 world.get_time_of_day()
             };
-            let mut json: serde_json::Value =
-                serde_json::to_value(&time).unwrap_or(serde_json::Value::Object(Default::default()));
+            let mut json: serde_json::Value = serde_json::to_value(&time)
+                .unwrap_or(serde_json::Value::Object(Default::default()));
             if let serde_json::Value::Object(ref mut map) = json {
                 map.insert(
                     "season".to_string(),
                     serde_json::Value::String(Season::from_day(time.day).to_string()),
                 );
             }
-            let json_str =
-                serde_json::to_string(&json).unwrap_or_else(|_| "{}".to_string());
+            let json_str = serde_json::to_string(&json).unwrap_or_else(|_| "{}".to_string());
             let written = write_string_to_wasm(&mut caller, out_ptr, out_len, &json_str);
             written as i32
         },
