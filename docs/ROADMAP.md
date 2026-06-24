@@ -46,7 +46,7 @@
 - [ ] Noise and detection mechanics
 - [ ] Item generation and loot tables
 - [ ] Material and property system
-- [ ] Time-of-day and season cycle
+- [x] Time-of-day and season cycle
 - [ ] Weather and climate system
 - [ ] Building and construction system
 - [ ] Administration and zone management
