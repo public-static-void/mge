@@ -44,6 +44,7 @@ pub struct TimeOfDay {
     /// Current minute.
     pub minute: u8,
     /// Current day (0-indexed, incremented on hour wrap 23→0).
+    #[serde(default)]
     pub day: u64,
 }
 
