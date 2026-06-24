@@ -14,8 +14,8 @@ pub fn register_time_of_day_api(linker: &mut Linker<Arc<Mutex<WasmWorld>>>) -> a
                 let world = caller.data().lock().unwrap();
                 world.get_time_of_day()
             };
-            let mut json: serde_json::Value = serde_json::to_value(&time)
-                .unwrap_or(serde_json::Value::Object(Default::default()));
+            let mut json: serde_json::Value =
+                serde_json::to_value(time).unwrap_or(serde_json::Value::Object(Default::default()));
             if let serde_json::Value::Object(ref mut map) = json {
                 map.insert(
                     "season".to_string(),
