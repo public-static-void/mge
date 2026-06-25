@@ -20,7 +20,7 @@ Project roadmap: [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ```sh
 make all                    # validate schemas → build everything
-make test                   # validate-schema + test-rust + test-python + test-lua
+make test                   # validate-schema + test-rust + test-python + test-lua + test-wasm
 make clean                  # cargo clean
 ```
 
@@ -76,7 +76,7 @@ CI enforces this sequence:
 validate-schema → build-c-plugins → build-wasm-tests → build-all → test-rust → test-python → test-lua
 ```
 
-`make test` runs: `validate-schema → test-rust → test-python → test-lua` (sequential). Python requires `maturin develop` (handled by `build-python` target in `make test-python`). Lua tests require C plugin `.so` at `plugins/simple_square_plugin/libsimple_square_plugin.so`.
+`make test` runs: `validate-schema → test-rust → test-python → test-lua → test-wasm` (sequential). Python requires `maturin develop` (handled by `build-python` target in `make test-python`). Lua tests require C plugin `.so` at `plugins/simple_square_plugin/libsimple_square_plugin.so`.
 
 ---
 
