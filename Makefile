@@ -72,7 +72,7 @@ test-wasm:
 	cargo test -p engine_wasm
 
 # ====== AGGREGATED TEST TARGETS ======
-test-all: validate-schema test-rust test-python test-lua
+test-all: validate-schema test-rust test-python test-lua test-wasm
 test: test-all
 
 # ====== CLEAN TARGET ======

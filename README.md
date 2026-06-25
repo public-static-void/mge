@@ -93,7 +93,7 @@ rustup toolchain install nightly-2026-06-01 && rustup default nightly-2026-06-01
 | Target | Description |
 |---|---|
 | `make all` | Validate schemas → build everything |
-| `make test` | All tests: schema + Rust + Python + Lua |
+| `make test` | All tests: schema + Rust + Python + Lua + WASM |
 | `make validate-schema` | Validate JSON schemas in `engine/assets/schemas/` |
 | `make test-rust` | `cargo test --all` |
 | `make test-python` | Setup venv → `maturin develop` → `pytest` |
