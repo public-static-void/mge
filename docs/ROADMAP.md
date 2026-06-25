@@ -69,6 +69,7 @@
 - [x] Terminal UI widget library (button, label, checkbox, dropdown, text input, context menu, panel, event log)
 - [x] UI layout system (linear arrangement, z-ordering)
 - [x] UI event handling and propagation
+- [x] ANSI 24-bit terminal color output (colored glyph rendering via escape sequences)
 
 ## Tooling & Documentation
 

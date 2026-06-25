@@ -12,7 +12,9 @@ pub mod renderer;
 /// User interface
 pub mod ui;
 
-use crate::presentation::renderer::{PresentationRenderer, RenderColor, RenderCommand};
+use crate::presentation::renderer::{
+    COLOR_DIM_GRAY, COLOR_GRAY, PresentationRenderer, RenderColor, RenderCommand,
+};
 
 /// Presentation system for ECS worlds with schema-driven components.
 pub struct PresentationSystem<R: PresentationRenderer> {
@@ -105,15 +107,15 @@ impl<R: PresentationRenderer> PresentationSystem<R> {
                 let (glyph, color) = if let Some(meta) = meta {
                     if let Some(terrain) = meta.get("terrain").and_then(|v| v.as_str()) {
                         match terrain {
-                            "wall" => ('#', RenderColor(128, 128, 128)),
-                            "floor" => ('.', RenderColor(60, 60, 60)),
-                            _ => ('.', RenderColor(60, 60, 60)),
+                            "wall" => ('#', COLOR_GRAY),
+                            "floor" => ('.', COLOR_DIM_GRAY),
+                            _ => ('.', COLOR_DIM_GRAY),
                         }
                     } else {
-                        ('.', RenderColor(60, 60, 60))
+                        ('.', COLOR_DIM_GRAY)
                     }
                 } else {
-                    ('.', RenderColor(60, 60, 60))
+                    ('.', COLOR_DIM_GRAY)
                 };
                 self.renderer.queue_draw(RenderCommand {
                     glyph,
