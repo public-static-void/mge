@@ -200,6 +200,7 @@ xtask builds each Rust plugin crate in release mode, then copies `target/release
 ## Repo Conventions
 
 - **Commit format:** `<type>(<scope>): <subject>` — enforced by `.gitmessage` and used by `semantic-release` via `.releaserc.json`.
+- **Roadmap tracking:** When implementing an item listed in [docs/ROADMAP.md](docs/ROADMAP.md), mark it completed (`[x]`) in the ROADMAP file as part of the implementation.
 - **Schema-driven ECS:** All components defined as JSON schemas in `engine/assets/schemas/`. Loaded dynamically into `ComponentRegistry`. Rust-side components use `#[component]` macro for auto-generated versioning/migration/serde/schema.
 - **Game config:** `game.toml` at workspace root defines title, version, allowed game modes, and native plugin paths.
 - **Plugin ABI:** C ABI defined in `engine/engine_plugin_abi.h`. Exports `PluginVTable` with init, shutdown, update, worldgen, system registration, hot-reload.
