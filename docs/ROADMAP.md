@@ -44,7 +44,7 @@
 - [ ] Fog of war and visibility system
 - [ ] AI behaviors (enemy tactics, patrol routes)
 - [ ] Noise and detection mechanics
-- [ ] Item generation and loot tables
+- [x] Item generation and loot tables
 - [ ] Material and property system
 - [x] Time-of-day and season cycle
 - [ ] Weather and climate system

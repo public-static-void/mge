@@ -54,6 +54,8 @@ engine_macros (proc-macro)
 | `rust_test_plugin` | Test plugin (Rust cdylib) |
 | C plugins | `simple_square_plugin`, `simple_hex_plugin`, `simple_province_plugin`, `test_plugin` |
 
+**Lua VM sandbox:** The `mge_cli` binary runs Lua scripts in a restricted VM. Standard Lua modules `os`, `io`, `package`, and `debug` are blocked. Functions like `require()`, `dofile()`, `loadfile()` are unavailable. Use Rust-native global functions (exposed via `engine_lua`) to access engine features from scripts. The same restrictions apply to Lua mods loaded via `--mod`.
+
 ---
 
 ## Current State

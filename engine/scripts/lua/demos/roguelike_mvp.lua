@@ -730,154 +730,44 @@ function show_load_menu()
 	end
 end
 
--- SECTION 12: Loot Table Module (inlined — CLI blocks require())
-local loot = (function()
-	local _tables = {}
-	local _spawners = {}
+-- SECTION 12: Loot Tables (Rust-native API)
+-- Item metadata for loot drops: maps item_id to rendering info
+local ITEM_LOOKUP = {
+	health_potion = { glyph = "!", color = COLOR_GREEN, name = "Health Potion" },
+	rusty_sword = { glyph = "/", color = COLOR_WHITE, name = "Rusty Sword" },
+}
 
-	local ITEM_META = {
-		health_potion = { glyph = "!", color = { 0, 255, 0 }, name = "Health Potion" },
-		rusty_sword = { glyph = "/", color = { 200, 200, 200 }, name = "Rusty Sword" },
-	}
+local function item_meta(item_id)
+	local m = ITEM_LOOKUP[item_id]
+	if m then return m end
+	return { glyph = "?", color = COLOR_WHITE, name = item_id }
+end
 
-	local function cap(word)
-		return word:sub(1, 1):upper() .. word:sub(2)
-	end
-
-	local function derive_name(item_id)
-		local words = {}
-		for w in item_id:gmatch("[^_]+") do
-			table.insert(words, cap(w))
-		end
-		return table.concat(words, " ")
-	end
-
-	local function meta_for(item_id)
-		local m = ITEM_META[item_id]
-		if m then return m end
-		return { glyph = "?", color = { 200, 200, 200 }, name = derive_name(item_id) }
-	end
-
-	local function val_entry(e, i)
-		if type(e) ~= "table" then error("entry " .. i .. " must be a table") end
-		if type(e.item_id) ~= "string" then error("entry " .. i .. ": item_id must be a string") end
-		if type(e.weight) ~= "number" or e.weight < 1 or e.weight ~= math.floor(e.weight) then
-			error("entry " .. i .. ": weight must be integer >= 1")
-		end
-		local min = e.min_count or 1
-		local max = e.max_count or 1
-		if type(min) ~= "number" or min < 1 or min ~= math.floor(min) then error("entry " .. i .. ": bad min_count") end
-		if type(max) ~= "number" or max < 1 or max ~= math.floor(max) then error("entry " .. i .. ": bad max_count") end
-		if min > max then error("entry " .. i .. ": min_count > max_count") end
-		if e.condition ~= nil and type(e.condition) ~= "function" then error("entry " .. i .. ": condition must be function or nil") end
-	end
-
-	local _L = {}
-
-	function _L.register_spawner(id, fn)
-		_spawners[id] = fn
-	end
-
-	function _L.define_table(name, entries)
-		if type(name) ~= "string" then error("table name must be string") end
-		if type(entries) ~= "table" or #entries == 0 then error("entries must be non-empty table") end
-		for i, e in ipairs(entries) do val_entry(e, i) end
-		local tw = 0
-		for _, e in ipairs(entries) do tw = tw + e.weight end
-		_tables[name] = { entries = entries, total_weight = tw }
-	end
-
-	function _L.roll(tname, pos, eid)
-		if type(tname) ~= "string" then error("table_name must be string") end
-		if not pos or pos.x == nil or pos.y == nil then error("position needs x and y") end
-		local td = _tables[tname]
-		if not td or td.total_weight <= 0 then return {} end
-		local z = pos.z or 0
-		local eligible = {}
-		for _, e in ipairs(td.entries) do
-			if eid ~= nil and e.condition ~= nil then
-				if e.condition(eid) then table.insert(eligible, e) end
-			else
-				table.insert(eligible, e)
+-- Spawn items from loot table results at a dead entity's position
+local function spawn_loot_at(death_eid)
+	local hp = get_component(death_eid, "Health")
+	if hp and hp.current and hp.current > 0 then return end
+	local pos = get_component(death_eid, "Position")
+	if not pos or not pos.pos or not pos.pos.Square then return end
+	local results = roll_loot_table("enemy")
+	if not results or #results == 0 then return end
+	for _, drop in ipairs(results) do
+		local meta = item_meta(drop.item_id)
+		for _ = 1, drop.count do
+			local eid = spawn_item(drop.item_id, meta.name, meta.glyph, meta.color,
+				pos.pos.Square.x, pos.pos.Square.y)
+			if eid then
+				table.insert(items, eid)
+				loot_count = loot_count + 1
 			end
 		end
-		if #eligible == 0 then return {} end
-		local tw = 0
-		for _, e in ipairs(eligible) do tw = tw + e.weight end
-		if tw <= 0 then return {} end
-		local r = math.random(1, tw)
-		local cum = 0
-		local sel = nil
-		for _, e in ipairs(eligible) do
-			cum = cum + e.weight
-			if r <= cum then sel = e; break end
-		end
-		if not sel then return {} end
-		local min = sel.min_count or 1
-		local max = sel.max_count or 1
-		local cnt = math.random(min, max)
-		local res = {}
-		local sp = _spawners[sel.item_id]
-		for _ = 1, cnt do
-			local eid2
-			if sp then
-				eid2 = sp({ x = pos.x, y = pos.y, z = z })
-			else
-				local m = meta_for(sel.item_id)
-				eid2 = spawn_entity()
-				if eid2 then
-					set_component(eid2, "Type", { kind = "item" })
-					set_component(eid2, "Position", { pos = { Square = { x = pos.x, y = pos.y, z = z } } })
-					set_component(eid2, "Renderable", { glyph = m.glyph, color = m.color })
-					set_component(eid2, "Item", { id = sel.item_id, name = m.name, slot = "none" })
-				end
-			end
-			if eid2 then table.insert(res, eid2) end
-		end
-		return res
 	end
-
-	function _L.spawn_for_death(eid)
-		if eid == nil or type(eid) ~= "number" then error("entity_id must be number") end
-		local hp = get_component(eid, "Health")
-		if hp and hp.current ~= nil and hp.current > 0 then return {} end
-		local pos = get_component(eid, "Position")
-		if not pos or not pos.pos or not pos.pos.Square then return {} end
-		local typ = get_component(eid, "Type")
-		local kind = (typ and typ.kind) or "enemy"
-		local map = { enemy = "enemy", player = "player" }
-		local tn = map[kind]
-		if not tn then return {} end
-		return _L.roll(tn, { x = pos.pos.Square.x, y = pos.pos.Square.y, z = pos.pos.Square.z or 0 }, eid)
-	end
-
-	_L.register_spawner("health_potion", function(pos)
-		local e = spawn_entity()
-		if not e then return nil end
-		set_component(e, "Type", { kind = "item" })
-		set_component(e, "Position", { pos = { Square = { x = pos.x, y = pos.y, z = pos.z or 0 } } })
-		set_component(e, "Renderable", { glyph = "!", color = { 0, 255, 0 } })
-		set_component(e, "Item", { id = "health_potion", name = "Health Potion", slot = "none" })
-		return e
-	end)
-
-	_L.register_spawner("rusty_sword", function(pos)
-		local e = spawn_entity()
-		if not e then return nil end
-		set_component(e, "Type", { kind = "item" })
-		set_component(e, "Position", { pos = { Square = { x = pos.x, y = pos.y, z = pos.z or 0 } } })
-		set_component(e, "Renderable", { glyph = "/", color = { 200, 200, 200 } })
-		set_component(e, "Item", { id = "rusty_sword", name = "Rusty Sword", slot = "weapon" })
-		return e
-	end)
-
-	return _L
-end)()
+end
 
 loot_count = 0
 
--- Goblin death drops: 80% health potion, 20% rusty sword
-loot.define_table("enemy", {
+-- Goblin death drops: health potion (weight 80), rusty sword (weight 20)
+define_loot_table("enemy", {
 	{ item_id = "health_potion", weight = 80, min_count = 1, max_count = 1 },
 	{ item_id = "rusty_sword", weight = 20, min_count = 1, max_count = 1 },
 })
@@ -951,11 +841,7 @@ function main()
 						end
 						-- Spawn loot at dead entity's position
 						if ev.entity_id then
-							local spawned = loot.spawn_for_death(ev.entity_id)
-							for _, eid in ipairs(spawned) do
-								table.insert(items, eid)
-								loot_count = loot_count + 1
-							end
+							spawn_loot_at(ev.entity_id)
 						end
 					end
 

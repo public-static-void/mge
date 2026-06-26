@@ -15,6 +15,7 @@ use crate::host_api::job_events::register_job_events_api;
 use crate::host_api::job_mutation::register_job_mutation_api;
 use crate::host_api::job_query::register_job_query_api;
 use crate::host_api::job_system::register_job_system_api;
+use crate::host_api::loot::register_loot_api;
 use crate::host_api::map::register_map_api;
 use crate::host_api::mode::register_mode_api;
 use crate::host_api::movement_ops::register_movement_ops_api;
@@ -166,6 +167,7 @@ impl WasmScriptEngine {
         register_ui_api(&mut linker)?;
         register_ui_tree_api(&mut linker)?;
         register_ui_events_api(&mut linker)?;
+        register_loot_api(&mut linker)?;
 
         // Load schemas if schema_path is provided
         let schemas = config

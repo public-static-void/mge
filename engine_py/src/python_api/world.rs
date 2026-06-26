@@ -15,11 +15,14 @@ use crate::python_api::time_of_day::TimeOfDayApi;
 use crate::python_api::turn::TurnApi;
 use crate::system_bridge::SystemBridge;
 use engine_core::ecs::world::World;
+use engine_core::loot::LootEntry;
 use engine_core::systems::job::job_board::JobBoard;
 use engine_core::systems::job::types::loader::load_job_types_from_dir;
 use pyo3::Python;
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyAnyMethods, PyDict};
+use serde_pyobject::from_pyobject;
+use serde_pyobject::to_pyobject;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -791,5 +794,73 @@ impl PyWorld {
     /// Get the camera position as a dict {x, y}
     fn get_camera(&self, py: Python) -> PyObject {
         crate::python_api::camera_api::get_camera(self, py)
+    }
+
+    // ---- LOOT TABLE ----
+
+    /// Define a named loot table from a list of entry dicts.
+    ///
+    /// Each entry dict must contain `item_id` (str) and `weight` (int).
+    /// Optional fields: `min_count` (int, default 1), `max_count` (int, default 1).
+    /// Returns `true` on success.
+    fn define_loot_table(&self, name: &str, entries: Vec<Bound<'_, PyAny>>) -> PyResult<bool> {
+        let mut world = self.inner.borrow_mut();
+        let mut loot_entries = Vec::with_capacity(entries.len());
+
+        for entry in entries {
+            let value: serde_json::Value = from_pyobject(entry)?;
+            let loot_entry: LootEntry = serde_json::from_value(value)
+                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+            loot_entries.push(loot_entry);
+        }
+
+        world
+            .loot_tables
+            .define_table(name, loot_entries)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+        Ok(true)
+    }
+
+    /// Roll on a named loot table.
+    ///
+    /// Returns a list of dicts, each with `item_id` (str) and `count` (int).
+    /// Raises `ValueError` if the table is not found or has no entries.
+    fn roll_loot_table(&self, py: Python<'_>, name: &str) -> PyResult<Vec<PyObject>> {
+        let world = self.inner.borrow();
+        let results = world
+            .loot_tables
+            .roll(name)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+
+        results
+            .iter()
+            .map(|(item_id, count)| {
+                let dict = serde_json::json!({
+                    "item_id": item_id,
+                    "count": count,
+                });
+                to_pyobject(py, &dict)
+                    .map(|b| b.into())
+                    .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
+            })
+            .collect()
+    }
+
+    /// Check if a loot table with the given name exists.
+    fn has_loot_table(&self, name: &str) -> bool {
+        let world = self.inner.borrow();
+        world.loot_tables.has_table(name)
+    }
+
+    /// Return the names of all defined loot tables.
+    fn loot_table_names(&self) -> Vec<String> {
+        let world = self.inner.borrow();
+        world.loot_tables.table_names()
+    }
+
+    /// Remove a loot table by name.
+    fn remove_loot_table(&self, name: &str) {
+        let mut world = self.inner.borrow_mut();
+        world.loot_tables.remove_table(name);
     }
 }

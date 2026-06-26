@@ -146,6 +146,7 @@ mods/mvp_roguelike/
 2. **LuaJIT system dep.** Install `libluajit-5.1-dev` + `pkg-config`. CI sets `PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig`.
 3. **C plugins need gcc + libjansson-dev.** xtask finds single `.c` file per plugin dir, compiles to `.so` with `-shared -fPIC -ljansson`.
 4. **engine/core/Cargo.lock is stale.** The root workspace `Cargo.lock` is authoritative. Do not use the nested one.
+5. **Lua CLI sandbox.** The `mge_cli` VM blocks `os`, `io`, `package`, `debug` stdlibs — `require()`, `dofile()`, `loadfile()` do not exist. Expose Rust functionality via global functions in `engine_lua/src/lua_api/`. Don't design Lua modules that rely on `require()`.
 
 ### Environment Variables
 
@@ -205,6 +206,8 @@ xtask builds each Rust plugin crate in release mode, then copies `target/release
 - **Game config:** `game.toml` at workspace root defines title, version, allowed game modes, and native plugin paths.
 - **Plugin ABI:** C ABI defined in `engine/engine_plugin_abi.h`. Exports `PluginVTable` with init, shutdown, update, worldgen, system registration, hot-reload.
 - **Presentation layer:** Terminal-based renderer with viewport support (terminal roguelike-style output). Demo: `cargo run --example viewport_demo -p engine_core`.
+- **Roadmap tracking:** After implementing any ROADMAP item (in `docs/ROADMAP.md`), mark it as `[x]` completed in that file as part of the commit.
+- **Format before push:** Run `cargo fmt --all` before committing. CI enforces `cargo fmt --all --check`.
 
 ---
 

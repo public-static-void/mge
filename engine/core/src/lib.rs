@@ -6,6 +6,8 @@
 pub mod config;
 /// ECS module
 pub mod ecs;
+/// Loot table system
+pub mod loot;
 /// Map module
 pub mod map;
 /// Modes module

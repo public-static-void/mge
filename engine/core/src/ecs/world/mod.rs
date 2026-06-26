@@ -4,6 +4,7 @@
 
 use crate::ecs::registry::ComponentRegistry;
 use crate::ecs::system::SystemRegistry;
+use crate::loot::LootTableRegistry;
 use crate::map::Map;
 use crate::plugins::dynamic_systems::DynamicSystemRegistry;
 use crate::systems::job::{JobBoard, JobTypeRegistry};
@@ -77,6 +78,9 @@ pub struct World {
     /// Job type registry
     #[serde(skip)]
     pub job_types: JobTypeRegistry,
+    /// Loot table registry (runtime-defined, not serialized)
+    #[serde(skip)]
+    pub loot_tables: LootTableRegistry,
     /// Job handler registry
     #[serde(skip)]
     pub job_handler_registry:
@@ -134,6 +138,7 @@ impl World {
             event_buses: crate::ecs::event_bus_registry::EventBusRegistry::new(),
             dynamic_systems: DynamicSystemRegistry::new(),
             job_types: JobTypeRegistry::default(),
+            loot_tables: LootTableRegistry::new(),
             job_handler_registry: Arc::new(Mutex::new(
                 crate::systems::job::job_handler_registry::JobHandlerRegistry::new(),
             )),
