@@ -204,6 +204,7 @@ xtask builds each Rust plugin crate in release mode, then copies `target/release
 - **Game config:** `game.toml` at workspace root defines title, version, allowed game modes, and native plugin paths.
 - **Plugin ABI:** C ABI defined in `engine/engine_plugin_abi.h`. Exports `PluginVTable` with init, shutdown, update, worldgen, system registration, hot-reload.
 - **Presentation layer:** Terminal-based renderer with viewport support (terminal roguelike-style output). Demo: `cargo run --example viewport_demo -p engine_core`.
+- **Roadmap tracking:** After implementing any ROADMAP item (in `docs/ROADMAP.md`), mark it as `[x]` completed in that file as part of the commit.
 
 ---
 
