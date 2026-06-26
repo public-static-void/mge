@@ -37,6 +37,8 @@ pub mod job_mutation;
 pub mod job_query;
 /// Job System API
 pub mod job_system;
+/// Loot API
+pub mod loot;
 /// Map API
 pub mod map;
 /// Game mode API
@@ -96,5 +98,6 @@ pub fn register_all_api_functions(
     economic::register_economic_api(lua, globals, world.clone())?;
     movement_ops::register_movement_ops_api(lua, globals, world.clone())?;
     job_ai::register_job_ai_api(lua, globals, world.clone())?;
+    loot::register_loot_api(lua, globals, world.clone())?;
     Ok(())
 }
