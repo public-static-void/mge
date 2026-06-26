@@ -1,3 +1,4 @@
+use crate::loot::LootTableRegistry;
 use crate::map::CellKey;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
@@ -170,6 +171,10 @@ pub struct WasmWorld {
     /// Currently focused widget ID (0 = none)
     #[serde(default)]
     pub focused_widget: u32,
+
+    /// Loot table registry (runtime-defined, not serialized).
+    #[serde(skip)]
+    pub loot_tables: LootTableRegistry,
 }
 
 /// Load all JSON schema files from a directory.
@@ -236,6 +241,7 @@ impl WasmWorld {
             widget_roots: Vec::new(),
             ui_event_queue: Vec::new(),
             focused_widget: 0,
+            loot_tables: LootTableRegistry::new(),
         }
     }
 

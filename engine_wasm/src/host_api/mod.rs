@@ -91,3 +91,6 @@ pub mod job_events;
 
 /// Job AI module (ai_assign_jobs, ai_query_jobs, ai_modify_job_assignment)
 pub mod job_ai;
+
+/// Loot table module (define_table, roll, has_table, table_names, remove_table)
+pub mod loot;

@@ -8,6 +8,7 @@ use crate::host_api::equipment::register_equipment_api;
 use crate::host_api::event_bus::register_event_bus_api;
 use crate::host_api::input::register_input_api;
 use crate::host_api::inventory::register_inventory_api;
+use crate::host_api::loot::register_loot_api;
 use crate::host_api::job_ai::register_job_ai_api;
 use crate::host_api::job_board::register_job_board_api;
 use crate::host_api::job_cancel::register_job_cancel_api;
@@ -166,6 +167,7 @@ impl WasmScriptEngine {
         register_ui_api(&mut linker)?;
         register_ui_tree_api(&mut linker)?;
         register_ui_events_api(&mut linker)?;
+        register_loot_api(&mut linker)?;
 
         // Load schemas if schema_path is provided
         let schemas = config
