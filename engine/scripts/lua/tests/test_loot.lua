@@ -66,7 +66,7 @@ local function test_multiple_entries_resolve()
 	loot.define_table("test_uniform", {
 		{ item_id = "health_potion", weight = 1 },
 		{ item_id = "rusty_sword", weight = 1 },
-		{ item_id = "health_potion", weight = 1 },  -- duplicate item_id to increase its chance
+		{ item_id = "wooden_shield", weight = 1 },
 	})
 	local seen = {}
 	for _ = 1, 30 do
@@ -84,6 +84,7 @@ end
 
 -- 4. Weighted distribution: weight-90 entry drops more than weight-10 over 50 rolls
 local function test_weighted_distribution()
+	math.randomseed(42)
 	loot.define_table("test_weighted", {
 		{ item_id = "health_potion", weight = 90 },
 		{ item_id = "rusty_sword", weight = 10 },
