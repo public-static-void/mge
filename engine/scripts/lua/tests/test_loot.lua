@@ -23,38 +23,27 @@ local function test_undefined_table_returns_empty()
     assert.equals(#results, 0)
 end
 
--- 3. Multiple entries: weight=100 items always drop
-local function test_multiple_entries_resolve()
-    define_loot_table("test_multi", {
-        { item_id = "health_potion", weight = 100 },
-        { item_id = "rusty_sword", weight = 100 },
-    })
-    local results = roll_loot_table("test_multi")
-    -- Both have 100% weight, so both should always drop
-    assert.is_true(#results == 2, "Both entries should drop")
-    local ids = {}
-    for _, drop in ipairs(results) do
-        ids[drop.item_id] = true
-    end
-    assert.is_true(ids["health_potion"], "health_potion should appear")
-    assert.is_true(ids["rusty_sword"], "rusty_sword should appear")
-end
-
--- 4. Weighted distribution: both items appear over many rolls
+-- 3. Weighted distribution: common items selected more often than rare
 local function test_weighted_distribution()
     define_loot_table("test_weighted", {
         { item_id = "health_potion", weight = 90 },
         { item_id = "rusty_sword", weight = 10 },
     })
-    local seen = {}
+    local counts = { health_potion = 0, rusty_sword = 0 }
     for _ = 1, 100 do
         local results = roll_loot_table("test_weighted")
-        for _, drop in ipairs(results) do
-            seen[drop.item_id] = true
-        end
+        assert.equals(#results, 1, "weighted-sum should return exactly 1 item per roll")
+        local drop = results[1]
+        counts[drop.item_id] = counts[drop.item_id] + 1
     end
-    assert.is_true(seen["health_potion"], "health_potion should appear in 100 rolls")
-    assert.is_true(seen["rusty_sword"], "rusty_sword should appear in 100 rolls")
+    assert.equals(
+        counts["health_potion"] + counts["rusty_sword"], 100,
+        "all 100 rolls should produce exactly one item"
+    )
+    assert.is_true(
+        counts["health_potion"] > counts["rusty_sword"],
+        "health_potion (weight 90) should appear more often than rusty_sword (weight 10)"
+    )
 end
 
 -- 5. min_count/max_count: count stays within range
@@ -129,7 +118,6 @@ end
 return {
     test_define_and_roll_basic = test_define_and_roll_basic,
     test_undefined_table_returns_empty = test_undefined_table_returns_empty,
-    test_multiple_entries_resolve = test_multiple_entries_resolve,
     test_weighted_distribution = test_weighted_distribution,
     test_min_max_count = test_min_max_count,
     test_redefine_table_overwrites = test_redefine_table_overwrites,

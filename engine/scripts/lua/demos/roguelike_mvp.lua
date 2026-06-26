@@ -766,7 +766,7 @@ end
 
 loot_count = 0
 
--- Goblin death drops: health potion (80% each), rusty sword (20% each)
+-- Goblin death drops: health potion (weight 80), rusty sword (weight 20)
 define_loot_table("enemy", {
 	{ item_id = "health_potion", weight = 80, min_count = 1, max_count = 1 },
 	{ item_id = "rusty_sword", weight = 20, min_count = 1, max_count = 1 },

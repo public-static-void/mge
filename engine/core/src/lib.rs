@@ -16,6 +16,8 @@ pub mod mods;
 pub mod plugins;
 /// Presentation module
 pub mod presentation;
+/// Loot table system
+pub mod loot;
 /// Systems module
 pub mod systems;
 /// Worldgen module
