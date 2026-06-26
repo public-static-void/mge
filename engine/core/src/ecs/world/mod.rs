@@ -4,9 +4,9 @@
 
 use crate::ecs::registry::ComponentRegistry;
 use crate::ecs::system::SystemRegistry;
+use crate::loot::LootTableRegistry;
 use crate::map::Map;
 use crate::plugins::dynamic_systems::DynamicSystemRegistry;
-use crate::loot::LootTableRegistry;
 use crate::systems::job::{JobBoard, JobTypeRegistry};
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;

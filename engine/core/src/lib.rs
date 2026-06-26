@@ -6,6 +6,8 @@
 pub mod config;
 /// ECS module
 pub mod ecs;
+/// Loot table system
+pub mod loot;
 /// Map module
 pub mod map;
 /// Modes module
@@ -16,8 +18,6 @@ pub mod mods;
 pub mod plugins;
 /// Presentation module
 pub mod presentation;
-/// Loot table system
-pub mod loot;
 /// Systems module
 pub mod systems;
 /// Worldgen module

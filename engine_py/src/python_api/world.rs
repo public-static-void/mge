@@ -803,11 +803,7 @@ impl PyWorld {
     /// Each entry dict must contain `item_id` (str) and `weight` (int).
     /// Optional fields: `min_count` (int, default 1), `max_count` (int, default 1).
     /// Returns `true` on success.
-    fn define_loot_table(
-        &self,
-        name: &str,
-        entries: Vec<Bound<'_, PyAny>>,
-    ) -> PyResult<bool> {
+    fn define_loot_table(&self, name: &str, entries: Vec<Bound<'_, PyAny>>) -> PyResult<bool> {
         let mut world = self.inner.borrow_mut();
         let mut loot_entries = Vec::with_capacity(entries.len());
 
@@ -845,9 +841,7 @@ impl PyWorld {
                 });
                 to_pyobject(py, &dict)
                     .map(|b| b.into())
-                    .map_err(|e| {
-                        pyo3::exceptions::PyValueError::new_err(e.to_string())
-                    })
+                    .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
             })
             .collect()
     }

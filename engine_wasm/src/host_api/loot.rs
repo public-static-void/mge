@@ -18,8 +18,8 @@ pub fn register_loot_api(linker: &mut Linker<Arc<Mutex<WasmWorld>>>) -> anyhow::
                 .expect("Failed to read table name from WASM memory");
             let entries_json = read_wasm_string(&mut caller, entries_ptr, entries_len)
                 .expect("Failed to read entries JSON from WASM memory");
-            let entries: Vec<LootEntry> = serde_json::from_str(&entries_json)
-                .expect("Failed to parse loot entries JSON");
+            let entries: Vec<LootEntry> =
+                serde_json::from_str(&entries_json).expect("Failed to parse loot entries JSON");
             let mut world = caller.data().lock().unwrap();
             world
                 .loot_tables
@@ -45,8 +45,7 @@ pub fn register_loot_api(linker: &mut Linker<Arc<Mutex<WasmWorld>>>) -> anyhow::
             };
             match result {
                 Ok(items) => {
-                    let json =
-                        serde_json::to_string(&items).unwrap_or_else(|_| "[]".to_string());
+                    let json = serde_json::to_string(&items).unwrap_or_else(|_| "[]".to_string());
                     write_string_to_wasm(&mut caller, out_ptr, out_len, &json) as i32
                 }
                 Err(_) => -1,
@@ -57,10 +56,7 @@ pub fn register_loot_api(linker: &mut Linker<Arc<Mutex<WasmWorld>>>) -> anyhow::
     linker.func_wrap(
         "loot",
         "has_table",
-        |mut caller: Caller<'_, Arc<Mutex<WasmWorld>>>,
-         name_ptr: i32,
-         name_len: i32|
-         -> i32 {
+        |mut caller: Caller<'_, Arc<Mutex<WasmWorld>>>, name_ptr: i32, name_len: i32| -> i32 {
             let name = read_wasm_string(&mut caller, name_ptr, name_len)
                 .expect("Failed to read table name from WASM memory");
             let world = caller.data().lock().unwrap();
@@ -75,10 +71,7 @@ pub fn register_loot_api(linker: &mut Linker<Arc<Mutex<WasmWorld>>>) -> anyhow::
     linker.func_wrap(
         "loot",
         "table_names",
-        |mut caller: Caller<'_, Arc<Mutex<WasmWorld>>>,
-         out_ptr: i32,
-         out_len: i32|
-         -> i32 {
+        |mut caller: Caller<'_, Arc<Mutex<WasmWorld>>>, out_ptr: i32, out_len: i32| -> i32 {
             let names = {
                 let world = caller.data().lock().unwrap();
                 world.loot_tables.table_names()
@@ -91,9 +84,7 @@ pub fn register_loot_api(linker: &mut Linker<Arc<Mutex<WasmWorld>>>) -> anyhow::
     linker.func_wrap(
         "loot",
         "remove_table",
-        |mut caller: Caller<'_, Arc<Mutex<WasmWorld>>>,
-         name_ptr: i32,
-         name_len: i32| {
+        |mut caller: Caller<'_, Arc<Mutex<WasmWorld>>>, name_ptr: i32, name_len: i32| {
             let name = read_wasm_string(&mut caller, name_ptr, name_len)
                 .expect("Failed to read table name from WASM memory");
             let mut world = caller.data().lock().unwrap();

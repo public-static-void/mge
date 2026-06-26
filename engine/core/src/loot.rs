@@ -81,11 +81,7 @@ impl LootTableRegistry {
     /// - `weight > 0`
     /// - `min_count > 0` and `max_count > 0`
     /// - `min_count <= max_count`
-    pub fn define_table(
-        &mut self,
-        name: &str,
-        entries: Vec<LootEntry>,
-    ) -> Result<(), LootError> {
+    pub fn define_table(&mut self, name: &str, entries: Vec<LootEntry>) -> Result<(), LootError> {
         for entry in &entries {
             if entry.weight == 0 {
                 return Err(LootError::InvalidEntry(format!(
