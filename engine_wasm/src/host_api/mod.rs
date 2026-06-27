@@ -16,6 +16,8 @@ pub mod mode;
 
 /// Death/Decay module
 pub mod death_decay;
+/// Dungeon generation module
+pub mod dungeon;
 
 /// Time of day module
 pub mod time_of_day;

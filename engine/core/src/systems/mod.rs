@@ -6,6 +6,8 @@
 pub mod body_equipment_sync;
 /// Death and decay system
 pub mod death_decay;
+/// Procedural dungeon generation
+pub mod dungeon;
 /// Economic system
 pub mod economic;
 /// Equipment effect aggregation system

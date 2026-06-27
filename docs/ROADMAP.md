@@ -38,7 +38,7 @@
 - [x] Map generation, validation, and postprocessing hooks
 - [ ] Z-level / multi-layer map support
 - [ ] Multi-scale map navigation
-- [ ] Procedural dungeon generation
+- [x] Procedural dungeon generation
 - [ ] Fluid simulation (water, magma)
 - [ ] Field-of-view and lighting simulation
 - [ ] Fog of war and visibility system

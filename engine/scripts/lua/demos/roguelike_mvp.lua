@@ -42,109 +42,39 @@ function get_xy(eid)
 	return nil, nil
 end
 
--- SECTION 3: Map Generation
-local wall_data = {}
-
-function build_grid_map(w, h)
-	for x = 0, w - 1 do
-		for y = 0, h - 1 do
-			add_cell(x, y, 0)
-		end
-	end
-	for x = 0, w - 1 do
-		for y = 0, h - 1 do
-			for _, d in ipairs({ { 1, 0 }, { 0, 1 }, { -1, 0 }, { 0, -1 } }) do
-				local nx, ny = x + d[1], y + d[2]
-				if nx >= 0 and nx < w and ny >= 0 and ny < h then
-					add_neighbor(flat_cell(x, y), flat_cell(nx, ny))
-				end
-			end
-		end
-	end
-end
-
-function set_wall(x, y)
-	wall_data[wall_key(x, y)] = true
-end
-
-function wall_key(x, y)
-	return x .. "," .. y
-end
+-- SECTION 3: Map Generation (Rust-native dungeon generator)
 
 function is_wall(x, y)
-	return wall_data[wall_key(x, y)] == true
+	local meta = get_cell_metadata(flat_cell(x, y))
+	if meta and meta.walkable == false then
+		return true
+	end
+	return false
 end
 
-function carve_room(x1, y1, x2, y2, doors)
-	for x = x1, x2 do
-		set_wall(x, y1)
-		set_wall(x, y2)
-	end
-	for y = y1 + 1, y2 - 1 do
-		set_wall(x1, y)
-		set_wall(x2, y)
-	end
-	for _, d in ipairs(doors) do
-		wall_data[wall_key(d[1], d[2])] = nil
-	end
-end
-
-function register_walls_with_pathfinder()
-	for key, _ in pairs(wall_data) do
-		local comma = key:find(",")
-		if comma then
-			local x = tonumber(key:sub(1, comma - 1))
-			local y = tonumber(key:sub(comma + 1))
-			if x and y then
-				set_cell_metadata(flat_cell(x, y), { walkable = false })
+function find_walkable_cells()
+	-- Scan the map for cells without walkable=false metadata
+	local walkable = {}
+	for x = 0, MAP_W - 1 do
+		for y = 0, MAP_H - 1 do
+			if not is_wall(x, y) then
+				table.insert(walkable, { x, y })
 			end
 		end
 	end
+	return walkable
 end
 
 local function create_map()
-	world:apply_generated_map({ topology = "square", cells = { { x = 0, y = 0, z = 0 } } })
-	build_grid_map(MAP_W, MAP_H)
+	-- Generate procedural dungeon via Rust-native generator
+	-- Returns worldgen-format map with cells, neighbors, and wall metadata
+	local dungeon = generate_dungeon({
+		width = MAP_W, height = MAP_H, seed = 42,
+		min_room_size = 3, max_room_size = 8, max_rooms = 6
+	})
 
-	for x = 0, MAP_W - 1 do
-		set_wall(x, 0)
-		set_wall(x, MAP_H - 1)
-	end
-	for y = 0, MAP_H - 1 do
-		set_wall(0, y)
-		set_wall(MAP_W - 1, y)
-	end
-
-	carve_room(2, 2, 10, 7, { { 10, 5 }, { 6, 7 } })
-	carve_room(14, 2, 24, 7, { { 14, 5 }, { 24, 5 }, { 19, 7 } })
-	carve_room(28, 2, 37, 9, { { 28, 5 }, { 32, 9 } })
-	carve_room(2, 12, 10, 21, { { 6, 12 }, { 10, 16 } })
-	carve_room(14, 12, 24, 21, { { 19, 12 }, { 14, 16 }, { 24, 16 } })
-	carve_room(28, 12, 37, 21, { { 32, 12 }, { 28, 16 } })
-
-	for x = 11, 13 do
-		wall_data[wall_key(x, 5)] = nil
-	end
-	for x = 25, 27 do
-		wall_data[wall_key(x, 5)] = nil
-	end
-	for y = 8, 11 do
-		wall_data[wall_key(6, y)] = nil
-	end
-	for y = 8, 11 do
-		wall_data[wall_key(19, y)] = nil
-	end
-	for y = 10, 11 do
-		wall_data[wall_key(32, y)] = nil
-	end
-	for x = 11, 13 do
-		wall_data[wall_key(x, 16)] = nil
-	end
-	for x = 25, 27 do
-		wall_data[wall_key(x, 16)] = nil
-	end
-
-	register_walls_with_pathfinder()
+	-- Apply the generated map (creates all cells, neighbors, and wall metadata)
+	world:apply_generated_map(dungeon)
 end
 
 -- SECTION 4: Entity Factories
@@ -776,24 +706,41 @@ define_loot_table("enemy", {
 function main()
 	create_map()
 
-	player = spawn_player(5, 5)
-
-	local enemy_positions = {
-		{ 16, 4 },
-		{ 35, 4 },
-		{ 5, 16 },
-		{ 30, 16 },
-		{ 22, 16 },
-	}
-	for _, pos in ipairs(enemy_positions) do
-		table.insert(enemies, spawn_enemy(pos[1], pos[2]))
+	-- Find walkable cells for entity placement
+	local walkable = find_walkable_cells()
+	if #walkable == 0 then
+		print("ERROR: No walkable cells found!")
+		return
 	end
 
-	table.insert(items, spawn_item("health_potion", "Health Potion", "!", COLOR_GREEN, 3, 5))
-	table.insert(items, spawn_item("health_potion", "Health Potion", "!", COLOR_GREEN, 30, 4))
-	table.insert(items, spawn_item("health_potion", "Health Potion", "!", COLOR_GREEN, 8, 14))
+	-- Place player at the first walkable cell
+	local px, py = walkable[1][1], walkable[1][2]
+	player = spawn_player(px, py)
 
-	set_camera(5, 5)
+	-- Place enemies at subsequent walkable cells (skip first for player)
+	local enemy_count = 0
+	for i = 2, #walkable do
+		if enemy_count >= 5 then break end
+		local ex, ey = walkable[i][1], walkable[i][2]
+		-- Keep some distance from player
+		if math.abs(ex - px) + math.abs(ey - py) >= 6 then
+			table.insert(enemies, spawn_enemy(ex, ey))
+			enemy_count = enemy_count + 1
+		end
+	end
+
+	-- Place items at walkable cells near player
+	local item_count = 0
+	for i = 2, #walkable do
+		if item_count >= 3 then break end
+		local ix, iy = walkable[i][1], walkable[i][2]
+		if math.abs(ix - px) + math.abs(iy - py) <= 10 and math.abs(ix - px) + math.abs(iy - py) >= 3 then
+			table.insert(items, spawn_item("health_potion", "Health Potion", "!", COLOR_GREEN, ix, iy))
+			item_count = item_count + 1
+		end
+	end
+
+	set_camera(px, py)
 	set_inventory(player, {
 		slots = setmetatable({}, { __is_array = true }),
 		max_slots = 10,

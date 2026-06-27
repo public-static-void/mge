@@ -11,6 +11,8 @@ pub mod camera;
 pub mod component;
 /// Death/Decay API
 pub mod death_decay;
+/// Dungeon Generation API
+pub mod dungeon;
 /// Economic API
 pub mod economic;
 /// Entity API
@@ -97,6 +99,7 @@ pub fn register_all_api_functions(
     map::register_map_api(lua, globals, world.clone())?;
     economic::register_economic_api(lua, globals, world.clone())?;
     movement_ops::register_movement_ops_api(lua, globals, world.clone())?;
+    dungeon::register_dungeon_api(lua, globals)?;
     job_ai::register_job_ai_api(lua, globals, world.clone())?;
     loot::register_loot_api(lua, globals, world.clone())?;
     Ok(())
