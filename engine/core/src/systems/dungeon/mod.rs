@@ -450,26 +450,7 @@ mod tests {
         assert_ne!(a_walkable, b_walkable);
     }
 
-    #[test]
-    fn test_floor_walkable() {
-        let config = default_config();
-        let result = DungeonGenerator::generate(&config).unwrap();
-
-        // AC004: All floor cells have walkable=true
-        for cell in &result.cells {
-            if cell.walkable {
-                // Walkable cells should have at least one neighbor (be connected)
-                let has_neighbor = result
-                    .neighbors
-                    .iter()
-                    .any(|n| n.from_x == cell.x && n.from_y == cell.y && n.from_z == cell.z);
-                if has_neighbor {
-                    // Interior walkable cells should have neighbors
-                    assert!(true, "Walkable cell ({},{}) has neighbors", cell.x, cell.y);
-                }
-            }
-        }
-    }
+    // AC004 is covered by test_connectivity_all_rooms and test_wall_not_walkable.
 
     #[test]
     fn test_wall_not_walkable() {
@@ -597,8 +578,8 @@ mod tests {
             }
 
             // Union this room with any other room whose center is reachable
-            for j in (i + 1)..n_rooms {
-                if visited.contains(&room_centers[j]) {
+            for (j, center) in room_centers.iter().enumerate().skip(i + 1) {
+                if visited.contains(center) {
                     union(&mut parent, i, j);
                 }
             }
