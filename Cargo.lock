@@ -686,7 +686,7 @@ dependencies = [
  "jsonschema",
  "libloading",
  "parking_lot",
- "rand 0.8.6",
+ "rand",
  "schemars",
  "semver",
  "serde",

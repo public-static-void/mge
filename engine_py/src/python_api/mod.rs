@@ -11,6 +11,8 @@ pub mod camera_api;
 pub mod component;
 /// Death/decay API
 pub mod death_decay;
+/// Dungeon generation API
+pub mod dungeon;
 /// Economic API
 pub mod economic;
 /// Entity API

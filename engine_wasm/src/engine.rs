@@ -2,6 +2,7 @@ use crate::host_api::body::register_body_api;
 use crate::host_api::camera::register_camera_api;
 use crate::host_api::component::register_component_api;
 use crate::host_api::death_decay::register_death_decay_api;
+use crate::host_api::dungeon::register_dungeon_api;
 use crate::host_api::economic::register_economic_api;
 use crate::host_api::entity::register_entity_api;
 use crate::host_api::equipment::register_equipment_api;
@@ -143,6 +144,7 @@ impl WasmScriptEngine {
         register_turn_api(&mut linker)?;
         register_mode_api(&mut linker)?;
         register_death_decay_api(&mut linker)?;
+        register_dungeon_api(&mut linker)?;
         register_time_of_day_api(&mut linker)?;
         register_input_api(&mut linker)?;
         register_inventory_api(&mut linker)?;

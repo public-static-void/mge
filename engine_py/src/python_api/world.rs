@@ -317,6 +317,11 @@ impl PyWorld {
         ModeApi::get_available_modes(self)
     }
 
+    /// Generate a procedural dungeon map
+    fn generate_dungeon(&self, config: std::collections::HashMap<String, crate::PyObject>) -> PyResult<crate::PyObject> {
+        crate::python_api::dungeon::DungeonApi::generate_dungeon(self, config)
+    }
+
     /// Process deaths
     fn process_deaths(&self) {
         DeathDecayApi::process_deaths(self)
