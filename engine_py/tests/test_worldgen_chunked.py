@@ -1,5 +1,5 @@
 import pytest
-import engine_py
+import mge as engine_py
 
 def test_generate_and_apply_chunk(make_world):
     # Plugin is registered automatically at module init

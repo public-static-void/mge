@@ -1,4 +1,4 @@
-import engine_py
+import mge as engine_py
 
 
 def test_apply_generated_map(make_world):
