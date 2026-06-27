@@ -43,8 +43,7 @@ pub fn register_dungeon_api(lua: &Lua, globals: &Table) -> LuaResult<()> {
         }
 
         // Generate the dungeon map
-        let map =
-            DungeonGenerator::generate(&dungeon_config).map_err(|e| mlua::Error::external(e))?;
+        let map = DungeonGenerator::generate(&dungeon_config).map_err(mlua::Error::external)?;
 
         // Convert to worldgen JSON format
         let json_value = map.to_worldgen_json();

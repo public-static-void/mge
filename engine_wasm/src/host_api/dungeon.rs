@@ -76,7 +76,7 @@ pub fn register_dungeon_api(linker: &mut Linker<Arc<Mutex<WasmWorld>>>) -> anyho
                     write_string_to_wasm(&mut caller, out_ptr, out_len, &json_str) as i32
                 }
                 Err(e) => {
-                    let err = format!("{e}");
+                    let err = e.to_string();
                     write_string_to_wasm(&mut caller, out_ptr, out_len, &err) as i32
                 }
             }

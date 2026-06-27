@@ -1,11 +1,9 @@
 """Tests for procedural dungeon generation Python binding."""
 
-import mge as engine_py
 
-
-def test_generates_valid_map():
+def test_generates_valid_map(make_world):
     """AC010: generate_dungeon returns dict with cells and neighbors."""
-    world = engine_py.make_world("../../engine/assets/schemas")
+    world = make_world()
     result = world.generate_dungeon({"width": 40, "height": 25, "seed": 42})
 
     assert "topology" in result
@@ -30,9 +28,9 @@ def test_generates_valid_map():
     assert wall_count > 0, "Map should have wall cells"
 
 
-def test_invalid_config_raises():
+def test_invalid_config_raises(make_world):
     """AC011: generate_dungeon with zero dimensions raises ValueError."""
-    world = engine_py.make_world("../../engine/assets/schemas")
+    world = make_world()
     try:
         world.generate_dungeon({"width": 0, "height": 0})
         assert False, "Should have raised ValueError"
@@ -40,9 +38,9 @@ def test_invalid_config_raises():
         assert "positive" in str(e).lower()
 
 
-def test_same_seed_identical():
+def test_same_seed_identical(make_world):
     """Same seed + config produces identical maps."""
-    world = engine_py.make_world("../../engine/assets/schemas")
+    world = make_world()
     a = world.generate_dungeon({"width": 40, "height": 25, "seed": 42})
     b = world.generate_dungeon({"width": 40, "height": 25, "seed": 42})
 
@@ -52,9 +50,9 @@ def test_same_seed_identical():
     assert a_walkable == b_walkable
 
 
-def test_different_seeds_different():
+def test_different_seeds_different(make_world):
     """Different seeds produce different layouts."""
-    world = engine_py.make_world("../../engine/assets/schemas")
+    world = make_world()
     a = world.generate_dungeon({"width": 40, "height": 25, "seed": 1})
     b = world.generate_dungeon({"width": 40, "height": 25, "seed": 99})
 

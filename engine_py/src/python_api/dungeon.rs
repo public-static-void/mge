@@ -64,7 +64,7 @@ impl DungeonApi for PyWorld {
             }
 
             // Generate dungeon map
-            let map = DungeonGenerator::generate(&cfg).map_err(|e| PyValueError::new_err(e))?;
+            let map = DungeonGenerator::generate(&cfg).map_err(PyValueError::new_err)?;
 
             // Convert to worldgen JSON
             let json_value = map.to_worldgen_json();
