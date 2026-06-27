@@ -17,18 +17,14 @@ pub fn register_dungeon_api(lua: &Lua, globals: &Table) -> LuaResult<()> {
             if let Ok(val) = table.get::<f64>("width") {
                 let w = val as u32;
                 if w == 0 {
-                    return Err(mlua::Error::external(
-                        "Width must be positive".to_string(),
-                    ));
+                    return Err(mlua::Error::external("Width must be positive".to_string()));
                 }
                 dungeon_config.width = w;
             }
             if let Ok(val) = table.get::<f64>("height") {
                 let h = val as u32;
                 if h == 0 {
-                    return Err(mlua::Error::external(
-                        "Height must be positive".to_string(),
-                    ));
+                    return Err(mlua::Error::external("Height must be positive".to_string()));
                 }
                 dungeon_config.height = h;
             }
@@ -47,8 +43,8 @@ pub fn register_dungeon_api(lua: &Lua, globals: &Table) -> LuaResult<()> {
         }
 
         // Generate the dungeon map
-        let map = DungeonGenerator::generate(&dungeon_config)
-            .map_err(|e| mlua::Error::external(e))?;
+        let map =
+            DungeonGenerator::generate(&dungeon_config).map_err(|e| mlua::Error::external(e))?;
 
         // Convert to worldgen JSON format
         let json_value = map.to_worldgen_json();

@@ -71,8 +71,8 @@ pub fn register_dungeon_api(linker: &mut Linker<Arc<Mutex<WasmWorld>>>) -> anyho
             match DungeonGenerator::generate(&cfg) {
                 Ok(map) => {
                     let json_value = map.to_worldgen_json();
-                    let json_str = serde_json::to_string(&json_value)
-                        .unwrap_or_else(|_| "{}".to_string());
+                    let json_str =
+                        serde_json::to_string(&json_value).unwrap_or_else(|_| "{}".to_string());
                     write_string_to_wasm(&mut caller, out_ptr, out_len, &json_str) as i32
                 }
                 Err(e) => {

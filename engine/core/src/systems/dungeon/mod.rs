@@ -1,9 +1,9 @@
 //! Procedural dungeon generation — produces rooms and L-shaped corridors
 //! with seed-based determinism. Stateless utility, not an ECS System.
 
-use rand::rngs::StdRng;
 use rand::Rng;
 use rand::SeedableRng;
+use rand::rngs::StdRng;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::{HashMap, HashSet};
@@ -116,7 +116,12 @@ impl DungeonGenerator {
         let mut rng = StdRng::seed_from_u64(config.seed);
         let rooms = generate_rooms(config, &mut rng);
         let corridors = generate_corridors(&rooms, config.width, config.height);
-        Ok(build_dungeon_map(config.width, config.height, &rooms, &corridors))
+        Ok(build_dungeon_map(
+            config.width,
+            config.height,
+            &rooms,
+            &corridors,
+        ))
     }
 }
 
@@ -357,9 +362,7 @@ impl DungeonMap {
                 if let Some(ns) = neighs {
                     let neigh_json: Vec<serde_json::Value> = ns
                         .iter()
-                        .map(|(nx, ny, nz)| {
-                            json!({"x": *nx, "y": *ny, "z": *nz})
-                        })
+                        .map(|(nx, ny, nz)| json!({"x": *nx, "y": *ny, "z": *nz}))
                         .collect();
                     cell_obj["neighbors"] = json!(neigh_json);
                 }
@@ -462,11 +465,7 @@ mod tests {
                     .any(|n| n.from_x == cell.x && n.from_y == cell.y && n.from_z == cell.z);
                 if has_neighbor {
                     // Interior walkable cells should have neighbors
-                    assert!(
-                        true,
-                        "Walkable cell ({},{}) has neighbors",
-                        cell.x, cell.y
-                    );
+                    assert!(true, "Walkable cell ({},{}) has neighbors", cell.x, cell.y);
                 }
             }
         }
@@ -487,8 +486,7 @@ mod tests {
                 assert!(
                     !cell.walkable,
                     "Border cell ({},{}) should not be walkable",
-                    cell.x,
-                    cell.y
+                    cell.x, cell.y
                 );
             }
         }
@@ -700,7 +698,10 @@ mod tests {
 
         // EC-10: Single room, no corridors
         let walkable_count = result.cells.iter().filter(|c| c.walkable).count();
-        assert!(walkable_count > 0, "Single room should produce walkable cells");
+        assert!(
+            walkable_count > 0,
+            "Single room should produce walkable cells"
+        );
     }
 
     // ---- Helpers ------------------------------------------------------------

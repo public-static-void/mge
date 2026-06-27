@@ -1,7 +1,7 @@
 //! Dungeon generation API: `generate_dungeon(config)` method on PyWorld.
 
-use crate::python_api::PyWorld;
 use crate::PyObject;
+use crate::python_api::PyWorld;
 use engine_core::systems::dungeon::{DungeonConfig, DungeonGenerator};
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
@@ -64,15 +64,15 @@ impl DungeonApi for PyWorld {
             }
 
             // Generate dungeon map
-            let map = DungeonGenerator::generate(&cfg)
-                .map_err(|e| PyValueError::new_err(e))?;
+            let map = DungeonGenerator::generate(&cfg).map_err(|e| PyValueError::new_err(e))?;
 
             // Convert to worldgen JSON
             let json_value = map.to_worldgen_json();
 
             // Use pythonize to convert serde_json::Value to Python dict
-            let py_obj = pythonize::pythonize(py, &json_value)
-                .map_err(|e| PyValueError::new_err(format!("Failed to convert to Python object: {e}")))?;
+            let py_obj = pythonize::pythonize(py, &json_value).map_err(|e| {
+                PyValueError::new_err(format!("Failed to convert to Python object: {e}"))
+            })?;
             Ok(py_obj.unbind())
         })
     }

@@ -318,7 +318,10 @@ impl PyWorld {
     }
 
     /// Generate a procedural dungeon map
-    fn generate_dungeon(&self, config: std::collections::HashMap<String, crate::PyObject>) -> PyResult<crate::PyObject> {
+    fn generate_dungeon(
+        &self,
+        config: std::collections::HashMap<String, crate::PyObject>,
+    ) -> PyResult<crate::PyObject> {
         crate::python_api::dungeon::DungeonApi::generate_dungeon(self, config)
     }
 
