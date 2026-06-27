@@ -2,9 +2,9 @@
 
 ## Project Identity
 
-Rust workspace monorepo (9 crates) — cross-language game engine. Languages: Rust (edition "2024"), Lua, Python, C, WASM.
+Rust workspace monorepo (8 crates) — cross-language game engine. Languages: Rust (edition "2024"), Lua, Python, C, WASM.
 
-**Rust edition 2024 requires nightly Rust.** All 9 crates use `edition = "2024"`.
+**Rust edition 2024 requires nightly Rust.** All 8 crates use `edition = "2024"`.
 
 Build system: Cargo + Makefile (orchestration) + xtask (plugin deploy).
 
@@ -73,7 +73,7 @@ cargo clippy --all-targets --all-features -- -D warnings
 CI enforces this sequence:
 
 ```
-validate-schema → build-c-plugins → build-wasm-tests → build-all → test-rust → test-python → test-lua
+validate-schema → build-c-plugins → build-wasm-tests → build-all → test-rust → test-python → test-lua → test-wasm
 ```
 
 `make test` runs: `validate-schema → test-rust → test-python → test-lua → test-wasm` (sequential). Python requires `maturin develop` (handled by `build-python` target in `make test-python`). Lua tests require C plugin `.so` at `plugins/simple_square_plugin/libsimple_square_plugin.so`.
@@ -105,17 +105,6 @@ engine_macros ← engine_core ← engine_lua
 | `schema_validator` | `schema_validator` | `tools/schema_validator/src/main.rs` | Validate all JSON schemas |
 | `xtask` | `xtask` | `src/main.rs` | Plugin build/deploy orchestrator |
 
-### Feature flags on `engine_core`
-
-```toml
-[features]
-lua = []
-python = []
-wasm = []
-```
-
-Currently empty placeholders — control which language bridges are active.
-
 ### Plugin Source Directories
 
 ```
@@ -145,8 +134,7 @@ mods/mvp_roguelike/
 1. **Nightly Rust required.** Edition "2024" is not stable. Use `rustup toolchain install nightly && rustup default nightly`.
 2. **LuaJIT system dep.** Install `libluajit-5.1-dev` + `pkg-config`. CI sets `PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig`.
 3. **C plugins need gcc + libjansson-dev.** xtask finds single `.c` file per plugin dir, compiles to `.so` with `-shared -fPIC -ljansson`.
-4. **engine/core/Cargo.lock is stale.** The root workspace `Cargo.lock` is authoritative. Do not use the nested one.
-5. **Lua CLI sandbox.** The `mge_cli` VM blocks `os`, `io`, `package`, `debug` stdlibs — `require()`, `dofile()`, `loadfile()` do not exist. Expose Rust functionality via global functions in `engine_lua/src/lua_api/`. Don't design Lua modules that rely on `require()`.
+4. **Lua CLI sandbox.** The `mge_cli` VM blocks `os`, `io`, `package`, `debug` stdlibs — `require()`, `dofile()`, `loadfile()` do not exist. Expose Rust functionality via global functions in `engine_lua/src/lua_api/`. Don't design Lua modules that rely on `require()`.
 
 ### Environment Variables
 

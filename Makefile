@@ -1,7 +1,7 @@
 # ====== PHONY TARGETS ======
 .PHONY: all build-plugins build-c-plugins build-wasm-tests build-all \
 	test test-rust test-python test-lua test-wasm test-all \
-	setup-python build-python clean validate-schema help
+	setup-python build-python build-wheel clean validate-schema help
 
 # ====== CONFIGURABLE VARIABLES ======
 SCHEMA_DIR := engine/assets/schemas
@@ -16,6 +16,7 @@ help:
 	@echo "  make test-rust       - Run Rust tests"
 	@echo "  make test-lua        - Run Lua tests"
 	@echo "  make test-wasm      - Run WASM tests"
+	@echo "  make build-wheel    - Build Python wheel for distribution"
 	@echo "  make clean           - Clean Rust build artifacts"
 
 # ====== SCHEMA VALIDATION ======
@@ -55,6 +56,12 @@ build-python: setup-python
 	@command -v maturin >/dev/null 2>&1 || { echo >&2 "maturin is not installed. Aborting."; exit 1; }
 	@echo "Building Python Rust extension with maturin..."
 	@cd engine_py && . .venv/bin/activate && maturin develop --release
+
+# Build Python wheel for distribution (standalone, not part of dev workflow)
+build-wheel:
+	@command -v maturin >/dev/null 2>&1 || { echo >&2 "maturin is not installed. Aborting."; exit 1; }
+	@echo "Building Python wheel with maturin..."
+	@cd engine_py && maturin build --release
 
 # Run Python tests (always runs setup and build first)
 test-python: build-python

@@ -1,6 +1,6 @@
 import pytest
 
-import engine_py
+import mge as engine_py
 
 
 def test_register_and_invoke_worldgen():

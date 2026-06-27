@@ -32,7 +32,7 @@ Project roadmap: [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Architecture
 
-9 crates in a Rust workspace (`edition = "2024"`, nightly toolchain):
+8 crates in a Rust workspace (`edition = "2024"`, nightly toolchain):
 
 ```
 engine_macros (proc-macro)

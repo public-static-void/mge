@@ -80,7 +80,7 @@
 - [x] Rust unit + integration test suite
 - [x] Lua test suite
 - [x] Python test suite
-- [ ] Python wheel packaging
+- [x] Python wheel packaging
 - [x] API reference documentation
 - [x] Plugin authoring guide
 - [x] World generation documentation

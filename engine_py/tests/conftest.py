@@ -1,6 +1,6 @@
 import os
 import pytest
-import engine_py
+import mge as engine_py
 
 
 @pytest.fixture
