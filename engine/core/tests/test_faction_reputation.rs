@@ -14,13 +14,13 @@ fn setup_world() -> World {
             name: "Faction".to_string(),
             schema: serde_json::from_str(include_str!("../../assets/schemas/faction.json"))
                 .unwrap(),
-            modes: vec!["colony".to_string(), "roguelike".to_string()],
+            modes: vec!["colony".to_string(), "roguelike".to_string(), "simulation".to_string()],
         });
         let _ = reg.register_external_schema(ComponentSchema {
             name: "Reputation".to_string(),
             schema: serde_json::from_str(include_str!("../../assets/schemas/reputation.json"))
                 .unwrap(),
-            modes: vec!["colony".to_string(), "roguelike".to_string()],
+            modes: vec!["colony".to_string(), "roguelike".to_string(), "simulation".to_string()],
         });
     }
     let mut world = World::new(registry);
