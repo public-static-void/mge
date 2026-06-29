@@ -11,7 +11,7 @@ fn setup_world() -> World {
     let registry = Arc::new(Mutex::new(ComponentRegistry::new()));
     {
         let mut reg = registry.lock().unwrap();
-        let _ = reg.register_external_schema(ComponentSchema {
+        reg.register_external_schema(ComponentSchema {
             name: "Faction".to_string(),
             schema: serde_json::from_str(include_str!("../../assets/schemas/faction.json"))
                 .unwrap(),
@@ -21,7 +21,7 @@ fn setup_world() -> World {
                 "simulation".to_string(),
             ],
         });
-        let _ = reg.register_external_schema(ComponentSchema {
+        reg.register_external_schema(ComponentSchema {
             name: "Reputation".to_string(),
             schema: serde_json::from_str(include_str!("../../assets/schemas/reputation.json"))
                 .unwrap(),

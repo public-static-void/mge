@@ -55,14 +55,12 @@ impl System for FactionReputationSystem {
 
         // Apply collected updates
         for (entity, faction_id, new_value) in to_update {
-            if let Some(reputations) = world.components.get_mut("Reputation") {
-                if let Some(value) = reputations.get_mut(&entity) {
-                    if let Some(values) = value.get_mut("values") {
-                        if let Some(obj) = values.as_object_mut() {
-                            obj.insert(faction_id, serde_json::json!(new_value));
-                        }
-                    }
-                }
+            if let Some(reputations) = world.components.get_mut("Reputation")
+                && let Some(value) = reputations.get_mut(&entity)
+                && let Some(values) = value.get_mut("values")
+                && let Some(obj) = values.as_object_mut()
+            {
+                obj.insert(faction_id, serde_json::json!(new_value));
             }
         }
     }
