@@ -75,6 +75,29 @@ local function test_set_faction_with_role()
     assert.equals(faction_id, "humans", "Entity should have faction 'humans'")
 end
 
+-- 10. Reputation decays toward zero each tick with configured decay_rate
+local function test_reputation_decay()
+    local id = spawn_entity()
+    set_faction(id, "goblins", "member")
+    -- Set Reputation with decay_rate via set_component (modify_reputation always sets decay_rate to 0.0)
+    set_component(id, "Reputation", { values = { goblins = 5 }, decay_rate = 1.0 })
+    tick()
+    tick()
+    tick()
+    local rep = get_reputation(id, "goblins")
+    assert.equals(rep, 2, "Reputation should decay from 5 to 2 after 3 ticks with decay_rate 1.0")
+end
+
+-- 11. Reputation does NOT decay when decay_rate is 0.0
+local function test_reputation_no_decay_zero_rate()
+    local id = spawn_entity()
+    set_faction(id, "goblins", "member")
+    set_component(id, "Reputation", { values = { goblins = 5 }, decay_rate = 0.0 })
+    tick()
+    local rep = get_reputation(id, "goblins")
+    assert.equals(rep, 5, "Reputation should NOT decay with decay_rate 0.0")
+end
+
 return {
     test_set_and_get_faction = test_set_and_get_faction,
     test_get_faction_none = test_get_faction_none,
@@ -85,4 +108,6 @@ return {
     test_reputation_unknown_faction = test_reputation_unknown_faction,
     test_reputation_cumulative = test_reputation_cumulative,
     test_set_faction_with_role = test_set_faction_with_role,
+    test_reputation_decay = test_reputation_decay,
+    test_reputation_no_decay_zero_rate = test_reputation_no_decay_zero_rate,
 }
