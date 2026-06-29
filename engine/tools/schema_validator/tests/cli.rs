@@ -49,7 +49,7 @@ fn test_valid_schema_directory() {
         .arg(schema_dir.to_str().unwrap())
         .assert()
         .success()
-        .stdout(predicate::str::contains("Checked 25 files, 0 errors."));
+        .stdout(predicate::str::contains("Checked 27 files, 0 errors."));
 }
 
 #[test]
