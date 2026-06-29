@@ -44,12 +44,17 @@ fn test_valid_schema_directory() {
     let root = workspace_root();
     let schema_dir = root.join("engine/assets/schemas");
 
+    // Count files dynamically rather than hardcoding
+    let count = std::fs::read_dir(&schema_dir)
+        .map(|entries| entries.filter_map(|e| e.ok()).count())
+        .unwrap_or(0);
+
     let mut cmd = Command::cargo_bin("schema_validator").unwrap();
     cmd.current_dir(&root)
         .arg(schema_dir.to_str().unwrap())
         .assert()
         .success()
-        .stdout(predicate::str::contains("Checked 27 files, 0 errors."));
+        .stdout(predicate::str::contains(format!("Checked {count} files, 0 errors.")));
 }
 
 #[test]

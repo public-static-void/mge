@@ -218,9 +218,9 @@ Identical API surface in Lua, Python, and WASM:
 
 ## Testing Conventions
 
-### Test Placement — No Inline Tests in Source Files
+### Test Placement — Integration Tests in `tests/` Directories
 
-**Do NOT write `#[cfg(test)] mod tests { ... }` blocks inside production source files.** Tests must live in dedicated test files:
+Place all tests in dedicated test files outside production source code:
 
 | Test Type | Location | Example |
 |---|---|---|
@@ -231,7 +231,7 @@ Identical API surface in Lua, Python, and WASM:
 
 ### Reasoning
 
-- Source files should contain only production code — tests are separate artifacts
+- Source files contain only production code — tests are separate artifacts
 - Integration tests in `tests/` directories test the public API, which is the correct boundary
 - This prevents source file bloat and keeps the module's public interface readable
 - CI runs all test files automatically — no special registration needed
@@ -239,4 +239,4 @@ Identical API surface in Lua, Python, and WASM:
 ### Test Naming
 
 - Test files: `test_<feature>.rs` (Rust), `test_<feature>.lua` (Lua), `test_<feature>.py` (Python)
-- Test functions: `test_<descriptive_name>` (snake_case for Rust, snake_case for Lua/Python)
+- Test functions: `test_<descriptive_name>` (snake_case for all languages)
