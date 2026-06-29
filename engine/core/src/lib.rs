@@ -6,6 +6,8 @@
 pub mod config;
 /// ECS module
 pub mod ecs;
+/// Faction and reputation system
+pub mod faction;
 /// Loot table system
 pub mod loot;
 /// Map module

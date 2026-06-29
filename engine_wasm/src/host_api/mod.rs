@@ -96,3 +96,6 @@ pub mod job_ai;
 
 /// Loot table module (define_table, roll, has_table, table_names, remove_table)
 pub mod loot;
+
+/// Faction and reputation module (set_faction, get_faction, modify_reputation, get_reputation)
+pub mod faction;

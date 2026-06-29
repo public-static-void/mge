@@ -56,7 +56,7 @@
 - [ ] Crafting system (recipes, tools, materials)
 - [ ] Manufacturing and production queue
 - [ ] Diplomacy AI (relationships, treaties, war)
-- [ ] Faction and reputation system
+- [x] Faction and reputation system
 - [ ] Event-driven narrative engine (scenarios, decision events)
 - [ ] Procedural history and lore generation
 - [ ] Tech tree and research system

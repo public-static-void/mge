@@ -19,6 +19,8 @@ pub mod economic;
 pub mod entity;
 /// Equipment API
 pub mod equipment;
+/// Faction and Reputation API
+pub mod faction;
 /// Inventory API
 pub mod inventory;
 /// Job AI API

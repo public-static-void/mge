@@ -5,6 +5,7 @@ use crate::python_api::death_decay::DeathDecayApi;
 use crate::python_api::economic::EconomicApi;
 use crate::python_api::entity::EntityApi;
 use crate::python_api::equipment::EquipmentApi;
+use crate::python_api::faction::FactionApi;
 use crate::python_api::inventory::InventoryApi;
 use crate::python_api::job_query::JobQueryApi;
 use crate::python_api::mode::ModeApi;
@@ -16,6 +17,7 @@ use crate::python_api::turn::TurnApi;
 use crate::system_bridge::SystemBridge;
 use engine_core::ecs::world::World;
 use engine_core::loot::LootEntry;
+use engine_core::systems::faction_reputation::FactionReputationSystem;
 use engine_core::systems::job::job_board::JobBoard;
 use engine_core::systems::job::types::loader::load_job_types_from_dir;
 use pyo3::Python;
@@ -106,6 +108,7 @@ impl PyWorld {
         world.register_system(engine_core::systems::death_decay::ProcessDeaths);
         world.register_system(engine_core::systems::death_decay::ProcessDecay);
         world.register_system(engine_core::systems::job::JobSystem);
+        world.register_system(FactionReputationSystem);
         Ok(PyWorld {
             inner: Rc::new(RefCell::new(world)),
             systems: Rc::new(SystemBridge {
@@ -333,6 +336,26 @@ impl PyWorld {
     /// Process decay
     fn process_decay(&self) {
         DeathDecayApi::process_decay(self)
+    }
+
+    /// Assign an entity to a faction
+    fn set_faction(&self, entity: u32, faction_id: String, role: String) {
+        FactionApi::set_faction(self, entity, &faction_id, &role)
+    }
+
+    /// Get the entity's faction_id, or None
+    fn get_faction(&self, entity: u32) -> Option<String> {
+        FactionApi::get_faction(self, entity)
+    }
+
+    /// Adjust reputation with a faction by delta
+    fn modify_reputation(&self, entity: u32, faction_id: String, delta: i64) {
+        FactionApi::modify_reputation(self, entity, &faction_id, delta)
+    }
+
+    /// Get the reputation score with a faction, or 0 if absent
+    fn get_reputation(&self, entity: u32, faction_id: String) -> i64 {
+        FactionApi::get_reputation(self, entity, &faction_id)
     }
 
     /// Save

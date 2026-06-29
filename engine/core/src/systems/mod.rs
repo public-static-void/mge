@@ -14,6 +14,8 @@ pub mod economic;
 pub mod equipment_effect_aggregation;
 /// Equipment logic system
 pub mod equipment_logic;
+/// Faction reputation system
+pub mod faction_reputation;
 /// Inventory system
 pub mod inventory;
 /// Job system

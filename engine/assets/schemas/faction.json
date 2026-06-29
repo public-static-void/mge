@@ -1,0 +1,24 @@
+{
+  "title": "Faction",
+  "type": "object",
+  "description": "Faction membership for an entity.",
+  "properties": {
+    "faction_id": {
+      "type": "string",
+      "description": "Unique identifier for the faction (e.g., 'goblins', 'humans', 'nature')"
+    },
+    "role": {
+      "type": ["string", "null"],
+      "enum": ["leader", "member", "ally", "enemy", null],
+      "default": "member",
+      "description": "Entity's role within the faction"
+    },
+    "joined_tick": {
+      "type": ["integer", "null"],
+      "default": null,
+      "description": "Game tick when the entity joined this faction"
+    }
+  },
+  "required": ["faction_id"],
+  "modes": ["colony", "roguelike", "simulation"]
+}

@@ -213,3 +213,30 @@ Identical API surface in Lua, Python, and WASM:
 - **Simulation:** `tick()`, `get_turn()`, `process_deaths()`, `process_decay()`
 - **Worldgen:** `register_worldgen_plugin()`, `invoke_worldgen_plugin()`
 - **Jobs:** full job system API (board, query, mutation, events, AI assignment)
+
+---
+
+## Testing Conventions
+
+### Test Placement — Integration Tests in `tests/` Directories
+
+Place all tests in dedicated test files outside production source code:
+
+| Test Type | Location | Example |
+|---|---|---|
+| Core crate unit/integration tests | `engine/core/tests/test_<module>.rs` | `engine/core/tests/test_faction.rs` |
+| Lua tests | `engine/scripts/lua/tests/test_<feature>.lua` | `engine/scripts/lua/tests/test_faction_reputation.lua` |
+| Python tests | `engine_py/tests/test_<feature>.py` | `engine_py/tests/test_faction_reputation.py` |
+| WASM tests | `engine_wasm/tests/<feature>.rs` | `engine_wasm/tests/wasm_faction_api.rs` |
+
+### Reasoning
+
+- Source files contain only production code — tests are separate artifacts
+- Integration tests in `tests/` directories test the public API, which is the correct boundary
+- This prevents source file bloat and keeps the module's public interface readable
+- CI runs all test files automatically — no special registration needed
+
+### Test Naming
+
+- Test files: `test_<feature>.rs` (Rust), `test_<feature>.lua` (Lua), `test_<feature>.py` (Python)
+- Test functions: `test_<descriptive_name>` (snake_case for all languages)

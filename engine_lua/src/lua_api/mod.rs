@@ -21,6 +21,8 @@ pub mod entity;
 pub mod equipment;
 /// Event Bus API
 pub mod event_bus;
+/// Faction and Reputation API
+pub mod faction;
 /// Input API
 pub mod input;
 /// Inventory API
@@ -102,5 +104,6 @@ pub fn register_all_api_functions(
     dungeon::register_dungeon_api(lua, globals)?;
     job_ai::register_job_ai_api(lua, globals, world.clone())?;
     loot::register_loot_api(lua, globals, world.clone())?;
+    faction::register_faction_api(lua, globals, world.clone())?;
     Ok(())
 }
