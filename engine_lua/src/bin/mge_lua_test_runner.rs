@@ -8,9 +8,9 @@ use engine_core::plugins::loader::load_plugin_and_register_worldgen_threadsafe;
 use engine_core::plugins::types::EngineApi;
 use engine_core::systems::body_equipment_sync::BodyEquipmentSyncSystem;
 use engine_core::systems::death_decay::{ProcessDeaths, ProcessDecay};
-use engine_core::systems::faction_reputation::FactionReputationSystem;
 use engine_core::systems::economic::{EconomicSystem, load_recipes_from_dir};
 use engine_core::systems::equipment_logic::EquipmentLogicSystem;
+use engine_core::systems::faction_reputation::FactionReputationSystem;
 use engine_core::systems::inventory::InventoryConstraintSystem;
 use engine_core::systems::job::{
     JobLogicKind, JobSystem, JobTypeRegistry, load_job_types_from_dir,
@@ -277,9 +277,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         world.borrow_mut().register_system(ProcessDeaths);
         world.borrow_mut().register_system(ProcessDecay);
-        world
-            .borrow_mut()
-            .register_system(FactionReputationSystem);
+        world.borrow_mut().register_system(FactionReputationSystem);
 
         // --- Economic System registration ---
         let recipes = load_recipes_from_dir(recipes_dir().to_str().unwrap());

@@ -69,11 +69,7 @@ fn test_wall_not_walkable() {
 
     // AC005: Border cells are always walls
     for cell in &result.cells {
-        if cell.x == 0
-            || cell.x == config.width - 1
-            || cell.y == 0
-            || cell.y == config.height - 1
-        {
+        if cell.x == 0 || cell.x == config.width - 1 || cell.y == 0 || cell.y == config.height - 1 {
             assert!(
                 !cell.walkable,
                 "Border cell ({},{}) should not be walkable",

@@ -1,5 +1,5 @@
 use engine_core::presentation::renderer::{
-    PresentationRenderer, RenderCommand, RenderColor, TerminalRenderer,
+    PresentationRenderer, RenderColor, RenderCommand, TerminalRenderer,
 };
 use std::fs::File;
 use std::io::Read;

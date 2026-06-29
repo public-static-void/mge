@@ -150,4 +150,3 @@ impl PresentationRenderer for TerminalRenderer {
         }
     }
 }
-

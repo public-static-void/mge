@@ -48,9 +48,7 @@ pub fn register_faction_api(linker: &mut Linker<Arc<Mutex<WasmWorld>>>) -> anyho
                 let world = caller.data().lock().unwrap();
                 world
                     .get_component(entity, "Faction")
-                    .and_then(|json_str| {
-                        serde_json::from_str::<serde_json::Value>(&json_str).ok()
-                    })
+                    .and_then(|json_str| serde_json::from_str::<serde_json::Value>(&json_str).ok())
                     .and_then(|v| {
                         v.get("faction_id")
                             .and_then(|id| id.as_str().map(|s| s.to_string()))
@@ -80,9 +78,7 @@ pub fn register_faction_api(linker: &mut Linker<Arc<Mutex<WasmWorld>>>) -> anyho
             // Read current reputation or default
             let old_value = world
                 .get_component(entity, "Reputation")
-                .and_then(|json_str| {
-                    serde_json::from_str::<serde_json::Value>(&json_str).ok()
-                })
+                .and_then(|json_str| serde_json::from_str::<serde_json::Value>(&json_str).ok())
                 .and_then(|v| {
                     v.get("values")
                         .and_then(|vals| vals.get(&faction_id).and_then(|s| s.as_i64()))
@@ -94,18 +90,14 @@ pub fn register_faction_api(linker: &mut Linker<Arc<Mutex<WasmWorld>>>) -> anyho
             // Build and set the Reputation component
             let decay_rate = world
                 .get_component(entity, "Reputation")
-                .and_then(|json_str| {
-                    serde_json::from_str::<serde_json::Value>(&json_str).ok()
-                })
+                .and_then(|json_str| serde_json::from_str::<serde_json::Value>(&json_str).ok())
                 .and_then(|v| v.get("decay_rate").cloned())
                 .unwrap_or(json!(0.0));
 
             // Get existing values map or create empty
             let mut values_map = world
                 .get_component(entity, "Reputation")
-                .and_then(|json_str| {
-                    serde_json::from_str::<serde_json::Value>(&json_str).ok()
-                })
+                .and_then(|json_str| serde_json::from_str::<serde_json::Value>(&json_str).ok())
                 .and_then(|v| {
                     v.get("values")
                         .and_then(|vals| vals.as_object())
@@ -160,9 +152,7 @@ pub fn register_faction_api(linker: &mut Linker<Arc<Mutex<WasmWorld>>>) -> anyho
             let world = caller.data().lock().unwrap();
             world
                 .get_component(entity, "Reputation")
-                .and_then(|json_str| {
-                    serde_json::from_str::<serde_json::Value>(&json_str).ok()
-                })
+                .and_then(|json_str| serde_json::from_str::<serde_json::Value>(&json_str).ok())
                 .and_then(|v| {
                     v.get("values")
                         .and_then(|vals| vals.get(&faction_id))

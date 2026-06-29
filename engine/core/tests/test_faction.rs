@@ -1,9 +1,7 @@
 use engine_core::ecs::registry::ComponentRegistry;
 use engine_core::ecs::schema::ComponentSchema;
 use engine_core::ecs::world::World;
-use engine_core::faction::{
-    get_faction, get_reputation, modify_reputation, set_faction,
-};
+use engine_core::faction::{get_faction, get_reputation, modify_reputation, set_faction};
 use serde_json::Value as JsonValue;
 use std::sync::{Arc, Mutex};
 
@@ -15,13 +13,21 @@ fn setup_world() -> World {
             name: "Faction".to_string(),
             schema: serde_json::from_str(include_str!("../../assets/schemas/faction.json"))
                 .unwrap(),
-            modes: vec!["colony".to_string(), "roguelike".to_string(), "simulation".to_string()],
+            modes: vec![
+                "colony".to_string(),
+                "roguelike".to_string(),
+                "simulation".to_string(),
+            ],
         });
         let _ = reg.register_external_schema(ComponentSchema {
             name: "Reputation".to_string(),
             schema: serde_json::from_str(include_str!("../../assets/schemas/reputation.json"))
                 .unwrap(),
-            modes: vec!["colony".to_string(), "roguelike".to_string(), "simulation".to_string()],
+            modes: vec![
+                "colony".to_string(),
+                "roguelike".to_string(),
+                "simulation".to_string(),
+            ],
         });
     }
     let mut world = World::new(registry);
