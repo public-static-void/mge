@@ -6,6 +6,7 @@ use crate::host_api::dungeon::register_dungeon_api;
 use crate::host_api::economic::register_economic_api;
 use crate::host_api::entity::register_entity_api;
 use crate::host_api::equipment::register_equipment_api;
+use crate::host_api::faction::register_faction_api;
 use crate::host_api::event_bus::register_event_bus_api;
 use crate::host_api::input::register_input_api;
 use crate::host_api::inventory::register_inventory_api;
@@ -170,6 +171,7 @@ impl WasmScriptEngine {
         register_ui_tree_api(&mut linker)?;
         register_ui_events_api(&mut linker)?;
         register_loot_api(&mut linker)?;
+        register_faction_api(&mut linker)?;
 
         // Load schemas if schema_path is provided
         let schemas = config

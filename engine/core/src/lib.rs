@@ -4,6 +4,8 @@
 
 /// Config module
 pub mod config;
+/// Faction and reputation system
+pub mod faction;
 /// ECS module
 pub mod ecs;
 /// Loot table system

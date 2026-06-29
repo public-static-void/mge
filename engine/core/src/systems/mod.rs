@@ -6,6 +6,8 @@
 pub mod body_equipment_sync;
 /// Death and decay system
 pub mod death_decay;
+/// Faction reputation system
+pub mod faction_reputation;
 /// Procedural dungeon generation
 pub mod dungeon;
 /// Economic system

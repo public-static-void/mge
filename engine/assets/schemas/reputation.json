@@ -1,0 +1,24 @@
+{
+  "title": "Reputation",
+  "type": "object",
+  "description": "Reputation tracking between an entity and factions or other entities.",
+  "properties": {
+    "values": {
+      "type": "object",
+      "description": "Map of faction_id or entity_id → reputation score (-100 to 100)",
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": -100,
+        "maximum": 100
+      },
+      "default": {}
+    },
+    "decay_rate": {
+      "type": ["number", "null"],
+      "default": 0.0,
+      "description": "How much reputation decays per tick toward 0 (0 = no decay)"
+    }
+  },
+  "required": ["values"],
+  "modes": ["colony", "roguelike", "simulation"]
+}
