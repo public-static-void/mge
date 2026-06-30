@@ -40,7 +40,7 @@
 - [ ] Multi-scale map navigation
 - [x] Procedural dungeon generation
 - [ ] Fluid simulation (water, magma)
-- [ ] Field-of-view and lighting simulation
+- [x] Field-of-view and lighting simulation
 - [ ] Fog of war and visibility system
 - [ ] AI behaviors (enemy tactics, patrol routes)
 - [ ] Noise and detection mechanics

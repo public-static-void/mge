@@ -65,6 +65,8 @@ pub mod ui;
 pub mod world;
 /// Worldgen API
 pub mod worldgen;
+/// Field-of-view API
+pub mod fov;
 
 use crate::input::InputProvider;
 use engine_core::ecs::world::World;
@@ -105,5 +107,6 @@ pub fn register_all_api_functions(
     job_ai::register_job_ai_api(lua, globals, world.clone())?;
     loot::register_loot_api(lua, globals, world.clone())?;
     faction::register_faction_api(lua, globals, world.clone())?;
+    fov::register_fov_api(lua, globals, world.clone())?;
     Ok(())
 }

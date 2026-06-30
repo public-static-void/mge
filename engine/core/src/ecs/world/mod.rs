@@ -10,7 +10,8 @@ use crate::plugins::dynamic_systems::DynamicSystemRegistry;
 use crate::systems::job::{JobBoard, JobTypeRegistry};
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
-use std::collections::{HashMap, VecDeque};
+use crate::map::cell_key::CellKey;
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::{Arc, Mutex};
 
 /// Job handler modules
@@ -97,6 +98,9 @@ pub struct World {
     /// Map
     #[serde(skip)]
     pub map: Option<Map>,
+    /// Visible cells per entity (transient FOV state, not serialized)
+    #[serde(skip)]
+    pub visible_cells: HashMap<u32, HashSet<CellKey>>,
     event_queues: HashMap<String, (VecDeque<JsonValue>, VecDeque<JsonValue>)>, // (write, read)
     /// Map postprocessors
     #[serde(skip)]
@@ -146,6 +150,7 @@ impl World {
                 crate::systems::job::effect_processor_registry::EffectProcessorRegistry::new(),
             ))),
             map: None,
+            visible_cells: HashMap::new(),
             event_queues: HashMap::new(),
             map_postprocessors: Vec::new(),
             map_validators: Vec::new(),
@@ -156,6 +161,18 @@ impl World {
             jobs: HashMap::new(),
             job_board: JobBoard::default(),
         }
+    }
+}
+
+impl World {
+    /// Get the visible cells for an entity, if computed.
+    pub fn get_visible_cells(&self, entity: u32) -> Option<&HashSet<CellKey>> {
+        self.visible_cells.get(&entity)
+    }
+
+    /// Set the visible cells for an entity.
+    pub fn set_visible_cells(&mut self, entity: u32, cells: HashSet<CellKey>) {
+        self.visible_cells.insert(entity, cells);
     }
 }
 

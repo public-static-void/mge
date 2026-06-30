@@ -24,3 +24,5 @@ pub mod job;
 pub mod movement_system;
 /// Stat calculation system
 pub mod stat_calculation;
+/// Field-of-view update system
+pub mod fov;

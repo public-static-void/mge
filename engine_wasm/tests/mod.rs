@@ -10,6 +10,7 @@ mod wasm_entity_api;
 mod wasm_event_bus_ecs;
 mod wasm_export_discovery;
 mod wasm_faction_api;
+mod fov;
 mod wasm_input_api;
 mod wasm_inventory_api;
 mod wasm_job_ai;

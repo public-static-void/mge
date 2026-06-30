@@ -21,6 +21,8 @@ pub mod entity;
 pub mod equipment;
 /// Faction and Reputation API
 pub mod faction;
+/// Field-of-view API
+pub mod fov;
 /// Inventory API
 pub mod inventory;
 /// Job AI API

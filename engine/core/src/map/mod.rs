@@ -16,12 +16,15 @@ pub mod province;
 pub mod square;
 /// Map topology module.
 pub mod topology;
+/// Field-of-view module with recursive shadowcasting.
+pub mod fov;
 
 pub use cell_key::CellKey;
 pub use hex::HexGridMap;
 pub use pathfinding::{PathfindingResult, find_path as pathfinding_find_path};
 pub use province::ProvinceMap;
 use serde_json::Value;
+pub use fov::compute_fov;
 pub use square::SquareGridMap;
 pub use topology::MapTopology;
 

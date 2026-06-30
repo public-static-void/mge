@@ -172,6 +172,10 @@ pub struct WasmWorld {
     #[serde(default)]
     pub focused_widget: u32,
 
+    /// Per-entity visible cell cache (computed by FovUpdateSystem).
+    #[serde(skip)]
+    pub visible_cells: HashMap<u32, HashSet<CellKey>>,
+
     /// Loot table registry (runtime-defined, not serialized).
     #[serde(skip)]
     pub loot_tables: LootTableRegistry,
@@ -232,6 +236,7 @@ impl WasmWorld {
             job_board_policy: "priority".to_string(),
             job_board_jobs: Vec::new(),
             job_event_log: Vec::new(),
+            visible_cells: HashMap::new(),
             widget_registry: HashMap::new(),
             widget_types: HashMap::new(),
             widget_parents: HashMap::new(),
@@ -1386,6 +1391,18 @@ impl WasmWorld {
     /// Returns the number of cells in the map, or 0 if no map.
     pub fn get_map_cell_count(&self) -> i32 {
         self.map.as_ref().map(|m| m.cells.len() as i32).unwrap_or(0)
+    }
+
+    // ---- FOV API ----
+
+    /// Returns visible cells for an entity, or None if not computed.
+    pub fn get_visible_cells(&self, entity: u32) -> Option<&HashSet<CellKey>> {
+        self.visible_cells.get(&entity)
+    }
+
+    /// Sets visible cells for an entity.
+    pub fn set_visible_cells(&mut self, entity: u32, cells: HashSet<CellKey>) {
+        self.visible_cells.insert(entity, cells);
     }
 
     // ---- UI Widget API ----

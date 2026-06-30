@@ -369,7 +369,7 @@ impl DungeonMap {
 
                 // Add walkable metadata for wall cells
                 if !cell.walkable {
-                    cell_obj["metadata"] = json!({"walkable": false});
+                    cell_obj["metadata"] = json!({"walkable": false, "transparent": false});
                 }
 
                 cell_obj
