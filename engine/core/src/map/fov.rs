@@ -1,6 +1,14 @@
-//! Field-of-view computation using recursive symmetric shadowcasting.
+//! Field-of-view computation.
 //!
-//! Algorithm from Albert Ford's "Symmetric Shadowcasting":
+//! Uses the [`FovAlgorithm`] trait to make FOV pluggable across map topologies:
+//! - [`RecursiveShadowcasting`] — works on square grids (recursive symmetric shadowcasting)
+//! - [`HexFovAlgorithm`] — works on hex grids (BFS-based flood fill)
+//!
+//! Custom algorithms can be registered on the
+//! [`World`](crate::ecs::world::World) via
+//! [`set_fov_algorithm`](crate::ecs::world::World::set_fov_algorithm).
+//!
+//! Recursive shadowcasting algorithm from Albert Ford's "Symmetric Shadowcasting":
 //! <https://www.albertford.com/shadowcasting/>
 //!
 //! Uses integer fractions for slope tracking — no floating point.
@@ -8,10 +16,190 @@
 //! and splitting the visible cone when walls are encountered.
 
 use std::cmp::Ordering;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet, VecDeque};
 
 use super::cell_key::CellKey;
-use super::Map;
+use super::topology::MapTopology;
+
+/// A pluggable, topology-agnostic field-of-view algorithm.
+///
+/// Implementations use [`MapTopology::neighbors`] for graph traversal and
+/// [`MapTopology::get_cell_metadata`] to determine which cells block line of
+/// sight (cells with `"transparent": false` in metadata are opaque).
+///
+/// Implementations must be [`Send`] + [`Sync`] so they can be stored in the
+/// ECS [`World`](crate::ecs::world::World) which is shared across threads.
+pub trait FovAlgorithm: Send + Sync {
+    /// Compute visible cells from an origin with given range.
+    ///
+    /// * `origin` — the observer's position
+    /// * `range` — maximum sight distance in cells
+    /// * `topology` — the map topology (provides neighbor traversal and metadata)
+    ///
+    /// Returns a list of visible [`CellKey`]s. The origin is always included.
+    fn compute_fov(
+        &self,
+        origin: &CellKey,
+        range: u32,
+        topology: &dyn MapTopology,
+    ) -> Vec<CellKey>;
+
+    /// Human-readable name for debugging and API lookups.
+    fn name(&self) -> &'static str;
+}
+
+// ---------------------------------------------------------------------------
+// Helpers shared by all algorithms
+// ---------------------------------------------------------------------------
+
+/// Check whether a cell is transparent (does not block line of sight).
+/// Cells with no metadata default to transparent.
+fn is_transparent(topology: &dyn MapTopology, cell: &CellKey) -> bool {
+    topology
+        .get_cell_metadata(cell)
+        .and_then(|m| m.get("transparent"))
+        .and_then(|v| v.as_bool())
+        .unwrap_or(true)
+}
+
+// ---------------------------------------------------------------------------
+// Recursive symmetric shadowcasting (square grids only)
+// ---------------------------------------------------------------------------
+
+/// Recursive symmetric shadowcasting implementation.
+///
+/// This is the default FOV algorithm for square grids. Based on Albert Ford's
+/// symmetric shadowcasting. Handles arbitrary wall configurations and produces
+/// symmetric visibility.
+///
+/// Only works with [`CellKey::Square`] variants — returns empty for other
+/// topologies.
+pub struct RecursiveShadowcasting;
+
+impl FovAlgorithm for RecursiveShadowcasting {
+    fn compute_fov(
+        &self,
+        origin: &CellKey,
+        range: u32,
+        topology: &dyn MapTopology,
+    ) -> Vec<CellKey> {
+        let (ox, oy, oz) = match origin {
+            CellKey::Square { x, y, z } => (*x, *y, *z),
+            _ => return Vec::new(),
+        };
+
+        if range == 0 {
+            return Vec::new();
+        }
+        let range = range as i32;
+        let mut visible: HashSet<CellKey> = HashSet::new();
+
+        // Origin is always visible
+        visible.insert(origin.clone());
+
+        // Build is_opaque from topology
+        let is_opaque = |x: i32, y: i32| -> bool {
+            let cell = CellKey::Square { x, y, z: oz };
+            !topology.contains(&cell) || !is_transparent(topology, &cell)
+        };
+
+        // Scan each of the 4 quadrants (90-degree sectors)
+        for &quadrant in &[NORTH, SOUTH, EAST, WEST] {
+            scan_raw(
+                ox,
+                oy,
+                oz,
+                range,
+                quadrant,
+                &is_opaque,
+                &mut visible,
+                1,
+                Slope::neg_one(),
+                Slope::one(),
+            );
+        }
+
+        visible.into_iter().collect()
+    }
+
+    fn name(&self) -> &'static str {
+        "recursive_shadowcasting"
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Hex BFS FOV (hex grids)
+// ---------------------------------------------------------------------------
+
+/// BFS-based field-of-view for hex grids.
+///
+/// Uses a breadth-first flood fill from the origin. Opaque cells block further
+/// propagation but are themselves visible. This is the standard hex FOV
+/// algorithm — simpler than shadowcasting and works naturally with
+/// any graph topology.
+///
+/// Range is measured in graph-distance steps (edges traversed), which on a
+/// regular hex grid corresponds to the hex distance.
+pub struct HexFovAlgorithm;
+
+impl FovAlgorithm for HexFovAlgorithm {
+    fn compute_fov(
+        &self,
+        origin: &CellKey,
+        range: u32,
+        topology: &dyn MapTopology,
+    ) -> Vec<CellKey> {
+        if range == 0 {
+            return Vec::new();
+        }
+
+        if !topology.contains(origin) {
+            return Vec::new();
+        }
+
+        let range = range as i32;
+        let mut visible: HashSet<CellKey> = HashSet::new();
+        let mut queue: VecDeque<(CellKey, i32)> = VecDeque::new();
+        let mut distances: HashMap<CellKey, i32> = HashMap::new();
+
+        visible.insert(origin.clone());
+        queue.push_back((origin.clone(), 0));
+        distances.insert(origin.clone(), 0);
+
+        while let Some((current, depth)) = queue.pop_front() {
+            if depth >= range {
+                continue;
+            }
+
+            for neighbor in topology.neighbors(&current) {
+                if !topology.contains(&neighbor) || visible.contains(&neighbor) {
+                    continue;
+                }
+
+                let opaque = !is_transparent(topology, &neighbor);
+
+                // Mark the cell as visible (walls are visible too)
+                visible.insert(neighbor.clone());
+                distances.insert(neighbor.clone(), depth + 1);
+
+                // Only propagate through transparent cells (opaque blocks)
+                if !opaque {
+                    queue.push_back((neighbor, depth + 1));
+                }
+            }
+        }
+
+        visible.into_iter().collect()
+    }
+
+    fn name(&self) -> &'static str {
+        "hex_bfs"
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Internal helpers (shared by RecursiveShadowcasting)
+// ---------------------------------------------------------------------------
 
 /// Integer fraction for slope comparison.
 /// Denominator is always positive after normalization.
@@ -103,48 +291,6 @@ fn in_range(ox: i32, oy: i32, x: i32, y: i32, range: i32) -> bool {
     dx * dx + dy * dy <= range * range
 }
 
-/// Compute visible cells from an origin within a given range
-/// using recursive symmetric shadowcasting.
-///
-/// * `map` — The game map
-/// * `origin` — The observer's position
-/// * `range` — Maximum sight distance in cells
-///
-/// Returns a `HashSet` of visible `CellKey`s. The origin cell is always included.
-pub fn compute_fov(map: &Map, origin: &CellKey, range: u32) -> HashSet<CellKey> {
-    let mut visible = HashSet::new();
-
-    if range == 0 {
-        return visible;
-    }
-
-    let origin_coords = match origin {
-        CellKey::Square { x, y, z } => (*x, *y, *z),
-        _ => return visible,
-    };
-    let (ox, oy, oz) = origin_coords;
-    let range = range as i32;
-
-    // Origin is always visible
-    visible.insert(origin.clone());
-
-    // Scan each of the 4 quadrants (90-degree sectors)
-    for quadrant in &[NORTH, SOUTH, EAST, WEST] {
-        scan(
-            map,
-            ox, oy, oz,
-            range,
-            *quadrant,
-            &mut visible,
-            1,
-            Slope::neg_one(),
-            Slope::one(),
-        );
-    }
-
-    visible
-}
-
 /// Generate tiles for a row at `depth` bounded by `(start_slope, end_slope)`.
 /// Returns a Vec of (col, slope_of_tile_left_edge) for tiles in this row.
 fn row_tiles(depth: i32, start_slope: Slope, end_slope: Slope) -> Vec<(i32, Slope)> {
@@ -152,7 +298,9 @@ fn row_tiles(depth: i32, start_slope: Slope, end_slope: Slope) -> Vec<(i32, Slop
     let min_col = round_ties_up(depth * start_slope.num, start_slope.den);
     // max_col = round_ties_down(depth * end_slope)
     let max_col = round_ties_down(depth * end_slope.num, end_slope.den);
-    (min_col..=max_col).map(|col| (col, tile_slope(depth, col))).collect()
+    (min_col..=max_col)
+        .map(|col| (col, tile_slope(depth, col)))
+        .collect()
 }
 
 /// Check if a floor tile's center (col, depth) is within the view cone.
@@ -164,17 +312,18 @@ fn is_symmetric(depth: i32, col: i32, start_slope: Slope, end_slope: Slope) -> b
     above && below
 }
 
-/// Recursively scan a row, splitting the visible cone when walls are hit.
+/// Recursively scan a row (raw coordinate version).
 ///
-/// Follows Albert Ford's symmetric shadowcasting. Key behaviour:
-/// - `start_slope` may be updated (narrowed) during the wall→floor transition
-/// - `floor→wall` creates a child scan with narrowed end_slope
-/// - If the last tile in the row is floor, continue scanning the next depth
-fn scan(
-    map: &Map,
-    ox: i32, oy: i32, oz: i32,
+/// Variant of [`scan`] that uses an `is_opaque` callback instead of a map.
+/// Out-of-bounds cells are treated as opaque (blocking) so rays terminate
+/// naturally at the map boundary.
+fn scan_raw(
+    ox: i32,
+    oy: i32,
+    _oz: i32,
     range: i32,
     quadrant: u8,
+    is_opaque: &dyn Fn(i32, i32) -> bool,
     visible: &mut HashSet<CellKey>,
     depth: i32,
     start_slope: Slope,
@@ -192,67 +341,68 @@ fn scan(
     for &(col, ts) in &tiles {
         let (x, y) = quadrant_transform(quadrant, ox, oy, depth, col);
 
-        let cell = CellKey::Square { x, y, z: oz };
-
-        // Skip out-of-bounds cells
-        if !map.contains(&cell) {
-            prev_tile_was_wall = false;
-            continue;
-        }
-
         // Respect maximum range
         if !in_range(ox, oy, x, y, range) {
             continue;
         }
 
-        let is_wall_tile = !is_transparent(map, &cell);
+        let opaque = is_opaque(x, y);
 
         // Reveal wall tiles, and floor tiles whose centre is within the cone
-        if is_wall_tile || is_symmetric(depth, col, current_start, end_slope) {
-            visible.insert(cell.clone());
+        if opaque || is_symmetric(depth, col, current_start, end_slope) {
+            visible.insert(CellKey::Square { x, y, z: _oz });
         }
 
         // wall → floor transition: narrow the start_slope for subsequent children
-        if prev_tile_was_wall && !is_wall_tile {
+        if prev_tile_was_wall && !opaque {
             current_start = ts;
         }
 
         // floor → wall transition: scan child with narrowed end_slope
-        if !prev_tile_was_wall && is_wall_tile {
-            scan(
-                map,
-                ox, oy, oz,
-                range,
-                quadrant,
-                visible,
-                depth + 1,
-                current_start,
-                ts,  // narrowed end_slope = wall's left edge
+        if !prev_tile_was_wall && opaque {
+            scan_raw(
+                ox, oy, _oz, range, quadrant, is_opaque, visible, depth + 1, current_start, ts,
             );
         }
 
-        prev_tile_was_wall = is_wall_tile;
+        prev_tile_was_wall = opaque;
     }
 
     // Last tile was floor → continue scanning the next depth
     if !prev_tile_was_wall {
-        scan(
-            map,
-            ox, oy, oz,
-            range,
-            quadrant,
-            visible,
-            depth + 1,
-            current_start,
-            end_slope,
+        scan_raw(
+            ox, oy, _oz, range, quadrant, is_opaque, visible, depth + 1, current_start, end_slope,
         );
     }
 }
 
-/// Check whether a cell is transparent (does not block line of sight).
-fn is_transparent(map: &Map, cell: &CellKey) -> bool {
-    map.get_cell_metadata(cell)
-        .and_then(|m| m.get("transparent"))
-        .and_then(|v| v.as_bool())
-        .unwrap_or(true)
+// ---------------------------------------------------------------------------
+// Convenience free function (backward-compatible wrapper)
+// ---------------------------------------------------------------------------
+
+/// Compute visible cells from an origin within a given range.
+///
+/// This convenience wrapper auto-selects the appropriate FOV algorithm based
+/// on the map's topology type:
+/// - `"square"` → [`RecursiveShadowcasting`]
+/// - `"hex"` → [`HexFovAlgorithm`]
+/// - other → empty set
+///
+/// The origin cell is always included in the result.
+pub fn compute_fov(map: &super::Map, origin: &CellKey, range: u32) -> HashSet<CellKey> {
+    if range == 0 || !map.contains(origin) {
+        return HashSet::new();
+    }
+
+    let visible: Vec<CellKey> = match map.topology_type() {
+        "square" => {
+            RecursiveShadowcasting.compute_fov(origin, range, map.topology.as_ref())
+        }
+        "hex" => HexFovAlgorithm.compute_fov(origin, range, map.topology.as_ref()),
+        _ => return HashSet::new(),
+    };
+
+    let mut result: HashSet<CellKey> = visible.into_iter().collect();
+    result.insert(origin.clone());
+    result
 }

@@ -1,12 +1,20 @@
 use crate::ecs::system::System;
 use crate::ecs::world::World;
 use crate::map::cell_key::CellKey;
-use crate::map::fov::compute_fov;
+use crate::map::fov::{HexFovAlgorithm, RecursiveShadowcasting};
 use std::collections::HashSet;
 
 /// System: Computes field-of-view for all entities with a Sight component.
+///
 /// Each tick, this system iterates entities with Sight, reads their Position,
 /// and stores visible cell sets in `world.visible_cells`.
+///
+/// The FOV algorithm is auto-selected based on the map's topology type:
+/// - `"square"` → [`RecursiveShadowcasting`]
+/// - `"hex"` → [`HexFovAlgorithm`]
+///
+/// Any [`FovAlgorithm`](crate::map::fov::FovAlgorithm) can be plugged in via
+/// [`World::set_fov_algorithm`].
 pub struct FovUpdateSystem;
 
 impl System for FovUpdateSystem {
@@ -25,6 +33,18 @@ impl System for FovUpdateSystem {
             None => return,
         };
 
+        // Auto-select the FOV algorithm based on map topology
+        let desired = match map.topology_type() {
+            "hex" => "hex_bfs",
+            _ => "recursive_shadowcasting",
+        };
+        if world.fov_algorithm.name() != desired {
+            match desired {
+                "hex_bfs" => world.fov_algorithm = Box::new(HexFovAlgorithm),
+                _ => world.fov_algorithm = Box::new(RecursiveShadowcasting),
+            }
+        }
+
         // Collect-then-apply pattern to avoid borrow conflicts with world.components
         let mut results: Vec<(u32, HashSet<CellKey>)> = Vec::new();
 
@@ -39,7 +59,15 @@ impl System for FovUpdateSystem {
                     .get_component(entity, "Position")
                     .and_then(|comp| CellKey::from_position(comp))
                 {
-                    let visible = compute_fov(map, &pos, range);
+                    let visible = world
+                        .fov_algorithm()
+                        .compute_fov(&pos, range, map.topology.as_ref());
+
+                    let visible: HashSet<CellKey> = visible
+                        .into_iter()
+                        .filter(|cell| map.contains(cell))
+                        .collect();
+
                     results.push((entity, visible));
                 }
             }

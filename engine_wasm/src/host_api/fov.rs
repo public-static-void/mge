@@ -5,6 +5,7 @@
 //! - `is_visible(entity, x, y, z) -> i32`
 //! - `set_sight(entity, range)`
 //! - `get_sight(entity, out_ptr, out_len) -> i32`
+//! - `set_fov_algorithm(name_ptr, name_len)`
 
 use crate::host_api::component::write_string_to_wasm;
 use engine_core::ecs::world::wasm::WasmWorld;
@@ -110,6 +111,25 @@ pub fn register_fov_api(linker: &mut Linker<Arc<Mutex<WasmWorld>>>) -> anyhow::R
                 }
                 None => -1,
             }
+        },
+    )?;
+
+    linker.func_wrap(
+        "wasm_fov",
+        "set_fov_algorithm",
+        |mut caller: Caller<'_, Arc<Mutex<WasmWorld>>>,
+         name_ptr: i32,
+         name_len: i32| {
+            let name = crate::host_api::component::read_wasm_string(
+                &mut caller,
+                name_ptr,
+                name_len,
+            )
+            .expect("Failed to read algorithm name from WASM memory");
+            let mut world = caller.data().lock().unwrap();
+            world
+                .set_fov_algorithm_by_name(&name)
+                .expect("set_fov_algorithm failed");
         },
     )?;
 

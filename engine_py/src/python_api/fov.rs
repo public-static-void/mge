@@ -15,6 +15,8 @@ pub trait FovApi {
     fn set_sight(&self, entity: u32, range: u32);
     /// Get the Sight component data for an entity as a Python dict, or None
     fn get_sight(&self, py: Python<'_>, entity: u32) -> PyResult<Option<PyObject>>;
+    /// Switch the active FOV algorithm by registered name.
+    fn set_fov_algorithm(&self, name: &str);
 }
 
 impl FovApi for PyWorld {
@@ -74,5 +76,12 @@ impl FovApi for PyWorld {
             }
             None => Ok(None),
         }
+    }
+
+    fn set_fov_algorithm(&self, name: &str) {
+        let mut world = self.inner.borrow_mut();
+        world
+            .set_fov_algorithm_by_name(name)
+            .expect("set_fov_algorithm failed");
     }
 }

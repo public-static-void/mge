@@ -72,6 +72,17 @@ pub fn register_fov_api(
     })?;
     globals.set("set_sight", set_sight_fn)?;
 
+    // set_fov_algorithm(name) — switch the active FOV algorithm
+    let w = world.clone();
+    let set_fov_algo_fn = lua.create_function_mut(move |_, name: String| {
+        let mut world = w.borrow_mut();
+        world
+            .set_fov_algorithm_by_name(&name)
+            .map_err(mlua::Error::external)?;
+        Ok(())
+    })?;
+    globals.set("set_fov_algorithm", set_fov_algo_fn)?;
+
     // get_sight(entity_id) -> table | nil
     let w = world;
     let get_sight_fn = lua.create_function_mut(move |lua, entity_id: u32| {

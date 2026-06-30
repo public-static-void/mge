@@ -11,6 +11,7 @@ use crate::systems::job::{JobBoard, JobTypeRegistry};
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use crate::map::cell_key::CellKey;
+use crate::map::fov::{FovAlgorithm, HexFovAlgorithm, RecursiveShadowcasting};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::{Arc, Mutex};
 
@@ -125,6 +126,30 @@ pub struct World {
     /// Job board
     #[serde(skip)]
     pub job_board: JobBoard,
+
+    /// Active FOV algorithm used by the FOV update system.
+    #[serde(skip, default = "default_fov_algorithm")]
+    pub fov_algorithm: Box<dyn FovAlgorithm>,
+
+    /// Registered FOV algorithm implementations (name → instance).
+    #[serde(skip, default = "default_fov_algorithms")]
+    pub fov_algorithms: HashMap<String, Box<dyn FovAlgorithm>>,
+}
+
+/// Default FOV algorithm factory (used by serde `#[serde(skip, default)]`).
+fn default_fov_algorithm() -> Box<dyn FovAlgorithm> {
+    Box::new(RecursiveShadowcasting)
+}
+
+/// Default FOV algorithm registry (used by serde `#[serde(skip, default)]`).
+fn default_fov_algorithms() -> HashMap<String, Box<dyn FovAlgorithm>> {
+    let mut m: HashMap<String, Box<dyn FovAlgorithm>> = HashMap::new();
+    m.insert(
+        "recursive_shadowcasting".to_string(),
+        Box::new(RecursiveShadowcasting),
+    );
+    m.insert("hex_bfs".to_string(), Box::new(HexFovAlgorithm));
+    m
 }
 
 impl World {
@@ -160,6 +185,16 @@ impl World {
             recipes: HashMap::new(),
             jobs: HashMap::new(),
             job_board: JobBoard::default(),
+            fov_algorithm: Box::new(RecursiveShadowcasting),
+            fov_algorithms: {
+                let mut m: HashMap<String, Box<dyn FovAlgorithm>> = HashMap::new();
+                m.insert(
+                    "recursive_shadowcasting".to_string(),
+                    Box::new(RecursiveShadowcasting),
+                );
+                m.insert("hex_bfs".to_string(), Box::new(HexFovAlgorithm));
+                m
+            },
         }
     }
 }
@@ -173,6 +208,49 @@ impl World {
     /// Set the visible cells for an entity.
     pub fn set_visible_cells(&mut self, entity: u32, cells: HashSet<CellKey>) {
         self.visible_cells.insert(entity, cells);
+    }
+
+    /// Return a reference to the active FOV algorithm.
+    pub fn fov_algorithm(&self) -> &dyn FovAlgorithm {
+        self.fov_algorithm.as_ref()
+    }
+
+    /// Replace the active FOV algorithm.
+    pub fn set_fov_algorithm(&mut self, algo: Box<dyn FovAlgorithm>) {
+        self.fov_algorithm = algo;
+    }
+
+    /// Register an FOV algorithm under a named key.
+    ///
+    /// Panics if the name is already registered.
+    pub fn register_fov_algorithm(&mut self, name: &str, algo: Box<dyn FovAlgorithm>) {
+        let old = self.fov_algorithms.insert(name.to_string(), algo);
+        assert!(old.is_none(), "FOV algorithm '{name}' is already registered");
+    }
+
+    /// Set the active FOV algorithm by looking up its name in the registry.
+    ///
+    /// Only algorithms whose type can be reconstructed (known built-in names)
+    /// are supported via this method. Custom algorithms must be set directly
+    /// via [`set_fov_algorithm`](Self::set_fov_algorithm).
+    pub fn set_fov_algorithm_by_name(&mut self, name: &str) -> Result<(), String> {
+        if !self.fov_algorithms.contains_key(name) {
+            return Err(format!("FOV algorithm '{name}' is not registered"));
+        }
+        match name {
+            "recursive_shadowcasting" => {
+                self.fov_algorithm = Box::new(RecursiveShadowcasting);
+                Ok(())
+            }
+            "hex_bfs" => {
+                self.fov_algorithm = Box::new(HexFovAlgorithm);
+                Ok(())
+            }
+            _ => Err(format!(
+                "FOV algorithm '{name}' is registered but cannot be dynamically \
+                 constructed. Use set_fov_algorithm() directly."
+            )),
+        }
     }
 }
 

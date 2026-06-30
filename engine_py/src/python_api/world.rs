@@ -383,6 +383,11 @@ impl PyWorld {
         FovApi::get_sight(self, py, entity_id)
     }
 
+    /// Switch the active FOV algorithm by registered name.
+    fn set_fov_algorithm(&self, name: &str) {
+        FovApi::set_fov_algorithm(self, name)
+    }
+
     /// Save
     fn save_to_file(&self, path: String) -> PyResult<()> {
         SaveLoadApi::save_to_file(self, path)

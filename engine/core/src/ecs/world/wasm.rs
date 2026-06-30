@@ -179,6 +179,14 @@ pub struct WasmWorld {
     /// Loot table registry (runtime-defined, not serialized).
     #[serde(skip)]
     pub loot_tables: LootTableRegistry,
+
+    /// Active FOV algorithm name (for display/debugging).
+    #[serde(skip, default = "default_fov_algo_name")]
+    pub fov_algorithm_name: String,
+}
+
+fn default_fov_algo_name() -> String {
+    "recursive_shadowcasting".to_string()
 }
 
 /// Load all JSON schema files from a directory.
@@ -247,6 +255,7 @@ impl WasmWorld {
             ui_event_queue: Vec::new(),
             focused_widget: 0,
             loot_tables: LootTableRegistry::new(),
+            fov_algorithm_name: "recursive_shadowcasting".to_string(),
         }
     }
 
@@ -567,6 +576,17 @@ impl WasmWorld {
         let loaded: WasmWorld = serde_json::from_str(&json).map_err(|e| e.to_string())?;
         *self = loaded;
         Ok(())
+    }
+
+    /// Set the active FOV algorithm by name.
+    pub fn set_fov_algorithm_by_name(&mut self, name: &str) -> Result<(), String> {
+        match name {
+            "recursive_shadowcasting" | "hex_bfs" => {
+                self.fov_algorithm_name = name.to_string();
+                Ok(())
+            }
+            _ => Err(format!("FOV algorithm '{name}' is not registered")),
+        }
     }
 
     /// Sets the camera viewport position and dimensions.

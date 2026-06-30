@@ -24,7 +24,7 @@ pub use hex::HexGridMap;
 pub use pathfinding::{PathfindingResult, find_path as pathfinding_find_path};
 pub use province::ProvinceMap;
 use serde_json::Value;
-pub use fov::compute_fov;
+pub use fov::{FovAlgorithm, HexFovAlgorithm, RecursiveShadowcasting, compute_fov};
 pub use square::SquareGridMap;
 pub use topology::MapTopology;
 

@@ -10,7 +10,9 @@ use engine_core::ecs::system::System;
 use engine_core::ecs::world::World;
 use engine_core::map::cell_key::CellKey;
 use engine_core::map::fov::compute_fov;
-use engine_core::map::{Map, MapTopology, SquareGridMap};
+use engine_core::map::fov::HexFovAlgorithm;
+use engine_core::map::fov::FovAlgorithm;
+use engine_core::map::{HexGridMap, Map, MapTopology, SquareGridMap};
 use engine_core::systems::fov::FovUpdateSystem;
 use serde_json::json;
 use std::collections::HashSet;
@@ -458,5 +460,254 @@ fn fov_ring_shadow_single_wall() {
     assert!(
         !visible.contains(&CellKey::Square { x: 5, y: 0, z: 0 }),
         "Cell at (5,0) behind wall at (3,0) should be shadowed"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Hex FOV tests
+// ---------------------------------------------------------------------------
+
+/// Build a hex grid map for FOV testing (axial coordinates).
+fn hex_open_plane(radius: i32) -> Map {
+    let mut grid = HexGridMap::new();
+    // Add all hex cells in axial coordinates within the given radius
+    for q in -radius..=radius {
+        for r in -radius..=radius {
+            let s = -q - r;
+            if s.abs() <= radius {
+                grid.add_cell(q, r, 0);
+            }
+        }
+    }
+    // Add 6-directional adjacency for all cells
+    let hex_dirs: [(i32, i32); 6] =
+        [(1, 0), (-1, 0), (0, 1), (0, -1), (1, -1), (-1, 1)];
+    let all_cells: Vec<CellKey> = grid.all_cells();
+    for cell in &all_cells {
+        if let CellKey::Hex { q, r, z } = cell {
+            for &(dq, dr) in &hex_dirs {
+                let nq = q + dq;
+                let nr = r + dr;
+                let _ns: i32 = -nq - nr;
+                let neighbor = CellKey::Hex {
+                    q: nq,
+                    r: nr,
+                    z: *z,
+                };
+                if grid.contains(&neighbor) {
+                    let from = (*q, *r, *z);
+                    let to = (nq, nr, *z);
+                    grid.add_neighbor(from, to);
+                }
+            }
+        }
+    }
+    Map::new(Box::new(grid))
+}
+
+/// Build a hex map with a single opaque wall at the given hex coordinate.
+fn hex_map_with_wall(wq: i32, wr: i32, wall: bool) -> Map {
+    let mut grid = HexGridMap::new();
+    for q in -10..=10 {
+        for r in -10..=10 {
+            let s: i32 = -q - r;
+            if s.abs() <= 10 {
+                grid.add_cell(q, r, 0);
+            }
+        }
+    }
+    let hex_dirs: [(i32, i32); 6] =
+        [(1, 0), (-1, 0), (0, 1), (0, -1), (1, -1), (-1, 1)];
+    for q in -10..=10 {
+        for r in -10..=10 {
+            let s: i32 = -q - r;
+            if s.abs() > 10 {
+                continue;
+            }
+            for &(dq, dr) in &hex_dirs {
+                let nq = q + dq;
+                let nr = r + dr;
+                let ns: i32 = -nq - nr;
+                if ns.abs() <= 10 {
+                    grid.add_neighbor((q, r, 0), (nq, nr, 0));
+                }
+            }
+        }
+    }
+    let mut map = Map::new(Box::new(grid));
+    if wall {
+        map.set_cell_metadata(
+            &CellKey::Hex {
+                q: wq,
+                r: wr,
+                z: 0,
+            },
+            json!({"transparent": false}),
+        );
+    }
+    map
+}
+
+#[test]
+fn hex_origin_always_visible() {
+    let map = hex_open_plane(5);
+    let origin = CellKey::Hex { q: 0, r: 0, z: 0 };
+    let visible = compute_fov(&map, &origin, 5);
+    assert!(
+        visible.contains(&origin),
+        "Hex origin must always be visible"
+    );
+}
+
+#[test]
+fn hex_range_zero_returns_empty() {
+    let map = hex_open_plane(5);
+    let origin = CellKey::Hex { q: 0, r: 0, z: 0 };
+    let visible = HexFovAlgorithm.compute_fov(&origin, 0, map.topology.as_ref());
+    assert!(visible.is_empty(), "Hex range 0 should return empty vec");
+}
+
+#[test]
+fn hex_open_plane_visibility() {
+    let map = hex_open_plane(10);
+    let origin = CellKey::Hex { q: 0, r: 0, z: 0 };
+    let range = 4;
+    let visible = compute_fov(&map, &origin, range);
+
+    // Origin should be visible
+    assert!(visible.contains(&origin));
+
+    // Immediate neighbors (distance 1) should be visible
+    let neighbors = map.neighbors(&origin);
+    for n in &neighbors {
+        assert!(
+            visible.contains(n),
+            "Neighbor {:?} should be visible on open hex plane",
+            n
+        );
+    }
+
+    // Cells at distance 'range' on a straight line should be visible
+    assert!(
+        visible.contains(&CellKey::Hex {
+            q: range as i32,
+            r: 0,
+            z: 0
+        }),
+        "Cell (range, 0) should be visible on open hex plane"
+    );
+
+    // Cells beyond range should NOT be visible
+    let beyond = range as i32 + 1;
+    assert!(
+        !visible.contains(&CellKey::Hex {
+            q: beyond,
+            r: 0,
+            z: 0
+        }),
+        "Cell beyond range should NOT be visible on hex plane"
+    );
+}
+
+#[test]
+fn hex_wall_is_visible() {
+    let map = hex_map_with_wall(3, 0, true);
+    let origin = CellKey::Hex { q: 0, r: 0, z: 0 };
+    let visible = compute_fov(&map, &origin, 6);
+
+    // Wall itself should be visible
+    assert!(
+        visible.contains(&CellKey::Hex { q: 3, r: 0, z: 0 }),
+        "Wall hex at (3,0) should be visible"
+    );
+}
+
+#[test]
+fn hex_wall_in_corridor_blocks() {
+    // Create a narrow corridor (1-cell-wide line) with a wall in the middle
+    // Cells beyond the wall should not be visible since there's no alternate path.
+    let mut grid = HexGridMap::new();
+    // Line of cells along q axis at r=0
+    for q in 0..=5 {
+        grid.add_cell(q, 0, 0);
+    }
+    // Only connect adjacent cells in a line (no off-axis connections)
+    for q in 0..5 {
+        grid.add_neighbor((q, 0, 0), (q + 1, 0, 0));
+    }
+    let mut map = Map::new(Box::new(grid));
+
+    // Place wall at (2, 0)
+    map.set_cell_metadata(
+        &CellKey::Hex { q: 2, r: 0, z: 0 },
+        json!({"transparent": false}),
+    );
+
+    let origin = CellKey::Hex { q: 0, r: 0, z: 0 };
+    let visible = compute_fov(&map, &origin, 5);
+
+    // Wall itself is visible
+    assert!(
+        visible.contains(&CellKey::Hex { q: 2, r: 0, z: 0 }),
+        "Wall hex should be visible"
+    );
+
+    // Cells beyond the wall (only reachable through the wall) should NOT be visible
+    assert!(
+        !visible.contains(&CellKey::Hex { q: 3, r: 0, z: 0 }),
+        "Cell at (3,0) behind wall in corridor should not be visible"
+    );
+    assert!(
+        !visible.contains(&CellKey::Hex { q: 4, r: 0, z: 0 }),
+        "Cell at (4,0) behind wall in corridor should not be visible"
+    );
+}
+
+#[test]
+fn hex_no_wall_does_not_block() {
+    let map = hex_map_with_wall(2, 0, false);
+    let origin = CellKey::Hex { q: 0, r: 0, z: 0 };
+    let visible = compute_fov(&map, &origin, 5);
+    assert!(
+        visible.contains(&CellKey::Hex { q: 3, r: 0, z: 0 }),
+        "Cell (3,0) should be visible without wall at (2,0)"
+    );
+}
+
+#[test]
+fn hex_opaque_wall_visible() {
+    // Wall blocks propagation: cells behind it in a corridor are hidden,
+    // but the wall itself is visible
+    let mut grid = HexGridMap::new();
+    for q in 0..=3 {
+        grid.add_cell(q, 0, 0);
+    }
+    for q in 0..3 {
+        grid.add_neighbor((q, 0, 0), (q + 1, 0, 0));
+    }
+    let mut map = Map::new(Box::new(grid));
+
+    map.set_cell_metadata(
+        &CellKey::Hex { q: 1, r: 0, z: 0 },
+        json!({"transparent": false}),
+    );
+
+    let origin = CellKey::Hex { q: 0, r: 0, z: 0 };
+    let visible = compute_fov(&map, &origin, 3);
+
+    // Wall is visible
+    assert!(
+        visible.contains(&CellKey::Hex { q: 1, r: 0, z: 0 }),
+        "Opaque wall should be visible"
+    );
+
+    // Cell behind wall in corridor is not visible (cannot propagate through opaque)
+    assert!(
+        !visible.contains(&CellKey::Hex { q: 2, r: 0, z: 0 }),
+        "Cell behind opaque wall in corridor should not be visible"
+    );
+    assert!(
+        !visible.contains(&CellKey::Hex { q: 3, r: 0, z: 0 }),
+        "Cell behind opaque wall in corridor should not be visible"
     );
 }

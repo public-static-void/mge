@@ -14,6 +14,7 @@ pub extern "C" fn test_fov_api() -> i32 {
         fn get_sight(entity: u32, out_ptr: *mut u8, out_len: i32) -> i32;
         fn get_visible_cells(entity: u32, out_ptr: *mut u8, out_len: i32) -> i32;
         fn is_visible(entity: u32, x: i32, y: i32, z: i32) -> i32;
+        fn set_fov_algorithm(name_ptr: *const u8, name_len: i32);
     }
 
     unsafe {
@@ -74,6 +75,12 @@ pub extern "C" fn test_fov_api() -> i32 {
         if !json_str6.contains("\"range\":10") {
             return 0;
         }
+
+        // Test 7: set_fov_algorithm with known name succeeds
+        set_fov_algorithm(
+            "recursive_shadowcasting\0".as_ptr(),
+            "recursive_shadowcasting\0".len() as i32 - 1,
+        );
 
         1
     }
