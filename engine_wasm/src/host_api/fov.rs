@@ -49,8 +49,8 @@ pub fn register_fov_api(linker: &mut Linker<Arc<Mutex<WasmWorld>>>) -> anyhow::R
             if cells_json.is_empty() {
                 -1
             } else {
-                let json_str = serde_json::to_string(&cells_json)
-                    .unwrap_or_else(|_| "[]".to_string());
+                let json_str =
+                    serde_json::to_string(&cells_json).unwrap_or_else(|_| "[]".to_string());
                 write_string_to_wasm(&mut caller, out_ptr, out_len, &json_str) as i32
             }
         },
@@ -59,12 +59,7 @@ pub fn register_fov_api(linker: &mut Linker<Arc<Mutex<WasmWorld>>>) -> anyhow::R
     linker.func_wrap(
         "wasm_fov",
         "is_visible",
-         |caller: Caller<'_, Arc<Mutex<WasmWorld>>>,
-          entity: u32,
-          x: i32,
-          y: i32,
-          z: i32|
-         -> i32 {
+        |caller: Caller<'_, Arc<Mutex<WasmWorld>>>, entity: u32, x: i32, y: i32, z: i32| -> i32 {
             let visible = {
                 let world = caller.data().lock().unwrap();
                 let cell = CellKey::Square { x, y, z };
@@ -80,9 +75,7 @@ pub fn register_fov_api(linker: &mut Linker<Arc<Mutex<WasmWorld>>>) -> anyhow::R
     linker.func_wrap(
         "wasm_fov",
         "set_sight",
-         |caller: Caller<'_, Arc<Mutex<WasmWorld>>>,
-          entity: u32,
-          range: i32| {
+        |caller: Caller<'_, Arc<Mutex<WasmWorld>>>, entity: u32, range: i32| {
             let mut world = caller.data().lock().unwrap();
             let data = json!({
                 "range": range,
@@ -117,15 +110,10 @@ pub fn register_fov_api(linker: &mut Linker<Arc<Mutex<WasmWorld>>>) -> anyhow::R
     linker.func_wrap(
         "wasm_fov",
         "set_fov_algorithm",
-        |mut caller: Caller<'_, Arc<Mutex<WasmWorld>>>,
-         name_ptr: i32,
-         name_len: i32| {
-            let name = crate::host_api::component::read_wasm_string(
-                &mut caller,
-                name_ptr,
-                name_len,
-            )
-            .expect("Failed to read algorithm name from WASM memory");
+        |mut caller: Caller<'_, Arc<Mutex<WasmWorld>>>, name_ptr: i32, name_len: i32| {
+            let name =
+                crate::host_api::component::read_wasm_string(&mut caller, name_ptr, name_len)
+                    .expect("Failed to read algorithm name from WASM memory");
             let mut world = caller.data().lock().unwrap();
             world
                 .set_fov_algorithm_by_name(&name)

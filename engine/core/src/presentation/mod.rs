@@ -122,9 +122,7 @@ impl<R: PresentationRenderer> PresentationSystem<R> {
         for cell in map.all_cells() {
             let (sx, sy) = layout.cell_to_screen(&cell);
             if viewport.contains(sx, sy) {
-                let in_visible = visible_cells
-                    .map(|vis| vis.contains(&cell))
-                    .unwrap_or(true);
+                let in_visible = visible_cells.map(|vis| vis.contains(&cell)).unwrap_or(true);
 
                 let meta = map.get_cell_metadata(&cell);
                 let (glyph, color) = if !in_visible {
@@ -156,31 +154,29 @@ impl<R: PresentationRenderer> PresentationSystem<R> {
             let pos_json = world.get_component(*entity, "Position");
             let renderable_json = world.get_component(*entity, "Renderable");
             if let (Some(pos_json), Some(renderable_json)) = (pos_json, renderable_json) {
-                let (x, y, entity_cell) =
-                    if let Some(pos_obj) = pos_json.get("pos") {
-                        if let Some(square) = pos_obj.get("Square") {
-                            let x = square.get("x").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
-                            let y = square.get("y").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
-                            let z = square.get("z").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
-                            (x, y, Some(CellKey::Square { x, y, z }))
-                        } else if let Some(hex) = pos_obj.get("Hex") {
-                            let q = hex.get("q").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
-                            let r = hex.get("r").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
-                            let z = hex.get("z").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
-                            (q, r, Some(CellKey::Hex { q, r, z }))
-                        } else if let Some(province) = pos_obj.get("Province") {
-                            if let Some(province_id) =
-                                province.get("id").and_then(|v| v.as_str())
-                            {
-                                if let Some(map) = &world.map {
-                                    let (cx, cy) =
-                                        province_centroid(map, province_id).unwrap_or((0, 0));
-                                    (cx, cy, Some(CellKey::Province {
+                let (x, y, entity_cell) = if let Some(pos_obj) = pos_json.get("pos") {
+                    if let Some(square) = pos_obj.get("Square") {
+                        let x = square.get("x").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
+                        let y = square.get("y").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
+                        let z = square.get("z").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
+                        (x, y, Some(CellKey::Square { x, y, z }))
+                    } else if let Some(hex) = pos_obj.get("Hex") {
+                        let q = hex.get("q").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
+                        let r = hex.get("r").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
+                        let z = hex.get("z").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
+                        (q, r, Some(CellKey::Hex { q, r, z }))
+                    } else if let Some(province) = pos_obj.get("Province") {
+                        if let Some(province_id) = province.get("id").and_then(|v| v.as_str()) {
+                            if let Some(map) = &world.map {
+                                let (cx, cy) =
+                                    province_centroid(map, province_id).unwrap_or((0, 0));
+                                (
+                                    cx,
+                                    cy,
+                                    Some(CellKey::Province {
                                         id: province_id.to_string(),
-                                    }))
-                                } else {
-                                    (0, 0, None)
-                                }
+                                    }),
+                                )
                             } else {
                                 (0, 0, None)
                             }
@@ -189,7 +185,10 @@ impl<R: PresentationRenderer> PresentationSystem<R> {
                         }
                     } else {
                         (0, 0, None)
-                    };
+                    }
+                } else {
+                    (0, 0, None)
+                };
 
                 // Skip entities in non-visible cells
                 let in_visible = match (&visible_cells, &entity_cell) {

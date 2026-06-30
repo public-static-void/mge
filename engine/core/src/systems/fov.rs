@@ -50,18 +50,16 @@ impl System for FovUpdateSystem {
 
         if let Some(sight_components) = world.components.get("Sight") {
             for (&entity, data) in sight_components.iter() {
-                let range = data
-                    .get("range")
-                    .and_then(|v| v.as_u64())
-                    .unwrap_or(8) as u32;
+                let range = data.get("range").and_then(|v| v.as_u64()).unwrap_or(8) as u32;
 
                 if let Some(pos) = world
                     .get_component(entity, "Position")
                     .and_then(|comp| CellKey::from_position(comp))
                 {
-                    let visible = world
-                        .fov_algorithm()
-                        .compute_fov(&pos, range, map.topology.as_ref());
+                    let visible =
+                        world
+                            .fov_algorithm()
+                            .compute_fov(&pos, range, map.topology.as_ref());
 
                     let visible: HashSet<CellKey> = visible
                         .into_iter()

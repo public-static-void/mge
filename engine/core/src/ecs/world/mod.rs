@@ -6,12 +6,12 @@ use crate::ecs::registry::ComponentRegistry;
 use crate::ecs::system::SystemRegistry;
 use crate::loot::LootTableRegistry;
 use crate::map::Map;
+use crate::map::cell_key::CellKey;
+use crate::map::fov::{BfsFovAlgorithm, FovAlgorithm, RecursiveShadowcasting};
 use crate::plugins::dynamic_systems::DynamicSystemRegistry;
 use crate::systems::job::{JobBoard, JobTypeRegistry};
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
-use crate::map::cell_key::CellKey;
-use crate::map::fov::{BfsFovAlgorithm, FovAlgorithm, RecursiveShadowcasting};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::{Arc, Mutex};
 
@@ -225,7 +225,10 @@ impl World {
     /// Panics if the name is already registered.
     pub fn register_fov_algorithm(&mut self, name: &str, algo: Box<dyn FovAlgorithm>) {
         let old = self.fov_algorithms.insert(name.to_string(), algo);
-        assert!(old.is_none(), "FOV algorithm '{name}' is already registered");
+        assert!(
+            old.is_none(),
+            "FOV algorithm '{name}' is already registered"
+        );
     }
 
     /// Set the active FOV algorithm by looking up its name in the registry.

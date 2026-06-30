@@ -7,11 +7,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 /// Registers the FOV API functions into the Lua globals table.
-pub fn register_fov_api(
-    lua: &Lua,
-    globals: &Table,
-    world: Rc<RefCell<World>>,
-) -> LuaResult<()> {
+pub fn register_fov_api(lua: &Lua, globals: &Table, world: Rc<RefCell<World>>) -> LuaResult<()> {
     // get_visible_cells(entity_id) -> table of {x, y, z} cell tables
     let w = world.clone();
     let get_visible_cells_fn = lua.create_function_mut(move |lua, entity_id: u32| {
@@ -45,8 +41,8 @@ pub fn register_fov_api(
 
     // is_visible(entity_id, x, y, z) -> bool
     let w = world.clone();
-    let is_visible_fn = lua.create_function_mut(
-        move |_, (entity_id, x, y, z): (u32, i32, i32, i32)| {
+    let is_visible_fn =
+        lua.create_function_mut(move |_, (entity_id, x, y, z): (u32, i32, i32, i32)| {
             let world = w.borrow();
             let cell = CellKey::Square { x, y, z };
             let result = world
@@ -54,8 +50,7 @@ pub fn register_fov_api(
                 .map(|cells| cells.contains(&cell))
                 .unwrap_or(false);
             Ok(result)
-        },
-    )?;
+        })?;
     globals.set("is_visible", is_visible_fn)?;
 
     // set_sight(entity_id, range) — sets/updates Sight component

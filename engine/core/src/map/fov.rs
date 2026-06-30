@@ -37,12 +37,8 @@ pub trait FovAlgorithm: Send + Sync {
     /// * `topology` — the map topology (provides neighbor traversal and metadata)
     ///
     /// Returns a list of visible [`CellKey`]s. The origin is always included.
-    fn compute_fov(
-        &self,
-        origin: &CellKey,
-        range: u32,
-        topology: &dyn MapTopology,
-    ) -> Vec<CellKey>;
+    fn compute_fov(&self, origin: &CellKey, range: u32, topology: &dyn MapTopology)
+    -> Vec<CellKey>;
 
     /// Human-readable name for debugging and API lookups.
     fn name(&self) -> &'static str;
@@ -243,22 +239,14 @@ impl PartialOrd for Slope {
 fn round_ties_up(num: i32, den: i32) -> i32 {
     let n = 2 * num + den;
     let d = 2 * den;
-    if n >= 0 {
-        n / d
-    } else {
-        (n - d + 1) / d
-    }
+    if n >= 0 { n / d } else { (n - d + 1) / d }
 }
 
 /// Round `n - 0.5` toward negative infinity (ceil(n - 0.5) for all n).
 fn round_ties_down(num: i32, den: i32) -> i32 {
     let n = 2 * num - den;
     let d = 2 * den;
-    if n >= 0 {
-        (n + d - 1) / d
-    } else {
-        n / d
-    }
+    if n >= 0 { (n + d - 1) / d } else { n / d }
 }
 
 /// Compute the slope of a tile's left edge: (2*col - 1) / (2*depth)
@@ -360,7 +348,16 @@ fn scan_raw(
         // floor → wall transition: scan child with narrowed end_slope
         if !prev_tile_was_wall && opaque {
             scan_raw(
-                ox, oy, _oz, range, quadrant, is_opaque, visible, depth + 1, current_start, ts,
+                ox,
+                oy,
+                _oz,
+                range,
+                quadrant,
+                is_opaque,
+                visible,
+                depth + 1,
+                current_start,
+                ts,
             );
         }
 
@@ -370,7 +367,16 @@ fn scan_raw(
     // Last tile was floor → continue scanning the next depth
     if !prev_tile_was_wall {
         scan_raw(
-            ox, oy, _oz, range, quadrant, is_opaque, visible, depth + 1, current_start, end_slope,
+            ox,
+            oy,
+            _oz,
+            range,
+            quadrant,
+            is_opaque,
+            visible,
+            depth + 1,
+            current_start,
+            end_slope,
         );
     }
 }
@@ -394,9 +400,7 @@ pub fn compute_fov(map: &super::Map, origin: &CellKey, range: u32) -> HashSet<Ce
     }
 
     let visible: Vec<CellKey> = match map.topology_type() {
-        "square" => {
-            RecursiveShadowcasting.compute_fov(origin, range, map.topology.as_ref())
-        }
+        "square" => RecursiveShadowcasting.compute_fov(origin, range, map.topology.as_ref()),
         "hex" | "province" => BfsFovAlgorithm.compute_fov(origin, range, map.topology.as_ref()),
         _ => return HashSet::new(),
     };

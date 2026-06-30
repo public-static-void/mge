@@ -9,9 +9,9 @@ use engine_core::ecs::schema::ComponentSchema;
 use engine_core::ecs::system::System;
 use engine_core::ecs::world::World;
 use engine_core::map::cell_key::CellKey;
-use engine_core::map::fov::compute_fov;
 use engine_core::map::fov::BfsFovAlgorithm;
 use engine_core::map::fov::FovAlgorithm;
+use engine_core::map::fov::compute_fov;
 use engine_core::map::{HexGridMap, Map, MapTopology, SquareGridMap};
 use engine_core::systems::fov::FovUpdateSystem;
 use serde_json::json;
@@ -72,11 +72,7 @@ fn map_with_wall(wx: i32, wy: i32, wall: bool) -> Map {
     let mut map = Map::new(Box::new(grid));
     if wall {
         map.set_cell_metadata(
-            &CellKey::Square {
-                x: wx,
-                y: wy,
-                z: 0,
-            },
+            &CellKey::Square { x: wx, y: wy, z: 0 },
             serde_json::json!({"transparent": false}),
         );
     }
@@ -89,8 +85,7 @@ fn setup_world_with_schema() -> World {
         let mut reg = registry.lock().unwrap();
         reg.register_external_schema(ComponentSchema {
             name: "Sight".to_string(),
-            schema: serde_json::from_str(include_str!("../../assets/schemas/sight.json"))
-                .unwrap(),
+            schema: serde_json::from_str(include_str!("../../assets/schemas/sight.json")).unwrap(),
             modes: vec![
                 "colony".to_string(),
                 "roguelike".to_string(),
@@ -118,10 +113,7 @@ fn integration_origin_always_visible() {
     let map = open_plane(5);
     let origin = CellKey::Square { x: 0, y: 0, z: 0 };
     let visible = compute_fov(&map, &origin, 5);
-    assert!(
-        visible.contains(&origin),
-        "Origin must always be visible"
-    );
+    assert!(visible.contains(&origin), "Origin must always be visible");
 }
 
 #[test]
@@ -184,11 +176,7 @@ fn integration_out_of_bounds_excluded() {
     let origin = CellKey::Square { x: 0, y: 0, z: 0 };
     let visible = compute_fov(&map, &origin, 10);
     assert!(
-        !visible.contains(&CellKey::Square {
-            x: 10,
-            y: 0,
-            z: 0
-        }),
+        !visible.contains(&CellKey::Square { x: 10, y: 0, z: 0 }),
         "Out-of-bounds cell should not be visible"
     );
 }
@@ -261,11 +249,7 @@ fn integration_visible_cells_get_none() {
 fn integration_visible_cells_set_get_roundtrip() {
     let mut world = setup_world_with_schema();
     let mut cells = HashSet::new();
-    cells.insert(CellKey::Square {
-        x: 0,
-        y: 0,
-        z: 0,
-    });
+    cells.insert(CellKey::Square { x: 0, y: 0, z: 0 });
     world.set_visible_cells(42, cells.clone());
     let retrieved = world.get_visible_cells(42);
     assert!(retrieved.is_some());
@@ -276,11 +260,7 @@ fn integration_visible_cells_set_get_roundtrip() {
 fn integration_visible_cells_serde_skip() {
     let mut world = setup_world_with_schema();
     let mut cells = HashSet::new();
-    cells.insert(CellKey::Square {
-        x: 0,
-        y: 0,
-        z: 0,
-    });
+    cells.insert(CellKey::Square { x: 0, y: 0, z: 0 });
     world.set_visible_cells(1, cells);
 
     let json = serde_json::to_string(&world).unwrap();
@@ -336,11 +316,7 @@ fn integration_ring_shadow() {
         "Cell at (4,0) behind wall at (3,0) should be shadowed"
     );
     assert!(
-        !visible.contains(&CellKey::Square {
-            x: -4,
-            y: 0,
-            z: 0
-        }),
+        !visible.contains(&CellKey::Square { x: -4, y: 0, z: 0 }),
         "Cell at (-4,0) behind wall at (-3,0) should be shadowed"
     );
     assert!(
@@ -381,7 +357,11 @@ fn fov_open_plane_radius() {
     }
     let beyond = range as i32 + 1;
     assert!(
-        !visible.contains(&CellKey::Square { x: beyond, y: 0, z: 0 }),
+        !visible.contains(&CellKey::Square {
+            x: beyond,
+            y: 0,
+            z: 0
+        }),
         "Cell ({beyond}, 0) beyond range should NOT be visible"
     );
 }
@@ -433,11 +413,7 @@ fn fov_update_system_preserves_existing_no_sight() {
     world.map = Some(map);
 
     let mut cells = HashSet::new();
-    cells.insert(CellKey::Square {
-        x: 0,
-        y: 0,
-        z: 0,
-    });
+    cells.insert(CellKey::Square { x: 0, y: 0, z: 0 });
     world.set_visible_cells(99, cells);
 
     let mut system = FovUpdateSystem;
@@ -480,8 +456,7 @@ fn hex_open_plane(radius: i32) -> Map {
         }
     }
     // Add 6-directional adjacency for all cells
-    let hex_dirs: [(i32, i32); 6] =
-        [(1, 0), (-1, 0), (0, 1), (0, -1), (1, -1), (-1, 1)];
+    let hex_dirs: [(i32, i32); 6] = [(1, 0), (-1, 0), (0, 1), (0, -1), (1, -1), (-1, 1)];
     let all_cells: Vec<CellKey> = grid.all_cells();
     for cell in &all_cells {
         if let CellKey::Hex { q, r, z } = cell {
@@ -516,8 +491,7 @@ fn hex_map_with_wall(wq: i32, wr: i32, wall: bool) -> Map {
             }
         }
     }
-    let hex_dirs: [(i32, i32); 6] =
-        [(1, 0), (-1, 0), (0, 1), (0, -1), (1, -1), (-1, 1)];
+    let hex_dirs: [(i32, i32); 6] = [(1, 0), (-1, 0), (0, 1), (0, -1), (1, -1), (-1, 1)];
     for q in -10..=10 {
         for r in -10..=10 {
             let s: i32 = -q - r;
@@ -537,11 +511,7 @@ fn hex_map_with_wall(wq: i32, wr: i32, wall: bool) -> Map {
     let mut map = Map::new(Box::new(grid));
     if wall {
         map.set_cell_metadata(
-            &CellKey::Hex {
-                q: wq,
-                r: wr,
-                z: 0,
-            },
+            &CellKey::Hex { q: wq, r: wr, z: 0 },
             json!({"transparent": false}),
         );
     }

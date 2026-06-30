@@ -23,6 +23,8 @@ pub mod equipment;
 pub mod event_bus;
 /// Faction and Reputation API
 pub mod faction;
+/// Field-of-view API
+pub mod fov;
 /// Input API
 pub mod input;
 /// Inventory API
@@ -65,8 +67,6 @@ pub mod ui;
 pub mod world;
 /// Worldgen API
 pub mod worldgen;
-/// Field-of-view API
-pub mod fov;
 
 use crate::input::InputProvider;
 use engine_core::ecs::world::World;
