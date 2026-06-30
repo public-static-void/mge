@@ -581,7 +581,7 @@ impl WasmWorld {
     /// Set the active FOV algorithm by name.
     pub fn set_fov_algorithm_by_name(&mut self, name: &str) -> Result<(), String> {
         match name {
-            "recursive_shadowcasting" | "hex_bfs" => {
+            "recursive_shadowcasting" | "bfs_flood_fill" => {
                 self.fov_algorithm_name = name.to_string();
                 Ok(())
             }

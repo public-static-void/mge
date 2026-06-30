@@ -1,7 +1,7 @@
 use crate::ecs::system::System;
 use crate::ecs::world::World;
 use crate::map::cell_key::CellKey;
-use crate::map::fov::{HexFovAlgorithm, RecursiveShadowcasting};
+use crate::map::fov::{BfsFovAlgorithm, RecursiveShadowcasting};
 use std::collections::HashSet;
 
 /// System: Computes field-of-view for all entities with a Sight component.
@@ -11,7 +11,7 @@ use std::collections::HashSet;
 ///
 /// The FOV algorithm is auto-selected based on the map's topology type:
 /// - `"square"` → [`RecursiveShadowcasting`]
-/// - `"hex"` → [`HexFovAlgorithm`]
+/// - `"hex"` / `"province"` → [`BfsFovAlgorithm`]
 ///
 /// Any [`FovAlgorithm`](crate::map::fov::FovAlgorithm) can be plugged in via
 /// [`World::set_fov_algorithm`].
@@ -35,12 +35,12 @@ impl System for FovUpdateSystem {
 
         // Auto-select the FOV algorithm based on map topology
         let desired = match map.topology_type() {
-            "hex" => "hex_bfs",
+            "hex" | "province" => "bfs_flood_fill",
             _ => "recursive_shadowcasting",
         };
         if world.fov_algorithm.name() != desired {
             match desired {
-                "hex_bfs" => world.fov_algorithm = Box::new(HexFovAlgorithm),
+                "bfs_flood_fill" => world.fov_algorithm = Box::new(BfsFovAlgorithm),
                 _ => world.fov_algorithm = Box::new(RecursiveShadowcasting),
             }
         }

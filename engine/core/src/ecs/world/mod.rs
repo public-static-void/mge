@@ -11,7 +11,7 @@ use crate::systems::job::{JobBoard, JobTypeRegistry};
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use crate::map::cell_key::CellKey;
-use crate::map::fov::{FovAlgorithm, HexFovAlgorithm, RecursiveShadowcasting};
+use crate::map::fov::{BfsFovAlgorithm, FovAlgorithm, RecursiveShadowcasting};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::{Arc, Mutex};
 
@@ -148,7 +148,7 @@ fn default_fov_algorithms() -> HashMap<String, Box<dyn FovAlgorithm>> {
         "recursive_shadowcasting".to_string(),
         Box::new(RecursiveShadowcasting),
     );
-    m.insert("hex_bfs".to_string(), Box::new(HexFovAlgorithm));
+    m.insert("bfs_flood_fill".to_string(), Box::new(BfsFovAlgorithm));
     m
 }
 
@@ -192,7 +192,7 @@ impl World {
                     "recursive_shadowcasting".to_string(),
                     Box::new(RecursiveShadowcasting),
                 );
-                m.insert("hex_bfs".to_string(), Box::new(HexFovAlgorithm));
+                m.insert("bfs_flood_fill".to_string(), Box::new(BfsFovAlgorithm));
                 m
             },
         }
@@ -242,8 +242,8 @@ impl World {
                 self.fov_algorithm = Box::new(RecursiveShadowcasting);
                 Ok(())
             }
-            "hex_bfs" => {
-                self.fov_algorithm = Box::new(HexFovAlgorithm);
+            "bfs_flood_fill" => {
+                self.fov_algorithm = Box::new(BfsFovAlgorithm);
                 Ok(())
             }
             _ => Err(format!(

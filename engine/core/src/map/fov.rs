@@ -2,7 +2,7 @@
 //!
 //! Uses the [`FovAlgorithm`] trait to make FOV pluggable across map topologies:
 //! - [`RecursiveShadowcasting`] — works on square grids (recursive symmetric shadowcasting)
-//! - [`HexFovAlgorithm`] — works on hex grids (BFS-based flood fill)
+//! - [`BfsFovAlgorithm`] — works on hex and province grids (BFS-based flood fill)
 //!
 //! Custom algorithms can be registered on the
 //! [`World`](crate::ecs::world::World) via
@@ -128,21 +128,20 @@ impl FovAlgorithm for RecursiveShadowcasting {
 }
 
 // ---------------------------------------------------------------------------
-// Hex BFS FOV (hex grids)
+// BFS FOV (any graph topology — hex and province grids)
 // ---------------------------------------------------------------------------
 
-/// BFS-based field-of-view for hex grids.
+/// BFS-based field-of-view for any graph topology.
 ///
 /// Uses a breadth-first flood fill from the origin. Opaque cells block further
-/// propagation but are themselves visible. This is the standard hex FOV
-/// algorithm — simpler than shadowcasting and works naturally with
-/// any graph topology.
+/// propagation but are themselves visible. Works for hex grids, province maps,
+/// or any map topology that implements [`MapTopology::neighbors`].
 ///
 /// Range is measured in graph-distance steps (edges traversed), which on a
 /// regular hex grid corresponds to the hex distance.
-pub struct HexFovAlgorithm;
+pub struct BfsFovAlgorithm;
 
-impl FovAlgorithm for HexFovAlgorithm {
+impl FovAlgorithm for BfsFovAlgorithm {
     fn compute_fov(
         &self,
         origin: &CellKey,
@@ -193,7 +192,7 @@ impl FovAlgorithm for HexFovAlgorithm {
     }
 
     fn name(&self) -> &'static str {
-        "hex_bfs"
+        "bfs_flood_fill"
     }
 }
 
@@ -385,7 +384,7 @@ fn scan_raw(
 /// This convenience wrapper auto-selects the appropriate FOV algorithm based
 /// on the map's topology type:
 /// - `"square"` → [`RecursiveShadowcasting`]
-/// - `"hex"` → [`HexFovAlgorithm`]
+/// - `"hex"` / `"province"` → [`BfsFovAlgorithm`]
 /// - other → empty set
 ///
 /// The origin cell is always included in the result.
@@ -398,7 +397,7 @@ pub fn compute_fov(map: &super::Map, origin: &CellKey, range: u32) -> HashSet<Ce
         "square" => {
             RecursiveShadowcasting.compute_fov(origin, range, map.topology.as_ref())
         }
-        "hex" => HexFovAlgorithm.compute_fov(origin, range, map.topology.as_ref()),
+        "hex" | "province" => BfsFovAlgorithm.compute_fov(origin, range, map.topology.as_ref()),
         _ => return HashSet::new(),
     };
 

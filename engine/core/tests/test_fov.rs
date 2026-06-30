@@ -10,7 +10,7 @@ use engine_core::ecs::system::System;
 use engine_core::ecs::world::World;
 use engine_core::map::cell_key::CellKey;
 use engine_core::map::fov::compute_fov;
-use engine_core::map::fov::HexFovAlgorithm;
+use engine_core::map::fov::BfsFovAlgorithm;
 use engine_core::map::fov::FovAlgorithm;
 use engine_core::map::{HexGridMap, Map, MapTopology, SquareGridMap};
 use engine_core::systems::fov::FovUpdateSystem;
@@ -563,7 +563,7 @@ fn hex_origin_always_visible() {
 fn hex_range_zero_returns_empty() {
     let map = hex_open_plane(5);
     let origin = CellKey::Hex { q: 0, r: 0, z: 0 };
-    let visible = HexFovAlgorithm.compute_fov(&origin, 0, map.topology.as_ref());
+    let visible = BfsFovAlgorithm.compute_fov(&origin, 0, map.topology.as_ref());
     assert!(visible.is_empty(), "Hex range 0 should return empty vec");
 }
 
