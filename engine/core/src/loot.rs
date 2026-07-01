@@ -1,3 +1,4 @@
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -131,7 +132,7 @@ impl LootTableRegistry {
             return Err(LootError::EmptyTable(name.to_string()));
         }
 
-        let mut rng = rand_08::thread_rng();
+        let mut rng = rand::rng();
 
         // Sum all weights for weighted selection
         let total_weight: u64 = table.entries.iter().map(|e| e.weight as u64).sum();
@@ -141,7 +142,7 @@ impl LootTableRegistry {
         }
 
         // Weighted random selection: pick one entry proportional to its weight
-        let pick = rand_08::Rng::gen_range(&mut rng, 0u64..total_weight);
+        let pick = rng.random_range(0u64..total_weight);
         let mut cumulative = 0u64;
 
         for entry in &table.entries {
@@ -150,7 +151,7 @@ impl LootTableRegistry {
                 let count = if entry.min_count == entry.max_count {
                     entry.min_count
                 } else {
-                    rand_08::Rng::gen_range(&mut rng, entry.min_count..=entry.max_count)
+                    rng.random_range(entry.min_count..=entry.max_count)
                 };
                 return Ok(vec![(entry.item_id.clone(), count)]);
             }
