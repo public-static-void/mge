@@ -43,10 +43,7 @@ impl System for FogUpdateSystem {
 
         // Apply collected updates
         for (entity, cells) in updates {
-            let explored = world
-                .explored_cells
-                .entry(entity)
-                .or_default();
+            let explored = world.explored_cells.entry(entity).or_default();
             explored.extend(cells);
         }
     }
