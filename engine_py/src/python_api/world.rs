@@ -19,6 +19,7 @@ use crate::system_bridge::SystemBridge;
 use engine_core::ecs::world::World;
 use engine_core::loot::LootEntry;
 use engine_core::systems::faction_reputation::FactionReputationSystem;
+use engine_core::systems::fog::FogUpdateSystem;
 use engine_core::systems::fov::FovUpdateSystem;
 use engine_core::systems::job::job_board::JobBoard;
 use engine_core::systems::job::types::loader::load_job_types_from_dir;
@@ -112,6 +113,7 @@ impl PyWorld {
         world.register_system(engine_core::systems::job::JobSystem);
         world.register_system(FactionReputationSystem);
         world.register_system(FovUpdateSystem);
+        world.register_system(FogUpdateSystem);
         Ok(PyWorld {
             inner: Rc::new(RefCell::new(world)),
             systems: Rc::new(SystemBridge {
@@ -386,6 +388,29 @@ impl PyWorld {
     /// Switch the active FOV algorithm by registered name.
     fn set_fov_algorithm(&self, name: &str) {
         FovApi::set_fov_algorithm(self, name)
+    }
+
+    // ---- FOG OF WAR ----
+
+    /// Check if a cell is explored by an entity.
+    fn is_explored(&self, entity_id: u32, x: i32, y: i32, z: i32) -> bool {
+        FovApi::is_explored(self, entity_id, x, y, z)
+    }
+
+    /// Get explored cells for an entity. Returns a list of dicts with x, y, z keys.
+    fn get_explored_cells(&self, entity_id: u32) -> Vec<HashMap<String, i32>> {
+        FovApi::get_explored_cells(self, entity_id)
+    }
+
+    /// Reset (clear) fog-of-war for an entity.
+    fn reset_fog(&self, entity_id: u32) {
+        FovApi::reset_fog(self, entity_id)
+    }
+
+    /// Get the visibility state of a cell for an entity.
+    /// Returns 0 (unexplored), 1 (explored), or 2 (visible).
+    fn get_visibility_state(&self, entity_id: u32, x: i32, y: i32, z: i32) -> u8 {
+        FovApi::get_visibility_state(self, entity_id, x, y, z)
     }
 
     /// Save

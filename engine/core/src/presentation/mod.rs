@@ -14,7 +14,8 @@ pub mod ui;
 
 use crate::map::cell_key::CellKey;
 use crate::presentation::renderer::{
-    COLOR_DIM_GRAY, COLOR_GRAY, COLOR_VERY_DIM, PresentationRenderer, RenderColor, RenderCommand,
+    COLOR_BLACK, COLOR_DIM_GRAY, COLOR_GRAY, COLOR_VERY_DIM, PresentationRenderer, RenderColor,
+    RenderCommand,
 };
 use std::collections::HashSet;
 
@@ -88,16 +89,21 @@ impl<R: PresentationRenderer> PresentationSystem<R> {
 
     /// Render the map without visibility filtering.
     /// Delegates to [`render_map_with_visibility`](Self::render_map_with_visibility)
-    /// with `None` for the visible-cells set.
+    /// with `None` for visible/explored cells.
     pub fn render_map(&mut self, world: &crate::ecs::world::World, viewport: &Viewport) {
-        self.render_map_with_visibility(world, viewport, None);
+        self.render_map_with_visibility(world, viewport, None, None);
     }
 
-    /// Render the map with optional visibility filtering.
+    /// Render the map with optional visibility and fog-of-war filtering.
     ///
-    /// When `visible_cells` is `Some(set)`:
-    /// - Cells NOT in the set are drawn with a dim style.
-    /// - Entities in non-visible cells are not drawn.
+    /// When both `visible_cells` and `explored_cells` are `Some`:
+    /// - Cells NOT in `explored_cells` are drawn as black (unexplored).
+    /// - Cells IN `explored_cells` but NOT in `visible_cells` are drawn dimmed (explored).
+    /// - Cells IN `visible_cells` are drawn normally (currently visible).
+    ///
+    /// When `explored_cells` is `None` (backward-compatible mode):
+    /// - Cells NOT in `visible_cells` are drawn dimmed.
+    /// - Cells in `visible_cells` are drawn normally.
     ///
     /// When `visible_cells` is `None` everything is drawn normally.
     pub fn render_map_with_visibility(
@@ -105,6 +111,7 @@ impl<R: PresentationRenderer> PresentationSystem<R> {
         world: &crate::ecs::world::World,
         viewport: &Viewport,
         visible_cells: Option<&HashSet<CellKey>>,
+        explored_cells: Option<&HashSet<CellKey>>,
     ) {
         use crate::presentation::layout::{CellLayout, HexLayout, SquareLayout};
 
@@ -124,23 +131,40 @@ impl<R: PresentationRenderer> PresentationSystem<R> {
             let (sx, sy) = layout.cell_to_screen(&cell);
             if viewport.contains(sx, sy) {
                 let in_visible = visible_cells.map(|vis| vis.contains(&cell)).unwrap_or(true);
+                let in_explored = explored_cells.map(|exp| exp.contains(&cell));
 
                 let meta = map.get_cell_metadata(&cell);
-                let (glyph, color) = if !in_visible {
-                    // Dimmed terrain outside visible set
-                    ('.', COLOR_VERY_DIM)
-                } else if let Some(meta) = meta {
-                    if let Some(terrain) = meta.get("terrain").and_then(|v| v.as_str()) {
-                        match terrain {
-                            "wall" => ('#', COLOR_GRAY),
-                            "floor" => ('.', COLOR_DIM_GRAY),
-                            _ => ('.', COLOR_DIM_GRAY),
-                        }
-                    } else {
-                        ('.', COLOR_DIM_GRAY)
+                let (glyph, color) = match (in_visible, in_explored) {
+                    // Fog-of-war mode: both sets provided
+                    (false, Some(false)) => {
+                        // Unexplored: black background, space glyph, no entity
+                        (' ', COLOR_BLACK)
                     }
-                } else {
-                    ('.', COLOR_DIM_GRAY)
+                    (false, Some(true)) => {
+                        // Explored but not visible: very dim glyph
+                        ('.', COLOR_VERY_DIM)
+                    }
+                    // Backward-compatible mode (no explored_cells): non-visible cells dimmed
+                    (false, None) => {
+                        // Pre-fog behavior: cells outside FOV rendered with very dim color
+                        ('.', COLOR_VERY_DIM)
+                    }
+                    // Visible: render terrain normally (also handles explored_cells=None + visible)
+                    (true, _) => {
+                        if let Some(meta) = meta {
+                            if let Some(terrain) = meta.get("terrain").and_then(|v| v.as_str()) {
+                                match terrain {
+                                    "wall" => ('#', COLOR_GRAY),
+                                    "floor" => ('.', COLOR_DIM_GRAY),
+                                    _ => ('.', COLOR_DIM_GRAY),
+                                }
+                            } else {
+                                ('.', COLOR_DIM_GRAY)
+                            }
+                        } else {
+                            ('.', COLOR_DIM_GRAY)
+                        }
+                    }
                 };
                 self.renderer.queue_draw(RenderCommand {
                     glyph,
@@ -199,7 +223,14 @@ impl<R: PresentationRenderer> PresentationSystem<R> {
                 };
 
                 if !in_visible {
-                    continue;
+                    // Also skip entities in explored-but-not-visible cells when fog is active
+                    let in_explored = match (&explored_cells, &entity_cell) {
+                        (Some(exp), Some(cell)) => exp.contains(cell),
+                        _ => false,
+                    };
+                    if !in_explored || explored_cells.is_some() {
+                        continue;
+                    }
                 }
 
                 if viewport.contains(x, y)

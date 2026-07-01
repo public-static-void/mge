@@ -102,6 +102,10 @@ pub struct World {
     /// Visible cells per entity (transient FOV state, not serialized)
     #[serde(skip)]
     pub visible_cells: HashMap<u32, HashSet<CellKey>>,
+    /// Explored cells per entity (persistent fog-of-war state, serialized for save/load).
+    /// Old saves without this field deserialize as empty (backward compatible).
+    #[serde(default)]
+    pub explored_cells: HashMap<u32, HashSet<CellKey>>,
     event_queues: HashMap<String, (VecDeque<JsonValue>, VecDeque<JsonValue>)>, // (write, read)
     /// Map postprocessors
     #[serde(skip)]
@@ -176,6 +180,7 @@ impl World {
             ))),
             map: None,
             visible_cells: HashMap::new(),
+            explored_cells: HashMap::new(),
             event_queues: HashMap::new(),
             map_postprocessors: Vec::new(),
             map_validators: Vec::new(),
@@ -208,6 +213,45 @@ impl World {
     /// Set the visible cells for an entity.
     pub fn set_visible_cells(&mut self, entity: u32, cells: HashSet<CellKey>) {
         self.visible_cells.insert(entity, cells);
+    }
+
+    /// Get the explored cells for an entity, if any.
+    pub fn get_explored_cells(&self, entity: u32) -> Option<&HashSet<CellKey>> {
+        self.explored_cells.get(&entity)
+    }
+
+    /// Set the explored cells for an entity.
+    pub fn set_explored_cells(&mut self, entity: u32, cells: HashSet<CellKey>) {
+        self.explored_cells.insert(entity, cells);
+    }
+
+    /// Reset (clear) fog-of-war for a single entity.
+    pub fn reset_fog(&mut self, entity: u32) {
+        self.explored_cells.remove(&entity);
+    }
+
+    /// Reset (clear) fog-of-war for all entities.
+    pub fn reset_all_fog(&mut self) {
+        self.explored_cells.clear();
+    }
+
+    /// Determine the visibility state of a cell for an entity.
+    /// Returns 0 = UNEXPLORED, 1 = EXPLORED (seen before but not currently visible), 2 = VISIBLE.
+    pub fn get_visibility_state(&self, entity: u32, cell: &CellKey) -> u8 {
+        let visible = self
+            .visible_cells
+            .get(&entity)
+            .map(|cells| cells.contains(cell))
+            .unwrap_or(false);
+        if visible {
+            return 2;
+        }
+        let explored = self
+            .explored_cells
+            .get(&entity)
+            .map(|cells| cells.contains(cell))
+            .unwrap_or(false);
+        if explored { 1 } else { 0 }
     }
 
     /// Return a reference to the active FOV algorithm.

@@ -41,7 +41,7 @@
 - [x] Procedural dungeon generation
 - [ ] Fluid simulation (water, magma)
 - [x] Field-of-view and lighting simulation
-- [ ] Fog of war and visibility system
+- [x] Fog of war and visibility system
 - [ ] AI behaviors (enemy tactics, patrol routes)
 - [ ] Noise and detection mechanics
 - [x] Item generation and loot tables

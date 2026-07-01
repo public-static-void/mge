@@ -187,7 +187,7 @@ fn test_map_rendering_with_visibility_filter() {
     let mut system = PresentationSystem::new(renderer);
     let viewport = Viewport::new(0, 0, 3, 3);
 
-    system.render_map_with_visibility(&world, &viewport, Some(&visible));
+    system.render_map_with_visibility(&world, &viewport, Some(&visible), None);
 
     let draws = &system.renderer.draws;
 
