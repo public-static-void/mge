@@ -19,6 +19,9 @@ pub const COLOR_BLUE: RenderColor = RenderColor(0, 0, 255);
 pub const COLOR_GRAY: RenderColor = RenderColor(128, 128, 128);
 pub const COLOR_DIM_GRAY: RenderColor = RenderColor(60, 60, 60);
 
+/// Very dim color for cells outside the visible set.
+pub const COLOR_VERY_DIM: RenderColor = RenderColor(25, 25, 25);
+
 /// A command to draw a glyph at a position with a color
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RenderCommand {

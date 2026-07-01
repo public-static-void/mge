@@ -6,6 +6,8 @@
 pub mod cell_key;
 /// Map deserialization module.
 pub mod deserialize;
+/// Field-of-view module with recursive shadowcasting.
+pub mod fov;
 /// Hex grid map module.
 pub mod hex;
 /// Map pathfinding module.
@@ -18,6 +20,7 @@ pub mod square;
 pub mod topology;
 
 pub use cell_key::CellKey;
+pub use fov::{BfsFovAlgorithm, FovAlgorithm, RecursiveShadowcasting, compute_fov};
 pub use hex::HexGridMap;
 pub use pathfinding::{PathfindingResult, find_path as pathfinding_find_path};
 pub use province::ProvinceMap;

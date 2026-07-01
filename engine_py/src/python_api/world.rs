@@ -6,6 +6,7 @@ use crate::python_api::economic::EconomicApi;
 use crate::python_api::entity::EntityApi;
 use crate::python_api::equipment::EquipmentApi;
 use crate::python_api::faction::FactionApi;
+use crate::python_api::fov::FovApi;
 use crate::python_api::inventory::InventoryApi;
 use crate::python_api::job_query::JobQueryApi;
 use crate::python_api::mode::ModeApi;
@@ -18,6 +19,7 @@ use crate::system_bridge::SystemBridge;
 use engine_core::ecs::world::World;
 use engine_core::loot::LootEntry;
 use engine_core::systems::faction_reputation::FactionReputationSystem;
+use engine_core::systems::fov::FovUpdateSystem;
 use engine_core::systems::job::job_board::JobBoard;
 use engine_core::systems::job::types::loader::load_job_types_from_dir;
 use pyo3::Python;
@@ -109,6 +111,7 @@ impl PyWorld {
         world.register_system(engine_core::systems::death_decay::ProcessDecay);
         world.register_system(engine_core::systems::job::JobSystem);
         world.register_system(FactionReputationSystem);
+        world.register_system(FovUpdateSystem);
         Ok(PyWorld {
             inner: Rc::new(RefCell::new(world)),
             systems: Rc::new(SystemBridge {
@@ -356,6 +359,33 @@ impl PyWorld {
     /// Get the reputation score with a faction, or 0 if absent
     fn get_reputation(&self, entity: u32, faction_id: String) -> i64 {
         FactionApi::get_reputation(self, entity, &faction_id)
+    }
+
+    // ---- FOV ----
+
+    /// Get visible cells for an entity. Returns a list of dicts with x, y, z keys.
+    fn get_visible_cells(&self, entity_id: u32) -> Vec<HashMap<String, i32>> {
+        FovApi::get_visible_cells(self, entity_id)
+    }
+
+    /// Check if a cell is visible to an entity.
+    fn is_visible(&self, entity_id: u32, x: i32, y: i32, z: i32) -> bool {
+        FovApi::is_visible(self, entity_id, x, y, z)
+    }
+
+    /// Set/update the Sight component on an entity with the given range.
+    fn set_sight(&self, entity_id: u32, range: u32) {
+        FovApi::set_sight(self, entity_id, range)
+    }
+
+    /// Get the Sight component data for an entity as a Python dict, or None.
+    fn get_sight(&self, py: Python<'_>, entity_id: u32) -> PyResult<Option<PyObject>> {
+        FovApi::get_sight(self, py, entity_id)
+    }
+
+    /// Switch the active FOV algorithm by registered name.
+    fn set_fov_algorithm(&self, name: &str) {
+        FovApi::set_fov_algorithm(self, name)
     }
 
     /// Save

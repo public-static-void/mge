@@ -1,3 +1,4 @@
+mod fov;
 mod wasm_body_api;
 mod wasm_camera_api;
 mod wasm_component_api;

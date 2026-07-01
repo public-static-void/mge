@@ -23,6 +23,8 @@ pub mod equipment;
 pub mod event_bus;
 /// Faction and Reputation API
 pub mod faction;
+/// Field-of-view API
+pub mod fov;
 /// Input API
 pub mod input;
 /// Inventory API
@@ -105,5 +107,6 @@ pub fn register_all_api_functions(
     job_ai::register_job_ai_api(lua, globals, world.clone())?;
     loot::register_loot_api(lua, globals, world.clone())?;
     faction::register_faction_api(lua, globals, world.clone())?;
+    fov::register_fov_api(lua, globals, world.clone())?;
     Ok(())
 }

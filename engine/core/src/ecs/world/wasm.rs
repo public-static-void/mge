@@ -172,9 +172,21 @@ pub struct WasmWorld {
     #[serde(default)]
     pub focused_widget: u32,
 
+    /// Per-entity visible cell cache (computed by FovUpdateSystem).
+    #[serde(skip)]
+    pub visible_cells: HashMap<u32, HashSet<CellKey>>,
+
     /// Loot table registry (runtime-defined, not serialized).
     #[serde(skip)]
     pub loot_tables: LootTableRegistry,
+
+    /// Active FOV algorithm name (for display/debugging).
+    #[serde(skip, default = "default_fov_algo_name")]
+    pub fov_algorithm_name: String,
+}
+
+fn default_fov_algo_name() -> String {
+    "recursive_shadowcasting".to_string()
 }
 
 /// Load all JSON schema files from a directory.
@@ -232,6 +244,7 @@ impl WasmWorld {
             job_board_policy: "priority".to_string(),
             job_board_jobs: Vec::new(),
             job_event_log: Vec::new(),
+            visible_cells: HashMap::new(),
             widget_registry: HashMap::new(),
             widget_types: HashMap::new(),
             widget_parents: HashMap::new(),
@@ -242,6 +255,7 @@ impl WasmWorld {
             ui_event_queue: Vec::new(),
             focused_widget: 0,
             loot_tables: LootTableRegistry::new(),
+            fov_algorithm_name: "recursive_shadowcasting".to_string(),
         }
     }
 
@@ -562,6 +576,17 @@ impl WasmWorld {
         let loaded: WasmWorld = serde_json::from_str(&json).map_err(|e| e.to_string())?;
         *self = loaded;
         Ok(())
+    }
+
+    /// Set the active FOV algorithm by name.
+    pub fn set_fov_algorithm_by_name(&mut self, name: &str) -> Result<(), String> {
+        match name {
+            "recursive_shadowcasting" | "bfs_flood_fill" => {
+                self.fov_algorithm_name = name.to_string();
+                Ok(())
+            }
+            _ => Err(format!("FOV algorithm '{name}' is not registered")),
+        }
     }
 
     /// Sets the camera viewport position and dimensions.
@@ -1386,6 +1411,18 @@ impl WasmWorld {
     /// Returns the number of cells in the map, or 0 if no map.
     pub fn get_map_cell_count(&self) -> i32 {
         self.map.as_ref().map(|m| m.cells.len() as i32).unwrap_or(0)
+    }
+
+    // ---- FOV API ----
+
+    /// Returns visible cells for an entity, or None if not computed.
+    pub fn get_visible_cells(&self, entity: u32) -> Option<&HashSet<CellKey>> {
+        self.visible_cells.get(&entity)
+    }
+
+    /// Sets visible cells for an entity.
+    pub fn set_visible_cells(&mut self, entity: u32, cells: HashSet<CellKey>) {
+        self.visible_cells.insert(entity, cells);
     }
 
     // ---- UI Widget API ----

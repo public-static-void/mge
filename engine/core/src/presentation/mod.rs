@@ -12,9 +12,11 @@ pub mod renderer;
 /// User interface
 pub mod ui;
 
+use crate::map::cell_key::CellKey;
 use crate::presentation::renderer::{
-    COLOR_DIM_GRAY, COLOR_GRAY, PresentationRenderer, RenderColor, RenderCommand,
+    COLOR_DIM_GRAY, COLOR_GRAY, COLOR_VERY_DIM, PresentationRenderer, RenderColor, RenderCommand,
 };
+use std::collections::HashSet;
 
 /// Presentation system for ECS worlds with schema-driven components.
 pub struct PresentationSystem<R: PresentationRenderer> {
@@ -84,8 +86,26 @@ impl<R: PresentationRenderer> PresentationSystem<R> {
         self.renderer.present();
     }
 
-    /// Render the map
+    /// Render the map without visibility filtering.
+    /// Delegates to [`render_map_with_visibility`](Self::render_map_with_visibility)
+    /// with `None` for the visible-cells set.
     pub fn render_map(&mut self, world: &crate::ecs::world::World, viewport: &Viewport) {
+        self.render_map_with_visibility(world, viewport, None);
+    }
+
+    /// Render the map with optional visibility filtering.
+    ///
+    /// When `visible_cells` is `Some(set)`:
+    /// - Cells NOT in the set are drawn with a dim style.
+    /// - Entities in non-visible cells are not drawn.
+    ///
+    /// When `visible_cells` is `None` everything is drawn normally.
+    pub fn render_map_with_visibility(
+        &mut self,
+        world: &crate::ecs::world::World,
+        viewport: &Viewport,
+        visible_cells: Option<&HashSet<CellKey>>,
+    ) {
         use crate::presentation::layout::{CellLayout, HexLayout, SquareLayout};
 
         let map = match &world.map {
@@ -103,8 +123,13 @@ impl<R: PresentationRenderer> PresentationSystem<R> {
         for cell in map.all_cells() {
             let (sx, sy) = layout.cell_to_screen(&cell);
             if viewport.contains(sx, sy) {
+                let in_visible = visible_cells.map(|vis| vis.contains(&cell)).unwrap_or(true);
+
                 let meta = map.get_cell_metadata(&cell);
-                let (glyph, color) = if let Some(meta) = meta {
+                let (glyph, color) = if !in_visible {
+                    // Dimmed terrain outside visible set
+                    ('.', COLOR_VERY_DIM)
+                } else if let Some(meta) = meta {
                     if let Some(terrain) = meta.get("terrain").and_then(|v| v.as_str()) {
                         match terrain {
                             "wall" => ('#', COLOR_GRAY),
@@ -130,33 +155,52 @@ impl<R: PresentationRenderer> PresentationSystem<R> {
             let pos_json = world.get_component(*entity, "Position");
             let renderable_json = world.get_component(*entity, "Renderable");
             if let (Some(pos_json), Some(renderable_json)) = (pos_json, renderable_json) {
-                let (x, y) = if let Some(pos_obj) = pos_json.get("pos") {
+                let (x, y, entity_cell) = if let Some(pos_obj) = pos_json.get("pos") {
                     if let Some(square) = pos_obj.get("Square") {
-                        (
-                            square.get("x").and_then(|v| v.as_i64()).unwrap_or(0) as i32,
-                            square.get("y").and_then(|v| v.as_i64()).unwrap_or(0) as i32,
-                        )
+                        let x = square.get("x").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
+                        let y = square.get("y").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
+                        let z = square.get("z").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
+                        (x, y, Some(CellKey::Square { x, y, z }))
                     } else if let Some(hex) = pos_obj.get("Hex") {
-                        (
-                            hex.get("q").and_then(|v| v.as_i64()).unwrap_or(0) as i32,
-                            hex.get("r").and_then(|v| v.as_i64()).unwrap_or(0) as i32,
-                        )
+                        let q = hex.get("q").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
+                        let r = hex.get("r").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
+                        let z = hex.get("z").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
+                        (q, r, Some(CellKey::Hex { q, r, z }))
                     } else if let Some(province) = pos_obj.get("Province") {
                         if let Some(province_id) = province.get("id").and_then(|v| v.as_str()) {
                             if let Some(map) = &world.map {
-                                province_centroid(map, province_id).unwrap_or((0, 0))
+                                let (cx, cy) =
+                                    province_centroid(map, province_id).unwrap_or((0, 0));
+                                (
+                                    cx,
+                                    cy,
+                                    Some(CellKey::Province {
+                                        id: province_id.to_string(),
+                                    }),
+                                )
                             } else {
-                                (0, 0)
+                                (0, 0, None)
                             }
                         } else {
-                            (0, 0)
+                            (0, 0, None)
                         }
                     } else {
-                        (0, 0)
+                        (0, 0, None)
                     }
                 } else {
-                    (0, 0)
+                    (0, 0, None)
                 };
+
+                // Skip entities in non-visible cells
+                let in_visible = match (&visible_cells, &entity_cell) {
+                    (Some(vis), Some(cell)) => vis.contains(cell),
+                    (None, _) => true,
+                    (Some(_), None) => false,
+                };
+
+                if !in_visible {
+                    continue;
+                }
 
                 if viewport.contains(x, y)
                     && let (Some(glyph), Some(color)) = (
