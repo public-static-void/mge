@@ -79,7 +79,7 @@ pub fn register_fov_api(lua: &Lua, globals: &Table, world: Rc<RefCell<World>>) -
     globals.set("set_fov_algorithm", set_fov_algo_fn)?;
 
     // get_sight(entity_id) -> table | nil
-    let w = world;
+    let w = world.clone();
     let get_sight_fn = lua.create_function_mut(move |lua, entity_id: u32| {
         let world = w.borrow();
         let comp = world.get_component(entity_id, "Sight");
@@ -98,6 +98,73 @@ pub fn register_fov_api(lua: &Lua, globals: &Table, world: Rc<RefCell<World>>) -
         }
     })?;
     globals.set("get_sight", get_sight_fn)?;
+
+    // --- Fog-of-war API ---
+
+    // is_explored(entity_id, x, y, z) -> bool
+    let w = world.clone();
+    let is_explored_fn =
+        lua.create_function_mut(move |_, (entity_id, x, y, z): (u32, i32, i32, i32)| {
+            let world = w.borrow();
+            let cell = CellKey::Square { x, y, z };
+            let result = world
+                .get_explored_cells(entity_id)
+                .map(|cells| cells.contains(&cell))
+                .unwrap_or(false);
+            Ok(result)
+        })?;
+    globals.set("is_explored", is_explored_fn)?;
+
+    // get_explored_cells(entity_id) -> table of {x, y, z} cell tables
+    let w = world.clone();
+    let get_explored_cells_fn = lua.create_function_mut(move |lua, entity_id: u32| {
+        let world = w.borrow();
+        let cells = world.get_explored_cells(entity_id);
+        let results = lua.create_table()?;
+        if let Some(cell_set) = cells {
+            for (i, cell) in cell_set.iter().enumerate() {
+                let entry = lua.create_table()?;
+                match cell {
+                    CellKey::Square { x, y, z } => {
+                        entry.set("x", *x)?;
+                        entry.set("y", *y)?;
+                        entry.set("z", *z)?;
+                    }
+                    CellKey::Hex { q, r, z } => {
+                        entry.set("q", *q)?;
+                        entry.set("r", *r)?;
+                        entry.set("z", *z)?;
+                    }
+                    CellKey::Province { id } => {
+                        entry.set("id", id.clone())?;
+                    }
+                }
+                results.set(i + 1, entry)?;
+            }
+        }
+        Ok(results)
+    })?;
+    globals.set("get_explored_cells", get_explored_cells_fn)?;
+
+    // reset_fog(entity_id)
+    let w = world.clone();
+    let reset_fog_fn = lua.create_function_mut(move |_, entity_id: u32| {
+        let mut world = w.borrow_mut();
+        world.reset_fog(entity_id);
+        Ok(())
+    })?;
+    globals.set("reset_fog", reset_fog_fn)?;
+
+    // get_visibility_state(entity_id, x, y, z) -> integer
+    let w = world;
+    let get_visibility_state_fn =
+        lua.create_function_mut(move |_, (entity_id, x, y, z): (u32, i32, i32, i32)| {
+            let world = w.borrow();
+            let cell = CellKey::Square { x, y, z };
+            let state = world.get_visibility_state(entity_id, &cell);
+            Ok(state as i32)
+        })?;
+    globals.set("get_visibility_state", get_visibility_state_fn)?;
 
     Ok(())
 }

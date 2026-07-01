@@ -176,6 +176,11 @@ pub struct WasmWorld {
     #[serde(skip)]
     pub visible_cells: HashMap<u32, HashSet<CellKey>>,
 
+    /// Explored cells per entity (persistent fog-of-war state, serialized for save/load).
+    /// Old saves without this field deserialize as empty (backward compatible).
+    #[serde(default)]
+    pub explored_cells: HashMap<u32, HashSet<CellKey>>,
+
     /// Loot table registry (runtime-defined, not serialized).
     #[serde(skip)]
     pub loot_tables: LootTableRegistry,
@@ -245,6 +250,7 @@ impl WasmWorld {
             job_board_jobs: Vec::new(),
             job_event_log: Vec::new(),
             visible_cells: HashMap::new(),
+            explored_cells: HashMap::new(),
             widget_registry: HashMap::new(),
             widget_types: HashMap::new(),
             widget_parents: HashMap::new(),
@@ -1423,6 +1429,40 @@ impl WasmWorld {
     /// Sets visible cells for an entity.
     pub fn set_visible_cells(&mut self, entity: u32, cells: HashSet<CellKey>) {
         self.visible_cells.insert(entity, cells);
+    }
+
+    /// Returns explored cells for an entity, or None if not computed.
+    pub fn get_explored_cells(&self, entity: u32) -> Option<&HashSet<CellKey>> {
+        self.explored_cells.get(&entity)
+    }
+
+    /// Sets explored cells for an entity.
+    pub fn set_explored_cells(&mut self, entity: u32, cells: HashSet<CellKey>) {
+        self.explored_cells.insert(entity, cells);
+    }
+
+    /// Reset (clear) fog-of-war for a single entity.
+    pub fn reset_fog(&mut self, entity: u32) {
+        self.explored_cells.remove(&entity);
+    }
+
+    /// Determine the visibility state of a cell for an entity.
+    /// Returns 0 = UNEXPLORED, 1 = EXPLORED, 2 = VISIBLE.
+    pub fn get_visibility_state(&self, entity: u32, cell: &CellKey) -> u8 {
+        let visible = self
+            .visible_cells
+            .get(&entity)
+            .map(|cells| cells.contains(cell))
+            .unwrap_or(false);
+        if visible {
+            return 2;
+        }
+        let explored = self
+            .explored_cells
+            .get(&entity)
+            .map(|cells| cells.contains(cell))
+            .unwrap_or(false);
+        if explored { 1 } else { 0 }
     }
 
     // ---- UI Widget API ----
