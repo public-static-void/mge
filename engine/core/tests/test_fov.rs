@@ -62,7 +62,7 @@ fn map_with_wall(wx: i32, wy: i32, wall: bool) -> Map {
                     }
                     let nx = x + dx;
                     let ny = y + dy;
-                    if nx >= -10 && nx <= 10 && ny >= -10 && ny <= 10 {
+                    if (-10..=10).contains(&nx) && (-10..=10).contains(&ny) {
                         grid.add_neighbor((x, y, 0), (nx, ny, 0));
                     }
                 }
@@ -141,7 +141,7 @@ fn integration_wall_blocks_los() {
                     }
                     let nx = x + dx;
                     let ny = y + dy;
-                    if nx >= -5 && nx <= 5 && ny >= -5 && ny <= 5 {
+                    if (-5..=5).contains(&nx) && (-5..=5).contains(&ny) {
                         grid.add_neighbor((x, y, 0), (nx, ny, 0));
                     }
                 }
@@ -286,7 +286,7 @@ fn integration_ring_shadow() {
                     }
                     let nx = x + dx;
                     let ny = y + dy;
-                    if nx >= -6 && nx <= 6 && ny >= -6 && ny <= 6 {
+                    if (-6..=6).contains(&nx) && (-6..=6).contains(&ny) {
                         grid.add_neighbor((x, y, 0), (nx, ny, 0));
                     }
                 }

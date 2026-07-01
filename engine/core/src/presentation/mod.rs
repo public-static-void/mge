@@ -98,6 +98,7 @@ impl<R: PresentationRenderer> PresentationSystem<R> {
     /// When `visible_cells` is `Some(set)`:
     /// - Cells NOT in the set are drawn with a dim style.
     /// - Entities in non-visible cells are not drawn.
+    ///
     /// When `visible_cells` is `None` everything is drawn normally.
     pub fn render_map_with_visibility(
         &mut self,

@@ -54,7 +54,7 @@ impl System for FovUpdateSystem {
 
                 if let Some(pos) = world
                     .get_component(entity, "Position")
-                    .and_then(|comp| CellKey::from_position(comp))
+                    .and_then(CellKey::from_position)
                 {
                     let visible =
                         world

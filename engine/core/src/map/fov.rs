@@ -101,18 +101,16 @@ impl FovAlgorithm for RecursiveShadowcasting {
 
         // Scan each of the 4 quadrants (90-degree sectors)
         for &quadrant in &[NORTH, SOUTH, EAST, WEST] {
-            scan_raw(
+            let mut ctx = ScanContext {
                 ox,
                 oy,
                 oz,
                 range,
                 quadrant,
-                &is_opaque,
-                &mut visible,
-                1,
-                Slope::neg_one(),
-                Slope::one(),
-            );
+                is_opaque: &is_opaque,
+                visible: &mut visible,
+            };
+            ctx.scan(1, Slope::neg_one(), Slope::one());
         }
 
         visible.into_iter().collect()
@@ -299,85 +297,65 @@ fn is_symmetric(depth: i32, col: i32, start_slope: Slope, end_slope: Slope) -> b
     above && below
 }
 
-/// Recursively scan a row (raw coordinate version).
+/// Context for a recursive shadowcasting scan.
 ///
-/// Variant of [`scan`] that uses an `is_opaque` callback instead of a map.
-/// Out-of-bounds cells are treated as opaque (blocking) so rays terminate
-/// naturally at the map boundary.
-fn scan_raw(
+/// Holds the invariant parameters (origin, range, quadrant, opacity test,
+/// visible set) that are shared across all recursive calls. This reduces
+/// the number of parameters passed to the scan function.
+struct ScanContext<'a> {
     ox: i32,
     oy: i32,
-    _oz: i32,
+    oz: i32,
     range: i32,
     quadrant: u8,
-    is_opaque: &dyn Fn(i32, i32) -> bool,
-    visible: &mut HashSet<CellKey>,
-    depth: i32,
-    start_slope: Slope,
-    end_slope: Slope,
-) {
-    // Depth limit
-    if depth > range {
-        return;
-    }
+    is_opaque: &'a dyn Fn(i32, i32) -> bool,
+    visible: &'a mut HashSet<CellKey>,
+}
 
-    let tiles = row_tiles(depth, start_slope, end_slope);
-    let mut prev_tile_was_wall = false;
-    let mut current_start = start_slope;
-
-    for &(col, ts) in &tiles {
-        let (x, y) = quadrant_transform(quadrant, ox, oy, depth, col);
-
-        // Respect maximum range
-        if !in_range(ox, oy, x, y, range) {
-            continue;
+impl ScanContext<'_> {
+    /// Recursively scan a row of tiles at `depth` bounded by the slope interval.
+    fn scan(&mut self, depth: i32, start_slope: Slope, end_slope: Slope) {
+        // Depth limit
+        if depth > self.range {
+            return;
         }
 
-        let opaque = is_opaque(x, y);
+        let tiles = row_tiles(depth, start_slope, end_slope);
+        let mut prev_tile_was_wall = false;
+        let mut current_start = start_slope;
 
-        // Reveal wall tiles, and floor tiles whose centre is within the cone
-        if opaque || is_symmetric(depth, col, current_start, end_slope) {
-            visible.insert(CellKey::Square { x, y, z: _oz });
+        for &(col, ts) in &tiles {
+            let (x, y) = quadrant_transform(self.quadrant, self.ox, self.oy, depth, col);
+
+            // Respect maximum range
+            if !in_range(self.ox, self.oy, x, y, self.range) {
+                continue;
+            }
+
+            let opaque = (self.is_opaque)(x, y);
+
+            // Reveal wall tiles, and floor tiles whose centre is within the cone
+            if opaque || is_symmetric(depth, col, current_start, end_slope) {
+                self.visible.insert(CellKey::Square { x, y, z: self.oz });
+            }
+
+            // wall → floor transition: narrow the start_slope for subsequent children
+            if prev_tile_was_wall && !opaque {
+                current_start = ts;
+            }
+
+            // floor → wall transition: scan child with narrowed end_slope
+            if !prev_tile_was_wall && opaque {
+                self.scan(depth + 1, current_start, ts);
+            }
+
+            prev_tile_was_wall = opaque;
         }
 
-        // wall → floor transition: narrow the start_slope for subsequent children
-        if prev_tile_was_wall && !opaque {
-            current_start = ts;
+        // Last tile was floor → continue scanning the next depth
+        if !prev_tile_was_wall {
+            self.scan(depth + 1, current_start, end_slope);
         }
-
-        // floor → wall transition: scan child with narrowed end_slope
-        if !prev_tile_was_wall && opaque {
-            scan_raw(
-                ox,
-                oy,
-                _oz,
-                range,
-                quadrant,
-                is_opaque,
-                visible,
-                depth + 1,
-                current_start,
-                ts,
-            );
-        }
-
-        prev_tile_was_wall = opaque;
-    }
-
-    // Last tile was floor → continue scanning the next depth
-    if !prev_tile_was_wall {
-        scan_raw(
-            ox,
-            oy,
-            _oz,
-            range,
-            quadrant,
-            is_opaque,
-            visible,
-            depth + 1,
-            current_start,
-            end_slope,
-        );
     }
 }
 
