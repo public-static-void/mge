@@ -1,0 +1,27 @@
+{
+  "title": "EquipmentSlots",
+  "description": "Registry of valid equipment slot names.",
+  "type": "object",
+  "properties": {
+    "slots": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Valid slot names for equipment placement"
+    }
+  },
+  "required": ["slots"],
+  "slots": [
+    "weapon",
+    "shield",
+    "helmet",
+    "chest",
+    "legs",
+    "boots",
+    "ring_1",
+    "ring_2",
+    "amulet",
+    "gloves",
+    "left_hand",
+    "right_hand"
+  ]
+}

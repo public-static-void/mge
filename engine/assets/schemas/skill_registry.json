@@ -1,0 +1,76 @@
+{
+  "title": "SkillRegistry",
+  "description": "Master registry of valid skill names, level caps, and stat bonuses.",
+  "type": "object",
+  "properties": {
+    "skills": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "description": "Unique skill identifier" },
+          "max_level": { "type": "number", "default": 100, "description": "Level cap for this skill" },
+          "base_xp_per_action": { "type": "number", "default": 10, "description": "Base XP granted per job completion or action" },
+          "derived_stat_bonus": {
+            "type": "object",
+            "additionalProperties": { "type": "number" },
+            "default": {},
+            "description": "Per-level stat bonus: {stat_name: bonus_per_level}"
+          }
+        },
+        "required": ["name"]
+      }
+    }
+  },
+  "required": ["skills"],
+  "skills": [
+    {
+      "name": "dig",
+      "max_level": 100,
+      "base_xp_per_action": 10,
+      "derived_stat_bonus": { "constitution": 0.5 }
+    },
+    {
+      "name": "mine",
+      "max_level": 100,
+      "base_xp_per_action": 12,
+      "derived_stat_bonus": { "strength": 0.5, "constitution": 0.2 }
+    },
+    {
+      "name": "woodcutting",
+      "max_level": 100,
+      "base_xp_per_action": 10,
+      "derived_stat_bonus": { "strength": 0.3 }
+    },
+    {
+      "name": "crafting",
+      "max_level": 100,
+      "base_xp_per_action": 10,
+      "derived_stat_bonus": { "intelligence": 0.5 }
+    },
+    {
+      "name": "combat",
+      "max_level": 100,
+      "base_xp_per_action": 15,
+      "derived_stat_bonus": { "strength": 0.5, "constitution": 0.3 }
+    },
+    {
+      "name": "farming",
+      "max_level": 100,
+      "base_xp_per_action": 10,
+      "derived_stat_bonus": { "constitution": 0.3 }
+    },
+    {
+      "name": "building",
+      "max_level": 100,
+      "base_xp_per_action": 10,
+      "derived_stat_bonus": { "strength": 0.4 }
+    },
+    {
+      "name": "TestJob",
+      "max_level": 100,
+      "base_xp_per_action": 10,
+      "derived_stat_bonus": {}
+    }
+  ]
+}

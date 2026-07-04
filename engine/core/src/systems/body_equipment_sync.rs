@@ -1,7 +1,6 @@
 use crate::ecs::system::System;
 use crate::ecs::world::World;
 use serde_json::{Value as JsonValue, json};
-use std::collections::HashMap;
 
 /// Recursively ensure every part (and its children) has "equipped" and "children" as arrays.
 /// Also ensures the top-level "parts" field on the body is always an array.
@@ -45,21 +44,6 @@ fn find_part_mut<'a>(part: &'a mut JsonValue, name: &str) -> Option<&'a mut Json
     None
 }
 
-fn collect_equipped_items(part: &JsonValue, equipped: &mut Vec<String>) {
-    if let Some(eq) = part.get("equipped").and_then(|v| v.as_array()) {
-        for item in eq {
-            if let Some(id) = item.as_str() {
-                equipped.push(id.to_string());
-            }
-        }
-    }
-    if let Some(children) = part.get("children").and_then(|v| v.as_array()) {
-        for child in children {
-            collect_equipped_items(child, equipped);
-        }
-    }
-}
-
 fn clear_equipped_on_unhealthy_parts(part: &mut JsonValue) {
     let status = part
         .get("status")
@@ -96,6 +80,8 @@ fn find_part<'a>(part: &'a JsonValue, name: &str) -> Option<&'a JsonValue> {
 }
 
 /// Syncs Body and Equipment components
+/// Handles body↔equipment bidirectional sync and body part health → auto-unequip logic.
+/// Does NOT write to Stats (responsibility of downstream systems).
 pub struct BodyEquipmentSyncSystem;
 
 impl System for BodyEquipmentSyncSystem {
@@ -197,45 +183,10 @@ impl System for BodyEquipmentSyncSystem {
             // Step 3: Recursively ensure all arrays are present and schema-compliant
             ensure_body_part_arrays(&mut body);
 
-            // Step 4: Write back updated Equipment and Body components
+            // Step 4: Write back updated Equipment and Body components (no stat writes)
             equipment["slots"] = JsonValue::Object(slots);
             let _ = world.set_component(eid, "Equipment", equipment.clone());
             let _ = world.set_component(eid, "Body", body.clone());
-
-            // Step 5: Aggregate effects from all equipped items on body parts
-            let mut equipped_items = Vec::new();
-            if let Some(parts) = body.get("parts").and_then(|v| v.as_array()) {
-                for part in parts {
-                    collect_equipped_items(part, &mut equipped_items);
-                }
-            }
-
-            let mut total_effects: HashMap<String, f64> = HashMap::new();
-            for item_id in equipped_items {
-                for item_eid in world.get_entities_with_component("Item") {
-                    if let Some(item_comp) = world.get_component(item_eid, "Item")
-                        && item_comp.get("id").and_then(|v| v.as_str()) == Some(&item_id)
-                        && let Some(effects) = item_comp.get("effects").and_then(|v| v.as_object())
-                    {
-                        for (stat, delta) in effects {
-                            if let Some(d) = delta.as_f64() {
-                                *total_effects.entry(stat.clone()).or_insert(0.0) += d;
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Apply aggregated effects to Stats component
-            let mut stats = world
-                .get_component(eid, "Stats")
-                .cloned()
-                .unwrap_or_else(|| json!({}));
-            for (stat, bonus) in total_effects {
-                let base = stats.get(&stat).and_then(|v| v.as_f64()).unwrap_or(0.0);
-                stats[stat] = json!(base + bonus);
-            }
-            let _ = world.set_component(eid, "Stats", stats);
         }
     }
 }

@@ -15,14 +15,13 @@ fn test_equipping_item_applies_stat_bonuses() {
     let mut world = make_test_world();
     world.current_mode = "roguelike".to_string();
     world.register_system(EquipmentLogicSystem);
+    world.register_system(EquipmentEffectAggregationSystem);
+    world.register_system(StatCalculationSystem);
 
     let (_power_ring_id, eid) = setup_basic_equipment(&mut world);
 
-    // Create a stats component with strength 5
-    let stats = json!({
-        "strength": 5
-    });
-    world.set_component(eid, "Stats", stats).unwrap();
+    // Create a base stats component with strength 5
+    set_base_stats(&mut world, eid, 5.0, None);
 
     // Equip power ring
     let equipment = world.get_component(eid, "Equipment").unwrap().clone();
@@ -30,7 +29,12 @@ fn test_equipping_item_applies_stat_bonuses() {
     updated["slots"]["finger"] = json!("power_ring");
     world.set_component(eid, "Equipment", updated).unwrap();
 
+    // Run the full pipeline: validation -> aggregation -> calculation
     world.run_system("EquipmentLogicSystem").unwrap();
+    world
+        .run_system("EquipmentEffectAggregationSystem")
+        .unwrap();
+    world.run_system("StatCalculationSystem").unwrap();
 
     let stats_after = world.get_component(eid, "Stats").unwrap();
     assert_eq!(stats_after["strength"].as_f64().unwrap(), 8.0);

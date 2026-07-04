@@ -1,9 +1,47 @@
 use crate::ecs::system::System;
 use crate::ecs::world::World;
 use serde_json::Value as JsonValue;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use std::path::Path;
+use std::sync::OnceLock;
+
+/// Global cache for valid equipment slot names, loaded from equipment_slots.json.
+fn get_valid_slots() -> &'static HashSet<String> {
+    static SLOTS: OnceLock<HashSet<String>> = OnceLock::new();
+    SLOTS.get_or_init(|| {
+        let mut slots = HashSet::new();
+        // Try loading from default schema path
+        let paths = [
+            "engine/assets/schemas/equipment_slots.json",
+            "../engine/assets/schemas/equipment_slots.json",
+        ];
+        for path_str in &paths {
+            let path = Path::new(path_str);
+            if path.exists() {
+                match std::fs::read_to_string(path) {
+                    Ok(content) => {
+                        if let Ok(json) = serde_json::from_str::<JsonValue>(&content)
+                            && let Some(slot_list) = json.get("slots").and_then(|v| v.as_array())
+                        {
+                            for slot_val in slot_list {
+                                if let Some(s) = slot_val.as_str() {
+                                    slots.insert(s.to_string());
+                                }
+                            }
+                        }
+                    }
+                    Err(_) => continue,
+                }
+                break;
+            }
+        }
+        slots
+    })
+}
 
 ///Equipment logic system
+/// Validates slot compatibility, stat requirements, and two-handed weapon enforcement.
+/// Does NOT write to Stats or EquipmentEffects (responsibility of downstream systems).
 pub struct EquipmentLogicSystem;
 
 impl System for EquipmentLogicSystem {
@@ -57,7 +95,8 @@ impl System for EquipmentLogicSystem {
                 None
             };
 
-            // First pass: enforce slot compatibility and stat requirements
+            // First pass: enforce slot compatibility, stat requirements, and slot registry validation
+            let valid_slots = get_valid_slots();
             for (slot_name, item_id_value) in &slots_obj {
                 if item_id_value.is_null() {
                     continue;
@@ -71,6 +110,17 @@ impl System for EquipmentLogicSystem {
                     Some(meta) => meta,
                     None => continue,
                 };
+
+                // Slot registry validation: reject slots not in the valid set
+                if !valid_slots.is_empty() && !valid_slots.contains(slot_name.as_str()) {
+                    log::warn!(
+                        "Invalid slot '{}' for item '{}' — not in equipment_slots registry",
+                        slot_name,
+                        item_id
+                    );
+                    slots_mut.insert(slot_name.clone(), JsonValue::Null);
+                    continue;
+                }
 
                 // Check slot compatibility
                 if let Some(item_slot) = item_metadata.get("slot").and_then(|v| v.as_str())
@@ -105,22 +155,25 @@ impl System for EquipmentLogicSystem {
                 }
             }
 
-            // Second pass: handle two-handed weapons
-            let mut two_handed_items: Vec<(String, String)> = Vec::new(); // (slot_name, item_id)
-            for (slot_name, item_id_value) in slots_mut.iter() {
-                if item_id_value.is_null() {
-                    continue;
-                }
-                let item_id = match item_id_value.as_str() {
-                    Some(id) => id,
+            // Second pass: handle two-handed weapons (same logic, no stat writing)
+            // Uses the mutable slots_mut for checking current state
+            let current_slots: Vec<(String, Option<String>)> = slots_mut
+                .iter()
+                .map(|(k, v)| (k.clone(), v.as_str().map(|s| s.to_string())))
+                .collect();
+
+            let mut two_handed_items: Vec<(String, String)> = Vec::new();
+            for (slot_name, item_id_opt) in &current_slots {
+                let item_id = match item_id_opt {
+                    Some(id) => id.clone(),
                     None => continue,
                 };
-                let item_metadata = match get_item_metadata(item_id) {
+                let item_metadata = match get_item_metadata(&item_id) {
                     Some(meta) => meta,
                     None => continue,
                 };
                 if item_metadata.get("two_handed").and_then(JsonValue::as_bool) == Some(true) {
-                    two_handed_items.push((slot_name.clone(), item_id.to_string()));
+                    two_handed_items.push((slot_name.clone(), item_id));
                 }
             }
 
@@ -151,41 +204,7 @@ impl System for EquipmentLogicSystem {
                 }
             }
 
-            // --- Equipment Effects Application ---
-            let mut total_effects: HashMap<String, f64> = HashMap::new();
-            for (_slot_name, item_id_value) in slots_mut.iter() {
-                if item_id_value.is_null() {
-                    continue;
-                }
-                let item_id = match item_id_value.as_str() {
-                    Some(id) => id,
-                    None => continue,
-                };
-                let item_metadata = match get_item_metadata(item_id) {
-                    Some(meta) => meta,
-                    None => continue,
-                };
-                if let Some(effects) = item_metadata.get("effects").and_then(JsonValue::as_object) {
-                    for (stat, delta) in effects {
-                        if let Some(d) = delta.as_f64() {
-                            *total_effects.entry(stat.clone()).or_insert(0.0) += d;
-                        }
-                    }
-                }
-            }
-
-            // Get base stats (before equipment effects)
-            let mut new_stats = entity_stats.clone();
-            for (stat, bonus) in total_effects {
-                let base = new_stats
-                    .get(&stat)
-                    .and_then(JsonValue::as_f64)
-                    .unwrap_or(0.0);
-                new_stats[stat] = JsonValue::from(base + bonus);
-            }
-            let _ = world.set_component(eid, "Stats", new_stats);
-
-            // Apply changes if any
+            // Apply equipment changes only (no stat writes)
             let _ = world.set_component(eid, "Equipment", new_equipment);
         }
     }

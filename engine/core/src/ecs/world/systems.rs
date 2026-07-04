@@ -75,8 +75,9 @@ impl World {
 
     /// Borrow-safe, idiomatic ECS tick.
     pub fn simulation_tick(world_rc: Rc<RefCell<World>>) {
-        // Get the system names up front
-        let system_names: Vec<String> = world_rc.borrow().systems.sorted_system_names();
+        // Get system names in deterministic execution order (R011)
+        let sorted_names = world_rc.borrow().systems.sorted_system_names();
+        let system_names: Vec<String> = crate::systems::order_systems(&sorted_names);
 
         for name in &system_names {
             // Take the system out of the registry, drop the borrow immediately

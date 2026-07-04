@@ -1,11 +1,12 @@
 {
   "title": "Stats",
-  "type": "object",
+  "description": "Final computed stats for an entity. Open schema — any stat name is valid. Documented defaults: strength, dexterity, intelligence.",
+  "type": ["object", "null"],
   "properties": {
-    "strength": { "type": ["number", "null"], "default": null },
-    "dexterity": { "type": ["number", "null"], "default": null },
-    "intelligence": { "type": ["number", "null"], "default": null }
+    "strength": { "type": ["number", "null"], "default": null, "description": "Physical power. Affects melee damage, carry capacity." },
+    "dexterity": { "type": ["number", "null"], "default": null, "description": "Agility and precision. Affects ranged accuracy, dodge." },
+    "intelligence": { "type": ["number", "null"], "default": null, "description": "Mental acuity. Affects spell power, skill learning rate." }
   },
-  "required": [],
+  "additionalProperties": { "type": "number" },
   "modes": ["colony", "roguelike"]
 }

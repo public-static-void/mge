@@ -8,7 +8,9 @@ use engine_core::plugins::loader::load_plugin_and_register_worldgen_threadsafe;
 use engine_core::plugins::types::EngineApi;
 use engine_core::systems::body_equipment_sync::BodyEquipmentSyncSystem;
 use engine_core::systems::death_decay::{ProcessDeaths, ProcessDecay};
+use engine_core::systems::derived_stats::DerivedStatsSystem;
 use engine_core::systems::economic::{EconomicSystem, load_recipes_from_dir};
+use engine_core::systems::equipment_effect_aggregation::EquipmentEffectAggregationSystem;
 use engine_core::systems::equipment_logic::EquipmentLogicSystem;
 use engine_core::systems::faction_reputation::FactionReputationSystem;
 use engine_core::systems::fog::FogUpdateSystem;
@@ -17,6 +19,7 @@ use engine_core::systems::inventory::InventoryConstraintSystem;
 use engine_core::systems::job::{
     JobLogicKind, JobSystem, JobTypeRegistry, load_job_types_from_dir,
 };
+use engine_core::systems::stat_calculation::StatCalculationSystem;
 use engine_lua::ScriptEngine;
 use gag::BufferRedirect;
 use regex::Regex;
@@ -303,6 +306,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .register_system(InventoryConstraintSystem);
         world.borrow_mut().register_system(EquipmentLogicSystem);
         world.borrow_mut().register_system(BodyEquipmentSyncSystem);
+        world
+            .borrow_mut()
+            .register_system(EquipmentEffectAggregationSystem);
+        world.borrow_mut().register_system(StatCalculationSystem);
+        world.borrow_mut().register_system(DerivedStatsSystem);
 
         let mut engine = ScriptEngine::new();
 

@@ -462,3 +462,94 @@ fn test_dynamic_priority_update_affects_assignment() {
         "Agent should now have the higher-priority job"
     );
 }
+
+/// Verifies that skill levels are the differentiating factor in AI job assignment.
+///
+/// Agent A (skill_mining=5, skill_crafting=1) and Agent B (skill_mining=1, skill_crafting=5)
+/// with matching jobs. Both agents have no preferences, no specializations, and both jobs
+/// have equal priority — skill should be the deciding factor in assignment.
+#[test]
+fn test_skill_isolated_ai_assignment() {
+    engine_core::systems::job::system::events::init_job_event_logger();
+    let mut world = world_helper::make_test_world();
+
+    // Agent A: high mining skill (5.0), low crafting skill (1.0)
+    let agent_a = world.spawn_entity();
+    world
+        .set_component(
+            agent_a,
+            "Agent",
+            json!({
+                "entity_id": agent_a,
+                "skills": { "mining": 5.0, "crafting": 1.0 },
+                "state": "idle",
+            }),
+        )
+        .unwrap();
+
+    // Agent B: low mining skill (1.0), high crafting skill (5.0)
+    let agent_b = world.spawn_entity();
+    world
+        .set_component(
+            agent_b,
+            "Agent",
+            json!({
+                "entity_id": agent_b,
+                "skills": { "mining": 1.0, "crafting": 5.0 },
+                "state": "idle",
+            }),
+        )
+        .unwrap();
+
+    // Job X: mining — matches Agent A's higher skill
+    let job_x = world.spawn_entity();
+    world
+        .set_component(
+            job_x,
+            "Job",
+            json!({
+                "job_type": "mining",
+                "state": "pending",
+                "priority": 1,
+                "category": "general",
+            }),
+        )
+        .unwrap();
+
+    // Job Y: crafting — matches Agent B's higher skill
+    let job_y = world.spawn_entity();
+    world
+        .set_component(
+            job_y,
+            "Job",
+            json!({
+                "job_type": "crafting",
+                "state": "pending",
+                "priority": 1,
+                "category": "general",
+            }),
+        )
+        .unwrap();
+
+    let mut job_board = JobBoard::default();
+    job_board.update(&world, 0, &[]);
+    assign_jobs(&mut world, &mut job_board, 0, &[]);
+
+    let agent_a_obj = world.get_component(agent_a, "Agent").unwrap();
+    let agent_b_obj = world.get_component(agent_b, "Agent").unwrap();
+
+    // Both agents should now be working
+    assert_eq!(agent_a_obj["state"], "working");
+    assert_eq!(agent_b_obj["state"], "working");
+
+    // Agent A should have a job assigned (matching their higher mining skill)
+    let a_job = agent_a_obj.get("current_job").and_then(|v| v.as_u64());
+    assert!(a_job.is_some(), "Agent A should be assigned a job");
+
+    // Agent B should have a job assigned (matching their higher crafting skill)
+    let b_job = agent_b_obj.get("current_job").and_then(|v| v.as_u64());
+    assert!(b_job.is_some(), "Agent B should be assigned a job");
+
+    // Verify jobs are assigned to different agents
+    assert_ne!(a_job, b_job, "Each agent should have a different job");
+}

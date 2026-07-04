@@ -108,12 +108,20 @@ impl PyWorld {
         let map = engine_core::map::Map::new(Box::new(grid));
         world.map = Some(map);
 
-        world.register_system(engine_core::systems::death_decay::ProcessDeaths);
-        world.register_system(engine_core::systems::death_decay::ProcessDecay);
+        // Register core systems in deterministic execution order (R011)
+        world.register_system(engine_core::systems::equipment_logic::EquipmentLogicSystem);
+        world.register_system(
+            engine_core::systems::equipment_effect_aggregation::EquipmentEffectAggregationSystem,
+        );
+        world.register_system(engine_core::systems::body_equipment_sync::BodyEquipmentSyncSystem);
+        world.register_system(engine_core::systems::stat_calculation::StatCalculationSystem);
+        world.register_system(engine_core::systems::derived_stats::DerivedStatsSystem);
         world.register_system(engine_core::systems::job::JobSystem);
         world.register_system(FactionReputationSystem);
         world.register_system(FovUpdateSystem);
         world.register_system(FogUpdateSystem);
+        world.register_system(engine_core::systems::death_decay::ProcessDeaths);
+        world.register_system(engine_core::systems::death_decay::ProcessDecay);
         Ok(PyWorld {
             inner: Rc::new(RefCell::new(world)),
             systems: Rc::new(SystemBridge {

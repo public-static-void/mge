@@ -677,6 +677,7 @@ dependencies = [
  "indexmap",
  "jsonschema",
  "libloading",
+ "log",
  "parking_lot",
  "rand",
  "schemars",

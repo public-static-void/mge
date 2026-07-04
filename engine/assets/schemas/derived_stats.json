@@ -1,0 +1,12 @@
+{
+  "title": "DerivedStats",
+  "description": "Secondary stats computed from primary Stats by DerivedStatsSystem.",
+  "type": ["object", "null"],
+  "properties": {
+    "MaxHP": { "type": "number", "default": 100, "description": "Maximum hit points" },
+    "MeleeDamage": { "type": "number", "default": 1.0, "description": "Base melee damage" },
+    "CritChance": { "type": "number", "default": 0.05, "description": "Critical hit chance" }
+  },
+  "additionalProperties": { "type": "number" },
+  "modes": ["colony", "roguelike"]
+}

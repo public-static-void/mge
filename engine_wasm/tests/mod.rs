@@ -26,6 +26,7 @@ mod wasm_map_api;
 mod wasm_mode_api;
 mod wasm_region_api;
 mod wasm_save_load_api;
+mod wasm_skill_stat_api;
 mod wasm_time_of_day_api;
 mod wasm_turn_api;
 mod wasm_ui_api;
