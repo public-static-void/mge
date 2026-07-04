@@ -48,29 +48,25 @@ impl World {
             }
 
             // Check for deprecated agent.skills
-            if let Some(agent) = self.components.get("Agent").and_then(|map| map.get(&eid)) {
-                if let Some(skills) = agent.get("skills").and_then(|v| v.as_object()) {
-                    if !skills.is_empty() {
-                        log::warn!(
-                            "DEPRECATION: entity {eid} uses agent.skills — migrating to SkillLevels component. \
-                             agent.skills will be removed in a future milestone."
-                        );
+            if let Some(agent) = self.components.get("Agent").and_then(|map| map.get(&eid))
+                && let Some(skills) = agent.get("skills").and_then(|v| v.as_object())
+                && !skills.is_empty()
+            {
+                log::warn!(
+                    "DEPRECATION: entity {eid} uses agent.skills — migrating to SkillLevels component. \
+                     agent.skills will be removed in a future milestone."
+                );
 
-                        let mut skill_levels_map = Map::new();
-                        skill_levels_map
-                            .insert("skills".to_string(), JsonValue::Object(skills.clone()));
-                        skill_levels_map.insert("total_xp".to_string(), JsonValue::from(0.0));
-                        skill_levels_map
-                            .insert("skill_xp".to_string(), JsonValue::Object(Map::new()));
-                        skill_levels_map
-                            .insert("skill_levels".to_string(), JsonValue::Object(Map::new()));
+                let mut skill_levels_map = Map::new();
+                skill_levels_map.insert("skills".to_string(), JsonValue::Object(skills.clone()));
+                skill_levels_map.insert("total_xp".to_string(), JsonValue::from(0.0));
+                skill_levels_map.insert("skill_xp".to_string(), JsonValue::Object(Map::new()));
+                skill_levels_map.insert("skill_levels".to_string(), JsonValue::Object(Map::new()));
 
-                        self.components
-                            .entry("SkillLevels".to_string())
-                            .or_default()
-                            .insert(eid, JsonValue::Object(skill_levels_map));
-                    }
-                }
+                self.components
+                    .entry("SkillLevels".to_string())
+                    .or_default()
+                    .insert(eid, JsonValue::Object(skill_levels_map));
             }
         }
     }

@@ -30,44 +30,44 @@ fn get_skill_registry() -> &'static SkillRegistryMap {
             if path.exists() {
                 match std::fs::read_to_string(path) {
                     Ok(content) => {
-                        if let Ok(json) = serde_json::from_str::<JsonValue>(&content) {
-                            if let Some(skills) = json.get("skills").and_then(|v| v.as_array()) {
-                                for skill in skills {
-                                    let name = skill
-                                        .get("name")
-                                        .and_then(|v| v.as_str())
-                                        .unwrap_or("")
-                                        .to_string();
-                                    if name.is_empty() {
-                                        continue;
-                                    }
-                                    let max_level = skill
-                                        .get("max_level")
-                                        .and_then(|v| v.as_f64())
-                                        .unwrap_or(100.0);
-                                    let base_xp = skill
-                                        .get("base_xp_per_action")
-                                        .and_then(|v| v.as_f64())
-                                        .unwrap_or(10.0);
-                                    let mut stat_bonus = HashMap::new();
-                                    if let Some(bonus_obj) =
-                                        skill.get("derived_stat_bonus").and_then(|v| v.as_object())
-                                    {
-                                        for (k, v) in bonus_obj {
-                                            if let Some(val) = v.as_f64() {
-                                                stat_bonus.insert(k.clone(), val);
-                                            }
+                        if let Ok(json) = serde_json::from_str::<JsonValue>(&content)
+                            && let Some(skills) = json.get("skills").and_then(|v| v.as_array())
+                        {
+                            for skill in skills {
+                                let name = skill
+                                    .get("name")
+                                    .and_then(|v| v.as_str())
+                                    .unwrap_or("")
+                                    .to_string();
+                                if name.is_empty() {
+                                    continue;
+                                }
+                                let max_level = skill
+                                    .get("max_level")
+                                    .and_then(|v| v.as_f64())
+                                    .unwrap_or(100.0);
+                                let base_xp = skill
+                                    .get("base_xp_per_action")
+                                    .and_then(|v| v.as_f64())
+                                    .unwrap_or(10.0);
+                                let mut stat_bonus = HashMap::new();
+                                if let Some(bonus_obj) =
+                                    skill.get("derived_stat_bonus").and_then(|v| v.as_object())
+                                {
+                                    for (k, v) in bonus_obj {
+                                        if let Some(val) = v.as_f64() {
+                                            stat_bonus.insert(k.clone(), val);
                                         }
                                     }
-                                    registry.insert(
-                                        name,
-                                        SkillEntry {
-                                            max_level,
-                                            base_xp_per_action: base_xp,
-                                            derived_stat_bonus: stat_bonus,
-                                        },
-                                    );
                                 }
+                                registry.insert(
+                                    name,
+                                    SkillEntry {
+                                        max_level,
+                                        base_xp_per_action: base_xp,
+                                        derived_stat_bonus: stat_bonus,
+                                    },
+                                );
                             }
                         }
                     }

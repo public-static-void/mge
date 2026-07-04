@@ -20,12 +20,12 @@ fn get_valid_slots() -> &'static HashSet<String> {
             if path.exists() {
                 match std::fs::read_to_string(path) {
                     Ok(content) => {
-                        if let Ok(json) = serde_json::from_str::<JsonValue>(&content) {
-                            if let Some(slot_list) = json.get("slots").and_then(|v| v.as_array()) {
-                                for slot_val in slot_list {
-                                    if let Some(s) = slot_val.as_str() {
-                                        slots.insert(s.to_string());
-                                    }
+                        if let Ok(json) = serde_json::from_str::<JsonValue>(&content)
+                            && let Some(slot_list) = json.get("slots").and_then(|v| v.as_array())
+                        {
+                            for slot_val in slot_list {
+                                if let Some(s) = slot_val.as_str() {
+                                    slots.insert(s.to_string());
                                 }
                             }
                         }
