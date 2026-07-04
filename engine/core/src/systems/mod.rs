@@ -18,6 +18,8 @@ pub mod equipment_effect_aggregation;
 pub mod equipment_logic;
 /// Faction reputation system
 pub mod faction_reputation;
+/// Fog-of-war update system
+pub mod fog;
 /// Field-of-view update system
 pub mod fov;
 /// Inventory system

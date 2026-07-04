@@ -121,5 +121,82 @@ pub fn register_fov_api(linker: &mut Linker<Arc<Mutex<WasmWorld>>>) -> anyhow::R
         },
     )?;
 
+    // --- Fog-of-war API ---
+
+    linker.func_wrap(
+        "wasm_fov",
+        "is_explored",
+        |caller: Caller<'_, Arc<Mutex<WasmWorld>>>, entity: u32, x: i32, y: i32, z: i32| -> i32 {
+            let explored = {
+                let world = caller.data().lock().unwrap();
+                let cell = CellKey::Square { x, y, z };
+                world
+                    .get_explored_cells(entity)
+                    .map(|cells| cells.contains(&cell))
+                    .unwrap_or(false)
+            };
+            if explored { 1 } else { 0 }
+        },
+    )?;
+
+    linker.func_wrap(
+        "wasm_fov",
+        "get_explored_cells",
+        |mut caller: Caller<'_, Arc<Mutex<WasmWorld>>>,
+         entity: u32,
+         out_ptr: i32,
+         out_len: i32|
+         -> i32 {
+            let cells_json: Vec<serde_json::Value> = {
+                let world = caller.data().lock().unwrap();
+                world
+                    .get_explored_cells(entity)
+                    .map(|cells| {
+                        cells
+                            .iter()
+                            .map(|cell| match cell {
+                                CellKey::Square { x, y, z } => {
+                                    json!({"x": x, "y": y, "z": z})
+                                }
+                                CellKey::Hex { q, r, z } => {
+                                    json!({"q": q, "r": r, "z": z})
+                                }
+                                CellKey::Province { id } => {
+                                    json!({"id": id})
+                                }
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default()
+            };
+            if cells_json.is_empty() {
+                -1
+            } else {
+                let json_str =
+                    serde_json::to_string(&cells_json).unwrap_or_else(|_| "[]".to_string());
+                write_string_to_wasm(&mut caller, out_ptr, out_len, &json_str) as i32
+            }
+        },
+    )?;
+
+    linker.func_wrap(
+        "wasm_fov",
+        "reset_fog",
+        |caller: Caller<'_, Arc<Mutex<WasmWorld>>>, entity: u32| {
+            let mut world = caller.data().lock().unwrap();
+            world.reset_fog(entity);
+        },
+    )?;
+
+    linker.func_wrap(
+        "wasm_fov",
+        "get_visibility_state",
+        |caller: Caller<'_, Arc<Mutex<WasmWorld>>>, entity: u32, x: i32, y: i32, z: i32| -> i32 {
+            let world = caller.data().lock().unwrap();
+            let cell = CellKey::Square { x, y, z };
+            world.get_visibility_state(entity, &cell) as i32
+        },
+    )?;
+
     Ok(())
 }

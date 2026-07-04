@@ -13,6 +13,7 @@ use engine_core::systems::economic::{EconomicSystem, load_recipes_from_dir};
 use engine_core::systems::equipment_effect_aggregation::EquipmentEffectAggregationSystem;
 use engine_core::systems::equipment_logic::EquipmentLogicSystem;
 use engine_core::systems::faction_reputation::FactionReputationSystem;
+use engine_core::systems::fog::FogUpdateSystem;
 use engine_core::systems::fov::FovUpdateSystem;
 use engine_core::systems::inventory::InventoryConstraintSystem;
 use engine_core::systems::job::{
@@ -283,6 +284,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         world.borrow_mut().register_system(ProcessDecay);
         world.borrow_mut().register_system(FactionReputationSystem);
         world.borrow_mut().register_system(FovUpdateSystem);
+        world.borrow_mut().register_system(FogUpdateSystem);
 
         // --- Economic System registration ---
         let recipes = load_recipes_from_dir(recipes_dir().to_str().unwrap());
