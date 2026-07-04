@@ -30,7 +30,7 @@
 - [ ] Unit and equipment designer
 - [x] Combat and damage system
 - [ ] Body part damage model (per-part health, wounds)
-- [ ] Skill and attribute system
+- [x] Skill and attribute system
 - [x] Job system (job board, query, mutation, AI assignment, events, dependency chains)
 - [x] Economic engine (stockpile management, production recipes, resource reservations)
 - [x] Movement system (entity positioning and translation)
