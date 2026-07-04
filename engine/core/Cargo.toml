@@ -21,6 +21,7 @@ toml = "0.8.23"
 parking_lot = "0.12"
 walkdir = "2.5.0"
 dyn-clone = "1.0.19"
+log = "0.4"
 
 [[test]]
 name = "mods_manifest_test"
