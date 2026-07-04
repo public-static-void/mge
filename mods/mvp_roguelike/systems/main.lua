@@ -1,4 +1,5 @@
 -- MVP Roguelike main system for MGE
+-- Damage = base + (strength * 0.5) + (melee_skill * 0.2)
 
 function get_player_xy()
 	local player = get_player_eid()
@@ -45,7 +46,10 @@ function monster_turn(player, map)
 				if math.abs(dx) + math.abs(dy) == 1 then
 					print("The monster attacks you!")
 					local php = get_component(player, "Health")
-					php.current = math.max(0, php.current - 1)
+					-- Damage = base + (strength * 0.3)
+					local mstats = get_component(mid, "Stats") or {strength = 1}
+					local damage = 1.0 + (mstats.strength or 1.0) * 0.3
+					php.current = math.max(0, php.current - damage)
 					set_component(player, "Health", php)
 				else
 					-- Move towards player (simple AI)
@@ -70,6 +74,7 @@ function spawn_entities_from_map(map)
 				set_component(eid, "Renderable", { glyph = "@", color = "yellow" })
 				set_component(eid, "Position", pos)
 				set_component(eid, "Health", { current = 10, max = 10 })
+				set_component(eid, "BaseStats", { strength = 3, dexterity = 2, intelligence = 1 })
 				new_row = new_row:sub(1, x - 1) .. "." .. new_row:sub(x + 1)
 			elseif ch == "M" then
 				local eid = spawn_entity()
@@ -77,6 +82,7 @@ function spawn_entities_from_map(map)
 				set_component(eid, "Renderable", { glyph = "M", color = "red" })
 				set_component(eid, "Position", pos)
 				set_component(eid, "Health", { current = 5, max = 5 })
+				set_component(eid, "BaseStats", { strength = 2, dexterity = 1 })
 				new_row = new_row:sub(1, x - 1) .. "." .. new_row:sub(x + 1)
 			elseif ch == "!" then
 				local eid = spawn_entity()
@@ -151,7 +157,11 @@ function try_move(eid, dx, dy, map)
 			if ox == nx and oy == ny then
 				if get_component(other, "Monster") and get_component(eid, "Player") then
 					local hp = get_component(other, "Health")
-					hp.current = math.max(0, hp.current - 3)
+					-- Damage = base + (strength * 0.5) + (melee_skill * 0.2)
+					local stats = get_component(eid, "Stats") or {strength = 1}
+					local skills = get_component(eid, "SkillLevels") or {skills = {melee = 0}}
+					local damage = 1.0 + (stats.strength or 1.0) * 0.5 + (skills.skills.melee or 0) * 0.2
+					hp.current = math.max(0, hp.current - damage)
 					set_component(other, "Health", hp)
 					print("You hit the monster!")
 					if hp.current <= 0 then
@@ -196,7 +206,11 @@ function attack_adjacent_monster(player)
 	for _, mid in ipairs(get_monster_eids()) do
 		if is_entity_alive(mid) and is_adjacent(player, mid) then
 			local hp = get_component(mid, "Health")
-			hp.current = math.max(0, hp.current - 3)
+			-- Damage = base + (strength * 0.5) + (melee_skill * 0.2)
+			local stats = get_component(player, "Stats") or {strength = 1}
+			local skills = get_component(player, "SkillLevels") or {skills = {melee = 0}}
+			local damage = 1.0 + (stats.strength or 1.0) * 0.5 + (skills.skills.melee or 0) * 0.2
+			hp.current = math.max(0, hp.current - damage)
 			set_component(mid, "Health", hp)
 			print("You attack the monster!")
 			if hp.current <= 0 then
