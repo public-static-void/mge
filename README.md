@@ -2,7 +2,7 @@
 
 **Cross-language game engine** — Rust core with identical scripting APIs in **Lua**, **Python**, and **WASM**, plus **C ABI plugins**.
 
-![CI]({{CI_BADGE_URL}}) · {{LATEST_TAG}}
+[![CI](https://github.com/public-static-void/mge/actions/workflows/ci.yml/badge.svg)](https://github.com/public-static-void/mge/actions/workflows/ci.yml) · `v1.149.0`
 
 ---
 
