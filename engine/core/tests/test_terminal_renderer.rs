@@ -2,7 +2,7 @@ use engine_core::presentation::renderer::{
     PresentationRenderer, RenderColor, RenderCommand, TerminalRenderer,
 };
 use std::fs::File;
-use std::io::Read;
+use std::io::{Read, Write};
 use std::os::unix::io::{AsRawFd, FromRawFd, OwnedFd};
 use std::sync::Mutex;
 
@@ -20,6 +20,10 @@ unsafe extern "C" {
 /// Serialized via STDOUT_CAPTURE_LOCK to prevent parallel test interference.
 fn capture_stdout<F: FnOnce()>(f: F) -> String {
     let _guard = STDOUT_CAPTURE_LOCK.lock().expect("stdout capture lock");
+
+    // Flush stdout before redirecting to prevent stale buffered data from
+    // earlier test output from leaking into the capture pipe.
+    std::io::stdout().flush().ok();
 
     let mut fds = [0i32; 2];
     let ret = unsafe { pipe(fds.as_mut_ptr()) };
@@ -125,7 +129,10 @@ fn test_terminal_renderer_ansi_all_none() {
 fn test_terminal_renderer_ansi_zero_size() {
     let mut renderer = TerminalRenderer::new(0, 0);
     let output = capture_stdout(|| renderer.present());
-    assert!(output.is_empty(), "zero-size buffer produces no output");
+    assert!(
+        output.is_empty(),
+        "zero-size buffer should produce no output, got: {output:?}"
+    );
 }
 
 #[test]

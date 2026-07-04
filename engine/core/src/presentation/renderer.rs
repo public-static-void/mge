@@ -122,6 +122,12 @@ impl PresentationRenderer for TerminalRenderer {
     }
 
     fn present(&mut self) {
+        // Guard: zero-dimension renderer has no pixels to display.
+        // Avoids stdout interaction entirely (prevents stray output in CI
+        // when the fd-level capture pipe may transiently receive data).
+        if self.width == 0 || self.height == 0 {
+            return;
+        }
         // Uses BufWriter + stdout().lock() to avoid per-cell heap allocation (R003/AC007).
         // ANSI 24-bit escapes are always emitted; no fallback for legacy terminals (NFR001).
         use std::io::Write;
