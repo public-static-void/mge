@@ -1,5 +1,3 @@
-#[path = "helpers/event.rs"]
-mod event_helper;
 #[path = "helpers/world.rs"]
 mod world_helper;
 
