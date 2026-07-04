@@ -2,6 +2,8 @@
 mod world_helper;
 
 use engine_core::systems::body_equipment_sync::BodyEquipmentSyncSystem;
+use engine_core::systems::equipment_effect_aggregation::EquipmentEffectAggregationSystem;
+use engine_core::systems::stat_calculation::StatCalculationSystem;
 use serde_json::json;
 
 #[test]
@@ -10,8 +12,10 @@ fn test_body_equipment_sync_enforcement() {
     let mut world = world_helper::make_test_world();
     world.current_mode = "roguelike".to_string();
 
-    // Register the integration system
+    // Register the integration system and pipeline systems
     world.register_system(BodyEquipmentSyncSystem);
+    world.register_system(EquipmentEffectAggregationSystem);
+    world.register_system(StatCalculationSystem);
 
     // Create an item (ring) with a stat effect
     let ring_id = world.spawn_entity();
@@ -25,6 +29,8 @@ fn test_body_equipment_sync_enforcement() {
 
     // Create a body: torso -> left arm -> left hand
     let eid = world.spawn_entity();
+    // Add BaseStats (required by pipeline)
+    world.set_component(eid, "BaseStats", json!({})).unwrap();
     let body = json!({
         "parts": [
             {
@@ -86,6 +92,12 @@ fn test_body_equipment_sync_enforcement() {
     // Run the sync system
     world.run_system("BodyEquipmentSyncSystem").unwrap();
 
+    // Run pipeline systems to compute stats
+    world
+        .run_system("EquipmentEffectAggregationSystem")
+        .unwrap();
+    world.run_system("StatCalculationSystem").unwrap();
+
     // The ring should now appear in Body.parts[*].equipped for "left hand"
     let body_after = world.get_component(eid, "Body").unwrap();
     let left_hand_equipped = &body_after["parts"][0]["children"][0]["children"][0]["equipped"];
@@ -102,22 +114,40 @@ fn test_body_equipment_sync_enforcement() {
     world.run_system("BodyEquipmentSyncSystem").unwrap();
 
     // The ring should be auto-unequipped from both Equipment and Body
-    let equipment_after = world.get_component(eid, "Equipment").unwrap();
+    let equipment_after = world.get_component(eid, "Equipment").unwrap().clone();
     assert!(equipment_after["slots"]["left hand"].is_null());
-    let body_after_wound = world.get_component(eid, "Body").unwrap();
+    let body_after_wound = world.get_component(eid, "Body").unwrap().clone();
     let left_hand_equipped =
         &body_after_wound["parts"][0]["children"][0]["children"][0]["equipped"];
     assert_eq!(left_hand_equipped.as_array().unwrap().len(), 0);
 
-    // Equip a ring directly to the left hand (Body)
-    let mut direct_body = body_after_wound.clone();
-    direct_body["parts"][0]["children"][0]["children"][0]["equipped"] = json!(["gold_ring"]);
+    // Heal the left hand before re-equipping
+    let mut healed_body = body_after_wound.clone();
+    healed_body["parts"][0]["children"][0]["children"][0]["status"] = json!("healthy");
     world
-        .set_component(eid, "Body", direct_body.clone())
+        .set_component(eid, "Body", healed_body.clone())
         .unwrap();
 
-    // Run the sync system
+    // Re-equip the ring via Equipment (the primary source of truth for equipment)
+    let mut re_equipment = equipment_after.clone();
+    re_equipment["slots"]["left hand"] = json!("gold_ring");
+    world
+        .set_component(eid, "Equipment", re_equipment.clone())
+        .unwrap();
+
+    // Run the sync system — Equipment -> Body now succeeds because part is healthy
     world.run_system("BodyEquipmentSyncSystem").unwrap();
+
+    // Verify Body synced from Equipment
+    let body_re_equipped = world.get_component(eid, "Body").unwrap();
+    let left_hand_reeq = &body_re_equipped["parts"][0]["children"][0]["children"][0]["equipped"];
+    assert_eq!(left_hand_reeq[0], "gold_ring");
+
+    // Run pipeline systems to compute stats
+    world
+        .run_system("EquipmentEffectAggregationSystem")
+        .unwrap();
+    world.run_system("StatCalculationSystem").unwrap();
 
     // The effect should be aggregated (dexterity +2)
     let default_stats = json!({});
