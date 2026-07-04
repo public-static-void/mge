@@ -1,0 +1,31 @@
+{
+  "title": "SkillLevels",
+  "description": "Per-entity skill levels, XP tracking, and skill validation against registry.",
+  "type": ["object", "null"],
+  "properties": {
+    "skills": {
+      "type": "object",
+      "additionalProperties": { "type": "number" },
+      "default": {},
+      "description": "Current skill levels. Keys validated against skill_registry."
+    },
+    "total_xp": {
+      "type": "number",
+      "default": 0,
+      "description": "Cumulative XP earned across all skills."
+    },
+    "skill_xp": {
+      "type": "object",
+      "additionalProperties": { "type": "number" },
+      "default": {},
+      "description": "Per-skill accumulated XP."
+    },
+    "skill_levels": {
+      "type": "object",
+      "additionalProperties": { "type": "number" },
+      "default": {},
+      "description": "Per-skill current computed level."
+    }
+  },
+  "modes": ["colony", "roguelike"]
+}

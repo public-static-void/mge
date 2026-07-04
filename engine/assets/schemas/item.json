@@ -11,21 +11,22 @@
     },
     "two_handed": { "type": "boolean", "default": false },
     "requirements": {
-      "type": "object",
+      "type": ["object", "null"],
+      "description": "Minimum stat values required to equip this item.",
       "properties": {
-        "strength": { "type": ["number", "null"], "default": null }
+        "strength": { "type": "number" }
       },
-      "required": []
+      "additionalProperties": { "type": "number" }
     },
     "effects": {
-      "type": "object",
-      "description": "Stat bonuses or effects applied when equipped",
+      "type": ["object", "null"],
+      "description": "Stat bonuses granted when item is equipped. Any stat name accepted.",
       "properties": {
-        "strength": { "type": ["number", "null"], "default": null },
-        "dexterity": { "type": ["number", "null"], "default": null },
-        "intelligence": { "type": ["number", "null"], "default": null }
+        "strength": { "type": ["number", "null"] },
+        "dexterity": { "type": ["number", "null"] },
+        "intelligence": { "type": ["number", "null"] }
       },
-      "additionalProperties": false
+      "additionalProperties": { "type": ["number", "null"] }
     }
   },
   "required": ["id", "name", "slot"],
