@@ -6,6 +6,7 @@ use crate::python_api::economic::EconomicApi;
 use crate::python_api::entity::EntityApi;
 use crate::python_api::equipment::EquipmentApi;
 use crate::python_api::faction::FactionApi;
+use crate::python_api::tech_tree::TechTreeApi;
 use crate::python_api::fov::FovApi;
 use crate::python_api::inventory::InventoryApi;
 use crate::python_api::job_query::JobQueryApi;
@@ -19,6 +20,7 @@ use crate::system_bridge::SystemBridge;
 use engine_core::ecs::world::World;
 use engine_core::loot::LootEntry;
 use engine_core::systems::faction_reputation::FactionReputationSystem;
+use engine_core::systems::research::ResearchSystem;
 use engine_core::systems::fog::FogUpdateSystem;
 use engine_core::systems::fov::FovUpdateSystem;
 use engine_core::systems::job::job_board::JobBoard;
@@ -122,6 +124,7 @@ impl PyWorld {
         world.register_system(FogUpdateSystem);
         world.register_system(engine_core::systems::death_decay::ProcessDeaths);
         world.register_system(engine_core::systems::death_decay::ProcessDecay);
+        world.register_system(ResearchSystem);
         Ok(PyWorld {
             inner: Rc::new(RefCell::new(world)),
             systems: Rc::new(SystemBridge {
@@ -369,6 +372,73 @@ impl PyWorld {
     /// Get the reputation score with a faction, or 0 if absent
     fn get_reputation(&self, entity: u32, faction_id: String) -> i64 {
         FactionApi::get_reputation(self, entity, &faction_id)
+    }
+
+    // ---- TECH TREE / RESEARCH ----
+
+    /// Returns all tech tree nodes as a list of dicts.
+    fn get_tech_tree(&self, py: Python) -> PyResult<PyObject> {
+        let val = TechTreeApi::get_tech_tree(self);
+        Ok(serde_pyobject::to_pyobject(py, &val)?.into())
+    }
+
+    /// Returns a specific tech node by ID, or None.
+    fn get_tech_node(&self, py: Python, tech_id: String) -> PyResult<Option<PyObject>> {
+        let val = TechTreeApi::get_tech_node(self, &tech_id);
+        if val.is_null() {
+            Ok(None)
+        } else {
+            Ok(Some(serde_pyobject::to_pyobject(py, &val)?.into()))
+        }
+    }
+
+    /// Returns the TechProgress component for an entity, or None.
+    fn get_tech_progress(&self, py: Python, entity: u32) -> PyResult<Option<PyObject>> {
+        match TechTreeApi::get_tech_progress(self, entity) {
+            Some(val) => Ok(Some(serde_pyobject::to_pyobject(py, &val)?.into())),
+            None => Ok(None),
+        }
+    }
+
+    /// Returns a list of completed tech IDs for an entity.
+    fn get_completed_techs(&self, entity: u32) -> Vec<String> {
+        TechTreeApi::get_completed_techs(self, entity)
+    }
+
+    /// Checks if a tech is completed for an entity.
+    fn is_tech_completed(&self, entity: u32, tech_id: String) -> bool {
+        TechTreeApi::is_tech_completed(self, entity, &tech_id)
+    }
+
+    /// Returns the current research queue for an entity.
+    fn get_research_queue(&self, entity: u32) -> Vec<String> {
+        TechTreeApi::get_research_queue(self, entity)
+    }
+
+    /// Returns the queue progress map (tech_id -> accumulated points).
+    fn get_research_queue_progress(&self, py: Python, entity: u32) -> PyResult<PyObject> {
+        let val = TechTreeApi::get_research_queue_progress(self, entity);
+        Ok(serde_pyobject::to_pyobject(py, &val)?.into())
+    }
+
+    /// Adds a tech to the research queue.
+    fn research_tech(&self, entity: u32, tech_id: String) -> PyResult<()> {
+        TechTreeApi::research_tech(self, entity, &tech_id)
+    }
+
+    /// Removes a tech from the research queue.
+    fn cancel_research(&self, entity: u32, tech_id: String) -> PyResult<()> {
+        TechTreeApi::cancel_research(self, entity, &tech_id)
+    }
+
+    /// Empties the research queue.
+    fn clear_research_queue(&self, entity: u32) -> PyResult<()> {
+        TechTreeApi::clear_research_queue(self, entity)
+    }
+
+    /// Checks if an entity can research a tech, returns (can_research, reason).
+    fn can_research_tech(&self, entity: u32, tech_id: String) -> (bool, String) {
+        TechTreeApi::can_research_tech(self, entity, &tech_id)
     }
 
     // ---- FOV ----

@@ -102,3 +102,6 @@ pub mod faction;
 
 /// Field-of-view module (get_visible_cells, is_visible, set_sight, get_sight)
 pub mod fov;
+
+/// Tech tree and research module
+pub mod tech_tree;

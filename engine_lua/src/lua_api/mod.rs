@@ -57,6 +57,8 @@ pub mod region;
 pub mod save_load;
 /// System API
 pub mod system;
+/// Tech Tree and Research API
+pub mod tech_tree;
 /// Time of Day API
 pub mod time_of_day;
 /// Turn API
@@ -107,6 +109,7 @@ pub fn register_all_api_functions(
     job_ai::register_job_ai_api(lua, globals, world.clone())?;
     loot::register_loot_api(lua, globals, world.clone())?;
     faction::register_faction_api(lua, globals, world.clone())?;
+    tech_tree::register_tech_tree_api(lua, globals, world.clone())?;
     fov::register_fov_api(lua, globals, world.clone())?;
     Ok(())
 }

@@ -59,7 +59,7 @@
 - [x] Faction and reputation system
 - [ ] Event-driven narrative engine (scenarios, decision events)
 - [ ] Procedural history and lore generation
-- [ ] Tech tree and research system
+- [x] Tech tree and research system
 - [ ] Resource economy (production, trade, consumption)
 - [ ] Supply and logistics network
 

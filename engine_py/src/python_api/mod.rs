@@ -59,6 +59,8 @@ pub mod time_of_day;
 pub mod turn;
 /// UI API
 pub mod ui;
+/// Tech Tree and Research API
+pub mod tech_tree;
 /// World API
 pub mod world;
 

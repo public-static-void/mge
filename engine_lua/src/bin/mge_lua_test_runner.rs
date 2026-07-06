@@ -9,6 +9,7 @@ use engine_core::plugins::types::EngineApi;
 use engine_core::systems::body_equipment_sync::BodyEquipmentSyncSystem;
 use engine_core::systems::death_decay::{ProcessDeaths, ProcessDecay};
 use engine_core::systems::derived_stats::DerivedStatsSystem;
+use engine_core::systems::research::ResearchSystem;
 use engine_core::systems::economic::{EconomicSystem, load_recipes_from_dir};
 use engine_core::systems::equipment_effect_aggregation::EquipmentEffectAggregationSystem;
 use engine_core::systems::equipment_logic::EquipmentLogicSystem;
@@ -311,6 +312,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .register_system(EquipmentEffectAggregationSystem);
         world.borrow_mut().register_system(StatCalculationSystem);
         world.borrow_mut().register_system(DerivedStatsSystem);
+        world.borrow_mut().register_system(ResearchSystem);
 
         let mut engine = ScriptEngine::new();
 

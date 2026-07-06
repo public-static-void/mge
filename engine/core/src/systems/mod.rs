@@ -28,6 +28,8 @@ pub mod inventory;
 pub mod job;
 /// Movement system
 pub mod movement_system;
+/// Research system
+pub mod research;
 /// Stat calculation system
 pub mod stat_calculation;
 
@@ -41,6 +43,7 @@ pub const SYSTEM_EXECUTION_ORDER: &[&str] = &[
     "BodyEquipmentSyncSystem",
     "StatCalculationSystem",
     "DerivedStatsSystem",
+    "ResearchSystem",
     "JobSystem",
     "FactionReputationSystem",
     "FovUpdateSystem",
