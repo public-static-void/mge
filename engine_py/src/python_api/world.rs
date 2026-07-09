@@ -656,6 +656,45 @@ impl PyWorld {
         crate::python_api::job_production::set_production_job_state(self, entity_id, value)
     }
 
+    /// Enqueue a production job on an entity.
+    /// Returns True if enqueued, False if entity already has a ProductionJob.
+    #[pyo3(signature = (entity_id, recipe_name, priority=0, batch_size=1))]
+    fn enqueue_production_job(
+        &self,
+        entity_id: u32,
+        recipe_name: String,
+        priority: i64,
+        batch_size: i64,
+    ) -> PyResult<bool> {
+        crate::python_api::job_production::enqueue_production_job(
+            self,
+            entity_id,
+            recipe_name,
+            Some(priority),
+            Some(batch_size),
+        )
+    }
+
+    /// Get the production queue (single job) for an entity.
+    /// Returns a dict or None.
+    fn get_production_queue(
+        &self,
+        py: Python,
+        entity_id: u32,
+    ) -> PyResult<Option<PyObject>> {
+        crate::python_api::job_production::get_production_queue(self, py, entity_id)
+    }
+
+    /// Get completed production jobs for an entity (polling).
+    /// Returns a list of dicts. Clears consumed events.
+    fn get_completed_production_jobs(
+        &self,
+        py: Python,
+        entity_id: u32,
+    ) -> PyResult<Vec<PyObject>> {
+        crate::python_api::job_production::get_completed_production_jobs(self, py, entity_id)
+    }
+
     /// Get the reserved resources for a job by entity ID.
     /// Returns a list of dicts or None.
     fn get_job_resource_reservations(

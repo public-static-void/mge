@@ -6,6 +6,7 @@ use engine_core::ecs::world::World;
 use engine_core::mods::loader::load_mod;
 use engine_core::plugins::loader::load_native_plugins_from_config;
 use engine_core::plugins::types::EngineApi;
+use engine_core::systems::economic::{EconomicSystem, load_recipes_from_dir};
 use engine_core::worldgen::WorldgenRegistry;
 use engine_lua::ScriptEngine;
 use std::cell::RefCell;
@@ -24,6 +25,14 @@ fn find_schema_dir() -> PathBuf {
     }
     // Default: relative to engine_lua's Cargo.toml
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../engine/assets/schemas")
+}
+
+/// Returns the absolute path to the engine's recipes directory.
+fn find_recipes_dir() -> PathBuf {
+    if let Ok(dir) = env::var("MGE_RECIPES_DIR") {
+        return PathBuf::from(dir);
+    }
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../engine/assets/recipes")
 }
 
 fn find_config_file() -> PathBuf {
@@ -127,7 +136,19 @@ fn main() {
             .or(manifest_mode)
             .unwrap_or_else(|| "colony".to_string());
 
+        // Load recipes and register EconomicSystem
+        let recipes_dir = find_recipes_dir();
+        if !recipes_dir.exists() {
+            eprintln!(
+                "Recipes directory does not exist: {recipes_dir:?}\n\
+                Set MGE_RECIPES_DIR or check your workspace structure."
+            );
+            std::process::exit(1);
+        }
+        let recipes = load_recipes_from_dir(&recipes_dir);
+        let economic_system = EconomicSystem::with_recipes(recipes);
         let mut world = World::new(registry.clone());
+        world.register_system(economic_system);
         world.current_mode = mode.clone();
 
         let world_rc = Rc::new(RefCell::new(world));
@@ -189,7 +210,19 @@ fn main() {
         }
         .expect("Failed to load native plugins from config");
 
+        // Load recipes and register EconomicSystem
+        let recipes_dir = find_recipes_dir();
+        if !recipes_dir.exists() {
+            eprintln!(
+                "Recipes directory does not exist: {recipes_dir:?}\n\
+                Set MGE_RECIPES_DIR or check your workspace structure."
+            );
+            std::process::exit(1);
+        }
+        let recipes = load_recipes_from_dir(&recipes_dir);
+        let economic_system = EconomicSystem::with_recipes(recipes);
         let mut world = World::new(registry.clone());
+        world.register_system(economic_system);
         if let Some(mode) = mode_arg {
             world.current_mode = mode;
         }
