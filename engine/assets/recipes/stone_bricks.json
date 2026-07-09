@@ -1,0 +1,6 @@
+{
+  "name": "stone_bricks",
+  "inputs": [{ "kind": "stone", "amount": 3 }],
+  "outputs": [{ "kind": "bricks", "amount": 6 }],
+  "duration": 2
+}

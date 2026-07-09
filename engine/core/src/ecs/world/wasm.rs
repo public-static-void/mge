@@ -917,6 +917,52 @@ impl WasmWorld {
 
     // ---- Economic API ----
 
+    /// Enqueue a production job on an entity.
+    /// Returns true if enqueued, false if entity already has a ProductionJob.
+    pub fn enqueue_production_job(
+        &mut self,
+        entity_id: u32,
+        recipe_name: &str,
+        priority: i32,
+        batch_size: i32,
+    ) -> bool {
+        // Check if entity already has a ProductionJob
+        if self.components.get("ProductionJob").is_some_and(|m| m.contains_key(&entity_id)) {
+            return false;
+        }
+        let priority_val = priority as i64;
+        let batch_size_val = if batch_size < 1 { 1 } else { batch_size as i64 };
+        let job = serde_json::json!({
+            "recipe": recipe_name,
+            "progress": 0,
+            "state": "pending",
+            "priority": priority_val,
+            "batch_size": batch_size_val,
+        });
+        self.components
+            .entry("ProductionJob".to_string())
+            .or_default()
+            .insert(entity_id, job);
+        true
+    }
+
+    /// Returns the ProductionJob component as a JSON string, or None.
+    pub fn get_production_queue(&self, entity_id: u32) -> Option<String> {
+        self.get_component(entity_id, "ProductionJob")
+    }
+
+    /// Returns completed production jobs for an entity as a JSON array string.
+    /// Clears consumed events. Returns "[]" if no completions.
+    pub fn get_completed_production_jobs(&mut self, entity_id: u32) -> String {
+        let events = self.event_buses.remove("production_completed").unwrap_or_default();
+        let filtered: Vec<serde_json::Value> = events
+            .into_iter()
+            .filter(|ev| ev.get("entity").and_then(|v| v.as_u64()) == Some(entity_id as u64))
+            .collect();
+        self.event_reader_positions.remove("production_completed");
+        serde_json::to_string(&filtered).unwrap_or_else(|_| "[]".to_string())
+    }
+
     /// Returns the stockpile resources JSON for an entity, or None if missing.
     pub fn get_stockpile_resources(&self, entity_id: u32) -> Option<String> {
         self.components
