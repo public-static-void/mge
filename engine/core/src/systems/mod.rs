@@ -42,6 +42,7 @@ pub const SYSTEM_EXECUTION_ORDER: &[&str] = &[
     "StatCalculationSystem",
     "DerivedStatsSystem",
     "JobSystem",
+    "EconomicSystem",
     "FactionReputationSystem",
     "FovUpdateSystem",
     "ProcessDeaths",
