@@ -54,7 +54,7 @@
 - [ ] Ecosystem and wildlife simulation
 - [ ] Vehicle support
 - [ ] Crafting system (recipes, tools, materials)
-- [ ] Manufacturing and production queue
+- [x] Manufacturing and production queue
 - [ ] Diplomacy AI (relationships, treaties, war)
 - [x] Faction and reputation system
 - [ ] Event-driven narrative engine (scenarios, decision events)
