@@ -18,6 +18,7 @@ use crate::python_api::turn::TurnApi;
 use crate::system_bridge::SystemBridge;
 use engine_core::ecs::world::World;
 use engine_core::loot::LootEntry;
+use engine_core::systems::economic::{EconomicSystem, load_recipes_from_dir};
 use engine_core::systems::faction_reputation::FactionReputationSystem;
 use engine_core::systems::fog::FogUpdateSystem;
 use engine_core::systems::fov::FovUpdateSystem;
@@ -122,6 +123,13 @@ impl PyWorld {
         world.register_system(FogUpdateSystem);
         world.register_system(engine_core::systems::death_decay::ProcessDeaths);
         world.register_system(engine_core::systems::death_decay::ProcessDecay);
+
+        // Load recipes and register EconomicSystem
+        let recipes_dir = schema_path.parent().unwrap().join("recipes");
+        let recipes = load_recipes_from_dir(&recipes_dir);
+        let economic_system = EconomicSystem::with_recipes(recipes);
+        world.register_system(economic_system);
+
         Ok(PyWorld {
             inner: Rc::new(RefCell::new(world)),
             systems: Rc::new(SystemBridge {
@@ -487,9 +495,13 @@ impl PyWorld {
         crate::event_bus::poll_ecs_event(self, py, event_type)
     }
 
-    /// Update event buses
+    /// Update event buses (both the global Python-event bus and the ECS World's internal buses).
     fn update_event_buses(&self) {
-        crate::event_bus::update_event_buses()
+        // Update the global Python-side event buses (used by send_event/poll_event).
+        crate::event_bus::update_event_buses();
+        // Also update the ECS World's internal event buses (used by poll_ecs_event, take_events).
+        let world = self.inner.borrow();
+        world.update_event_buses::<serde_json::Value>();
     }
 
     // ---- USER INPUT ----
