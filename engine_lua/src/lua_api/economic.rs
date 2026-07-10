@@ -178,7 +178,13 @@ pub fn register_economic_api(
     // enqueue_production_job(entity_id, recipe_name[, priority, batch_size])
     let world_enqueue = world.clone();
     let enqueue_production_job = lua.create_function_mut(
-        move |_, (entity_id, recipe_name, priority, batch_size): (u32, String, Option<i64>, Option<i64>)| {
+        move |_,
+              (entity_id, recipe_name, priority, batch_size): (
+            u32,
+            String,
+            Option<i64>,
+            Option<i64>,
+        )| {
             let mut world = world_enqueue.borrow_mut();
             // Check if entity already has a ProductionJob
             if world.get_component(entity_id, "ProductionJob").is_some() {
@@ -225,7 +231,10 @@ pub fn register_economic_api(
         let arr = serde_json::Value::Array(filtered);
         crate::helpers::json_to_lua_table(lua, &arr)
     })?;
-    globals.set("get_completed_production_jobs", get_completed_production_jobs)?;
+    globals.set(
+        "get_completed_production_jobs",
+        get_completed_production_jobs,
+    )?;
 
     Ok(())
 }

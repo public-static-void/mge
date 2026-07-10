@@ -80,8 +80,8 @@ function test_get_completed_production_jobs()
 	enqueue_production_job(eid, "wood_plank", 0, 1)
 
 	-- Run economic system until completion
-	run_system("EconomicSystem")
-	run_system("EconomicSystem")
+	run_native_system("EconomicSystem")
+	run_native_system("EconomicSystem")
 
 	-- Update event buses so events are readable
 	update_event_buses()

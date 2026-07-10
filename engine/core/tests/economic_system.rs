@@ -3,7 +3,7 @@ mod world_helper;
 
 use engine_core::ecs::system::System;
 use engine_core::systems::economic::{EconomicSystem, load_recipes_from_dir};
-use serde_json::{json, Value as JsonValue};
+use serde_json::{Value as JsonValue, json};
 
 #[test]
 fn test_workshop_produces_resources_using_recipe() {
@@ -62,8 +62,12 @@ fn test_production_job_priority_ordering() {
     let entity_a = world.spawn_entity();
     let entity_b = world.spawn_entity();
 
-    world.set_component(entity_a, "Stockpile", json!({"resources": {"wood": 10}})).unwrap();
-    world.set_component(entity_b, "Stockpile", json!({"resources": {"wood": 10}})).unwrap();
+    world
+        .set_component(entity_a, "Stockpile", json!({"resources": {"wood": 10}}))
+        .unwrap();
+    world
+        .set_component(entity_b, "Stockpile", json!({"resources": {"wood": 10}}))
+        .unwrap();
 
     world
         .set_component(
@@ -118,9 +122,15 @@ fn test_production_job_tie_break_by_entity_id() {
     let entity_c = world.spawn_entity(); // higher ID
 
     // Each has 1 wood stockpile for a recipe that consumes 1 wood
-    world.set_component(entity_a, "Stockpile", json!({"resources": {"wood": 1}})).unwrap();
-    world.set_component(entity_b, "Stockpile", json!({"resources": {"wood": 1}})).unwrap();
-    world.set_component(entity_c, "Stockpile", json!({"resources": {"wood": 1}})).unwrap();
+    world
+        .set_component(entity_a, "Stockpile", json!({"resources": {"wood": 1}}))
+        .unwrap();
+    world
+        .set_component(entity_b, "Stockpile", json!({"resources": {"wood": 1}}))
+        .unwrap();
+    world
+        .set_component(entity_c, "Stockpile", json!({"resources": {"wood": 1}}))
+        .unwrap();
 
     for (eid, _name) in &[(entity_a, "a"), (entity_b, "b"), (entity_c, "c")] {
         world
@@ -160,7 +170,9 @@ fn test_production_job_batch_processing() {
 
     let workshop = world.spawn_entity();
     // Stockpile with enough wood for 3 batch runs: wood_plank consumes 1 wood per run
-    world.set_component(workshop, "Stockpile", json!({"resources": {"wood": 3}})).unwrap();
+    world
+        .set_component(workshop, "Stockpile", json!({"resources": {"wood": 3}}))
+        .unwrap();
 
     // batch_size=3: after complete, produces 3x4=12 plank from 1 wood
     world
@@ -187,8 +199,16 @@ fn test_production_job_batch_processing() {
     // After 1 tick, should have consumed 1 wood and produced 12 plank (3*4)
     let stockpile = world.get_component(workshop, "Stockpile").unwrap();
     let resources = stockpile["resources"].as_object().unwrap();
-    assert_eq!(resources.get("wood").unwrap(), 2, "Should have consumed 1 wood");
-    assert_eq!(resources.get("plank").unwrap(), 12, "Should have produced 12 plank (3*4)");
+    assert_eq!(
+        resources.get("wood").unwrap(),
+        2,
+        "Should have consumed 1 wood"
+    );
+    assert_eq!(
+        resources.get("plank").unwrap(),
+        12,
+        "Should have produced 12 plank (3*4)"
+    );
 
     // job should be complete
     let job = world.get_component(workshop, "ProductionJob").unwrap();
@@ -201,7 +221,9 @@ fn test_production_job_event_emission() {
     world.current_mode = "colony".to_string();
 
     let workshop = world.spawn_entity();
-    world.set_component(workshop, "Stockpile", json!({"resources": {"wood": 5}})).unwrap();
+    world
+        .set_component(workshop, "Stockpile", json!({"resources": {"wood": 5}}))
+        .unwrap();
 
     world
         .set_component(
@@ -230,7 +252,10 @@ fn test_production_job_event_emission() {
 
     // Check event emission
     let events = world.take_events("production_completed");
-    assert!(!events.is_empty(), "Should have emitted production_completed event");
+    assert!(
+        !events.is_empty(),
+        "Should have emitted production_completed event"
+    );
     let event = &events[0];
     assert_eq!(event["entity"].as_u64(), Some(workshop as u64));
     assert_eq!(event["recipe"].as_str(), Some("wood_plank"));
@@ -259,19 +284,31 @@ fn test_negative_priority_sorted_lowest() {
     let entity_high = world.spawn_entity();
     let entity_low = world.spawn_entity();
 
-    world.set_component(entity_high, "Stockpile", json!({"resources": {"wood": 5}})).unwrap();
-    world.set_component(entity_low, "Stockpile", json!({"resources": {"wood": 5}})).unwrap();
+    world
+        .set_component(entity_high, "Stockpile", json!({"resources": {"wood": 5}}))
+        .unwrap();
+    world
+        .set_component(entity_low, "Stockpile", json!({"resources": {"wood": 5}}))
+        .unwrap();
 
     // Negative priority treated as lowest
     world
-        .set_component(entity_high, "ProductionJob", json!({
-            "recipe": "wood_plank", "progress": 0, "state": "pending", "priority": 5
-        }))
+        .set_component(
+            entity_high,
+            "ProductionJob",
+            json!({
+                "recipe": "wood_plank", "progress": 0, "state": "pending", "priority": 5
+            }),
+        )
         .unwrap();
     world
-        .set_component(entity_low, "ProductionJob", json!({
-            "recipe": "wood_plank", "progress": 0, "state": "pending", "priority": -1
-        }))
+        .set_component(
+            entity_low,
+            "ProductionJob",
+            json!({
+                "recipe": "wood_plank", "progress": 0, "state": "pending", "priority": -1
+            }),
+        )
         .unwrap();
 
     let recipe_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap() + "/../assets/recipes";
