@@ -16,7 +16,8 @@ pub fn register_economic_api(linker: &mut Linker<Arc<Mutex<WasmWorld>>>) -> anyh
          recipe_ptr: i32,
          recipe_len: i32,
          priority: i32,
-         batch_size: i32| -> i32 {
+         batch_size: i32|
+         -> i32 {
             let recipe_name = read_wasm_string(&mut caller, recipe_ptr, recipe_len)
                 .expect("Failed to read recipe name from WASM memory");
             let mut world = caller.data().lock().unwrap();
@@ -34,7 +35,8 @@ pub fn register_economic_api(linker: &mut Linker<Arc<Mutex<WasmWorld>>>) -> anyh
         |mut caller: Caller<'_, Arc<Mutex<WasmWorld>>>,
          entity_id: u32,
          out_ptr: i32,
-         out_len: i32| -> i32 {
+         out_len: i32|
+         -> i32 {
             let result = {
                 let world = caller.data().lock().unwrap();
                 world.get_production_queue(entity_id)
@@ -52,7 +54,8 @@ pub fn register_economic_api(linker: &mut Linker<Arc<Mutex<WasmWorld>>>) -> anyh
         |mut caller: Caller<'_, Arc<Mutex<WasmWorld>>>,
          entity_id: u32,
          out_ptr: i32,
-         out_len: i32| -> i32 {
+         out_len: i32|
+         -> i32 {
             let result = {
                 let mut world = caller.data().lock().unwrap();
                 world.get_completed_production_jobs(entity_id)
