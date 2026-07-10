@@ -119,6 +119,21 @@ pub fn register_entity_api(linker: &mut Linker<Arc<Mutex<WasmWorld>>>) -> anyhow
         },
     )?;
 
+    linker.func_wrap(
+        "entity",
+        "damage_entity_part",
+        |mut caller: Caller<'_, Arc<Mutex<WasmWorld>>>,
+         entity_id: u32,
+         part_name_ptr: i32,
+         part_name_len: i32,
+         amount: f32| {
+            let part_name = read_wasm_string(&mut caller, part_name_ptr, part_name_len)
+                .expect("Failed to read string from WASM memory");
+            let mut world = caller.data().lock().unwrap();
+            world.damage_entity_part(entity_id, &part_name, amount);
+        },
+    )?;
+
     Ok(())
 }
 

@@ -1,4 +1,5 @@
 use crate::host_api::body::register_body_api;
+use crate::host_api::body_part_damage::register_body_part_damage_api;
 use crate::host_api::camera::register_camera_api;
 use crate::host_api::component::register_component_api;
 use crate::host_api::death_decay::register_death_decay_api;
@@ -159,6 +160,7 @@ impl WasmScriptEngine {
         register_equipment_api(&mut linker)?;
         register_region_api(&mut linker)?;
         register_body_api(&mut linker)?;
+        register_body_part_damage_api(&mut linker)?;
         register_economic_api(&mut linker)?;
         register_job_system_api(&mut linker)?;
         register_job_board_api(&mut linker)?;

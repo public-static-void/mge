@@ -1,0 +1,28 @@
+{
+  "title": "PendingDamage",
+  "type": "object",
+  "properties": {
+    "damages": {
+      "type": "array",
+      "description": "Queued damage entries to be processed by BodyPartDamageSystem.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Damage amount to apply."
+          },
+          "target_part": {
+            "type": ["string", "null"],
+            "default": null,
+            "description": "Name of the body part to damage, or null for distribution across all parts."
+          }
+        },
+        "required": ["amount"]
+      }
+    }
+  },
+  "required": ["damages"],
+  "modes": ["colony", "roguelike"]
+}

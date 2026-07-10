@@ -28,6 +28,18 @@
           "enum": ["healthy", "wounded", "broken", "missing"],
           "default": "healthy"
         },
+        "hp": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Current hit points of this part.",
+          "default": 25
+        },
+        "max_hp": {
+          "type": "number",
+          "minimum": 1,
+          "description": "Maximum hit points of this part.",
+          "default": 25
+        },
         "temperature": {
           "type": ["number", "null"],
           "description": "Current temperature of this part (e.g., in Celsius).",

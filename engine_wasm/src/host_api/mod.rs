@@ -103,5 +103,8 @@ pub mod faction;
 /// Field-of-view module (get_visible_cells, is_visible, set_sight, get_sight)
 pub mod fov;
 
+/// Body part damage module
+pub mod body_part_damage;
+
 /// Tech tree and research module
 pub mod tech_tree;
