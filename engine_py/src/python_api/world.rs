@@ -18,6 +18,7 @@ use crate::python_api::turn::TurnApi;
 use crate::system_bridge::SystemBridge;
 use engine_core::ecs::world::World;
 use engine_core::loot::LootEntry;
+use engine_core::systems::body_part_damage::BodyPartDamageSystem;
 use engine_core::systems::economic::{EconomicSystem, load_recipes_from_dir};
 use engine_core::systems::faction_reputation::FactionReputationSystem;
 use engine_core::systems::fog::FogUpdateSystem;
@@ -110,6 +111,7 @@ impl PyWorld {
         world.map = Some(map);
 
         // Register core systems in deterministic execution order (R011)
+        world.register_system(BodyPartDamageSystem);
         world.register_system(engine_core::systems::equipment_logic::EquipmentLogicSystem);
         world.register_system(
             engine_core::systems::equipment_effect_aggregation::EquipmentEffectAggregationSystem,
@@ -177,6 +179,11 @@ impl PyWorld {
     /// Apply damage to an entity.
     fn damage_entity(&self, entity_id: u32, amount: f32) {
         EntityApi::damage_entity(self, entity_id, amount)
+    }
+
+    /// Apply targeted damage to a specific body part.
+    fn damage_entity_part(&self, entity_id: u32, part_name: String, amount: f32) {
+        EntityApi::damage_entity_part(self, entity_id, part_name, amount)
     }
 
     // ---- COMPONENT ----
@@ -619,21 +626,13 @@ impl PyWorld {
 
     /// Get the production queue (single job) for an entity.
     /// Returns a dict or None.
-    fn get_production_queue(
-        &self,
-        py: Python,
-        entity_id: u32,
-    ) -> PyResult<Option<PyObject>> {
+    fn get_production_queue(&self, py: Python, entity_id: u32) -> PyResult<Option<PyObject>> {
         crate::python_api::job_production::get_production_queue(self, py, entity_id)
     }
 
     /// Get completed production jobs for an entity (polling).
     /// Returns a list of dicts. Clears consumed events.
-    fn get_completed_production_jobs(
-        &self,
-        py: Python,
-        entity_id: u32,
-    ) -> PyResult<Vec<PyObject>> {
+    fn get_completed_production_jobs(&self, py: Python, entity_id: u32) -> PyResult<Vec<PyObject>> {
         crate::python_api::job_production::get_completed_production_jobs(self, py, entity_id)
     }
 
