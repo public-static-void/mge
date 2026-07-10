@@ -4,7 +4,9 @@
   "properties": {
     "recipe": { "type": "string" },
     "progress": { "type": "integer" },
-    "state": { "type": "string" }
+    "state": { "type": "string" },
+    "priority": { "type": "integer", "default": 0 },
+    "batch_size": { "type": "integer", "default": 1 }
   },
   "required": ["recipe", "progress", "state"],
   "modes": ["colony"]

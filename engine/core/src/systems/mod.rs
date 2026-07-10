@@ -4,6 +4,8 @@
 
 /// Body and equipment synchronization system
 pub mod body_equipment_sync;
+/// Body part damage distribution system
+pub mod body_part_damage;
 /// Death and decay system
 pub mod death_decay;
 /// Derived stats calculation system
@@ -36,12 +38,14 @@ pub mod stat_calculation;
 /// Systems execute in this exact sequence when `run_all_systems` is called.
 /// Systems not in this array execute after in registration order (for extensibility).
 pub const SYSTEM_EXECUTION_ORDER: &[&str] = &[
+    "BodyPartDamageSystem",
     "EquipmentLogicSystem",
     "EquipmentEffectAggregationSystem",
     "BodyEquipmentSyncSystem",
     "StatCalculationSystem",
     "DerivedStatsSystem",
     "JobSystem",
+    "EconomicSystem",
     "FactionReputationSystem",
     "FovUpdateSystem",
     "ProcessDeaths",

@@ -29,7 +29,7 @@
 - [x] Body management and equipment synchronization
 - [ ] Unit and equipment designer
 - [x] Combat and damage system
-- [ ] Body part damage model (per-part health, wounds)
+- [x] Body part damage model (per-part health, wounds)
 - [x] Skill and attribute system
 - [x] Job system (job board, query, mutation, AI assignment, events, dependency chains)
 - [x] Economic engine (stockpile management, production recipes, resource reservations)
@@ -54,7 +54,7 @@
 - [ ] Ecosystem and wildlife simulation
 - [ ] Vehicle support
 - [ ] Crafting system (recipes, tools, materials)
-- [ ] Manufacturing and production queue
+- [x] Manufacturing and production queue
 - [ ] Diplomacy AI (relationships, treaties, war)
 - [x] Faction and reputation system
 - [ ] Event-driven narrative engine (scenarios, decision events)

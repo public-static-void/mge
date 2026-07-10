@@ -92,15 +92,65 @@ impl World {
         }
     }
 
-    /// Damage an entity
+    /// Damage an entity.
+    ///
+    /// When the entity has a Body component, damage is routed through PendingDamage
+    /// for distribution by BodyPartDamageSystem. Otherwise falls back to direct
+    /// Health subtraction for backward compatibility.
     pub fn damage_entity(&mut self, entity: u32, amount: f32) {
-        if let Some(healths) = self.components.get_mut("Health")
+        if self.has_component(entity, "Body") {
+            self.append_pending_damage(entity, amount as f64, None);
+        } else if let Some(healths) = self.components.get_mut("Health")
             && let Some(value) = healths.get_mut(&entity)
             && let Some(obj) = value.as_object_mut()
             && let Some(current) = obj.get_mut("current")
             && let Some(cur_val) = current.as_f64()
         {
             *current = serde_json::json!((cur_val - amount as f64).max(0.0));
+        }
+    }
+
+    /// Apply targeted damage to a specific body part.
+    ///
+    /// Appends a PendingDamage entry with the specified `part_name`.
+    /// If the entity has no Body component, this is a no-op.
+    pub fn damage_entity_part(&mut self, entity: u32, part_name: &str, amount: f32) {
+        if self.has_component(entity, "Body") {
+            self.append_pending_damage(entity, amount as f64, Some(part_name));
+        }
+    }
+
+    /// Appends a damage entry to the entity's PendingDamage component.
+    /// Creates the component if it doesn't exist.
+    fn append_pending_damage(&mut self, entity: u32, amount: f64, target_part: Option<&str>) {
+        use serde_json::json;
+
+        let target_part_val = match target_part {
+            Some(name) => json!(name),
+            None => json!(null),
+        };
+
+        let damage_entry = json!({
+            "amount": amount,
+            "target_part": target_part_val
+        });
+
+        if let Some(pending) = self.components.get_mut("PendingDamage")
+            && let Some(value) = pending.get_mut(&entity)
+            && let Some(obj) = value.as_object_mut()
+            && let Some(damages) = obj.get_mut("damages")
+            && let Some(arr) = damages.as_array_mut()
+        {
+            arr.push(damage_entry);
+        } else {
+            let pending = json!({
+                "damages": [damage_entry]
+            });
+            // Bypass schema validation for internal PendingDamage writes
+            self.components
+                .entry("PendingDamage".to_string())
+                .or_default()
+                .insert(entity, pending);
         }
     }
 

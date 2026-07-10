@@ -338,16 +338,272 @@ impl WasmWorld {
         *pos = serde_json::json!({"x": x, "y": y});
     }
 
-    /// Damage an entity
+    /// Damage an entity.
+    ///
+    /// Routes through PendingDamage when the entity has a Body component,
+    /// otherwise falls back to direct Health subtraction.
     pub fn damage_entity(&mut self, entity_id: u32, amount: f32) {
-        // This implementation assumes a "Health" component with an "hp" field.
-        let comps = self.components.entry("Health".to_string()).or_default();
-        let health = comps
-            .entry(entity_id)
-            .or_insert_with(|| serde_json::json!({"hp": 100.0}));
+        let has_body = self
+            .components
+            .get("Body")
+            .is_some_and(|m| m.contains_key(&entity_id));
 
-        let hp = health.get("hp").and_then(|v| v.as_f64()).unwrap_or(100.0) - amount as f64;
-        *health = serde_json::json!({"hp": hp.max(0.0)});
+        if has_body {
+            self.append_pending_damage(entity_id, amount as f64, None);
+        } else {
+            let comps = self.components.entry("Health".to_string()).or_default();
+            let health = comps
+                .entry(entity_id)
+                .or_insert_with(|| serde_json::json!({"hp": 100.0}));
+
+            let hp = health.get("hp").and_then(|v| v.as_f64()).unwrap_or(100.0) - amount as f64;
+            *health = serde_json::json!({"hp": hp.max(0.0)});
+        }
+    }
+
+    /// Apply targeted damage to a specific body part.
+    pub fn damage_entity_part(&mut self, entity_id: u32, part_name: &str, amount: f32) {
+        let has_body = self
+            .components
+            .get("Body")
+            .is_some_and(|m| m.contains_key(&entity_id));
+        if has_body {
+            self.append_pending_damage(entity_id, amount as f64, Some(part_name));
+        }
+    }
+
+    /// Appends a damage entry to the entity's PendingDamage component.
+    fn append_pending_damage(&mut self, entity_id: u32, amount: f64, target_part: Option<&str>) {
+        let target_part_val = match target_part {
+            Some(name) => serde_json::json!(name),
+            None => serde_json::json!(null),
+        };
+
+        let damage_entry = serde_json::json!({
+            "amount": amount,
+            "target_part": target_part_val
+        });
+
+        if let Some(pending) = self.components.get_mut("PendingDamage")
+            && let Some(value) = pending.get_mut(&entity_id)
+            && let Some(obj) = value.as_object_mut()
+            && let Some(damages) = obj.get_mut("damages")
+            && let Some(arr) = damages.as_array_mut()
+        {
+            arr.push(damage_entry);
+        } else {
+            let pending = serde_json::json!({
+                "damages": [damage_entry]
+            });
+            self.components
+                .entry("PendingDamage".to_string())
+                .or_default()
+                .insert(entity_id, pending);
+        }
+    }
+
+    /// Process PendingDamage for all entities with Body components.
+    /// Mirrors the BodyPartDamageSystem logic for WASM host API.
+    pub fn process_body_part_damage(&mut self) {
+        // Collect entities that have both Body and PendingDamage
+        let entities: Vec<u32> = {
+            let body_ids: std::collections::HashSet<u32> = self
+                .components
+                .get("Body")
+                .map(|m| m.keys().copied().collect())
+                .unwrap_or_default();
+            let pending_ids: std::collections::HashSet<u32> = self
+                .components
+                .get("PendingDamage")
+                .map(|m| m.keys().copied().collect())
+                .unwrap_or_default();
+            body_ids.intersection(&pending_ids).copied().collect()
+        };
+
+        for entity in entities {
+            let pending = match self
+                .components
+                .get("PendingDamage")
+                .and_then(|m| m.get(&entity))
+                .cloned()
+            {
+                Some(p) => p,
+                None => continue,
+            };
+
+            let damages = match pending.get("damages").and_then(|v| v.as_array()) {
+                Some(d) if !d.is_empty() => d.clone(),
+                _ => {
+                    if let Some(pd) = self.components.get_mut("PendingDamage") {
+                        pd.remove(&entity);
+                    }
+                    continue;
+                }
+            };
+
+            let mut body = match self
+                .components
+                .get("Body")
+                .and_then(|m| m.get(&entity))
+                .cloned()
+            {
+                Some(b) => b,
+                None => {
+                    if let Some(pd) = self.components.get_mut("PendingDamage") {
+                        pd.remove(&entity);
+                    }
+                    continue;
+                }
+            };
+
+            if let Some(parts) = body.get_mut("parts").and_then(|v| v.as_array_mut()) {
+                // Phase 1: Collect damage amounts per part name
+                let mut damage_per_part: std::collections::HashMap<String, f64> =
+                    std::collections::HashMap::new();
+
+                for damage_entry in &damages {
+                    let amount = damage_entry
+                        .get("amount")
+                        .and_then(|v| v.as_f64())
+                        .unwrap_or(0.0);
+                    if amount <= 0.0 {
+                        continue;
+                    }
+
+                    let target_part = damage_entry.get("target_part").and_then(|v| v.as_str());
+
+                    if let Some(target) = target_part {
+                        *damage_per_part.entry(target.to_string()).or_insert(0.0) += amount;
+                    } else {
+                        // Untargeted: distribute proportionally across non-missing parts
+                        let mut part_info: Vec<(String, f64, String)> = Vec::new();
+                        Self::collect_part_info_static(parts, &mut part_info);
+
+                        let total_max_hp: f64 = part_info
+                            .iter()
+                            .filter(|(_, _, status)| status != "missing")
+                            .map(|(_, max_hp, _)| max_hp)
+                            .sum();
+
+                        if total_max_hp > 0.0 {
+                            for (name, max_hp, status) in &part_info {
+                                if status == "missing" {
+                                    continue;
+                                }
+                                let weight = max_hp / total_max_hp;
+                                let share = amount * weight;
+                                *damage_per_part.entry(name.clone()).or_insert(0.0) += share;
+                            }
+                        }
+                    }
+                }
+
+                // Phase 2: Apply accumulated damage to each part
+                for (name, amount) in &damage_per_part {
+                    Self::apply_damage_to_named_part_static(parts, name, *amount);
+                }
+            }
+
+            // Recompute Health.current as sum of all parts' hp
+            let total_hp = {
+                let mut hp_vals: Vec<f64> = Vec::new();
+                if let Some(parts) = body.get("parts").and_then(|v| v.as_array()) {
+                    Self::collect_part_hp_static(parts, &mut hp_vals);
+                }
+                hp_vals.iter().sum::<f64>().max(0.0)
+            };
+
+            self.components
+                .entry("Body".to_string())
+                .or_default()
+                .insert(entity, body);
+
+            // Update Health.current
+            if let Some(healths) = self.components.get_mut("Health")
+                && let Some(value) = healths.get_mut(&entity)
+                && let Some(obj) = value.as_object_mut()
+                && let Some(current) = obj.get_mut("current")
+            {
+                *current = serde_json::json!(total_hp);
+            }
+
+            if let Some(pd) = self.components.get_mut("PendingDamage") {
+                pd.remove(&entity);
+            }
+        }
+    }
+
+    fn collect_part_info_static(
+        parts: &[serde_json::Value],
+        result: &mut Vec<(String, f64, String)>,
+    ) {
+        for part in parts {
+            let name = part
+                .get("name")
+                .and_then(|n| n.as_str())
+                .unwrap_or("")
+                .to_string();
+            let max_hp = part.get("max_hp").and_then(|v| v.as_f64()).unwrap_or(25.0);
+            let status = part
+                .get("status")
+                .and_then(|s| s.as_str())
+                .unwrap_or("healthy")
+                .to_string();
+            result.push((name, max_hp, status));
+            if let Some(children) = part.get("children").and_then(|v| v.as_array()) {
+                Self::collect_part_info_static(children, result);
+            }
+        }
+    }
+
+    fn apply_damage_to_named_part_static(
+        parts: &mut [serde_json::Value],
+        target: &str,
+        amount: f64,
+    ) {
+        for part in parts.iter_mut() {
+            if part.get("name").and_then(|n| n.as_str()) == Some(target) {
+                // Convert to owned String before mutating part to avoid borrow conflict
+                let cur_status = part
+                    .get("status")
+                    .and_then(|s| s.as_str())
+                    .unwrap_or("healthy")
+                    .to_string();
+                if cur_status == "missing" {
+                    return;
+                }
+                let hp = part.get("hp").and_then(|v| v.as_f64()).unwrap_or(25.0);
+                let actual = amount.min(hp);
+                let new_hp = (hp - actual).max(0.0);
+                part["hp"] = serde_json::json!(new_hp);
+
+                // Update status based on HP thresholds
+                let max_hp = part.get("max_hp").and_then(|v| v.as_f64()).unwrap_or(25.0);
+                let new_status = if cur_status == "broken" && new_hp <= 0.0 {
+                    "missing"
+                } else if new_hp <= 0.0 {
+                    "broken"
+                } else if new_hp <= 0.5 * max_hp {
+                    "wounded"
+                } else {
+                    "healthy"
+                };
+                part["status"] = serde_json::json!(new_status);
+                return;
+            }
+            if let Some(children) = part.get_mut("children").and_then(|v| v.as_array_mut()) {
+                Self::apply_damage_to_named_part_static(children, target, amount);
+            }
+        }
+    }
+
+    fn collect_part_hp_static(parts: &[serde_json::Value], result: &mut Vec<f64>) {
+        for part in parts {
+            result.push(part.get("hp").and_then(|v| v.as_f64()).unwrap_or(25.0));
+            if let Some(children) = part.get("children").and_then(|v| v.as_array()) {
+                Self::collect_part_hp_static(children, result);
+            }
+        }
     }
 
     /// Set a component on an entity from a JSON string.
@@ -916,6 +1172,59 @@ impl WasmWorld {
     }
 
     // ---- Economic API ----
+
+    /// Enqueue a production job on an entity.
+    /// Returns true if enqueued, false if entity already has a ProductionJob.
+    pub fn enqueue_production_job(
+        &mut self,
+        entity_id: u32,
+        recipe_name: &str,
+        priority: i32,
+        batch_size: i32,
+    ) -> bool {
+        // Check if entity already has a ProductionJob
+        if self
+            .components
+            .get("ProductionJob")
+            .is_some_and(|m| m.contains_key(&entity_id))
+        {
+            return false;
+        }
+        let priority_val = priority as i64;
+        let batch_size_val = if batch_size < 1 { 1 } else { batch_size as i64 };
+        let job = serde_json::json!({
+            "recipe": recipe_name,
+            "progress": 0,
+            "state": "pending",
+            "priority": priority_val,
+            "batch_size": batch_size_val,
+        });
+        self.components
+            .entry("ProductionJob".to_string())
+            .or_default()
+            .insert(entity_id, job);
+        true
+    }
+
+    /// Returns the ProductionJob component as a JSON string, or None.
+    pub fn get_production_queue(&self, entity_id: u32) -> Option<String> {
+        self.get_component(entity_id, "ProductionJob")
+    }
+
+    /// Returns completed production jobs for an entity as a JSON array string.
+    /// Clears consumed events. Returns "[]" if no completions.
+    pub fn get_completed_production_jobs(&mut self, entity_id: u32) -> String {
+        let events = self
+            .event_buses
+            .remove("production_completed")
+            .unwrap_or_default();
+        let filtered: Vec<serde_json::Value> = events
+            .into_iter()
+            .filter(|ev| ev.get("entity").and_then(|v| v.as_u64()) == Some(entity_id as u64))
+            .collect();
+        self.event_reader_positions.remove("production_completed");
+        serde_json::to_string(&filtered).unwrap_or_else(|_| "[]".to_string())
+    }
 
     /// Returns the stockpile resources JSON for an entity, or None if missing.
     pub fn get_stockpile_resources(&self, entity_id: u32) -> Option<String> {

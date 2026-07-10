@@ -17,6 +17,8 @@ pub trait EntityApi {
     fn move_entity(&self, entity_id: u32, dx: f32, dy: f32);
     /// Damage an entity
     fn damage_entity(&self, entity_id: u32, amount: f32);
+    /// Damage a specific body part of an entity
+    fn damage_entity_part(&self, entity_id: u32, part_name: String, amount: f32);
 }
 
 impl EntityApi for PyWorld {
@@ -61,5 +63,11 @@ impl EntityApi for PyWorld {
     fn damage_entity(&self, entity_id: u32, amount: f32) {
         let mut world = self.inner.borrow_mut();
         world.damage_entity(entity_id, amount);
+    }
+
+    /// Damage a specific body part of an entity
+    fn damage_entity_part(&self, entity_id: u32, part_name: String, amount: f32) {
+        let mut world = self.inner.borrow_mut();
+        world.damage_entity_part(entity_id, &part_name, amount);
     }
 }

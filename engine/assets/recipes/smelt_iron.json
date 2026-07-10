@@ -1,0 +1,6 @@
+{
+  "name": "smelt_iron",
+  "inputs": [{ "kind": "ore", "amount": 2 }],
+  "outputs": [{ "kind": "iron_bar", "amount": 1 }],
+  "duration": 4
+}

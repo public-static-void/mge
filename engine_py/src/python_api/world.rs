@@ -18,6 +18,8 @@ use crate::python_api::turn::TurnApi;
 use crate::system_bridge::SystemBridge;
 use engine_core::ecs::world::World;
 use engine_core::loot::LootEntry;
+use engine_core::systems::body_part_damage::BodyPartDamageSystem;
+use engine_core::systems::economic::{EconomicSystem, load_recipes_from_dir};
 use engine_core::systems::faction_reputation::FactionReputationSystem;
 use engine_core::systems::fog::FogUpdateSystem;
 use engine_core::systems::fov::FovUpdateSystem;
@@ -109,6 +111,7 @@ impl PyWorld {
         world.map = Some(map);
 
         // Register core systems in deterministic execution order (R011)
+        world.register_system(BodyPartDamageSystem);
         world.register_system(engine_core::systems::equipment_logic::EquipmentLogicSystem);
         world.register_system(
             engine_core::systems::equipment_effect_aggregation::EquipmentEffectAggregationSystem,
@@ -122,6 +125,13 @@ impl PyWorld {
         world.register_system(FogUpdateSystem);
         world.register_system(engine_core::systems::death_decay::ProcessDeaths);
         world.register_system(engine_core::systems::death_decay::ProcessDecay);
+
+        // Load recipes and register EconomicSystem
+        let recipes_dir = schema_path.parent().unwrap().join("recipes");
+        let recipes = load_recipes_from_dir(&recipes_dir);
+        let economic_system = EconomicSystem::with_recipes(recipes);
+        world.register_system(economic_system);
+
         Ok(PyWorld {
             inner: Rc::new(RefCell::new(world)),
             systems: Rc::new(SystemBridge {
@@ -169,6 +179,11 @@ impl PyWorld {
     /// Apply damage to an entity.
     fn damage_entity(&self, entity_id: u32, amount: f32) {
         EntityApi::damage_entity(self, entity_id, amount)
+    }
+
+    /// Apply targeted damage to a specific body part.
+    fn damage_entity_part(&self, entity_id: u32, part_name: String, amount: f32) {
+        EntityApi::damage_entity_part(self, entity_id, part_name, amount)
     }
 
     // ---- COMPONENT ----
@@ -487,9 +502,13 @@ impl PyWorld {
         crate::event_bus::poll_ecs_event(self, py, event_type)
     }
 
-    /// Update event buses
+    /// Update event buses (both the global Python-event bus and the ECS World's internal buses).
     fn update_event_buses(&self) {
-        crate::event_bus::update_event_buses()
+        // Update the global Python-side event buses (used by send_event/poll_event).
+        crate::event_bus::update_event_buses();
+        // Also update the ECS World's internal event buses (used by poll_ecs_event, take_events).
+        let world = self.inner.borrow();
+        world.update_event_buses::<serde_json::Value>();
     }
 
     // ---- USER INPUT ----
@@ -584,6 +603,37 @@ impl PyWorld {
     /// Set the state string for a production job by entity ID.
     fn set_production_job_state(&self, entity_id: u32, value: String) -> PyResult<()> {
         crate::python_api::job_production::set_production_job_state(self, entity_id, value)
+    }
+
+    /// Enqueue a production job on an entity.
+    /// Returns True if enqueued, False if entity already has a ProductionJob.
+    #[pyo3(signature = (entity_id, recipe_name, priority=0, batch_size=1))]
+    fn enqueue_production_job(
+        &self,
+        entity_id: u32,
+        recipe_name: String,
+        priority: i64,
+        batch_size: i64,
+    ) -> PyResult<bool> {
+        crate::python_api::job_production::enqueue_production_job(
+            self,
+            entity_id,
+            recipe_name,
+            Some(priority),
+            Some(batch_size),
+        )
+    }
+
+    /// Get the production queue (single job) for an entity.
+    /// Returns a dict or None.
+    fn get_production_queue(&self, py: Python, entity_id: u32) -> PyResult<Option<PyObject>> {
+        crate::python_api::job_production::get_production_queue(self, py, entity_id)
+    }
+
+    /// Get completed production jobs for an entity (polling).
+    /// Returns a list of dicts. Clears consumed events.
+    fn get_completed_production_jobs(&self, py: Python, entity_id: u32) -> PyResult<Vec<PyObject>> {
+        crate::python_api::job_production::get_completed_production_jobs(self, py, entity_id)
     }
 
     /// Get the reserved resources for a job by entity ID.

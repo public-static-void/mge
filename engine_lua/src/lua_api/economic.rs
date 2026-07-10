@@ -173,5 +173,68 @@ pub fn register_economic_api(
         run_resource_reservation_system,
     )?;
 
+    // ---- Queue API ----
+
+    // enqueue_production_job(entity_id, recipe_name[, priority, batch_size])
+    let world_enqueue = world.clone();
+    let enqueue_production_job = lua.create_function_mut(
+        move |_,
+              (entity_id, recipe_name, priority, batch_size): (
+            u32,
+            String,
+            Option<i64>,
+            Option<i64>,
+        )| {
+            let mut world = world_enqueue.borrow_mut();
+            // Check if entity already has a ProductionJob
+            if world.get_component(entity_id, "ProductionJob").is_some() {
+                return Ok(false);
+            }
+            let priority = priority.unwrap_or(0);
+            let batch_size = batch_size.filter(|&v| v >= 1).unwrap_or(1);
+            let job = serde_json::json!({
+                "recipe": recipe_name,
+                "progress": 0,
+                "state": "pending",
+                "priority": priority,
+                "batch_size": batch_size,
+            });
+            match world.set_component(entity_id, "ProductionJob", job) {
+                Ok(_) => Ok(true),
+                Err(_) => Ok(false),
+            }
+        },
+    )?;
+    globals.set("enqueue_production_job", enqueue_production_job)?;
+
+    // get_production_queue(entity_id)
+    let world_get_queue = world.clone();
+    let get_production_queue = lua.create_function_mut(move |lua, entity_id: u32| {
+        let world = world_get_queue.borrow();
+        if let Some(job) = world.get_component(entity_id, "ProductionJob") {
+            crate::helpers::json_to_lua_table(lua, job)
+        } else {
+            Ok(mlua::Value::Nil)
+        }
+    })?;
+    globals.set("get_production_queue", get_production_queue)?;
+
+    // get_completed_production_jobs(entity_id)
+    let world_get_completions = world.clone();
+    let get_completed_production_jobs = lua.create_function_mut(move |lua, entity_id: u32| {
+        let mut world = world_get_completions.borrow_mut();
+        let all_events = world.take_events("production_completed");
+        let filtered: Vec<serde_json::Value> = all_events
+            .into_iter()
+            .filter(|ev| ev.get("entity").and_then(|v| v.as_u64()) == Some(entity_id as u64))
+            .collect();
+        let arr = serde_json::Value::Array(filtered);
+        crate::helpers::json_to_lua_table(lua, &arr)
+    })?;
+    globals.set(
+        "get_completed_production_jobs",
+        get_completed_production_jobs,
+    )?;
+
     Ok(())
 }

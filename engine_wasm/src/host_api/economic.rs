@@ -6,8 +6,64 @@ use engine_core::systems::job::reservation::resource_reservation::{
 use std::sync::{Arc, Mutex};
 use wasmtime::{Caller, Linker};
 
-/// Registers the economic API (9 host functions).
+/// Registers the economic API (12 host functions).
 pub fn register_economic_api(linker: &mut Linker<Arc<Mutex<WasmWorld>>>) -> anyhow::Result<()> {
+    linker.func_wrap(
+        "economic",
+        "enqueue_production_job",
+        |mut caller: Caller<'_, Arc<Mutex<WasmWorld>>>,
+         entity_id: u32,
+         recipe_ptr: i32,
+         recipe_len: i32,
+         priority: i32,
+         batch_size: i32|
+         -> i32 {
+            let recipe_name = read_wasm_string(&mut caller, recipe_ptr, recipe_len)
+                .expect("Failed to read recipe name from WASM memory");
+            let mut world = caller.data().lock().unwrap();
+            if world.enqueue_production_job(entity_id, &recipe_name, priority, batch_size) {
+                1
+            } else {
+                0
+            }
+        },
+    )?;
+
+    linker.func_wrap(
+        "economic",
+        "get_production_queue",
+        |mut caller: Caller<'_, Arc<Mutex<WasmWorld>>>,
+         entity_id: u32,
+         out_ptr: i32,
+         out_len: i32|
+         -> i32 {
+            let result = {
+                let world = caller.data().lock().unwrap();
+                world.get_production_queue(entity_id)
+            };
+            match result {
+                Some(data) => write_string_to_wasm(&mut caller, out_ptr, out_len, &data) as i32,
+                None => -1,
+            }
+        },
+    )?;
+
+    linker.func_wrap(
+        "economic",
+        "get_completed_production_jobs",
+        |mut caller: Caller<'_, Arc<Mutex<WasmWorld>>>,
+         entity_id: u32,
+         out_ptr: i32,
+         out_len: i32|
+         -> i32 {
+            let result = {
+                let mut world = caller.data().lock().unwrap();
+                world.get_completed_production_jobs(entity_id)
+            };
+            write_string_to_wasm(&mut caller, out_ptr, out_len, &result) as i32
+        },
+    )?;
+
     linker.func_wrap(
         "economic",
         "get_stockpile_resources",

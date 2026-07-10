@@ -94,5 +94,15 @@ pub fn register_entity_api(lua: &Lua, globals: &Table, world: Rc<RefCell<World>>
     })?;
     globals.set("damage_entity", damage_entity)?;
 
+    // damage_entity_part(entity, part_name, amount)
+    let world_damage_part = world.clone();
+    let damage_entity_part =
+        lua.create_function_mut(move |_, (entity, part_name, amount): (u32, String, f32)| {
+            let mut world = world_damage_part.borrow_mut();
+            world.damage_entity_part(entity, &part_name, amount);
+            Ok(())
+        })?;
+    globals.set("damage_entity_part", damage_entity_part)?;
+
     Ok(())
 }

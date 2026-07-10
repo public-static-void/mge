@@ -70,8 +70,23 @@ impl System for EconomicSystem {
     }
 
     fn run(&mut self, world: &mut World) {
-        let entities = world.get_entities_with_component("ProductionJob");
-        for eid in entities {
+        // Collect (entity_id, priority) pairs and sort by priority descending,
+        // tie-breaking by ascending entity ID for deterministic order.
+        let mut entity_priorities: Vec<(u32, i64)> = world
+            .get_entities_with_component("ProductionJob")
+            .into_iter()
+            .filter_map(|eid| {
+                let job = world.get_component(eid, "ProductionJob")?;
+                let priority = job.get("priority").and_then(|v| v.as_i64()).unwrap_or(0);
+                Some((eid, priority))
+            })
+            .collect();
+        entity_priorities.sort_by(|a, b| {
+            // Higher priority first (descending), then lower entity ID first (ascending)
+            b.1.cmp(&a.1).then(a.0.cmp(&b.0))
+        });
+
+        for (eid, _priority) in entity_priorities {
             let Some(mut job) = world.get_component(eid, "ProductionJob").cloned() else {
                 continue;
             };
@@ -80,19 +95,21 @@ impl System for EconomicSystem {
                 .and_then(|v| v.as_str())
                 .unwrap_or("pending");
 
+            // Skip already completed jobs
             if state == "complete" {
                 continue;
             }
 
+            // Transition pending → in_progress when assigned to a worker
             if state == "pending" && job.get("assigned_to").and_then(|v| v.as_u64()).is_some() {
                 job["state"] = json!("in_progress");
             }
 
             let recipe_name = match job.get("recipe").and_then(|v| v.as_str()) {
-                Some(r) => r,
+                Some(r) => r.to_string(),
                 None => continue,
             };
-            let recipe = match self.recipes.get(recipe_name) {
+            let recipe = match self.recipes.get(&recipe_name) {
                 Some(r) => r,
                 None => continue,
             };
@@ -113,8 +130,43 @@ impl System for EconomicSystem {
                 job["progress"] = json!(progress);
 
                 if progress >= recipe.duration {
-                    Self::produce_outputs(stock_map, &recipe.outputs);
+                    // Read batch_size (default 1, minimum 1)
+                    let batch_size = job
+                        .get("batch_size")
+                        .and_then(|v| v.as_i64())
+                        .filter(|&v| v >= 1)
+                        .unwrap_or(1);
+
+                    // Produce outputs multiplied by batch_size
+                    let multiplied_outputs: Vec<super::recipe::ResourceAmount> = recipe
+                        .outputs
+                        .iter()
+                        .map(|o| super::recipe::ResourceAmount {
+                            kind: o.kind.clone(),
+                            amount: o.amount * batch_size,
+                        })
+                        .collect();
+                    Self::produce_outputs(stock_map, &multiplied_outputs);
                     job["state"] = json!("complete");
+
+                    // Emit production_completed event
+                    let outputs_payload: Vec<serde_json::Value> = recipe
+                        .outputs
+                        .iter()
+                        .map(|o| {
+                            json!({
+                                "kind": o.kind,
+                                "amount": o.amount * batch_size,
+                            })
+                        })
+                        .collect();
+                    let payload = json!({
+                        "entity": eid,
+                        "recipe": recipe_name,
+                        "outputs": outputs_payload,
+                        "batch_count": batch_size,
+                    });
+                    let _ = world.send_event("production_completed", payload);
                 } else if job.get("assigned_to").and_then(|v| v.as_u64()).is_some() {
                     job["state"] = json!("in_progress");
                 }

@@ -7,6 +7,7 @@ use engine_core::map::{Map, SquareGridMap};
 use engine_core::plugins::loader::load_plugin_and_register_worldgen_threadsafe;
 use engine_core::plugins::types::EngineApi;
 use engine_core::systems::body_equipment_sync::BodyEquipmentSyncSystem;
+use engine_core::systems::body_part_damage::BodyPartDamageSystem;
 use engine_core::systems::death_decay::{ProcessDeaths, ProcessDecay};
 use engine_core::systems::derived_stats::DerivedStatsSystem;
 use engine_core::systems::economic::{EconomicSystem, load_recipes_from_dir};
@@ -304,6 +305,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         world
             .borrow_mut()
             .register_system(InventoryConstraintSystem);
+        world.borrow_mut().register_system(BodyPartDamageSystem);
         world.borrow_mut().register_system(EquipmentLogicSystem);
         world.borrow_mut().register_system(BodyEquipmentSyncSystem);
         world
