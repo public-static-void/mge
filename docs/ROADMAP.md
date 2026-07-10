@@ -29,7 +29,7 @@
 - [x] Body management and equipment synchronization
 - [ ] Unit and equipment designer
 - [x] Combat and damage system
-- [ ] Body part damage model (per-part health, wounds)
+- [x] Body part damage model (per-part health, wounds)
 - [x] Skill and attribute system
 - [x] Job system (job board, query, mutation, AI assignment, events, dependency chains)
 - [x] Economic engine (stockpile management, production recipes, resource reservations)
