@@ -206,7 +206,7 @@ impl System for BodyPartDamageSystem {
                 if let Some(parts) = body.get("parts").and_then(|v| v.as_array()) {
                     collect_part_info_for_hp(parts, &mut part_info);
                 }
-                part_info.iter().map(|hp| *hp).sum::<f64>().max(0.0)
+                part_info.iter().copied().sum::<f64>().max(0.0)
             };
 
             let _ = world.set_component(entity, "Body", body);
