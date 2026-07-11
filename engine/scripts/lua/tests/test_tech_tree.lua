@@ -48,7 +48,7 @@ local function test_cannot_research_completed()
     })
     local ok, err = pcall(research_tech, id, "bronze_working")
     assert.is_false(ok, "Should error when tech already completed")
-    assert.is_true(string.find(err or "", "already completed") ~= nil, "Error should mention already completed")
+    assert.is_true(string.find(tostring(err) or "", "already completed") ~= nil, "Error should mention already completed")
 end
 
 -- 6. Cannot research tech with unmet prerequisite
@@ -57,7 +57,7 @@ local function test_cannot_research_bad_prereq()
     -- iron_working requires bronze_working
     local ok, err = pcall(research_tech, id, "iron_working")
     assert.is_false(ok, "Should error when prerequisite not met")
-    assert.is_true(string.find(err or "", "Requires tech") ~= nil, "Error should mention requirement")
+    assert.is_true(string.find(tostring(err) or "", "Requires tech") ~= nil, "Error should mention requirement")
 end
 
 -- 7. Cannot research unknown tech
@@ -65,7 +65,7 @@ local function test_cannot_research_unknown()
     local id = spawn_entity()
     local ok, err = pcall(research_tech, id, "completely_unknown_tech")
     assert.is_false(ok, "Should error for unknown tech")
-    assert.is_true(string.find(err or "", "Unknown") ~= nil, "Error should mention Unknown")
+    assert.is_true(string.find(tostring(err) or "", "Unknown") ~= nil, "Error should mention Unknown")
 end
 
 -- 8. is_tech_completed returns correct state
