@@ -69,19 +69,19 @@ impl TechTreeApi for PyWorld {
     fn research_tech(&self, entity: u32, tech_id: &str) -> PyResult<()> {
         let mut world = self.inner.borrow_mut();
         tech_tree::research_tech(&mut world, entity, tech_id)
-            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e))
+            .map_err(pyo3::exceptions::PyValueError::new_err)
     }
 
     fn cancel_research(&self, entity: u32, tech_id: &str) -> PyResult<()> {
         let mut world = self.inner.borrow_mut();
         tech_tree::cancel_research(&mut world, entity, tech_id)
-            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e))
+            .map_err(pyo3::exceptions::PyValueError::new_err)
     }
 
     fn clear_research_queue(&self, entity: u32) -> PyResult<()> {
         let mut world = self.inner.borrow_mut();
         tech_tree::clear_research_queue(&mut world, entity)
-            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e))
+            .map_err(pyo3::exceptions::PyValueError::new_err)
     }
 
     fn can_research_tech(&self, entity: u32, tech_id: &str) -> (bool, String) {
