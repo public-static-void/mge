@@ -50,9 +50,7 @@ impl System for ResearchSystem {
                 .as_object()
                 .cloned()
                 .unwrap_or_default();
-            let mut research_points = progress["research_points"]
-                .as_f64()
-                .unwrap_or(0.0);
+            let mut research_points = progress["research_points"].as_f64().unwrap_or(0.0);
 
             if queue.is_empty() {
                 continue; // Nothing to research

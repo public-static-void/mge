@@ -25,30 +25,27 @@ pub fn register_tech_tree_api(
     globals.set("get_tech_tree", get_tech_tree_fn)?;
 
     // get_tech_node(tech_id) -> table or nil
-    let get_tech_node_fn = lua.create_function(
-        |lua, tech_id: String| -> LuaResult<LuaValue> {
-            match tech_tree::get_tech_node(&tech_id) {
-                Some(node) => {
-                    let json_value = serde_json::to_value(node).unwrap_or_default();
-                    json_to_lua_table(lua, &json_value)
-                }
-                None => Ok(LuaValue::Nil),
+    let get_tech_node_fn = lua.create_function(|lua, tech_id: String| -> LuaResult<LuaValue> {
+        match tech_tree::get_tech_node(&tech_id) {
+            Some(node) => {
+                let json_value = serde_json::to_value(node).unwrap_or_default();
+                json_to_lua_table(lua, &json_value)
             }
-        },
-    )?;
+            None => Ok(LuaValue::Nil),
+        }
+    })?;
     globals.set("get_tech_node", get_tech_node_fn)?;
 
     // get_tech_progress(entity) -> table or nil
     let w = world.clone();
-    let get_tech_progress_fn = lua.create_function_mut(
-        move |lua, entity: u32| -> LuaResult<LuaValue> {
+    let get_tech_progress_fn =
+        lua.create_function_mut(move |lua, entity: u32| -> LuaResult<LuaValue> {
             let world = w.borrow();
             match tech_tree::get_tech_progress(&world, entity) {
                 Some(val) => json_to_lua_table(lua, &val),
                 None => Ok(LuaValue::Nil),
             }
-        },
-    )?;
+        })?;
     globals.set("get_tech_progress", get_tech_progress_fn)?;
 
     // get_completed_techs(entity) -> array of strings
@@ -62,11 +59,12 @@ pub fn register_tech_tree_api(
 
     // is_tech_completed(entity, tech_id) -> boolean
     let w = world.clone();
-    let is_tech_completed_fn =
-        lua.create_function_mut(move |_, (entity, tech_id): (u32, String)| -> LuaResult<bool> {
+    let is_tech_completed_fn = lua.create_function_mut(
+        move |_, (entity, tech_id): (u32, String)| -> LuaResult<bool> {
             let world = w.borrow();
             Ok(tech_tree::is_tech_completed(&world, entity, &tech_id))
-        })?;
+        },
+    )?;
     globals.set("is_tech_completed", is_tech_completed_fn)?;
 
     // get_research_queue(entity) -> array of strings
@@ -80,14 +78,16 @@ pub fn register_tech_tree_api(
 
     // get_research_queue_progress(entity) -> table
     let w = world.clone();
-    let get_research_queue_progress_fn = lua.create_function_mut(
-        move |lua, entity: u32| -> LuaResult<LuaValue> {
+    let get_research_queue_progress_fn =
+        lua.create_function_mut(move |lua, entity: u32| -> LuaResult<LuaValue> {
             let world = w.borrow();
             let val = tech_tree::get_research_queue_progress(&world, entity);
             json_to_lua_table(lua, &val)
-        },
+        })?;
+    globals.set(
+        "get_research_queue_progress",
+        get_research_queue_progress_fn,
     )?;
-    globals.set("get_research_queue_progress", get_research_queue_progress_fn)?;
 
     // research_tech(entity, tech_id) — error on failure
     let w = world.clone();
@@ -118,8 +118,7 @@ pub fn register_tech_tree_api(
     let clear_research_queue_fn =
         lua.create_function_mut(move |_, entity: u32| -> LuaResult<()> {
             let mut world = w.borrow_mut();
-            tech_tree::clear_research_queue(&mut world, entity)
-                .map_err(mlua::Error::external)?;
+            tech_tree::clear_research_queue(&mut world, entity).map_err(mlua::Error::external)?;
             Ok(())
         })?;
     globals.set("clear_research_queue", clear_research_queue_fn)?;

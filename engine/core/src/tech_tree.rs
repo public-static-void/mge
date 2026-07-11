@@ -5,7 +5,7 @@
 
 use crate::ecs::world::World;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value as JsonValue};
+use serde_json::{Value as JsonValue, json};
 use std::path::Path;
 use std::sync::OnceLock;
 
@@ -82,9 +82,9 @@ fn get_tech_tree_inner() -> &'static TechTreeMap {
     static TECH_TREE: OnceLock<TechTreeMap> = OnceLock::new();
     TECH_TREE.get_or_init(|| {
         let paths = [
-            "engine/assets/schemas/tech_tree.json",             // from workspace root
-            "../engine/assets/schemas/tech_tree.json",          // from engine/ subdir
-            "../../engine/assets/schemas/tech_tree.json",       // from engine/core/ subdir (tests)
+            "engine/assets/schemas/tech_tree.json", // from workspace root
+            "../engine/assets/schemas/tech_tree.json", // from engine/ subdir
+            "../../engine/assets/schemas/tech_tree.json", // from engine/core/ subdir (tests)
         ];
         for path_str in &paths {
             let path = Path::new(path_str);
@@ -94,21 +94,21 @@ fn get_tech_tree_inner() -> &'static TechTreeMap {
                         if let Ok(json) = serde_json::from_str::<JsonValue>(&content)
                             && let Some(techs) = json.get("techs").and_then(|v| v.as_array())
                         {
-                                let nodes: Vec<TechNode> = techs
-                                    .iter()
-                                    .filter_map(|t| {
-                                        let mut node: TechNode =
-                                            serde_json::from_value(t.clone()).ok()?;
-                                        // Ensure cost is at least 1 to avoid division by zero
-                                        if node.cost < 1.0 {
-                                            node.cost = 1.0;
-                                        }
-                                        Some(node)
-                                    })
-                                    .collect();
-                                if !nodes.is_empty() {
-                                    return nodes;
-                                }
+                            let nodes: Vec<TechNode> = techs
+                                .iter()
+                                .filter_map(|t| {
+                                    let mut node: TechNode =
+                                        serde_json::from_value(t.clone()).ok()?;
+                                    // Ensure cost is at least 1 to avoid division by zero
+                                    if node.cost < 1.0 {
+                                        node.cost = 1.0;
+                                    }
+                                    Some(node)
+                                })
+                                .collect();
+                            if !nodes.is_empty() {
+                                return nodes;
+                            }
                         }
                     }
                     Err(_) => continue,
@@ -162,13 +162,11 @@ pub fn is_tech_completed(world: &World, entity: u32, tech_id: &str) -> bool {
 pub fn get_research_queue(world: &World, entity: u32) -> Vec<String> {
     get_tech_progress(world, entity)
         .and_then(|p| {
-            p.get("queue")
-                .and_then(|q| q.as_array())
-                .map(|a| {
-                    a.iter()
-                        .filter_map(|v| v.as_str().map(String::from))
-                        .collect()
-                })
+            p.get("queue").and_then(|q| q.as_array()).map(|a| {
+                a.iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect()
+            })
         })
         .unwrap_or_default()
 }
@@ -232,8 +230,7 @@ fn check_prerequisites(world: &World, entity: u32, node: &TechNode) -> Result<bo
 /// back on the target tech. We walk forward from the target's prerequisites.
 fn would_create_cycle(node: &TechNode, queue: &[String]) -> bool {
     // Collect all tech IDs in the queue as Strings for HashSet lookup
-    let queued_ids: std::collections::HashSet<String> =
-        queue.iter().cloned().collect();
+    let queued_ids: std::collections::HashSet<String> = queue.iter().cloned().collect();
 
     // BFS/DFS through the target's prerequisite chain
     let mut visited = std::collections::HashSet::new();
@@ -266,8 +263,7 @@ fn would_create_cycle(node: &TechNode, queue: &[String]) -> bool {
 /// Returns `Ok(true)` if the tech can be researched, or `Err(reason)` with a
 /// human-readable reason if it cannot.
 pub fn can_research_tech(world: &World, entity: u32, tech_id: &str) -> Result<bool, String> {
-    let node = get_tech_node(tech_id)
-        .ok_or_else(|| format!("Unknown tech '{}'", tech_id))?;
+    let node = get_tech_node(tech_id).ok_or_else(|| format!("Unknown tech '{}'", tech_id))?;
 
     // Already completed?
     if is_tech_completed(world, entity, tech_id) {
@@ -289,8 +285,7 @@ pub fn can_research_tech(world: &World, entity: u32, tech_id: &str) -> Result<bo
 /// Adds a tech to the research queue if prerequisites are met and it's not
 /// already completed or queued. Fires a `research_started` event on success.
 pub fn research_tech(world: &mut World, entity: u32, tech_id: &str) -> Result<(), String> {
-    let node = get_tech_node(tech_id)
-        .ok_or_else(|| format!("Unknown tech '{}'", tech_id))?;
+    let node = get_tech_node(tech_id).ok_or_else(|| format!("Unknown tech '{}'", tech_id))?;
 
     // Validate via can_research_tech
     can_research_tech(world, entity, tech_id)?;
@@ -385,10 +380,7 @@ pub fn cancel_research(world: &mut World, entity: u32, tech_id: &str) -> Result<
             queue_progress.remove(tech_id);
         }
         None => {
-            return Err(format!(
-                "Tech '{}' is not in the research queue",
-                tech_id
-            ));
+            return Err(format!("Tech '{}' is not in the research queue", tech_id));
         }
     }
 

@@ -53,14 +53,14 @@ pub mod movement;
 pub mod region;
 /// Save/Load API
 pub mod save_load;
+/// Tech Tree and Research API
+pub mod tech_tree;
 /// Time API
 pub mod time_of_day;
 /// Turn API
 pub mod turn;
 /// UI API
 pub mod ui;
-/// Tech Tree and Research API
-pub mod tech_tree;
 /// World API
 pub mod world;
 

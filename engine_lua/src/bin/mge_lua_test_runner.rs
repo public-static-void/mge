@@ -9,7 +9,6 @@ use engine_core::plugins::types::EngineApi;
 use engine_core::systems::body_equipment_sync::BodyEquipmentSyncSystem;
 use engine_core::systems::death_decay::{ProcessDeaths, ProcessDecay};
 use engine_core::systems::derived_stats::DerivedStatsSystem;
-use engine_core::systems::research::ResearchSystem;
 use engine_core::systems::economic::{EconomicSystem, load_recipes_from_dir};
 use engine_core::systems::equipment_effect_aggregation::EquipmentEffectAggregationSystem;
 use engine_core::systems::equipment_logic::EquipmentLogicSystem;
@@ -20,6 +19,7 @@ use engine_core::systems::inventory::InventoryConstraintSystem;
 use engine_core::systems::job::{
     JobLogicKind, JobSystem, JobTypeRegistry, load_job_types_from_dir,
 };
+use engine_core::systems::research::ResearchSystem;
 use engine_core::systems::stat_calculation::StatCalculationSystem;
 use engine_lua::ScriptEngine;
 use gag::BufferRedirect;

@@ -50,7 +50,9 @@ fn check_prerequisites(
             "tech" => {
                 let progress = read_tech_progress(world, entity);
                 let completed = progress.get("completed").and_then(|c| c.as_object());
-                let is_done = completed.map(|m| m.contains_key(&prereq.id)).unwrap_or(false);
+                let is_done = completed
+                    .map(|m| m.contains_key(&prereq.id))
+                    .unwrap_or(false);
                 if !is_done {
                     let name = tech_tree::get_tech_node(&prereq.id)
                         .map(|n| n.name.as_str())
@@ -99,10 +101,7 @@ pub fn register_tech_tree_api(linker: &mut Linker<Arc<Mutex<WasmWorld>>>) -> any
     linker.func_wrap(
         "tech_tree",
         "get_tech_tree",
-        |mut caller: Caller<'_, Arc<Mutex<WasmWorld>>>,
-         out_ptr: i32,
-         out_len: i32|
-         -> i32 {
+        |mut caller: Caller<'_, Arc<Mutex<WasmWorld>>>, out_ptr: i32, out_len: i32| -> i32 {
             let nodes = tech_tree::get_tech_tree();
             let json_str = serde_json::to_string(nodes).unwrap_or_else(|_| "[]".to_string());
             write_string_to_wasm(&mut caller, out_ptr, out_len, &json_str) as i32
@@ -125,8 +124,7 @@ pub fn register_tech_tree_api(linker: &mut Linker<Arc<Mutex<WasmWorld>>>) -> any
             };
             match tech_tree::get_tech_node(&tech_id) {
                 Some(node) => {
-                    let json_str =
-                        serde_json::to_string(node).unwrap_or_else(|_| "{}".to_string());
+                    let json_str = serde_json::to_string(node).unwrap_or_else(|_| "{}".to_string());
                     write_string_to_wasm(&mut caller, out_ptr, out_len, &json_str) as i32
                 }
                 None => -1,
@@ -436,9 +434,7 @@ pub fn register_tech_tree_api(linker: &mut Linker<Arc<Mutex<WasmWorld>>>) -> any
     linker.func_wrap(
         "tech_tree",
         "clear_research_queue",
-        |caller: Caller<'_, Arc<Mutex<WasmWorld>>>,
-         entity: u32|
-         -> i32 {
+        |caller: Caller<'_, Arc<Mutex<WasmWorld>>>, entity: u32| -> i32 {
             let mut world = caller.data().lock().unwrap();
             let progress = read_tech_progress(&world, entity);
             let completed = progress
@@ -515,7 +511,10 @@ pub fn register_tech_tree_api(linker: &mut Linker<Arc<Mutex<WasmWorld>>>) -> any
                     .map(|a| a.iter().any(|v| v.as_str() == Some(&tech_id)))
                     .unwrap_or(false)
                 {
-                    (false, format!("Tech '{}' already in research queue", tech_id))
+                    (
+                        false,
+                        format!("Tech '{}' already in research queue", tech_id),
+                    )
                 }
                 // Check prerequisites
                 else {
