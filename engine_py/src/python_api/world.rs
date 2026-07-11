@@ -13,18 +13,17 @@ use crate::python_api::mode::ModeApi;
 use crate::python_api::movement::MovementApi;
 use crate::python_api::region::RegionApi;
 use crate::python_api::save_load::SaveLoadApi;
-use crate::python_api::tech_tree::TechTreeApi;
 use crate::python_api::time_of_day::TimeOfDayApi;
 use crate::python_api::turn::TurnApi;
 use crate::system_bridge::SystemBridge;
 use engine_core::ecs::world::World;
 use engine_core::loot::LootEntry;
+use engine_core::systems::economic::{EconomicSystem, load_recipes_from_dir};
 use engine_core::systems::faction_reputation::FactionReputationSystem;
 use engine_core::systems::fog::FogUpdateSystem;
 use engine_core::systems::fov::FovUpdateSystem;
 use engine_core::systems::job::job_board::JobBoard;
 use engine_core::systems::job::types::loader::load_job_types_from_dir;
-use engine_core::systems::research::ResearchSystem;
 use pyo3::Python;
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyAnyMethods, PyDict};
@@ -124,7 +123,13 @@ impl PyWorld {
         world.register_system(FogUpdateSystem);
         world.register_system(engine_core::systems::death_decay::ProcessDeaths);
         world.register_system(engine_core::systems::death_decay::ProcessDecay);
-        world.register_system(ResearchSystem);
+
+        // Load recipes and register EconomicSystem
+        let recipes_dir = schema_path.parent().unwrap().join("recipes");
+        let recipes = load_recipes_from_dir(&recipes_dir);
+        let economic_system = EconomicSystem::with_recipes(recipes);
+        world.register_system(economic_system);
+
         Ok(PyWorld {
             inner: Rc::new(RefCell::new(world)),
             systems: Rc::new(SystemBridge {
@@ -374,73 +379,6 @@ impl PyWorld {
         FactionApi::get_reputation(self, entity, &faction_id)
     }
 
-    // ---- TECH TREE / RESEARCH ----
-
-    /// Returns all tech tree nodes as a list of dicts.
-    fn get_tech_tree(&self, py: Python) -> PyResult<PyObject> {
-        let val = TechTreeApi::get_tech_tree(self);
-        Ok(serde_pyobject::to_pyobject(py, &val)?.into())
-    }
-
-    /// Returns a specific tech node by ID, or None.
-    fn get_tech_node(&self, py: Python, tech_id: String) -> PyResult<Option<PyObject>> {
-        let val = TechTreeApi::get_tech_node(self, &tech_id);
-        if val.is_null() {
-            Ok(None)
-        } else {
-            Ok(Some(serde_pyobject::to_pyobject(py, &val)?.into()))
-        }
-    }
-
-    /// Returns the TechProgress component for an entity, or None.
-    fn get_tech_progress(&self, py: Python, entity: u32) -> PyResult<Option<PyObject>> {
-        match TechTreeApi::get_tech_progress(self, entity) {
-            Some(val) => Ok(Some(serde_pyobject::to_pyobject(py, &val)?.into())),
-            None => Ok(None),
-        }
-    }
-
-    /// Returns a list of completed tech IDs for an entity.
-    fn get_completed_techs(&self, entity: u32) -> Vec<String> {
-        TechTreeApi::get_completed_techs(self, entity)
-    }
-
-    /// Checks if a tech is completed for an entity.
-    fn is_tech_completed(&self, entity: u32, tech_id: String) -> bool {
-        TechTreeApi::is_tech_completed(self, entity, &tech_id)
-    }
-
-    /// Returns the current research queue for an entity.
-    fn get_research_queue(&self, entity: u32) -> Vec<String> {
-        TechTreeApi::get_research_queue(self, entity)
-    }
-
-    /// Returns the queue progress map (tech_id -> accumulated points).
-    fn get_research_queue_progress(&self, py: Python, entity: u32) -> PyResult<PyObject> {
-        let val = TechTreeApi::get_research_queue_progress(self, entity);
-        Ok(serde_pyobject::to_pyobject(py, &val)?.into())
-    }
-
-    /// Adds a tech to the research queue.
-    fn research_tech(&self, entity: u32, tech_id: String) -> PyResult<()> {
-        TechTreeApi::research_tech(self, entity, &tech_id)
-    }
-
-    /// Removes a tech from the research queue.
-    fn cancel_research(&self, entity: u32, tech_id: String) -> PyResult<()> {
-        TechTreeApi::cancel_research(self, entity, &tech_id)
-    }
-
-    /// Empties the research queue.
-    fn clear_research_queue(&self, entity: u32) -> PyResult<()> {
-        TechTreeApi::clear_research_queue(self, entity)
-    }
-
-    /// Checks if an entity can research a tech, returns (can_research, reason).
-    fn can_research_tech(&self, entity: u32, tech_id: String) -> (bool, String) {
-        TechTreeApi::can_research_tech(self, entity, &tech_id)
-    }
-
     // ---- FOV ----
 
     /// Get visible cells for an entity. Returns a list of dicts with x, y, z keys.
@@ -557,9 +495,13 @@ impl PyWorld {
         crate::event_bus::poll_ecs_event(self, py, event_type)
     }
 
-    /// Update event buses
+    /// Update event buses (both the global Python-event bus and the ECS World's internal buses).
     fn update_event_buses(&self) {
-        crate::event_bus::update_event_buses()
+        // Update the global Python-side event buses (used by send_event/poll_event).
+        crate::event_bus::update_event_buses();
+        // Also update the ECS World's internal event buses (used by poll_ecs_event, take_events).
+        let world = self.inner.borrow();
+        world.update_event_buses::<serde_json::Value>();
     }
 
     // ---- USER INPUT ----
