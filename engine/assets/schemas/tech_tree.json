@@ -1,0 +1,110 @@
+{
+  "title": "TechTree",
+  "description": "Master registry of tech tree node definitions.",
+  "type": "object",
+  "properties": {
+    "techs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "description": { "type": "string" },
+          "cost": { "type": "number", "default": 100 },
+          "tier": { "type": "integer", "default": 1 },
+          "category": { "type": "string", "default": "general" },
+          "icon": { "type": "string", "default": "" },
+          "prerequisites": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": { "type": "string", "enum": ["tech", "skill"] },
+                "id": { "type": "string" },
+                "level": { "type": "number", "description": "Required skill level (skill type only)" }
+              },
+              "required": ["type", "id"]
+            },
+            "default": []
+          },
+          "effects": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "action": { "type": "string" },
+                "data": { "type": "object" }
+              },
+              "required": ["action"]
+            },
+            "default": []
+          }
+        },
+        "required": ["id", "name"]
+      }
+    }
+  },
+  "required": ["techs"],
+  "techs": [
+    {
+      "id": "bronze_working",
+      "name": "Bronze Working",
+      "description": "The art of smelting copper and tin to create bronze.",
+      "cost": 50,
+      "tier": 1,
+      "category": "industry",
+      "icon": "",
+      "prerequisites": [],
+      "effects": [
+        { "action": "log_message", "data": { "message": "Bronze Working unlocked" } }
+      ]
+    },
+    {
+      "id": "iron_working",
+      "name": "Iron Working",
+      "description": "Advanced smelting techniques for producing iron.",
+      "cost": 100,
+      "tier": 2,
+      "category": "industry",
+      "icon": "",
+      "prerequisites": [
+        { "type": "tech", "id": "bronze_working" }
+      ],
+      "effects": [
+        { "action": "log_message", "data": { "message": "Iron Working unlocked" } }
+      ]
+    },
+    {
+      "id": "advanced_metallurgy",
+      "name": "Advanced Metallurgy",
+      "description": "Cutting-edge metal refinement and alloy crafting.",
+      "cost": 200,
+      "tier": 3,
+      "category": "industry",
+      "icon": "",
+      "prerequisites": [
+        { "type": "tech", "id": "iron_working" },
+        { "type": "skill", "id": "metalworking", "level": 5 }
+      ],
+      "effects": [
+        { "action": "log_message", "data": { "message": "Advanced Metallurgy unlocked" } }
+      ]
+    },
+    {
+      "id": "military_engineering",
+      "name": "Military Engineering",
+      "description": "Design and construction of fortifications and siege engines.",
+      "cost": 150,
+      "tier": 2,
+      "category": "military",
+      "icon": "",
+      "prerequisites": [
+        { "type": "tech", "id": "bronze_working" }
+      ],
+      "effects": [
+        { "action": "log_message", "data": { "message": "Military Engineering unlocked" } }
+      ]
+    }
+  ]
+}

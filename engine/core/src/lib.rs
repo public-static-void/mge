@@ -22,6 +22,8 @@ pub mod plugins;
 pub mod presentation;
 /// Systems module
 pub mod systems;
+/// Tech tree and research system
+pub mod tech_tree;
 /// Worldgen module
 pub mod worldgen;
 

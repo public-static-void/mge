@@ -1,0 +1,31 @@
+{
+  "title": "TechProgress",
+  "description": "Per-entity tech research progress and completed techs.",
+  "type": ["object", "null"],
+  "properties": {
+    "completed": {
+      "type": "object",
+      "additionalProperties": { "type": "integer" },
+      "default": {},
+      "description": "Completed tech IDs mapped to the tick they were completed"
+    },
+    "queue": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": [],
+      "description": "Ordered list of tech IDs currently in the research queue"
+    },
+    "queue_progress": {
+      "type": "object",
+      "additionalProperties": { "type": "number" },
+      "default": {},
+      "description": "Accumulated research points per queued tech"
+    },
+    "research_points": {
+      "type": "number",
+      "default": 0,
+      "description": "Total accumulated research points available for allocation"
+    }
+  },
+  "modes": ["colony", "roguelike", "simulation"]
+}

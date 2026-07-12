@@ -26,6 +26,7 @@ use crate::host_api::movement_ops::register_movement_ops_api;
 use crate::host_api::region::register_region_api;
 use crate::host_api::save_load::register_save_load_api;
 use crate::host_api::system::register_system_api;
+use crate::host_api::tech_tree::register_tech_tree_api;
 use crate::host_api::time_of_day::register_time_of_day_api;
 use crate::host_api::turn::register_turn_api;
 use crate::host_api::ui::register_ui_api;
@@ -176,6 +177,7 @@ impl WasmScriptEngine {
         register_loot_api(&mut linker)?;
         register_faction_api(&mut linker)?;
         register_fov_api(&mut linker)?;
+        register_tech_tree_api(&mut linker)?;
 
         // Load schemas if schema_path is provided
         let schemas = config

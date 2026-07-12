@@ -20,6 +20,7 @@ use engine_core::systems::inventory::InventoryConstraintSystem;
 use engine_core::systems::job::{
     JobLogicKind, JobSystem, JobTypeRegistry, load_job_types_from_dir,
 };
+use engine_core::systems::research::ResearchSystem;
 use engine_core::systems::stat_calculation::StatCalculationSystem;
 use engine_lua::ScriptEngine;
 use gag::BufferRedirect;
@@ -313,6 +314,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .register_system(EquipmentEffectAggregationSystem);
         world.borrow_mut().register_system(StatCalculationSystem);
         world.borrow_mut().register_system(DerivedStatsSystem);
+        world.borrow_mut().register_system(ResearchSystem);
 
         let mut engine = ScriptEngine::new();
 
