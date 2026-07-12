@@ -17,6 +17,7 @@ use crate::python_api::time_of_day::TimeOfDayApi;
 use crate::python_api::turn::TurnApi;
 use crate::system_bridge::SystemBridge;
 use engine_core::ecs::world::World;
+use engine_core::tech_tree;
 use engine_core::loot::LootEntry;
 use engine_core::systems::body_part_damage::BodyPartDamageSystem;
 use engine_core::systems::economic::{EconomicSystem, load_recipes_from_dir};
@@ -1006,5 +1007,100 @@ impl PyWorld {
     fn remove_loot_table(&self, name: &str) {
         let mut world = self.inner.borrow_mut();
         world.loot_tables.remove_table(name);
+    }
+
+    // ---- TECH TREE / RESEARCH ----
+
+    /// Returns all tech tree nodes as a list of dicts.
+    fn get_tech_tree(&self, py: Python<'_>) -> PyResult<PyObject> {
+        let nodes = tech_tree::get_tech_tree();
+        let value = serde_json::to_value(nodes)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+        to_pyobject(py, &value)
+            .map(|b| b.into())
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
+    }
+
+    /// Returns a specific tech node by ID, or None.
+    fn get_tech_node(&self, py: Python<'_>, tech_id: &str) -> PyResult<PyObject> {
+        match tech_tree::get_tech_node(tech_id) {
+            Some(node) => {
+                let value = serde_json::to_value(node)
+                    .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
+                to_pyobject(py, &value)
+                    .map(|b| b.into())
+                    .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
+            }
+            None => Ok(py.None()),
+        }
+    }
+
+    /// Returns the TechProgress component for an entity, or None.
+    fn get_tech_progress(&self, py: Python<'_>, entity: u32) -> PyResult<PyObject> {
+        let world = self.inner.borrow();
+        match tech_tree::get_tech_progress(&world, entity) {
+            Some(value) => to_pyobject(py, &value)
+                .map(|b| b.into())
+                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string())),
+            None => Ok(py.None()),
+        }
+    }
+
+    /// Returns a list of completed tech IDs for an entity.
+    fn get_completed_techs(&self, entity: u32) -> Vec<String> {
+        let world = self.inner.borrow();
+        tech_tree::get_completed_techs(&world, entity)
+    }
+
+    /// Checks if a specific tech has been completed by an entity.
+    fn is_tech_completed(&self, entity: u32, tech_id: &str) -> bool {
+        let world = self.inner.borrow();
+        tech_tree::is_tech_completed(&world, entity, tech_id)
+    }
+
+    /// Returns the current research queue for an entity.
+    fn get_research_queue(&self, entity: u32) -> Vec<String> {
+        let world = self.inner.borrow();
+        tech_tree::get_research_queue(&world, entity)
+    }
+
+    /// Returns the queue progress map for an entity.
+    fn get_research_queue_progress(&self, py: Python<'_>, entity: u32) -> PyResult<PyObject> {
+        let world = self.inner.borrow();
+        let value = tech_tree::get_research_queue_progress(&world, entity);
+        to_pyobject(py, &value)
+            .map(|b| b.into())
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
+    }
+
+    /// Adds a tech to the research queue.
+    fn research_tech(&self, entity: u32, tech_id: &str) -> PyResult<()> {
+        let mut world = self.inner.borrow_mut();
+        tech_tree::research_tech(&mut world, entity, tech_id)
+            .map_err(pyo3::exceptions::PyValueError::new_err)
+    }
+
+    /// Removes a tech from the research queue.
+    fn cancel_research(&self, entity: u32, tech_id: &str) -> PyResult<()> {
+        let mut world = self.inner.borrow_mut();
+        tech_tree::cancel_research(&mut world, entity, tech_id)
+            .map_err(pyo3::exceptions::PyValueError::new_err)
+    }
+
+    /// Empties the research queue.
+    fn clear_research_queue(&self, entity: u32) -> PyResult<()> {
+        let mut world = self.inner.borrow_mut();
+        tech_tree::clear_research_queue(&mut world, entity)
+            .map_err(pyo3::exceptions::PyValueError::new_err)
+    }
+
+    /// Checks if an entity can research a tech, returns (can_research, reason).
+    fn can_research_tech(&self, entity: u32, tech_id: &str) -> (bool, String) {
+        let world = self.inner.borrow();
+        match tech_tree::can_research_tech(&world, entity, tech_id) {
+            Ok(true) => (true, String::new()),
+            Ok(false) => (false, "Unknown reason".to_string()),
+            Err(reason) => (false, reason),
+        }
     }
 }
