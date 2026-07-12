@@ -16,25 +16,25 @@ Project roadmap: [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ---
 
-## Mandatory Pre-Commit Gates
+## Pre-Commit Gates
 
-**Every agent MUST pass ALL three gates before committing. No exceptions.**
+Before every commit, run all three gates. Only commit when all three pass.
 
 ```sh
-# 1. Lint — zero warnings allowed
+# 1. Lint — zero warnings
 cargo clippy --all-targets --all-features -- -D warnings
 
-# 2. Format — must be clean
+# 2. Format — clean output
 cargo fmt --all
 
-# 3. Test — all suites must pass
+# 3. Test — all suites green
 cargo test --all                                          # Rust
 make test-python                                          # Python
 ./run_lua_tests.sh                                        # Lua (requires C plugin .so)
 make test-wasm                                            # WASM
 ```
 
-If any gate fails, fix the issue before committing. Do not commit code that does not lint, format, or test cleanly.
+When a gate fails, fix the issue and re-run the gates. Only commit code that lints, formats, and tests cleanly.
 
 ---
 
@@ -217,7 +217,7 @@ xtask builds each Rust plugin crate in release mode, then copies `target/release
 - **Plugin ABI:** C ABI defined in `engine/engine_plugin_abi.h`. Exports `PluginVTable` with init, shutdown, update, worldgen, system registration, hot-reload.
 - **Presentation layer:** Terminal-based renderer with viewport support (terminal roguelike-style output). Demo: `cargo run --example viewport_demo -p engine_core`.
 - **Roadmap tracking:** After implementing any ROADMAP item (in `docs/ROADMAP.md`), mark it as `[x]` completed in that file as part of the commit.
-- **Lint, format, and test before committing:** See [Mandatory Pre-Commit Gates](#mandatory-pre-commit-gates) above. All three gates (clippy, fmt, test suites) must pass before any commit.
+- **Lint, format, and test before committing:** See [Pre-Commit Gates](#pre-commit-gates) above. Run all three gates (clippy, fmt, test suites) before committing.
 
 ---
 
