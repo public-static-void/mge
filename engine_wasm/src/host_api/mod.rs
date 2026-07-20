@@ -108,3 +108,6 @@ pub mod body_part_damage;
 
 /// Tech tree and research module
 pub mod tech_tree;
+
+/// Material module (get_properties, set_entity_material, get_entity_material, get_names)
+pub mod material;
