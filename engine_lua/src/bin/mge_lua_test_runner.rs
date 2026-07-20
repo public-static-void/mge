@@ -1,5 +1,6 @@
 //! A test runner for Lua tests
 
+use engine_core::ecs::assets::load_material_definitions;
 use engine_core::ecs::registry::ComponentRegistry;
 use engine_core::ecs::schema::{load_allowed_modes, load_schemas_from_dir_with_modes};
 use engine_core::ecs::world::World;
@@ -77,6 +78,11 @@ fn recipes_dir() -> PathBuf {
 /// Returns the absolute path to the engine jobs directory
 fn jobs_dir() -> PathBuf {
     workspace_root().join("engine/assets/jobs")
+}
+
+/// Returns the absolute path to the engine materials directory
+fn materials_dir() -> PathBuf {
+    workspace_root().join("engine/assets/materials")
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -249,6 +255,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Each individual test function gets its own fresh World instance,
         // but all Lua API calls within a test run on that single World.
         let world = Rc::new(RefCell::new(World::new(registry.clone())));
+
+        // Load material definitions into the test world
+        if let Ok(mats) = load_material_definitions(materials_dir()) {
+            world.borrow_mut().material_definitions = mats;
+        }
 
         let mut grid = SquareGridMap::new();
         grid.add_cell(0, 2, 0);

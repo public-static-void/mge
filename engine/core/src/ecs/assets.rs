@@ -79,3 +79,14 @@ pub fn load_jobs<P: AsRef<Path>>(dir: P) -> anyhow::Result<HashMap<String, Value
 pub fn load_prototypes<P: AsRef<Path>>(dir: P) -> anyhow::Result<HashMap<String, Value>> {
     load_json_assets_by_key(dir, "name")
 }
+
+/// Loads all material definitions (expects "name" as key).
+///
+/// # Arguments
+/// * `dir` - Directory containing material JSON files.
+///
+/// # Returns
+/// A map from material name to its definition.
+pub fn load_material_definitions<P: AsRef<Path>>(dir: P) -> anyhow::Result<HashMap<String, Value>> {
+    load_json_assets_by_key(dir, "name")
+}

@@ -121,6 +121,9 @@ pub struct World {
     /// Map from resource kind to resource definition (loaded from assets/resources).
     #[serde(skip)]
     pub resource_definitions: HashMap<String, JsonValue>,
+    /// Map from material name to material definition (loaded from assets/materials).
+    #[serde(skip)]
+    pub material_definitions: HashMap<String, JsonValue>,
     /// Map from recipe name to recipe definition (loaded from assets/recipes).
     #[serde(skip)]
     pub recipes: HashMap<String, JsonValue>,
@@ -187,6 +190,7 @@ impl World {
             ai_event_intents: VecDeque::new(),
             // --- Asset/data fields ---
             resource_definitions: HashMap::new(),
+            material_definitions: HashMap::new(),
             recipes: HashMap::new(),
             jobs: HashMap::new(),
             job_board: JobBoard::default(),

@@ -45,7 +45,7 @@
 - [ ] AI behaviors (enemy tactics, patrol routes)
 - [ ] Noise and detection mechanics
 - [x] Item generation and loot tables
-- [ ] Material and property system
+- [x] Material and property system
 - [x] Time-of-day and season cycle
 - [ ] Weather and climate system
 - [ ] Building and construction system

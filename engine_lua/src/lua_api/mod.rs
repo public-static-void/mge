@@ -47,6 +47,8 @@ pub mod job_system;
 pub mod loot;
 /// Map API
 pub mod map;
+/// Material API
+pub mod material;
 /// Game mode API
 pub mod mode;
 /// Movement API
@@ -109,6 +111,7 @@ pub fn register_all_api_functions(
     job_ai::register_job_ai_api(lua, globals, world.clone())?;
     loot::register_loot_api(lua, globals, world.clone())?;
     faction::register_faction_api(lua, globals, world.clone())?;
+    material::register_material_api(lua, globals, world.clone())?;
     tech_tree::register_tech_tree_api(lua, globals, world.clone())?;
     fov::register_fov_api(lua, globals, world.clone())?;
     Ok(())

@@ -1,0 +1,9 @@
+{
+  "name": "cloth",
+  "density": 0.3,
+  "hardness": 1.0,
+  "flammability": 0.6,
+  "thermal_conductivity": 0.05,
+  "melting_point": 250,
+  "modes": ["colony", "roguelike"]
+}

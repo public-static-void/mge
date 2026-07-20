@@ -10,6 +10,10 @@
       "description": "Valid equipment slot for this item"
     },
     "two_handed": { "type": "boolean", "default": false },
+    "material": {
+      "type": ["string", "null"],
+      "description": "Reference to a material definition by name"
+    },
     "requirements": {
       "type": ["object", "null"],
       "description": "Minimum stat values required to equip this item.",

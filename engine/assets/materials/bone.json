@@ -1,0 +1,9 @@
+{
+  "name": "bone",
+  "density": 1.8,
+  "hardness": 5.0,
+  "flammability": 0.1,
+  "thermal_conductivity": 0.2,
+  "melting_point": 800,
+  "modes": ["colony", "roguelike"]
+}

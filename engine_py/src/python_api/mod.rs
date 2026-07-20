@@ -45,6 +45,8 @@ pub mod job_query;
 pub mod job_reservation;
 /// Map API
 pub mod map_api;
+/// Material API
+pub mod material;
 /// Game mode API
 pub mod mode;
 /// Movement API

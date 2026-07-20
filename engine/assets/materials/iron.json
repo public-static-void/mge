@@ -1,0 +1,9 @@
+{
+  "name": "iron",
+  "density": 7.8,
+  "hardness": 7.0,
+  "flammability": 0.0,
+  "thermal_conductivity": 0.8,
+  "melting_point": 1538,
+  "modes": ["colony", "roguelike"]
+}

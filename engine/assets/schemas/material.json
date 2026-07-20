@@ -1,0 +1,20 @@
+{
+  "title": "Material",
+  "type": "object",
+  "description": "Material properties attached to an entity.",
+  "properties": {
+    "material": {
+      "type": "string",
+      "description": "Key into material definitions registry"
+    },
+    "quality": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 10,
+      "default": 1.0,
+      "description": "Quality modifier (1.0 = standard)"
+    }
+  },
+  "required": ["material"],
+  "modes": ["colony", "roguelike"]
+}
