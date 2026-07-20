@@ -185,6 +185,10 @@ pub struct WasmWorld {
     #[serde(skip)]
     pub loot_tables: LootTableRegistry,
 
+    /// Material definitions loaded at initialization: name → JSON properties.
+    #[serde(default)]
+    pub material_definitions: HashMap<String, JsonValue>,
+
     /// Active FOV algorithm name (for display/debugging).
     #[serde(skip, default = "default_fov_algo_name")]
     pub fov_algorithm_name: String,
@@ -261,6 +265,7 @@ impl WasmWorld {
             ui_event_queue: Vec::new(),
             focused_widget: 0,
             loot_tables: LootTableRegistry::new(),
+            material_definitions: HashMap::new(),
             fov_algorithm_name: "recursive_shadowcasting".to_string(),
         }
     }

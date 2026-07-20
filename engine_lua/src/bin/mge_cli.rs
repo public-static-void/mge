@@ -1,6 +1,7 @@
 //! CLI entry point for running a game from a script or demo.
 
 use engine_core::config::GameConfig;
+use engine_core::ecs::assets::load_material_definitions;
 use engine_core::ecs::registry::ComponentRegistry;
 use engine_core::ecs::world::World;
 use engine_core::mods::loader::load_mod;
@@ -34,6 +35,10 @@ fn find_recipes_dir() -> PathBuf {
         return PathBuf::from(dir);
     }
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../engine/assets/recipes")
+}
+
+fn find_materials_dir() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../engine/assets/materials")
 }
 
 fn find_config_file() -> PathBuf {
@@ -153,6 +158,12 @@ fn main() {
         world.register_system(economic_system);
         world.current_mode = mode.clone();
 
+        // Load material definitions
+        let materials_dir = find_materials_dir();
+        if let Ok(mats) = load_material_definitions(&materials_dir) {
+            world.material_definitions = mats;
+        }
+
         let world_rc = Rc::new(RefCell::new(world));
         let mut engine = ScriptEngine::new();
         engine
@@ -228,6 +239,12 @@ fn main() {
         world.register_system(economic_system);
         if let Some(mode) = mode_arg {
             world.current_mode = mode;
+        }
+
+        // Load material definitions
+        let materials_dir = find_materials_dir();
+        if let Ok(mats) = load_material_definitions(&materials_dir) {
+            world.material_definitions = mats;
         }
 
         let world_rc = Rc::new(RefCell::new(world));

@@ -25,8 +25,20 @@ pub fn load_json_assets_by_key<P: AsRef<Path>>(
         for entry in entries.flatten() {
             let path = entry.path();
             if path.is_file() && path.extension().and_then(|e| e.to_str()) == Some("json") {
-                let data = fs::read_to_string(&path)?;
-                let json_val: Value = serde_json::from_str(&data)?;
+                let data = match fs::read_to_string(&path) {
+                    Ok(d) => d,
+                    Err(e) => {
+                        eprintln!("WARNING: skipping {:?}: read error: {}", path, e);
+                        continue;
+                    }
+                };
+                let json_val: Value = match serde_json::from_str(&data) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        eprintln!("WARNING: skipping {:?}: parse error: {}", path, e);
+                        continue;
+                    }
+                };
                 if let Some(key) = json_val.get(key_field).and_then(|v| v.as_str()) {
                     map.insert(key.to_string(), json_val);
                 }
@@ -77,5 +89,16 @@ pub fn load_jobs<P: AsRef<Path>>(dir: P) -> anyhow::Result<HashMap<String, Value
 /// # Returns
 /// A map from prototype name to its definition.
 pub fn load_prototypes<P: AsRef<Path>>(dir: P) -> anyhow::Result<HashMap<String, Value>> {
+    load_json_assets_by_key(dir, "name")
+}
+
+/// Loads all material definitions (expects "name" as key).
+///
+/// # Arguments
+/// * `dir` - Directory containing material JSON files.
+///
+/// # Returns
+/// A map from material name to its definition.
+pub fn load_material_definitions<P: AsRef<Path>>(dir: P) -> anyhow::Result<HashMap<String, Value>> {
     load_json_assets_by_key(dir, "name")
 }

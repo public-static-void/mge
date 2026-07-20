@@ -9,6 +9,7 @@ use crate::python_api::faction::FactionApi;
 use crate::python_api::fov::FovApi;
 use crate::python_api::inventory::InventoryApi;
 use crate::python_api::job_query::JobQueryApi;
+use crate::python_api::material::MaterialApi;
 use crate::python_api::mode::ModeApi;
 use crate::python_api::movement::MovementApi;
 use crate::python_api::region::RegionApi;
@@ -98,6 +99,12 @@ impl PyWorld {
         }
 
         let mut world = World::new(std::sync::Arc::new(std::sync::Mutex::new(registry)));
+
+        // Load material definitions
+        let materials_dir = schema_path.parent().unwrap().join("materials");
+        if let Ok(mats) = engine_core::ecs::assets::load_material_definitions(&materials_dir) {
+            world.material_definitions = mats;
+        }
 
         // Load and register job types from assets
         let jobs_dir = schema_path.parent().unwrap().join("jobs");
@@ -227,6 +234,28 @@ impl PyWorld {
     /// Get component schema
     fn get_component_schema(&self, name: String) -> PyResult<PyObject> {
         ComponentApi::get_component_schema(self, name)
+    }
+
+    // ---- MATERIAL ----
+
+    /// Get material properties by name. Returns a dict or None.
+    fn get_material_properties(&self, py: Python<'_>, name: String) -> PyResult<Option<PyObject>> {
+        MaterialApi::get_material_properties(self, py, name)
+    }
+
+    /// Attach a Material component to an entity. Raises ValueError on unknown name.
+    fn set_entity_material(&self, entity_id: u32, material_name: String) -> PyResult<()> {
+        MaterialApi::set_entity_material(self, entity_id, material_name)
+    }
+
+    /// Get the Material component for an entity, or None.
+    fn get_entity_material(&self, py: Python<'_>, entity_id: u32) -> PyResult<Option<PyObject>> {
+        MaterialApi::get_entity_material(self, py, entity_id)
+    }
+
+    /// Return all registered material definition names.
+    fn get_material_names(&self) -> Vec<String> {
+        MaterialApi::get_material_names(self)
     }
 
     // ---- INVENTORY ----

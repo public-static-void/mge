@@ -12,6 +12,8 @@ pub mod faction;
 pub mod loot;
 /// Map module
 pub mod map;
+/// Material property lookup and entity material management
+pub mod material;
 /// Modes module
 pub mod modes;
 /// Mods module

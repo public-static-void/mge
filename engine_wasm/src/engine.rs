@@ -21,6 +21,7 @@ use crate::host_api::job_query::register_job_query_api;
 use crate::host_api::job_system::register_job_system_api;
 use crate::host_api::loot::register_loot_api;
 use crate::host_api::map::register_map_api;
+use crate::host_api::material::register_material_api;
 use crate::host_api::mode::register_mode_api;
 use crate::host_api::movement_ops::register_movement_ops_api;
 use crate::host_api::region::register_region_api;
@@ -35,6 +36,7 @@ use crate::host_api::ui_tree::register_ui_tree_api;
 use crate::host_api::world_userdata::register_world_userdata_api;
 use crate::host_api::worldgen::register_worldgen_api;
 use anyhow::Result;
+use engine_core::ecs::assets::load_material_definitions;
 use engine_core::ecs::world::wasm::{WasmWorld, load_schemas_from_dir};
 use engine_core::worldgen::ThreadSafeWorldgenRegistry;
 use std::collections::HashMap;
@@ -175,6 +177,7 @@ impl WasmScriptEngine {
         register_ui_tree_api(&mut linker)?;
         register_ui_events_api(&mut linker)?;
         register_loot_api(&mut linker)?;
+        register_material_api(&mut linker)?;
         register_faction_api(&mut linker)?;
         register_fov_api(&mut linker)?;
         register_tech_tree_api(&mut linker)?;
@@ -198,6 +201,18 @@ impl WasmScriptEngine {
 
         let mut world = WasmWorld::new();
         world.component_schemas = schemas;
+
+        // Auto-load material definitions from a "materials" sibling directory
+        // relative to the schema path (e.g., engine/assets/schemas → engine/assets/materials).
+        if let Some(ref schema_dir) = config.schema_path
+            && let Some(parent) = schema_dir.parent()
+        {
+            let materials_dir = parent.join("materials");
+            if let Ok(mats) = load_material_definitions(&materials_dir) {
+                world.material_definitions = mats;
+            }
+        }
+
         let world = Arc::new(Mutex::new(world));
         let mut store = Store::new(&engine, world.clone());
         let instance = linker

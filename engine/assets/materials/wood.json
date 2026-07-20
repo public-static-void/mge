@@ -1,0 +1,9 @@
+{
+  "name": "wood",
+  "density": 0.6,
+  "hardness": 2.0,
+  "flammability": 0.9,
+  "thermal_conductivity": 0.1,
+  "melting_point": 300,
+  "modes": ["colony", "roguelike"]
+}

@@ -1,0 +1,9 @@
+{
+  "name": "obsidian",
+  "density": 2.4,
+  "hardness": 6.0,
+  "flammability": 0.0,
+  "thermal_conductivity": 0.3,
+  "melting_point": 1000,
+  "modes": ["colony", "roguelike"]
+}
