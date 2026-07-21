@@ -4,6 +4,7 @@ use engine_core::ecs::system::System;
 use engine_core::ecs::world::World;
 use engine_core::faction::{get_faction, get_reputation, modify_reputation, set_faction};
 use engine_core::systems::faction_reputation::FactionReputationSystem;
+use serde_json::Value as JsonValue;
 use serde_json::json;
 use std::sync::{Arc, Mutex};
 
@@ -251,4 +252,26 @@ fn test_system_name() {
 fn test_system_dependencies() {
     let system = FactionReputationSystem;
     assert!(system.dependencies().is_empty());
+}
+
+#[test]
+fn test_modify_reputation_emits_event() {
+    let mut world = setup_world();
+    let entity = world.spawn_entity();
+    let event_name = "reputation_changed".to_string();
+
+    modify_reputation(&mut world, entity, "goblins", 10).unwrap();
+
+    // Advance the event bus to move current events to last_events
+    world.update_event_buses::<JsonValue>();
+
+    let drained: Vec<JsonValue> = world.drain_events(&event_name);
+    assert!(!drained.is_empty(), "Should have events");
+    if let Some(event) = drained.first() {
+        assert_eq!(event["entity"], entity);
+        assert_eq!(event["faction"], "goblins");
+        assert_eq!(event["old"], 0);
+        assert_eq!(event["new"], 10);
+        assert_eq!(event["delta"], 10);
+    }
 }
