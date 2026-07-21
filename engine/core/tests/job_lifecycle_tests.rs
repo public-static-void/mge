@@ -1940,7 +1940,10 @@ fn test_job_event_logging_and_replay() {
             && e.get("state") == Some(&json!("pending"))
             && e.get("priority") == Some(&json!(5))
     });
-    assert!(found, "Replayed event with entity=42, job_type=dig not found");
+    assert!(
+        found,
+        "Replayed event with entity=42, job_type=dig not found"
+    );
 
     // Clean up
     let _ = fs::remove_file(log_path);

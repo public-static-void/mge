@@ -11,7 +11,9 @@ use agent_helper::AgentTestHelpers;
 
 use engine_core::ecs::system::System;
 use engine_core::systems::job::job_board::{JobAssignmentResult, JobBoard};
-use engine_core::systems::job::resource_reservation::{ResourceReservationStatus, ResourceReservationSystem};
+use engine_core::systems::job::resource_reservation::{
+    ResourceReservationStatus, ResourceReservationSystem,
+};
 use engine_core::systems::job::{JobLogicKind, JobSystem, JobTypeData, assign_jobs};
 use engine_core::systems::movement_system::MovementSystem;
 use serde_json::json;
