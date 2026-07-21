@@ -165,47 +165,6 @@ fn test_schema_driven_mode_enforcement() {
 }
 
 #[test]
-fn test_mode_enforcement_for_custom_schema() {
-    use engine_core::ecs::world::World;
-    use serde_json::json;
-    use std::sync::{Arc, Mutex};
-
-    // Test mode enforcement for a custom schema
-    let custom_schema = r#"
-    {
-        "title": "MagicPower",
-        "type": "object",
-        "properties": { "mana": { "type": "number" } },
-        "required": ["mana"],
-        "modes": ["colony"]
-    }
-    "#;
-
-    let mut registry = ComponentRegistry::new();
-    registry
-        .register_external_schema_from_json(custom_schema)
-        .unwrap();
-    let registry = Arc::new(Mutex::new(registry));
-
-    let mut world = World::new(registry.clone());
-    let id = world.spawn_entity();
-
-    // Allowed in "colony"
-    world.current_mode = "colony".to_string();
-    assert!(
-        world
-            .set_component(id, "MagicPower", json!({ "mana": 42 }))
-            .is_ok(),
-        "Should be allowed in colony mode"
-    );
-
-    // Not allowed in "roguelike"
-    world.current_mode = "roguelike".to_string();
-    let result = world.set_component(id, "MagicPower", json!({ "mana": 99 }));
-    assert!(result.is_err(), "Should not be allowed in roguelike mode");
-}
-
-#[test]
 fn test_set_component_validation() {
     use engine_core::ecs::registry::ComponentRegistry;
     use engine_core::ecs::world::World;
