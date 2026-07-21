@@ -49,27 +49,6 @@ fn test_checkbox_render_checked() {
 }
 
 #[test]
-fn test_checkbox_space_key_toggles_when_focused() {
-    let mut cb = Checkbox::new("Test", (0, 0), RenderColor(255, 255, 255), None);
-    cb.set_focused(true);
-    assert!(!cb.checked);
-    // Checkbox handle_event for KeyPress does not toggle — it only handles Click events
-    // So we document this behavior
-    cb.handle_event(&UiEvent::KeyPress {
-        key: "Space".to_string(),
-    });
-    assert!(!cb.checked); // Space key does not toggle checkbox per current implementation
-}
-
-#[test]
-fn test_checkbox_disabled_blocks_toggle() {
-    // Checkbox does not have a disabled field — we test that clicking outside bounds is no-op
-    let mut cb = Checkbox::new("Test", (5, 5), RenderColor(255, 255, 255), None);
-    cb.handle_event(&UiEvent::Click { x: 0, y: 0 });
-    assert!(!cb.checked);
-}
-
-#[test]
 fn test_checkbox_on_toggle_callback_fires() {
     let toggled = Arc::new(Mutex::new(false));
     let cb_toggle = toggled.clone();

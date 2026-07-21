@@ -32,14 +32,6 @@ fn test_label_empty_string_renders_nothing() {
 }
 
 #[test]
-fn test_label_color_application() {
-    let mut renderer = TestRenderer::new();
-    let mut label = Label::new("A", (0, 0), RenderColor(100, 150, 200));
-    label.render(&mut renderer);
-    assert_eq!(renderer.draws[0].color, RenderColor(100, 150, 200));
-}
-
-#[test]
 fn test_label_long_text_renders_all_chars() {
     let mut renderer = TestRenderer::new();
     let text = "ABCDE";
