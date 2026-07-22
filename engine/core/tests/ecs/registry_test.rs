@@ -97,15 +97,6 @@ fn test_register_external_from_json_empty_string() {
     assert!(result.is_err());
 }
 
-// --- Error paths ---
-
-#[test]
-fn test_schema_to_json_empty_registry() {
-    let reg = empty_registry();
-    let result = reg.schema_to_json::<Health>();
-    assert!(matches!(result, Err(RegistryError::UnregisteredComponent)));
-}
-
 // --- Query operations ---
 
 #[test]

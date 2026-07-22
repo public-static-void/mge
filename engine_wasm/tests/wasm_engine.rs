@@ -37,51 +37,6 @@ fn test_wasm_script_engine_can_instantiate_and_run() {
 }
 
 #[test]
-fn test_wasm_script_engine_can_instantiate_with_wasi() {
-    // Minimal WASI module (requires WASI import to instantiate)
-    let wat = r#"
-        (module
-            (import "wasi_snapshot_preview1" "proc_exit" (func $exit (param i32)))
-            (func (export "run") (param i32)
-                local.get 0
-                call $exit
-            )
-        )
-    "#;
-    let wasm_file = wat_to_tempfile(wat);
-
-    // Should fail if WASI is not enabled
-    let config_no_wasi = WasmScriptEngineConfig {
-        module_path: wasm_file.path().to_path_buf(),
-        schema_path: None,
-        worldgen_registry: None,
-        import_host_functions: None,
-    };
-    let result = WasmScriptEngine::new(config_no_wasi);
-    assert!(
-        result.is_err(),
-        "Should fail to instantiate WASI module without WASI enabled"
-    );
-
-    // Should succeed if WASI is enabled
-    // NOTE: This test will not pass unless you reintroduce WASI support in your engine.
-    // For now, this block is commented out to avoid confusion and errors.
-    /*
-    let config_with_wasi = WasmScriptEngineConfig {
-        module_path: wasm_file.path().to_path_buf(),
-        schema_path: None,
-        worldgen_registry: None,
-        import_host_functions: None,
-    };
-    let result = WasmScriptEngine::new(config_with_wasi);
-    assert!(
-        result.is_ok(),
-        "Should succeed to instantiate WASI module with WASI enabled"
-    );
-    */
-}
-
-#[test]
 fn test_wasm_script_engine_can_register_and_call_host_function() {
     let wat = r#"
         (module

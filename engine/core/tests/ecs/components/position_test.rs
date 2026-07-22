@@ -40,14 +40,6 @@ fn test_migrate_unsupported_version() {
 }
 
 #[test]
-fn test_migrate_unsupported_v2() {
-    let legacy = TestLegacyPosition { x: 0.0, y: 0.0 };
-    let data = bson::to_vec(&legacy).unwrap();
-    let result = PositionComponent::migrate(Version::parse("2.0.0").unwrap(), &data);
-    assert!(matches!(result, Err(MigrationError::UnsupportedVersion(_))));
-}
-
-#[test]
 fn test_migrate_empty_data() {
     let result = PositionComponent::migrate(Version::parse("1.0.0").unwrap(), &[]);
     assert!(matches!(

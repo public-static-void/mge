@@ -246,7 +246,7 @@ Place all tests in dedicated test files outside production source code:
 
 | Test Type | Location | Example |
 |---|---|---|
-| Core crate unit/integration tests | `engine/core/tests/test_<module>.rs` | `engine/core/tests/test_faction.rs` |
+| Core crate unit/integration tests | `engine/core/tests/test_<module>.rs` | `engine/core/tests/test_faction_reputation.rs` |
 | Lua tests | `engine/scripts/lua/tests/test_<feature>.lua` | `engine/scripts/lua/tests/test_faction_reputation.lua` |
 | Python tests | `engine_py/tests/test_<feature>.py` | `engine_py/tests/test_faction_reputation.py` |
 | WASM tests | `engine_wasm/tests/<feature>.rs` | `engine_wasm/tests/wasm_faction_api.rs` |

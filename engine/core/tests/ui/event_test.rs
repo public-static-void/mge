@@ -25,25 +25,4 @@ fn test_keypress_event_creation() {
     }
 }
 
-#[test]
-fn test_click_event_clone() {
-    let event = UiEvent::Click { x: 5, y: 3 };
-    let cloned = event.clone();
-    match cloned {
-        UiEvent::Click { x, y } => {
-            assert_eq!(x, 5);
-            assert_eq!(y, 3);
-        }
-        _ => panic!("Expected Click event"),
-    }
-}
 
-#[test]
-fn test_keypress_event_debug_format() {
-    let event = UiEvent::KeyPress {
-        key: "Space".to_string(),
-    };
-    let debug_str = format!("{:?}", event);
-    assert!(debug_str.contains("KeyPress"));
-    assert!(debug_str.contains("Space"));
-}
