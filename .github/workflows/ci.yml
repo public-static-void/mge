@@ -177,7 +177,7 @@ jobs:
           python3 -m venv .venv
           source .venv/bin/activate
           pip install maturin pytest
-          maturin develop --release
+          maturin develop
       - name: Run Python tests
         run: |
           cd engine_py

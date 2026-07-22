@@ -55,7 +55,7 @@ setup-python:
 build-python: setup-python
 	@command -v maturin >/dev/null 2>&1 || { echo >&2 "maturin is not installed. Aborting."; exit 1; }
 	@echo "Building Python Rust extension with maturin..."
-	@cd engine_py && . .venv/bin/activate && maturin develop --release
+	@cd engine_py && . .venv/bin/activate && maturin develop
 
 # Build Python wheel for distribution (standalone, not part of dev workflow)
 build-wheel:
