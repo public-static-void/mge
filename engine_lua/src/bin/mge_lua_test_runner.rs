@@ -222,6 +222,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
+    // --- Hoist: load schemas, materials, recipes, job types once ---
+    // Previously these were loaded from disk inside every iteration of the test loop,
+    // causing ~36 JSON reads per test function. Loading once cuts ~4,320 redundant reads.
+    let allowed_modes = load_allowed_modes()?;
+    let schemas = load_schemas_from_dir_with_modes(schema_dir(), &allowed_modes)?;
+    let mut base_registry = ComponentRegistry::new();
+    for (_name, schema) in schemas {
+        base_registry.register_external_schema(schema);
+    }
+
+    let materials = load_material_definitions(materials_dir()).unwrap_or_default();
+    let recipes = load_recipes_from_dir(recipes_dir().to_str().unwrap());
+    let job_types = load_job_types_from_dir(jobs_dir().to_str().unwrap());
+
     // Run each test in a fresh World and Lua state
     let mut total = 0;
     let mut failed = 0;
@@ -244,22 +258,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Print the RUN line before any test output
         println!("{}{}", color(COLOR_CYAN, "[RUN]    "), testname);
 
-        // --- ECS + Lua context ---
-        let allowed_modes = load_allowed_modes()?;
-        let schemas = load_schemas_from_dir_with_modes(schema_dir(), &allowed_modes)?;
-        let registry = Arc::new(Mutex::new(ComponentRegistry::new()));
-        for (_name, schema) in schemas.clone() {
-            registry.lock().unwrap().register_external_schema(schema);
-        }
+        // --- ECS + Lua context (cloned from pre-loaded state) ---
+        let registry = Arc::new(Mutex::new(base_registry.clone()));
 
         // Each individual test function gets its own fresh World instance,
         // but all Lua API calls within a test run on that single World.
         let world = Rc::new(RefCell::new(World::new(registry.clone())));
 
         // Load material definitions into the test world
-        if let Ok(mats) = load_material_definitions(materials_dir()) {
-            world.borrow_mut().material_definitions = mats;
-        }
+        world.borrow_mut().material_definitions = materials.clone();
 
         let mut grid = SquareGridMap::new();
         grid.add_cell(0, 2, 0);
@@ -299,15 +306,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         world.borrow_mut().register_system(FovUpdateSystem);
         world.borrow_mut().register_system(FogUpdateSystem);
 
-        // --- Economic System registration ---
-        let recipes = load_recipes_from_dir(recipes_dir().to_str().unwrap());
-        let economic_system = EconomicSystem::with_recipes(recipes);
+        // --- Economic System registration (cloned from pre-loaded recipes) ---
+        let economic_system = EconomicSystem::with_recipes(recipes.clone());
         world.borrow_mut().register_system(economic_system);
 
-        // --- Job System registration ---
-        let job_types = load_job_types_from_dir(jobs_dir().to_str().unwrap());
+        // --- Job System registration (cloned from pre-loaded job types) ---
         let mut job_registry = JobTypeRegistry::default();
-        for job in job_types {
+        for job in job_types.clone() {
             job_registry.register(job, JobLogicKind::Native(|_, _, _, job| job.clone()));
         }
         world.borrow_mut().job_types = job_registry;
