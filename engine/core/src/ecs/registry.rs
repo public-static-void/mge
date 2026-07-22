@@ -7,6 +7,7 @@ use std::any::TypeId;
 use std::collections::HashMap;
 
 /// Registry for component schemas and metadata.
+#[derive(Clone)]
 pub struct ComponentRegistry {
     components: HashMap<TypeId, ComponentSchema>,
     external_components: HashMap<String, ComponentSchema>,
