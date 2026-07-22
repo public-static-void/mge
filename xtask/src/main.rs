@@ -222,6 +222,17 @@ fn build_wasm_tests() -> Result<(), Box<dyn Error>> {
                 continue;
             }
             let wasm_out = test_dir.join(format!("{stem}.wasm"));
+
+            // Skip recompilation when .wasm is newer than .rs source
+            if wasm_out.exists() {
+                let src_mtime = fs::metadata(&path)?.modified()?;
+                let out_mtime = fs::metadata(&wasm_out)?.modified()?;
+                if out_mtime >= src_mtime {
+                    println!("Skipping {} (up to date)", path.display());
+                    continue;
+                }
+            }
+
             println!("Compiling {} to {}", path.display(), wasm_out.display());
             let status = Command::new("rustc")
                 .arg("--target")
