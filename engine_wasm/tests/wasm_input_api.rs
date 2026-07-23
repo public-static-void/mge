@@ -1,3 +1,4 @@
+use engine_core::ecs::world::wasm::InputSource;
 use engine_wasm::{WasmScriptEngine, WasmScriptEngineConfig};
 use std::io::Write;
 use tempfile::NamedTempFile;
@@ -32,6 +33,7 @@ fn test_wasm_input_api_bridge() {
         schema_path: None,
         worldgen_registry: None,
         import_host_functions: None,
+        input_source: Some(InputSource::Mock(vec![])),
     };
 
     let engine = WasmScriptEngine::new(config).expect("Failed to create WasmScriptEngine");

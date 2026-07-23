@@ -31,6 +31,7 @@ fn test_wasm_reserve_only() {
         schema_path: None,
         worldgen_registry: None,
         import_host_functions: None,
+        input_source: None,
     };
     let engine = WasmScriptEngine::new(config).expect("Failed to create WasmScriptEngine");
     let result = engine
@@ -47,6 +48,7 @@ fn test_wasm_get_reservations_before() {
         schema_path: None,
         worldgen_registry: None,
         import_host_functions: None,
+        input_source: None,
     };
     let engine = WasmScriptEngine::new(config).expect("Failed to create WasmScriptEngine");
     let result = engine
@@ -63,6 +65,7 @@ fn test_wasm_reserve_then_query() {
         schema_path: None,
         worldgen_registry: None,
         import_host_functions: None,
+        input_source: None,
     };
     let engine = WasmScriptEngine::new(config).expect("Failed to create WasmScriptEngine");
     let result = engine
@@ -79,6 +82,7 @@ fn test_wasm_reserve_and_release() {
         schema_path: None,
         worldgen_registry: None,
         import_host_functions: None,
+        input_source: None,
     };
     let engine = WasmScriptEngine::new(config).expect("Failed to create WasmScriptEngine");
     let result = engine

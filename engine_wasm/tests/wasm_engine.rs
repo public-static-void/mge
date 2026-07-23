@@ -28,6 +28,7 @@ fn test_wasm_script_engine_can_instantiate_and_run() {
         schema_path: None,
         worldgen_registry: None,
         import_host_functions: None,
+        input_source: None,
     };
     let engine = WasmScriptEngine::new(config).expect("Failed to create WasmScriptEngine");
     let result = engine
@@ -66,6 +67,7 @@ fn test_wasm_script_engine_can_register_and_call_host_function() {
                 })
                 .unwrap();
         })),
+        input_source: None,
     };
     let engine = WasmScriptEngine::new(config).expect("Failed to create WasmScriptEngine");
     let result = engine

@@ -38,6 +38,7 @@ fn test_wasm_dungeon_generate() {
         schema_path: None,
         worldgen_registry: None,
         import_host_functions: None,
+        input_source: None,
     };
 
     let engine = WasmScriptEngine::new(config).expect("Failed to create WasmScriptEngine");
@@ -78,6 +79,7 @@ fn test_wasm_dungeon_invalid_config() {
         schema_path: None,
         worldgen_registry: None,
         import_host_functions: None,
+        input_source: None,
     };
 
     let engine = WasmScriptEngine::new(config).expect("Failed to create WasmScriptEngine");
