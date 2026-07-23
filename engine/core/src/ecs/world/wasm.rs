@@ -65,6 +65,19 @@ pub struct WasmMap {
     pub cell_metadata: HashMap<String, JsonValue>,
 }
 
+/// Injectable input source for `WasmWorld::get_user_input()`.
+///
+/// Defaults to `Stdin` which blocks on `std::io::stdin().read_line()`.
+/// Tests inject `Mock` to avoid hanging on stdin reads.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub enum InputSource {
+    /// Block on real stdin (production default).
+    #[default]
+    Stdin,
+    /// Pre-loaded responses consumed FIFO; returns `None` when empty.
+    Mock(Vec<String>),
+}
+
 /// Wasm implementation of a world
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct WasmWorld {
@@ -192,6 +205,10 @@ pub struct WasmWorld {
     /// Active FOV algorithm name (for display/debugging).
     #[serde(skip, default = "default_fov_algo_name")]
     pub fov_algorithm_name: String,
+
+    /// Injectable input source for `get_user_input()`.
+    #[serde(skip, default)]
+    pub input_source: InputSource,
 }
 
 fn default_fov_algo_name() -> String {
@@ -267,6 +284,7 @@ impl WasmWorld {
             loot_tables: LootTableRegistry::new(),
             material_definitions: HashMap::new(),
             fov_algorithm_name: "recursive_shadowcasting".to_string(),
+            input_source: InputSource::default(),
         }
     }
 
@@ -757,20 +775,34 @@ impl WasmWorld {
         self.time_of_day
     }
 
-    /// Reads a line of user input from stdin.
+    /// Reads a line of user input from the configured input source.
+    ///
+    /// When `input_source` is `Stdin`, blocks on `std::io::stdin().read_line()`.
+    /// When `Mock`, pops from the front of the pre-loaded queue; returns `None` if empty.
     pub fn get_user_input(&mut self) -> Option<String> {
-        let mut input = String::new();
-        match std::io::stdin().read_line(&mut input) {
-            Ok(0) => None,
-            Ok(_) => {
-                let trimmed = input.trim().to_string();
-                if trimmed.is_empty() {
-                    None
-                } else {
-                    Some(trimmed)
+        match &mut self.input_source {
+            InputSource::Stdin => {
+                let mut input = String::new();
+                match std::io::stdin().read_line(&mut input) {
+                    Ok(0) => None,
+                    Ok(_) => {
+                        let trimmed = input.trim().to_string();
+                        if trimmed.is_empty() {
+                            None
+                        } else {
+                            Some(trimmed)
+                        }
+                    }
+                    Err(_) => None,
                 }
             }
-            Err(_) => None,
+            InputSource::Mock(queue) => {
+                if queue.is_empty() {
+                    None
+                } else {
+                    Some(queue.remove(0))
+                }
+            }
         }
     }
 

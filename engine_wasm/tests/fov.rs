@@ -34,6 +34,7 @@ fn test_wasm_fov_api_bridge() {
         schema_path: None,
         worldgen_registry: None,
         import_host_functions: None,
+        input_source: None,
     };
 
     let engine = WasmScriptEngine::new(config).expect("Failed to create WasmScriptEngine");

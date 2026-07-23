@@ -41,6 +41,7 @@ fn test_wasm_material_api_bridge() {
         schema_path: Some(schema_dir),
         worldgen_registry: None,
         import_host_functions: None,
+        input_source: None,
     };
 
     let engine = WasmScriptEngine::new(config).expect("Failed to create WasmScriptEngine");

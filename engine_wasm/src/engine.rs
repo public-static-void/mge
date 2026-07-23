@@ -37,7 +37,7 @@ use crate::host_api::world_userdata::register_world_userdata_api;
 use crate::host_api::worldgen::register_worldgen_api;
 use anyhow::Result;
 use engine_core::ecs::assets::load_material_definitions;
-use engine_core::ecs::world::wasm::{WasmWorld, load_schemas_from_dir};
+use engine_core::ecs::world::wasm::{InputSource, WasmWorld, load_schemas_from_dir};
 use engine_core::worldgen::ThreadSafeWorldgenRegistry;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -123,6 +123,8 @@ pub struct WasmScriptEngineConfig {
     pub worldgen_registry: Option<Arc<Mutex<ThreadSafeWorldgenRegistry>>>,
     /// Optional host function registrar
     pub import_host_functions: Option<HostImportRegistrar>,
+    /// Injectable input source for `get_user_input()`. Defaults to `Stdin`.
+    pub input_source: Option<InputSource>,
 }
 
 /// A WASM script engine
@@ -201,6 +203,9 @@ impl WasmScriptEngine {
 
         let mut world = WasmWorld::new();
         world.component_schemas = schemas;
+        if let Some(src) = config.input_source {
+            world.input_source = src;
+        }
 
         // Auto-load material definitions from a "materials" sibling directory
         // relative to the schema path (e.g., engine/assets/schemas → engine/assets/materials).
