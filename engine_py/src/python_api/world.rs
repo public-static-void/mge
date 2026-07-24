@@ -26,6 +26,7 @@ use engine_core::systems::fog::FogUpdateSystem;
 use engine_core::systems::fov::FovUpdateSystem;
 use engine_core::systems::job::job_board::JobBoard;
 use engine_core::systems::job::types::loader::load_job_types_from_dir;
+use engine_core::systems::research::ResearchSystem;
 use engine_core::tech_tree;
 use pyo3::Python;
 use pyo3::prelude::*;
@@ -127,6 +128,7 @@ impl PyWorld {
         world.register_system(engine_core::systems::body_equipment_sync::BodyEquipmentSyncSystem);
         world.register_system(engine_core::systems::stat_calculation::StatCalculationSystem);
         world.register_system(engine_core::systems::derived_stats::DerivedStatsSystem);
+        world.register_system(ResearchSystem);
         world.register_system(engine_core::systems::job::JobSystem);
         world.register_system(FactionReputationSystem);
         world.register_system(FovUpdateSystem);
@@ -285,6 +287,11 @@ impl PyWorld {
     /// Get equipment
     fn get_equipment(&self, py: Python<'_>, entity_id: u32) -> PyResult<PyObject> {
         EquipmentApi::get_equipment(self, py, entity_id)
+    }
+
+    /// Set raw equipment component data
+    fn set_equipment(&self, entity_id: u32, value: Bound<'_, PyAny>) -> PyResult<()> {
+        EquipmentApi::set_equipment(self, entity_id, value)
     }
 
     /// Equip item
