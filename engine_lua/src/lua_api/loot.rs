@@ -75,5 +75,27 @@ pub fn register_loot_api(lua: &Lua, globals: &Table, world: Rc<RefCell<World>>) 
     })?;
     globals.set("has_loot_table", has_fn)?;
 
+    // loot_table_names() — returns array of table name strings
+    let world_tn = world.clone();
+    let names_fn = lua.create_function_mut(move |lua: &Lua, ()| -> LuaResult<Table> {
+        let world = world_tn.borrow();
+        let names = world.loot_tables.table_names();
+        let table = lua.create_table()?;
+        for (i, name) in names.iter().enumerate() {
+            table.set(i + 1, name.as_str())?;
+        }
+        Ok(table)
+    })?;
+    globals.set("loot_table_names", names_fn)?;
+
+    // remove_loot_table(name) — removes a loot table by name
+    let world_rt = world.clone();
+    let remove_fn = lua.create_function_mut(move |_, name: String| -> LuaResult<()> {
+        let mut world = world_rt.borrow_mut();
+        world.loot_tables.remove_table(&name);
+        Ok(())
+    })?;
+    globals.set("remove_loot_table", remove_fn)?;
+
     Ok(())
 }
