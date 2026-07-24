@@ -7,8 +7,19 @@ use engine_core::ecs::world::World;
 use engine_core::mods::loader::load_mod;
 use engine_core::plugins::loader::load_native_plugins_from_config;
 use engine_core::plugins::types::EngineApi;
+use engine_core::systems::body_equipment_sync::BodyEquipmentSyncSystem;
 use engine_core::systems::body_part_damage::BodyPartDamageSystem;
+use engine_core::systems::death_decay::{ProcessDeaths, ProcessDecay};
+use engine_core::systems::derived_stats::DerivedStatsSystem;
 use engine_core::systems::economic::{EconomicSystem, load_recipes_from_dir};
+use engine_core::systems::equipment_effect_aggregation::EquipmentEffectAggregationSystem;
+use engine_core::systems::equipment_logic::EquipmentLogicSystem;
+use engine_core::systems::faction_reputation::FactionReputationSystem;
+use engine_core::systems::fog::FogUpdateSystem;
+use engine_core::systems::fov::FovUpdateSystem;
+use engine_core::systems::job::JobSystem;
+use engine_core::systems::research::ResearchSystem;
+use engine_core::systems::stat_calculation::StatCalculationSystem;
 use engine_core::worldgen::WorldgenRegistry;
 use engine_lua::ScriptEngine;
 use std::cell::RefCell;
@@ -154,7 +165,20 @@ fn main() {
         let recipes = load_recipes_from_dir(&recipes_dir);
         let economic_system = EconomicSystem::with_recipes(recipes);
         let mut world = World::new(registry.clone());
+        // Register all core systems in deterministic execution order
         world.register_system(BodyPartDamageSystem);
+        world.register_system(EquipmentLogicSystem);
+        world.register_system(EquipmentEffectAggregationSystem);
+        world.register_system(BodyEquipmentSyncSystem);
+        world.register_system(StatCalculationSystem);
+        world.register_system(DerivedStatsSystem);
+        world.register_system(ResearchSystem);
+        world.register_system(JobSystem);
+        world.register_system(FactionReputationSystem);
+        world.register_system(FovUpdateSystem);
+        world.register_system(FogUpdateSystem);
+        world.register_system(ProcessDeaths);
+        world.register_system(ProcessDecay);
         world.register_system(economic_system);
         world.current_mode = mode.clone();
 
@@ -235,7 +259,20 @@ fn main() {
         let recipes = load_recipes_from_dir(&recipes_dir);
         let economic_system = EconomicSystem::with_recipes(recipes);
         let mut world = World::new(registry.clone());
+        // Register all core systems in deterministic execution order
         world.register_system(BodyPartDamageSystem);
+        world.register_system(EquipmentLogicSystem);
+        world.register_system(EquipmentEffectAggregationSystem);
+        world.register_system(BodyEquipmentSyncSystem);
+        world.register_system(StatCalculationSystem);
+        world.register_system(DerivedStatsSystem);
+        world.register_system(ResearchSystem);
+        world.register_system(JobSystem);
+        world.register_system(FactionReputationSystem);
+        world.register_system(FovUpdateSystem);
+        world.register_system(FogUpdateSystem);
+        world.register_system(ProcessDeaths);
+        world.register_system(ProcessDecay);
         world.register_system(economic_system);
         if let Some(mode) = mode_arg {
             world.current_mode = mode;

@@ -3,12 +3,14 @@ use crate::PyObject;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyTuple};
 use serde_json::Value;
-use serde_pyobject::to_pyobject;
+use serde_pyobject::{from_pyobject, to_pyobject};
 
 /// Equipment API
 pub trait EquipmentApi {
     /// Get equipment data
     fn get_equipment(&self, py: Python<'_>, entity_id: u32) -> PyResult<PyObject>;
+    /// Set raw equipment component data
+    fn set_equipment(&self, entity_id: u32, value: Bound<'_, PyAny>) -> PyResult<()>;
     /// Equip an item
     fn equip_item(&self, entity_id: u32, item_id: String, slot: String) -> PyResult<()>;
     /// Unequip an item
@@ -34,6 +36,14 @@ impl EquipmentApi for PyWorld {
         } else {
             Ok(PyDict::new(py).into())
         }
+    }
+
+    fn set_equipment(&self, entity_id: u32, value: Bound<'_, PyAny>) -> PyResult<()> {
+        let json_value: Value = from_pyobject(value)?;
+        let mut world = self.inner.borrow_mut();
+        world
+            .set_component(entity_id, "Equipment", json_value)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
     }
 
     fn equip_item(&self, entity_id: u32, item_id: String, slot: String) -> PyResult<()> {
