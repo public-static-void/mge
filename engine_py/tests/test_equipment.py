@@ -1,3 +1,4 @@
+import json
 import pytest
 
 
@@ -88,11 +89,9 @@ def test_equip_stat_effect_bonus(make_world):
         e, "Inventory", {"slots": [], "weight": 0.0, "volume": 0.0}
     )
     item = w.spawn_entity()
-    w.set_component(
-        item,
-        "Item",
-        {"id": "str_ring", "name": "Ring of Strength", "slot": "ring_1", "effects": {"strength": 3.0}},
-    )
+    item_def = {"id": "str_ring", "name": "Ring of Strength", "slot": "ring_1", "effects": {"strength": 3.0}}
+    w.set_component(item, "Item", item_def)
+    w.register_item(json.dumps(item_def))
     w.add_item_to_inventory(e, "str_ring")
     w.equip_item(e, "str_ring", "ring_1")
 
@@ -114,11 +113,9 @@ def test_unequip_removes_stat_bonus(make_world):
         e, "Inventory", {"slots": [], "weight": 0.0, "volume": 0.0}
     )
     item = w.spawn_entity()
-    w.set_component(
-        item,
-        "Item",
-        {"id": "str_ring", "name": "Ring of Strength", "slot": "ring_1", "effects": {"strength": 3.0}},
-    )
+    item_def = {"id": "str_ring", "name": "Ring of Strength", "slot": "ring_1", "effects": {"strength": 3.0}}
+    w.set_component(item, "Item", item_def)
+    w.register_item(json.dumps(item_def))
     w.add_item_to_inventory(e, "str_ring")
     w.equip_item(e, "str_ring", "ring_1")
 
@@ -147,11 +144,9 @@ def test_equip_custom_stat_effect(make_world):
         e, "Inventory", {"slots": [], "weight": 0.0, "volume": 0.0}
     )
     item = w.spawn_entity()
-    w.set_component(
-        item,
-        "Item",
-        {"id": "cha_ring", "name": "Ring of Charisma", "slot": "ring_2", "effects": {"charisma": 2.0}},
-    )
+    item_def = {"id": "cha_ring", "name": "Ring of Charisma", "slot": "ring_2", "effects": {"charisma": 2.0}}
+    w.set_component(item, "Item", item_def)
+    w.register_item(json.dumps(item_def))
     w.add_item_to_inventory(e, "cha_ring")
     w.equip_item(e, "cha_ring", "ring_2")
 

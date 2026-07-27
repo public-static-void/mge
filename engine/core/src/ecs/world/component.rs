@@ -6,7 +6,7 @@ use serde_json::{Map, Value as JsonValue, json};
 /// Recursively enforces required fields and default values from the schema on the given value.
 /// - Inserts default values for all fields if missing.
 /// - Handles `oneOf` by applying defaults only to the matched alternative to respect schema semantics.
-fn enforce_schema_defaults(value: &mut JsonValue, schema: &JsonValue) {
+pub(crate) fn enforce_schema_defaults(value: &mut JsonValue, schema: &JsonValue) {
     if let (JsonValue::Object(map), Some(props)) =
         (value, schema.get("properties").and_then(|p| p.as_object()))
     {

@@ -25,7 +25,9 @@ fn test_body_equipment_sync_enforcement() {
         "slot": "left hand",
         "effects": { "dexterity": 2 }
     });
-    world.set_component(ring_id, "Item", ring).unwrap();
+    world.set_component(ring_id, "Item", ring.clone()).unwrap();
+    // Register in ItemRegistry so EquipmentEffectAggregationSystem can find effects
+    world.item_registry.register_item(ring).unwrap();
 
     // Create a body: torso -> left arm -> left hand
     let eid = world.spawn_entity();

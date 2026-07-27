@@ -5,6 +5,7 @@ mod wasm_camera_api;
 mod wasm_component_api;
 mod wasm_component_introspection_api;
 mod wasm_death_decay_api;
+mod wasm_designer_api;
 mod wasm_economic_api;
 mod wasm_economic_reservation;
 mod wasm_engine;

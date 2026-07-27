@@ -1,0 +1,16 @@
+{
+  "title": "EquipmentSet",
+  "type": "object",
+  "description": "A named loadout blueprint mapping slots to item IDs.",
+  "properties": {
+    "name": { "type": "string" },
+    "version": { "type": "string", "default": "1.0.0" },
+    "description": { "type": "string", "default": "" },
+    "items": {
+      "type": "object",
+      "description": "Mapping of slot names to item IDs.",
+      "additionalProperties": { "type": "string" }
+    }
+  },
+  "required": ["name", "items"]
+}

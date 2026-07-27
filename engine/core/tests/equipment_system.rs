@@ -58,8 +58,10 @@ fn test_unequipping_item_removes_stat_bonuses_modular() {
         }
     });
     world
-        .set_component(power_ring_id, "Item", power_ring)
+        .set_component(power_ring_id, "Item", power_ring.clone())
         .unwrap();
+    // Register in ItemRegistry so EquipmentEffectAggregationSystem can find effects
+    world.item_registry.register_item(power_ring).unwrap();
 
     // Create equipment with power_ring equipped in finger slot
     let eid = world.spawn_entity();
@@ -119,8 +121,10 @@ fn test_equipping_item_applies_and_removes_effects_modular() {
         }
     });
     world
-        .set_component(power_ring_id, "Item", power_ring)
+        .set_component(power_ring_id, "Item", power_ring.clone())
         .unwrap();
+    // Register in ItemRegistry so EquipmentEffectAggregationSystem can find effects
+    world.item_registry.register_item(power_ring).unwrap();
 
     // Create equipment with empty finger slot
     let eid = world.spawn_entity();

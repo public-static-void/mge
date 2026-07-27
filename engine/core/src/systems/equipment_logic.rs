@@ -1,7 +1,7 @@
 use crate::ecs::system::System;
 use crate::ecs::world::World;
 use serde_json::Value as JsonValue;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::path::Path;
 use std::sync::OnceLock;
 
@@ -61,9 +61,6 @@ impl System for EquipmentLogicSystem {
                 _ => continue,
             };
 
-            // Cache item metadata by item ID for performance
-            let mut item_cache: HashMap<String, JsonValue> = HashMap::new();
-
             // Get entity stats for requirement checks
             let empty = JsonValue::Object(Default::default());
             let entity_stats = world.get_component(eid, "Stats").unwrap_or(&empty);
@@ -78,23 +75,6 @@ impl System for EquipmentLogicSystem {
                 None => continue,
             };
 
-            // Helper closure to get item metadata by ID
-            let mut get_item_metadata = |item_id: &str| -> Option<JsonValue> {
-                if let Some(cached) = item_cache.get(item_id) {
-                    return Some(cached.clone());
-                }
-                for item_eid in world.get_entities_with_component("Item") {
-                    if let Some(item_comp) = world.get_component(item_eid, "Item")
-                        && let Some(id_val) = item_comp.get("id")
-                        && id_val == item_id
-                    {
-                        item_cache.insert(item_id.to_string(), item_comp.clone());
-                        return Some(item_comp.clone());
-                    }
-                }
-                None
-            };
-
             // First pass: enforce slot compatibility, stat requirements, and slot registry validation
             let valid_slots = get_valid_slots();
             for (slot_name, item_id_value) in &slots_obj {
@@ -106,7 +86,7 @@ impl System for EquipmentLogicSystem {
                     None => continue,
                 };
 
-                let item_metadata = match get_item_metadata(item_id) {
+                let item_metadata = match world.item_registry.get_item(item_id).cloned() {
                     Some(meta) => meta,
                     None => continue,
                 };
@@ -168,7 +148,7 @@ impl System for EquipmentLogicSystem {
                     Some(id) => id.clone(),
                     None => continue,
                 };
-                let item_metadata = match get_item_metadata(&item_id) {
+                let item_metadata = match world.item_registry.get_item(&item_id).cloned() {
                     Some(meta) => meta,
                     None => continue,
                 };

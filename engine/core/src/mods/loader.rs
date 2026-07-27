@@ -35,6 +35,17 @@ pub fn load_mod<S: ModScriptEngine>(
         registry.lock().unwrap().register_external_schema(schema);
     }
 
+    // Load unit templates from mod directory if templates/ exists
+    let template_dir = format!("{mod_dir}/templates");
+    let template_path = std::path::Path::new(&template_dir);
+    if template_path.exists() {
+        world
+            .borrow_mut()
+            .template_registry
+            .load_templates_from_dir(template_path)
+            .map_err(|e| anyhow::anyhow!("Failed to load mod templates: {}", e))?;
+    }
+
     // Optionally: Load assets, jobs, recipes, etc. as needed here
 
     // Load and run the main system script

@@ -19,6 +19,8 @@ pub mod economic;
 pub mod entity;
 /// Equipment API
 pub mod equipment;
+/// Equipment set designer API (apply_loadout, get_loadout, validate_equipment)
+pub mod equipment_set_designer;
 /// Event Bus API
 pub mod event_bus;
 /// Faction and Reputation API
@@ -29,6 +31,8 @@ pub mod fov;
 pub mod input;
 /// Inventory API
 pub mod inventory;
+/// Item definition designer API (load, register, get, list items)
+pub mod item_definition;
 /// Job AI API
 pub mod job_ai;
 /// Job Board API
@@ -67,6 +71,8 @@ pub mod time_of_day;
 pub mod turn;
 /// UI API
 pub mod ui;
+/// Unit template API
+pub mod unit_template;
 /// World API
 pub mod world;
 /// Worldgen API
@@ -114,5 +120,8 @@ pub fn register_all_api_functions(
     material::register_material_api(lua, globals, world.clone())?;
     tech_tree::register_tech_tree_api(lua, globals, world.clone())?;
     fov::register_fov_api(lua, globals, world.clone())?;
+    unit_template::register_unit_template_api(lua, globals, world.clone())?;
+    item_definition::register_item_definition_api(lua, globals, world.clone())?;
+    equipment_set_designer::register_equipment_set_designer_api(lua, globals, world.clone())?;
     Ok(())
 }

@@ -2,6 +2,7 @@ use crate::PyObject;
 use crate::python_api::body::BodyApi;
 use crate::python_api::component::ComponentApi;
 use crate::python_api::death_decay::DeathDecayApi;
+use crate::python_api::designer::DesignerApi;
 use crate::python_api::economic::EconomicApi;
 use crate::python_api::entity::EntityApi;
 use crate::python_api::equipment::EquipmentApi;
@@ -16,6 +17,7 @@ use crate::python_api::region::RegionApi;
 use crate::python_api::save_load::SaveLoadApi;
 use crate::python_api::time_of_day::TimeOfDayApi;
 use crate::python_api::turn::TurnApi;
+use crate::python_api::unit_template::UnitTemplateApi;
 use crate::system_bridge::SystemBridge;
 use engine_core::ecs::world::World;
 use engine_core::loot::LootEntry;
@@ -1138,5 +1140,87 @@ impl PyWorld {
             Ok(false) => (false, "Unknown reason".to_string()),
             Err(reason) => (false, reason),
         }
+    }
+
+    // ---- UNIT TEMPLATES ----
+
+    /// Load all .json template files from a directory.
+    fn load_unit_templates(&self, dir: String) -> PyResult<()> {
+        UnitTemplateApi::load_unit_templates(self, dir)
+    }
+
+    /// Register a single template from a JSON string.
+    fn register_unit_template(&self, name: String, template_json: String) -> PyResult<()> {
+        UnitTemplateApi::register_unit_template(self, name, template_json)
+    }
+
+    /// Spawn an entity from a named template, with optional overrides dict.
+    fn spawn_from_template(
+        &self,
+        template_name: String,
+        overrides: Option<Bound<'_, PyDict>>,
+    ) -> PyResult<u32> {
+        UnitTemplateApi::spawn_from_template(self, template_name, overrides)
+    }
+
+    /// Get a template definition by name.
+    fn get_unit_template(&self, py: Python<'_>, name: String) -> PyResult<PyObject> {
+        UnitTemplateApi::get_unit_template(self, py, name)
+    }
+
+    /// List all registered template names.
+    fn list_unit_templates(&self) -> PyResult<Vec<String>> {
+        UnitTemplateApi::list_unit_templates(self)
+    }
+
+    // ---- DESIGNER APIs ----
+
+    /// Load item definitions from a directory of JSON files.
+    fn load_item_definitions(&self, dir: String) -> PyResult<()> {
+        DesignerApi::load_item_definitions(self, dir)
+    }
+
+    /// Register a single item definition from a JSON string.
+    fn register_item(&self, item_json: String) -> PyResult<()> {
+        DesignerApi::register_item(self, item_json)
+    }
+
+    /// Get an item definition by ID, or None.
+    fn get_item_definition(&self, py: Python<'_>, id: String) -> PyResult<Option<PyObject>> {
+        DesignerApi::get_item_definition(self, py, id)
+    }
+
+    /// List all registered item IDs.
+    fn list_item_definitions(&self) -> PyResult<Vec<String>> {
+        DesignerApi::list_item_definitions(self)
+    }
+
+    /// Load equipment set definitions from a directory of JSON files.
+    fn load_equipment_sets(&self, dir: String) -> PyResult<()> {
+        DesignerApi::load_equipment_sets(self, dir)
+    }
+
+    /// Define a named equipment set at runtime.
+    fn define_equipment_set(
+        &self,
+        name: String,
+        items: std::collections::HashMap<String, String>,
+    ) -> PyResult<()> {
+        DesignerApi::define_equipment_set(self, name, items)
+    }
+
+    /// Apply an equipment set to an entity. Returns entity ID on success.
+    fn apply_loadout(&self, entity: u32, set_name: String) -> PyResult<u32> {
+        DesignerApi::apply_loadout(self, entity, set_name)
+    }
+
+    /// Get the matching equipment set name for an entity, or None.
+    fn get_loadout(&self, py: Python<'_>, entity: u32) -> PyResult<Option<PyObject>> {
+        DesignerApi::get_loadout(self, py, entity)
+    }
+
+    /// Validate an entity's equipment. Returns dict with "issues" list.
+    fn validate_equipment(&self, py: Python<'_>, entity: u32) -> PyResult<PyObject> {
+        DesignerApi::validate_equipment(self, py, entity)
     }
 }

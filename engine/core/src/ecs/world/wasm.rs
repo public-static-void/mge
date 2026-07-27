@@ -1,3 +1,8 @@
+use crate::ecs::equipment_set::{EquipmentSet, EquipmentSetRegistry};
+use crate::ecs::item::ItemRegistry;
+use crate::ecs::template::UnitTemplateRegistry;
+use crate::ecs::world::component::enforce_schema_defaults;
+use crate::ecs::world::loadout::EquipmentIssue;
 use crate::loot::LootTableRegistry;
 use crate::map::CellKey;
 use serde::{Deserialize, Serialize};
@@ -209,6 +214,18 @@ pub struct WasmWorld {
     /// Injectable input source for `get_user_input()`.
     #[serde(skip, default)]
     pub input_source: InputSource,
+
+    /// Unit template registry for spawning entities from data-driven templates.
+    #[serde(skip)]
+    pub template_registry: UnitTemplateRegistry,
+
+    /// Item definition registry for O(1) item lookups.
+    #[serde(skip)]
+    pub item_registry: ItemRegistry,
+
+    /// Equipment set registry for named loadout blueprints.
+    #[serde(skip)]
+    pub equipment_set_registry: EquipmentSetRegistry,
 }
 
 fn default_fov_algo_name() -> String {
@@ -285,6 +302,9 @@ impl WasmWorld {
             material_definitions: HashMap::new(),
             fov_algorithm_name: "recursive_shadowcasting".to_string(),
             input_source: InputSource::default(),
+            template_registry: UnitTemplateRegistry::new(),
+            item_registry: ItemRegistry::new(),
+            equipment_set_registry: EquipmentSetRegistry::new(),
         }
     }
 
@@ -630,14 +650,33 @@ impl WasmWorld {
     }
 
     /// Set a component on an entity from a JSON string.
+    ///
+    /// Validates against schema (if registered) and enforces defaults,
+    /// matching `World::set_component` behavior.
     pub fn set_component(
         &mut self,
         entity_id: u32,
         component_name: &str,
         json_data: &str,
     ) -> Result<(), String> {
-        let value: JsonValue = serde_json::from_str(json_data)
+        let mut value: JsonValue = serde_json::from_str(json_data)
             .map_err(|e| format!("Failed to parse component JSON: {e}"))?;
+
+        // Validate against schema if one is registered for this component
+        if let Some(schema) = self.component_schemas.get(component_name) {
+            enforce_schema_defaults(&mut value, schema);
+
+            let validator = jsonschema::validator_for(schema)
+                .map_err(|e| format!("Schema compile error: {e}"))?;
+            let mut errors = validator.iter_errors(&value);
+            if let Some(first_error) = errors.next() {
+                let mut msgs = vec![first_error.to_string()];
+                msgs.extend(errors.map(|e| e.to_string()));
+                let msg = msgs.join(", ");
+                return Err(format!("Schema validation failed: {msg}"));
+            }
+        }
+
         self.components
             .entry(component_name.to_string())
             .or_default()
@@ -1066,6 +1105,23 @@ impl WasmWorld {
 
     /// Equips an item into a slot on the entity's Equipment component.
     pub fn equip_item(&mut self, entity_id: u32, item_id: &str, slot: &str) -> Result<(), String> {
+        // Check inventory
+        let inv = self
+            .components
+            .get("Inventory")
+            .and_then(|m| m.get(&entity_id))
+            .ok_or_else(|| "Entity has no Inventory".to_string())?;
+        let inv_slots = inv
+            .get("slots")
+            .and_then(|v| v.as_array())
+            .ok_or_else(|| "No slots array in Inventory".to_string())?;
+        if !inv_slots
+            .iter()
+            .any(|v| v == &serde_json::Value::String(item_id.to_string()))
+        {
+            return Err("Item not in Inventory".to_string());
+        }
+
         let equipment = self
             .components
             .entry("Equipment".to_string())
@@ -2449,6 +2505,310 @@ impl WasmWorld {
                 self.time_of_day.day += 1;
             }
         }
+    }
+
+    // ---- Unit Template API ----
+
+    /// Load all .json template files from a directory.
+    pub fn load_templates_from_dir(&mut self, dir: &str) -> Result<(), String> {
+        let path = std::path::Path::new(dir);
+        self.template_registry.load_templates_from_dir(path)
+    }
+
+    /// Register a single template from a JSON string.
+    pub fn register_template_from_json(&mut self, template_json: &str) -> Result<(), String> {
+        let template: crate::ecs::template::UnitTemplate = serde_json::from_str(template_json)
+            .map_err(|e| format!("Invalid template JSON: {e}"))?;
+        self.template_registry.register_template(template);
+        Ok(())
+    }
+
+    /// Spawn an entity from a named template, with optional overrides JSON.
+    pub fn spawn_from_template(
+        &mut self,
+        template_name: &str,
+        overrides_json: Option<&str>,
+    ) -> Result<u32, String> {
+        let template = self
+            .template_registry
+            .get_template(template_name)
+            .ok_or_else(|| format!("Template '{template_name}' not found"))?
+            .clone();
+
+        let overrides: Option<serde_json::Map<String, JsonValue>> = match overrides_json {
+            Some(json) => {
+                let val: JsonValue = serde_json::from_str(json)
+                    .map_err(|e| format!("Failed to parse overrides JSON: {e}"))?;
+                match val {
+                    JsonValue::Object(map) => Some(map),
+                    _ => return Err("Overrides must be a JSON object".to_string()),
+                }
+            }
+            None => None,
+        };
+
+        let entity = self.spawn_entity();
+
+        for (comp_name, comp_data) in &template.components {
+            let mut final_data = comp_data.clone();
+
+            if let Some(ref ov) = overrides
+                && let Some(override_data) = ov.get(comp_name)
+            {
+                crate::ecs::world::World::deep_merge(&mut final_data, override_data);
+            }
+
+            let json_str = serde_json::to_string(&final_data)
+                .map_err(|e| format!("Failed to serialize component data: {e}"))?;
+            self.set_component(entity, comp_name, &json_str)?;
+        }
+
+        Ok(entity)
+    }
+
+    /// Get a template definition by name as JSON string.
+    pub fn get_template_json(&self, name: &str) -> Option<String> {
+        self.template_registry
+            .get_template(name)
+            .and_then(|t| serde_json::to_string(t).ok())
+    }
+
+    /// List all registered template names.
+    pub fn list_template_names(&self) -> Vec<String> {
+        self.template_registry.list_templates()
+    }
+
+    // ---- Designer API ----
+
+    /// Load item definitions from a directory.
+    pub fn load_item_definitions_from_dir(&mut self, dir: &str) -> Result<(), String> {
+        let path = std::path::Path::new(dir);
+        self.item_registry.load_items_from_dir(path)
+    }
+
+    /// Register a single item from JSON.
+    pub fn register_item_from_json(&mut self, json: &str) -> Result<(), String> {
+        let definition: JsonValue =
+            serde_json::from_str(json).map_err(|e| format!("Invalid item JSON: {e}"))?;
+        self.item_registry.register_item(definition)
+    }
+
+    /// Get an item definition by ID as JSON string.
+    pub fn get_item_definition_json(&self, id: &str) -> Option<String> {
+        self.item_registry
+            .get_item(id)
+            .and_then(|v| serde_json::to_string(v).ok())
+    }
+
+    /// List all registered item IDs.
+    pub fn list_item_names(&self) -> Vec<String> {
+        self.item_registry.list_items()
+    }
+
+    /// Load equipment sets from a directory.
+    pub fn load_equipment_sets_from_dir(&mut self, dir: &str) -> Result<(), String> {
+        let path = std::path::Path::new(dir);
+        self.equipment_set_registry.load_sets_from_dir(path)
+    }
+
+    /// Register an equipment set from JSON.
+    pub fn register_equipment_set_from_json(&mut self, json: &str) -> Result<(), String> {
+        let set: EquipmentSet =
+            serde_json::from_str(json).map_err(|e| format!("Invalid equipment set JSON: {e}"))?;
+        self.equipment_set_registry.register_set(set);
+        Ok(())
+    }
+
+    /// Apply an equipment set to an entity.
+    pub fn apply_loadout(&mut self, entity: u32, set_name: &str) -> Result<u32, String> {
+        let set = self
+            .equipment_set_registry
+            .get_set(set_name)
+            .ok_or_else(|| format!("Equipment set '{set_name}' not found"))?
+            .clone();
+
+        // Check entity has Inventory
+        if self.get_component(entity, "Inventory").is_none() {
+            return Err("Entity has no Inventory component".to_string());
+        }
+
+        let mut equipped_slots: Vec<String> = Vec::new();
+        let mut spawned_items: Vec<u32> = Vec::new();
+
+        for (slot, item_id) in &set.items {
+            // Get item definition from registry
+            let definition = match self.item_registry.get_item(item_id) {
+                Some(def) => def.clone(),
+                None => {
+                    self.rollback_loadout(&spawned_items, &equipped_slots, entity);
+                    return Err(format!(
+                        "Item '{item_id}' not found in registry (required by set '{set_name}')"
+                    ));
+                }
+            };
+
+            // Spawn item entity with Item component
+            let item_eid = self.spawn_entity();
+            let item_json = serde_json::to_string(&definition)
+                .map_err(|e| format!("Failed to serialize item definition: {e}"))?;
+            if let Err(e) = self.set_component(item_eid, "Item", &item_json) {
+                self.despawn_entity(item_eid);
+                self.rollback_loadout(&spawned_items, &equipped_slots, entity);
+                return Err(e);
+            }
+            spawned_items.push(item_eid);
+
+            // Add item_id string to entity's Inventory slots array
+            if let Some(inv_str) = self.get_component(entity, "Inventory") {
+                let mut new_inv: JsonValue = serde_json::from_str(&inv_str)
+                    .map_err(|e| format!("Failed to parse Inventory: {e}"))?;
+                if let Some(slots) = new_inv.get_mut("slots").and_then(|v| v.as_array_mut()) {
+                    slots.push(JsonValue::String(item_id.clone()));
+                }
+                let new_inv_json = serde_json::to_string(&new_inv)
+                    .map_err(|e| format!("Failed to serialize Inventory: {e}"))?;
+                if let Err(e) = self.set_component(entity, "Inventory", &new_inv_json) {
+                    self.rollback_loadout(&spawned_items, &equipped_slots, entity);
+                    return Err(e);
+                }
+            }
+
+            // Set Equipment slot
+            let mut equipment: JsonValue = self
+                .get_component(entity, "Equipment")
+                .and_then(|s| serde_json::from_str(&s).ok())
+                .unwrap_or_else(|| serde_json::json!({"slots": {}}));
+
+            if let Some(slots_obj) = equipment.get_mut("slots").and_then(|v| v.as_object_mut()) {
+                slots_obj.insert(slot.clone(), JsonValue::String(item_id.clone()));
+            }
+
+            let eq_json = serde_json::to_string(&equipment)
+                .map_err(|e| format!("Failed to serialize Equipment: {e}"))?;
+            if let Err(e) = self.set_component(entity, "Equipment", &eq_json) {
+                self.rollback_loadout(&spawned_items, &equipped_slots, entity);
+                return Err(e);
+            }
+            equipped_slots.push(slot.clone());
+        }
+
+        Ok(entity)
+    }
+
+    /// Rollback a partial loadout: despawn created items and unequip slots.
+    fn rollback_loadout(&mut self, spawned_items: &[u32], equipped_slots: &[String], entity: u32) {
+        for &item_eid in spawned_items {
+            self.despawn_entity(item_eid);
+        }
+
+        if let Some(inv_str) = self.get_component(entity, "Inventory")
+            && let Ok(mut inv) = serde_json::from_str::<JsonValue>(&inv_str)
+        {
+            if let Some(slots) = inv.get_mut("slots").and_then(|v| v.as_array_mut()) {
+                let remove_count = equipped_slots.len();
+                let new_len = slots.len().saturating_sub(remove_count);
+                slots.truncate(new_len);
+            }
+            if let Ok(json) = serde_json::to_string(&inv) {
+                let _ = self.set_component(entity, "Inventory", &json);
+            }
+        }
+
+        if let Some(eq_str) = self.get_component(entity, "Equipment")
+            && let Ok(mut equipment) = serde_json::from_str::<JsonValue>(&eq_str)
+        {
+            if let Some(slots_obj) = equipment.get_mut("slots").and_then(|v| v.as_object_mut()) {
+                for slot in equipped_slots {
+                    slots_obj.insert(slot.clone(), JsonValue::Null);
+                }
+            }
+            if let Ok(json) = serde_json::to_string(&equipment) {
+                let _ = self.set_component(entity, "Equipment", &json);
+            }
+        }
+    }
+
+    /// Get the matching equipment set for an entity as JSON, or None.
+    pub fn get_loadout_json(&self, entity: u32) -> Option<String> {
+        let equipment = self.get_component(entity, "Equipment")?;
+        let equip_val: JsonValue = serde_json::from_str(&equipment).ok()?;
+        let entity_slots = equip_val.get("slots")?.as_object()?;
+
+        let entity_items: HashMap<&str, &str> = entity_slots
+            .iter()
+            .filter_map(|(slot, item_id)| item_id.as_str().map(|id| (slot.as_str(), id)))
+            .collect();
+
+        let set_names = self.equipment_set_registry.list_sets();
+        for set_name in &set_names {
+            if let Some(set) = self.equipment_set_registry.get_set(set_name)
+                && set.items.len() == entity_items.len()
+                && set.items.iter().all(|(slot, item_id)| {
+                    entity_items.get(slot.as_str()) == Some(&item_id.as_str())
+                })
+            {
+                let result = serde_json::json!({
+                    "name": set.name,
+                    "items": set.items,
+                });
+                return serde_json::to_string(&result).ok();
+            }
+        }
+
+        None
+    }
+
+    /// Validate an entity's equipment. Returns JSON string of issues.
+    pub fn validate_equipment_json(&self, entity: u32) -> String {
+        let issues = self.validate_equipment(entity);
+        serde_json::to_string(&serde_json::json!({
+            "issues": issues.iter().map(|i| {
+                serde_json::json!({
+                    "slot": i.slot,
+                    "item_id": i.item_id,
+                    "reason": i.reason,
+                })
+            }).collect::<Vec<_>>(),
+        }))
+        .unwrap_or_else(|_| r#"{"issues":[]}"#.to_string())
+    }
+
+    /// Validate equipment for an entity (core logic).
+    pub fn validate_equipment(&self, entity: u32) -> Vec<EquipmentIssue> {
+        let mut issues = Vec::new();
+
+        let equipment = match self.get_component(entity, "Equipment") {
+            Some(e) => e,
+            None => return issues,
+        };
+
+        let equip_val: JsonValue = match serde_json::from_str(&equipment) {
+            Ok(v) => v,
+            Err(_) => return issues,
+        };
+
+        let slots = match equip_val.get("slots").and_then(|v| v.as_object()) {
+            Some(s) => s,
+            None => return issues,
+        };
+
+        for (slot, item_id_val) in slots {
+            let item_id = match item_id_val.as_str() {
+                Some(id) => id,
+                None => continue,
+            };
+
+            // Check if item is registered
+            if self.item_registry.get_item(item_id).is_none() {
+                issues.push(EquipmentIssue {
+                    slot: slot.clone(),
+                    item_id: item_id.to_string(),
+                    reason: "item_not_registered".to_string(),
+                });
+            }
+        }
+
+        issues
     }
 }
 

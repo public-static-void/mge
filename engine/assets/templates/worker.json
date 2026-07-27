@@ -1,0 +1,33 @@
+{
+  "name": "worker",
+  "version": "1.0.0",
+  "description": "A non-combat unit focused on labor and crafting",
+  "components": {
+    "Type": { "kind": "player" },
+    "Health": { "current": 40, "max": 40 },
+    "BaseStats": { "strength": 7, "dexterity": 5, "constitution": 9 },
+    "SkillLevels": { "skills": { "crafting": 4, "gathering": 3 } },
+    "Equipment": { "slots": { "weapon": null, "chest": null, "legs": null, "boots": null } },
+    "Inventory": { "slots": [], "weight": 0, "volume": 0 },
+    "Body": {
+      "parts": [
+        {
+          "name": "torso",
+          "kind": "torso",
+          "status": "healthy",
+          "hp": 40,
+          "max_hp": 40,
+          "temperature": null,
+          "ideal_temperature": null,
+          "insulation": null,
+          "heat_loss": null,
+          "children": [],
+          "equipped": []
+        }
+      ]
+    },
+    "Renderable": { "glyph": "W", "color": [200, 200, 0] },
+    "Sight": { "range": 8 },
+    "Agent": { "entity_id": 0, "skills": { "crafting": 1.0, "gathering": 1.0 } }
+  }
+}

@@ -27,7 +27,7 @@
 - [x] Inventory management (pickup, use, drop)
 - [x] Equipment and gear system (wield, wear, inventory slots)
 - [x] Body management and equipment synchronization
-- [ ] Unit and equipment designer
+- [x] Unit and equipment designer
 - [x] Combat and damage system
 - [x] Body part damage model (per-part health, wounds)
 - [x] Skill and attribute system

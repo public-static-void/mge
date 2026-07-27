@@ -30,19 +30,12 @@ impl System for EquipmentEffectAggregationSystem {
                     Some(id) => id,
                     None => continue,
                 };
-                for item_eid in world.get_entities_with_component("Item") {
-                    let item = match world.get_component(item_eid, "Item") {
-                        Some(i) => i,
-                        None => continue,
-                    };
-                    if item.get("id").and_then(|v| v.as_str()) != Some(item_id) {
-                        continue;
-                    }
-                    if let Some(effects_obj) = item.get("effects").and_then(|v| v.as_object()) {
-                        for (k, v) in effects_obj {
-                            let delta = v.as_f64().unwrap_or(0.0);
-                            *effects.entry(k.clone()).or_insert(0.0) += delta;
-                        }
+                if let Some(item) = world.item_registry.get_item(item_id)
+                    && let Some(effects_obj) = item.get("effects").and_then(|v| v.as_object())
+                {
+                    for (k, v) in effects_obj {
+                        let delta = v.as_f64().unwrap_or(0.0);
+                        *effects.entry(k.clone()).or_insert(0.0) += delta;
                     }
                 }
             }

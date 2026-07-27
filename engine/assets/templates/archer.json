@@ -1,0 +1,33 @@
+{
+  "name": "archer",
+  "version": "1.0.0",
+  "description": "A ranged combat unit with high dexterity",
+  "components": {
+    "Type": { "kind": "player" },
+    "Health": { "current": 35, "max": 35 },
+    "BaseStats": { "strength": 6, "dexterity": 10, "constitution": 6 },
+    "SkillLevels": { "skills": { "archery": 5, "defense": 2 } },
+    "Equipment": { "slots": { "weapon": null, "chest": null, "legs": null, "boots": null } },
+    "Inventory": { "slots": [], "weight": 0, "volume": 0 },
+    "Body": {
+      "parts": [
+        {
+          "name": "torso",
+          "kind": "torso",
+          "status": "healthy",
+          "hp": 35,
+          "max_hp": 35,
+          "temperature": null,
+          "ideal_temperature": null,
+          "insulation": null,
+          "heat_loss": null,
+          "children": [],
+          "equipped": []
+        }
+      ]
+    },
+    "Renderable": { "glyph": "A", "color": [0, 200, 0] },
+    "Sight": { "range": 15 },
+    "Agent": { "entity_id": 0, "skills": { "archery": 1.0 } }
+  }
+}
