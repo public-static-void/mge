@@ -56,7 +56,10 @@ fn test_cannot_equip_incompatible_item() {
         "name": "Iron Helmet",
         "slot": "head"
     });
-    world.set_component(helmet_id, "Item", helmet).unwrap();
+    world
+        .set_component(helmet_id, "Item", helmet.clone())
+        .unwrap();
+    world.item_registry.register_item(helmet).unwrap();
 
     // Create equipment with empty slots
     let eid = world.spawn_entity();
@@ -105,7 +108,11 @@ fn test_equipping_two_handed_weapon_blocks_both_hands() {
         "two_handed": true
     });
     world
-        .set_component(two_handed_weapon_id, "Item", two_handed_weapon)
+        .set_component(two_handed_weapon_id, "Item", two_handed_weapon.clone())
+        .unwrap();
+    world
+        .item_registry
+        .register_item(two_handed_weapon)
         .unwrap();
 
     // Create equipment with empty hands
@@ -147,7 +154,10 @@ fn test_cannot_equip_two_handed_weapon_if_other_hand_occupied() {
         "slot": "right_hand",
         "two_handed": false
     });
-    world.set_component(sword_id, "Item", sword).unwrap();
+    world
+        .set_component(sword_id, "Item", sword.clone())
+        .unwrap();
+    world.item_registry.register_item(sword).unwrap();
 
     // Create a two-handed weapon item
     let greatsword_id = world.spawn_entity();
@@ -158,8 +168,9 @@ fn test_cannot_equip_two_handed_weapon_if_other_hand_occupied() {
         "two_handed": true
     });
     world
-        .set_component(greatsword_id, "Item", greatsword)
+        .set_component(greatsword_id, "Item", greatsword.clone())
         .unwrap();
+    world.item_registry.register_item(greatsword).unwrap();
 
     // Create equipment with sword equipped in right_hand
     let eid = world.spawn_entity();
@@ -204,8 +215,9 @@ fn test_cannot_equip_item_with_unmet_stat_requirement() {
         }
     });
     world
-        .set_component(heavy_armor_id, "Item", heavy_armor)
+        .set_component(heavy_armor_id, "Item", heavy_armor.clone())
         .unwrap();
+    world.item_registry.register_item(heavy_armor).unwrap();
 
     // Create equipment with empty torso slot
     let eid = world.spawn_entity();
@@ -254,8 +266,9 @@ fn test_can_equip_item_with_met_stat_requirement() {
         }
     });
     world
-        .set_component(light_armor_id, "Item", light_armor)
+        .set_component(light_armor_id, "Item", light_armor.clone())
         .unwrap();
+    world.item_registry.register_item(light_armor).unwrap();
 
     // Create equipment with empty torso slot
     let eid = world.spawn_entity();

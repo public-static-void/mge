@@ -11,6 +11,8 @@ pub mod camera_api;
 pub mod component;
 /// Death/decay API
 pub mod death_decay;
+/// Designer API (item definitions, equipment sets, loadouts)
+pub mod designer;
 /// Dungeon generation API
 pub mod dungeon;
 /// Economic API

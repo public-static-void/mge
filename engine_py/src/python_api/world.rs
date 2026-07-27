@@ -2,6 +2,7 @@ use crate::PyObject;
 use crate::python_api::body::BodyApi;
 use crate::python_api::component::ComponentApi;
 use crate::python_api::death_decay::DeathDecayApi;
+use crate::python_api::designer::DesignerApi;
 use crate::python_api::economic::EconomicApi;
 use crate::python_api::entity::EntityApi;
 use crate::python_api::equipment::EquipmentApi;
@@ -1170,5 +1171,56 @@ impl PyWorld {
     /// List all registered template names.
     fn list_unit_templates(&self) -> PyResult<Vec<String>> {
         UnitTemplateApi::list_unit_templates(self)
+    }
+
+    // ---- DESIGNER APIs ----
+
+    /// Load item definitions from a directory of JSON files.
+    fn load_item_definitions(&self, dir: String) -> PyResult<()> {
+        DesignerApi::load_item_definitions(self, dir)
+    }
+
+    /// Register a single item definition from a JSON string.
+    fn register_item(&self, item_json: String) -> PyResult<()> {
+        DesignerApi::register_item(self, item_json)
+    }
+
+    /// Get an item definition by ID, or None.
+    fn get_item_definition(&self, py: Python<'_>, id: String) -> PyResult<Option<PyObject>> {
+        DesignerApi::get_item_definition(self, py, id)
+    }
+
+    /// List all registered item IDs.
+    fn list_item_definitions(&self) -> PyResult<Vec<String>> {
+        DesignerApi::list_item_definitions(self)
+    }
+
+    /// Load equipment set definitions from a directory of JSON files.
+    fn load_equipment_sets(&self, dir: String) -> PyResult<()> {
+        DesignerApi::load_equipment_sets(self, dir)
+    }
+
+    /// Define a named equipment set at runtime.
+    fn define_equipment_set(
+        &self,
+        name: String,
+        items: std::collections::HashMap<String, String>,
+    ) -> PyResult<()> {
+        DesignerApi::define_equipment_set(self, name, items)
+    }
+
+    /// Apply an equipment set to an entity. Returns entity ID on success.
+    fn apply_loadout(&self, entity: u32, set_name: String) -> PyResult<u32> {
+        DesignerApi::apply_loadout(self, entity, set_name)
+    }
+
+    /// Get the matching equipment set name for an entity, or None.
+    fn get_loadout(&self, py: Python<'_>, entity: u32) -> PyResult<Option<PyObject>> {
+        DesignerApi::get_loadout(self, py, entity)
+    }
+
+    /// Validate an entity's equipment. Returns dict with "issues" list.
+    fn validate_equipment(&self, py: Python<'_>, entity: u32) -> PyResult<PyObject> {
+        DesignerApi::validate_equipment(self, py, entity)
     }
 }

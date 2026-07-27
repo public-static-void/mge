@@ -15,8 +15,10 @@ pub fn setup_basic_equipment(world: &mut World) -> (u32, u32) {
         }
     });
     world
-        .set_component(power_ring_id, "Item", power_ring)
+        .set_component(power_ring_id, "Item", power_ring.clone())
         .unwrap();
+    // Register in ItemRegistry so systems can look up item metadata
+    world.item_registry.register_item(power_ring).unwrap();
 
     // Create equipment with empty finger slot
     let eid = world.spawn_entity();

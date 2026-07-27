@@ -3,6 +3,7 @@ use crate::host_api::body_part_damage::register_body_part_damage_api;
 use crate::host_api::camera::register_camera_api;
 use crate::host_api::component::register_component_api;
 use crate::host_api::death_decay::register_death_decay_api;
+use crate::host_api::designer::register_designer_api;
 use crate::host_api::dungeon::register_dungeon_api;
 use crate::host_api::economic::register_economic_api;
 use crate::host_api::entity::register_entity_api;
@@ -185,6 +186,7 @@ impl WasmScriptEngine {
         register_fov_api(&mut linker)?;
         register_tech_tree_api(&mut linker)?;
         register_unit_template_api(&mut linker)?;
+        register_designer_api(&mut linker)?;
 
         // Load schemas if schema_path is provided
         let schemas = config
