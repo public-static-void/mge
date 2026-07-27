@@ -1,0 +1,25 @@
+{
+  "title": "UnitTemplate",
+  "type": "object",
+  "description": "Meta-schema for unit template definitions. Templates specify default components for entity archetypes.",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Unique template identifier"
+    },
+    "version": {
+      "type": "string",
+      "description": "Semantic version"
+    },
+    "description": {
+      "type": "string",
+      "description": "Human-readable description"
+    },
+    "components": {
+      "type": "object",
+      "description": "Map of component name to partial component data",
+      "additionalProperties": { "type": "object" }
+    }
+  },
+  "required": ["name", "version", "components"]
+}

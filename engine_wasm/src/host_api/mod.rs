@@ -111,3 +111,6 @@ pub mod tech_tree;
 
 /// Material module (get_properties, set_entity_material, get_entity_material, get_names)
 pub mod material;
+
+/// Unit template module (load, register, spawn, get, list)
+pub mod unit_template;

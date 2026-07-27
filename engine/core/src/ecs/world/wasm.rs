@@ -1,3 +1,5 @@
+use crate::ecs::template::UnitTemplateRegistry;
+use crate::ecs::world::component::enforce_schema_defaults;
 use crate::loot::LootTableRegistry;
 use crate::map::CellKey;
 use serde::{Deserialize, Serialize};
@@ -209,6 +211,10 @@ pub struct WasmWorld {
     /// Injectable input source for `get_user_input()`.
     #[serde(skip, default)]
     pub input_source: InputSource,
+
+    /// Unit template registry for spawning entities from data-driven templates.
+    #[serde(skip)]
+    pub template_registry: UnitTemplateRegistry,
 }
 
 fn default_fov_algo_name() -> String {
@@ -285,6 +291,7 @@ impl WasmWorld {
             material_definitions: HashMap::new(),
             fov_algorithm_name: "recursive_shadowcasting".to_string(),
             input_source: InputSource::default(),
+            template_registry: UnitTemplateRegistry::new(),
         }
     }
 
@@ -630,14 +637,33 @@ impl WasmWorld {
     }
 
     /// Set a component on an entity from a JSON string.
+    ///
+    /// Validates against schema (if registered) and enforces defaults,
+    /// matching `World::set_component` behavior.
     pub fn set_component(
         &mut self,
         entity_id: u32,
         component_name: &str,
         json_data: &str,
     ) -> Result<(), String> {
-        let value: JsonValue = serde_json::from_str(json_data)
+        let mut value: JsonValue = serde_json::from_str(json_data)
             .map_err(|e| format!("Failed to parse component JSON: {e}"))?;
+
+        // Validate against schema if one is registered for this component
+        if let Some(schema) = self.component_schemas.get(component_name) {
+            enforce_schema_defaults(&mut value, schema);
+
+            let validator = jsonschema::validator_for(schema)
+                .map_err(|e| format!("Schema compile error: {e}"))?;
+            let mut errors = validator.iter_errors(&value);
+            if let Some(first_error) = errors.next() {
+                let mut msgs = vec![first_error.to_string()];
+                msgs.extend(errors.map(|e| e.to_string()));
+                let msg = msgs.join(", ");
+                return Err(format!("Schema validation failed: {msg}"));
+            }
+        }
+
         self.components
             .entry(component_name.to_string())
             .or_default()
@@ -1066,6 +1092,23 @@ impl WasmWorld {
 
     /// Equips an item into a slot on the entity's Equipment component.
     pub fn equip_item(&mut self, entity_id: u32, item_id: &str, slot: &str) -> Result<(), String> {
+        // Check inventory
+        let inv = self
+            .components
+            .get("Inventory")
+            .and_then(|m| m.get(&entity_id))
+            .ok_or_else(|| "Entity has no Inventory".to_string())?;
+        let inv_slots = inv
+            .get("slots")
+            .and_then(|v| v.as_array())
+            .ok_or_else(|| "No slots array in Inventory".to_string())?;
+        if !inv_slots
+            .iter()
+            .any(|v| v == &serde_json::Value::String(item_id.to_string()))
+        {
+            return Err("Item not in Inventory".to_string());
+        }
+
         let equipment = self
             .components
             .entry("Equipment".to_string())
@@ -2449,6 +2492,77 @@ impl WasmWorld {
                 self.time_of_day.day += 1;
             }
         }
+    }
+
+    // ---- Unit Template API ----
+
+    /// Load all .json template files from a directory.
+    pub fn load_templates_from_dir(&mut self, dir: &str) -> Result<(), String> {
+        let path = std::path::Path::new(dir);
+        self.template_registry.load_templates_from_dir(path)
+    }
+
+    /// Register a single template from a JSON string.
+    pub fn register_template_from_json(&mut self, template_json: &str) -> Result<(), String> {
+        let template: crate::ecs::template::UnitTemplate = serde_json::from_str(template_json)
+            .map_err(|e| format!("Invalid template JSON: {e}"))?;
+        self.template_registry.register_template(template);
+        Ok(())
+    }
+
+    /// Spawn an entity from a named template, with optional overrides JSON.
+    pub fn spawn_from_template(
+        &mut self,
+        template_name: &str,
+        overrides_json: Option<&str>,
+    ) -> Result<u32, String> {
+        let template = self
+            .template_registry
+            .get_template(template_name)
+            .ok_or_else(|| format!("Template '{template_name}' not found"))?
+            .clone();
+
+        let overrides: Option<serde_json::Map<String, JsonValue>> = match overrides_json {
+            Some(json) => {
+                let val: JsonValue = serde_json::from_str(json)
+                    .map_err(|e| format!("Failed to parse overrides JSON: {e}"))?;
+                match val {
+                    JsonValue::Object(map) => Some(map),
+                    _ => return Err("Overrides must be a JSON object".to_string()),
+                }
+            }
+            None => None,
+        };
+
+        let entity = self.spawn_entity();
+
+        for (comp_name, comp_data) in &template.components {
+            let mut final_data = comp_data.clone();
+
+            if let Some(ref ov) = overrides
+                && let Some(override_data) = ov.get(comp_name)
+            {
+                crate::ecs::world::World::deep_merge(&mut final_data, override_data);
+            }
+
+            let json_str = serde_json::to_string(&final_data)
+                .map_err(|e| format!("Failed to serialize component data: {e}"))?;
+            self.set_component(entity, comp_name, &json_str)?;
+        }
+
+        Ok(entity)
+    }
+
+    /// Get a template definition by name as JSON string.
+    pub fn get_template_json(&self, name: &str) -> Option<String> {
+        self.template_registry
+            .get_template(name)
+            .and_then(|t| serde_json::to_string(t).ok())
+    }
+
+    /// List all registered template names.
+    pub fn list_template_names(&self) -> Vec<String> {
+        self.template_registry.list_templates()
     }
 }
 

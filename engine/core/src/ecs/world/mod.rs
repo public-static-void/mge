@@ -2,8 +2,11 @@
 //!
 //! Defines the World struct, which holds all entities, components, systems, and loaded assets.
 
+use crate::ecs::equipment_set::EquipmentSetRegistry;
+use crate::ecs::item::ItemRegistry;
 use crate::ecs::registry::ComponentRegistry;
 use crate::ecs::system::SystemRegistry;
+use crate::ecs::template::UnitTemplateRegistry;
 use crate::loot::LootTableRegistry;
 use crate::map::Map;
 use crate::map::cell_key::CellKey;
@@ -27,11 +30,13 @@ pub use season::Season;
 mod component;
 mod entity;
 mod events;
+pub mod loadout;
 mod map;
 mod mode;
 mod resources;
 mod save_load;
 mod systems;
+mod template;
 
 /// Map postprocessor function
 pub type MapPostprocessor = Arc<dyn Fn(&mut World) -> Result<(), String> + Send + Sync>;
@@ -141,6 +146,18 @@ pub struct World {
     /// Registered FOV algorithm implementations (name → instance).
     #[serde(skip, default = "default_fov_algorithms")]
     pub fov_algorithms: HashMap<String, Box<dyn FovAlgorithm>>,
+
+    /// Unit template registry for spawning entities from data-driven templates.
+    #[serde(skip)]
+    pub template_registry: UnitTemplateRegistry,
+
+    /// Item definition registry for O(1) item lookups.
+    #[serde(skip)]
+    pub item_registry: ItemRegistry,
+
+    /// Equipment set registry for named loadout blueprints.
+    #[serde(skip)]
+    pub equipment_set_registry: EquipmentSetRegistry,
 }
 
 /// Default FOV algorithm factory (used by serde `#[serde(skip, default)]`).
@@ -204,6 +221,9 @@ impl World {
                 m.insert("bfs_flood_fill".to_string(), Box::new(BfsFovAlgorithm));
                 m
             },
+            template_registry: UnitTemplateRegistry::new(),
+            item_registry: ItemRegistry::new(),
+            equipment_set_registry: EquipmentSetRegistry::new(),
         }
     }
 }
@@ -302,6 +322,28 @@ impl World {
                  constructed. Use set_fov_algorithm() directly."
             )),
         }
+    }
+}
+
+impl World {
+    /// Load item definitions from a directory into the item registry.
+    pub fn load_item_definitions(&mut self, dir: &std::path::Path) -> Result<(), String> {
+        self.item_registry.load_items_from_dir(dir)
+    }
+
+    /// Get an item definition by ID from the item registry.
+    pub fn get_item_definition(&self, id: &str) -> Option<&JsonValue> {
+        self.item_registry.get_item(id)
+    }
+
+    /// Load equipment sets from a directory into the equipment set registry.
+    pub fn load_equipment_sets(&mut self, dir: &std::path::Path) -> Result<(), String> {
+        self.equipment_set_registry.load_sets_from_dir(dir)
+    }
+
+    /// Get an equipment set by name from the equipment set registry.
+    pub fn get_equipment_set(&self, name: &str) -> Option<&crate::ecs::EquipmentSet> {
+        self.equipment_set_registry.get_set(name)
     }
 }
 

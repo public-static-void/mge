@@ -63,6 +63,8 @@ pub mod time_of_day;
 pub mod turn;
 /// UI API
 pub mod ui;
+/// Unit template API
+pub mod unit_template;
 /// World API
 pub mod world;
 

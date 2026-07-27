@@ -1,0 +1,33 @@
+{
+  "name": "warrior",
+  "version": "1.0.0",
+  "description": "A melee combat unit with heavy armor",
+  "components": {
+    "Type": { "kind": "player" },
+    "Health": { "current": 50, "max": 50 },
+    "BaseStats": { "strength": 10, "dexterity": 6, "constitution": 8 },
+    "SkillLevels": { "skills": { "combat": 5, "defense": 3 } },
+    "Equipment": { "slots": { "weapon": null, "chest": null, "legs": null, "boots": null } },
+    "Inventory": { "slots": [], "weight": 0, "volume": 0 },
+    "Body": {
+      "parts": [
+        {
+          "name": "torso",
+          "kind": "torso",
+          "status": "healthy",
+          "hp": 50,
+          "max_hp": 50,
+          "temperature": null,
+          "ideal_temperature": null,
+          "insulation": null,
+          "heat_loss": null,
+          "children": [],
+          "equipped": []
+        }
+      ]
+    },
+    "Renderable": { "glyph": "W", "color": [255, 0, 0] },
+    "Sight": { "range": 10 },
+    "Agent": { "entity_id": 0, "skills": { "combat": 1.0 } }
+  }
+}

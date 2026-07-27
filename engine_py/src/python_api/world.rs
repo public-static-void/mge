@@ -16,6 +16,7 @@ use crate::python_api::region::RegionApi;
 use crate::python_api::save_load::SaveLoadApi;
 use crate::python_api::time_of_day::TimeOfDayApi;
 use crate::python_api::turn::TurnApi;
+use crate::python_api::unit_template::UnitTemplateApi;
 use crate::system_bridge::SystemBridge;
 use engine_core::ecs::world::World;
 use engine_core::loot::LootEntry;
@@ -1138,5 +1139,36 @@ impl PyWorld {
             Ok(false) => (false, "Unknown reason".to_string()),
             Err(reason) => (false, reason),
         }
+    }
+
+    // ---- UNIT TEMPLATES ----
+
+    /// Load all .json template files from a directory.
+    fn load_unit_templates(&self, dir: String) -> PyResult<()> {
+        UnitTemplateApi::load_unit_templates(self, dir)
+    }
+
+    /// Register a single template from a JSON string.
+    fn register_unit_template(&self, name: String, template_json: String) -> PyResult<()> {
+        UnitTemplateApi::register_unit_template(self, name, template_json)
+    }
+
+    /// Spawn an entity from a named template, with optional overrides dict.
+    fn spawn_from_template(
+        &self,
+        template_name: String,
+        overrides: Option<Bound<'_, PyDict>>,
+    ) -> PyResult<u32> {
+        UnitTemplateApi::spawn_from_template(self, template_name, overrides)
+    }
+
+    /// Get a template definition by name.
+    fn get_unit_template(&self, py: Python<'_>, name: String) -> PyResult<PyObject> {
+        UnitTemplateApi::get_unit_template(self, py, name)
+    }
+
+    /// List all registered template names.
+    fn list_unit_templates(&self) -> PyResult<Vec<String>> {
+        UnitTemplateApi::list_unit_templates(self)
     }
 }
