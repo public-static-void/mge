@@ -19,6 +19,7 @@ cargo run --bin mge_cli -- engine/scripts/lua/demos/roguelike_mvp.lua
 ## Development Workflow
 
 MGE development is driven by targeting game genres. The process:
+
 1. Choose a target genre
 2. Identify what engine features it requires
 3. Check what's already implemented
@@ -42,17 +43,17 @@ engine_macros (proc-macro)
                 ←  engine_wasm (WASM scripting)
 ```
 
-| Crate | Role |
-|---|---|
-| `engine_core` | Pure Rust ECS, simulation, schema loader, plugin ABI — no language deps |
-| `engine_lua` | Lua bindings via mlua — CLI binary `mge_cli`, test runner |
-| `engine_py` | Python bindings via pyo3 — maturin-based native extension |
-| `engine_wasm` | WASM runtime via wasmtime |
-| `engine_macros` | Proc-macro crate for `#[component]` attribute |
-| `schema_validator` | JSON schema validation tool |
-| `xtask` | Build orchestration (plugin deploy, wasm tests, C plugins) |
-| `rust_test_plugin` | Test plugin (Rust cdylib) |
-| C plugins | `simple_square_plugin`, `simple_hex_plugin`, `simple_province_plugin`, `test_plugin` |
+| Crate              | Role                                                                                 |
+| ------------------ | ------------------------------------------------------------------------------------ |
+| `engine_core`      | Pure Rust ECS, simulation, schema loader, plugin ABI — no language deps              |
+| `engine_lua`       | Lua bindings via mlua — CLI binary `mge_cli`, test runner                            |
+| `engine_py`        | Python bindings via pyo3 — maturin-based native extension                            |
+| `engine_wasm`      | WASM runtime via wasmtime                                                            |
+| `engine_macros`    | Proc-macro crate for `#[component]` attribute                                        |
+| `schema_validator` | JSON schema validation tool                                                          |
+| `xtask`            | Build orchestration (plugin deploy, wasm tests, C plugins)                           |
+| `rust_test_plugin` | Test plugin (Rust cdylib)                                                            |
+| C plugins          | `simple_square_plugin`, `simple_hex_plugin`, `simple_province_plugin`, `test_plugin` |
 
 **Lua VM sandbox:** The `mge_cli` binary runs Lua scripts in a restricted VM. Standard Lua modules `os`, `io`, `package`, and `debug` are blocked. Functions like `require()`, `dofile()`, `loadfile()` are unavailable. Use Rust-native global functions (exposed via `engine_lua`) to access engine features from scripts. The same restrictions apply to Lua mods loaded via `--mod`.
 
@@ -77,32 +78,91 @@ engine_macros (proc-macro)
 
 ## Prerequisites
 
-| Dependency | Version |
-|---|---|
-| Rust | `nightly-2026-06-01` (edition 2024, see `rust-toolchain.toml`) |
-| LuaJIT | `libluajit-5.1-dev` + `pkg-config` |
-| C compiler | `gcc` + `libjansson-dev` |
-| Python | 3.8+ (`maturin`, `pytest`) |
+| Dependency  | Version                                                        |
+| ----------- | -------------------------------------------------------------- |
+| Rust        | `nightly-2026-06-01` (edition 2024, see `rust-toolchain.toml`) |
+| C compiler  | `gcc` (or compatible toolchain)                                |
+| LuaJIT      | LuaJIT devel package + **pkg-config** (required by `mlua-sys`) |
+| C libraries | `jansson` **devel** package (required by C plugins)            |
+| WASM target | `wasm32-unknown-unknown` (standard library)                    |
+| Python      | 3.8+ (`maturin`, `pytest`)                                     |
 
 ```sh
 rustup toolchain install nightly-2026-06-01 && rustup default nightly-2026-06-01
 ```
 
+### Jansson library (C plugins)
+
+On Debian/Ubuntu:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y libjansson-dev
+```
+
+On Fedora:
+
+```bash
+sudo dnf install -y jansson-devel
+```
+
+On Arch:
+
+```bash
+sudo pacman -S --needed jansson
+```
+
+### WASM standard library
+
+```bash
+rustup target add wasm32-unknown-unknown
+```
+
+### LuaJIT devel package (for `mlua` / `mlua-sys` via pkg-config)
+
+On Debian/Ubuntu:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y libluajit-5.1-dev pkg-config
+```
+
+On Fedora:
+
+```bash
+sudo dnf install -y luajit-devel pkgconfig
+```
+
+On Arch:
+
+```bash
+sudo pacman -S --needed luajit pkgconf
+```
+
+Quick check (should succeed after LuaJIT dev + pkg-config are installed):
+
+```bash
+pkg-config --modversion luajit
+pkg-config --cflags --libs luajit
+```
+
+If `pkg-config` reports that `luajit.pc` can’t be found, locate the `luajit.pc` file (typically under a `*/pkgconfig/` directory) and ensure `PKG_CONFIG_PATH` includes the directory containing it.
+
 ---
 
 ## Make Targets
 
-| Target | Description |
-|---|---|
-| `make all` | Validate schemas → build everything |
-| `make test` | All tests: schema + Rust + Python + Lua + WASM |
+| Target                 | Description                                       |
+| ---------------------- | ------------------------------------------------- |
+| `make all`             | Validate schemas → build everything               |
+| `make test`            | All tests: schema + Rust + Python + Lua + WASM    |
 | `make validate-schema` | Validate JSON schemas in `engine/assets/schemas/` |
-| `make test-rust` | `cargo test --all` |
-| `make test-python` | Setup venv → `maturin develop` → `pytest` |
-| `make test-lua` | Build test runner → run Lua test suite |
-| `make test-wasm` | `cargo test -p engine_wasm` |
-| `make clean` | `cargo clean` |
-| `make help` | Show a summary of available targets |
+| `make test-rust`       | `cargo test --all`                                |
+| `make test-python`     | Setup venv → `maturin develop` → `pytest`         |
+| `make test-lua`        | Build test runner → run Lua test suite            |
+| `make test-wasm`       | `cargo test -p engine_wasm`                       |
+| `make clean`           | `cargo clean`                                     |
+| `make help`            | Show a summary of available targets               |
 
 ---
 
@@ -112,17 +172,17 @@ rustup toolchain install nightly-2026-06-01 && rustup default nightly-2026-06-01
 
 A playable roguelike demonstrating 8+ engine subsystems:
 
-| Subsystem | What it demonstrates |
-|---|---|
-| Grid map | 40×25 tile map with rooms, corridors, walls |
-| Pathfinding | AI enemies navigate via `find_path()` |
-| Camera | Viewport follows player |
+| Subsystem     | What it demonstrates                              |
+| ------------- | ------------------------------------------------- |
+| Grid map      | 40×25 tile map with rooms, corridors, walls       |
+| Pathfinding   | AI enemies navigate via `find_path()`             |
+| Camera        | Viewport follows player                           |
 | ECS + Schemas | Schema-defined Health, Position, Type, Renderable |
-| Inventory | Pickup, use, drop items with visible UI |
-| Simulation | Structured `tick()` + `get_turn()` game loop |
-| Event bus | Combat/death events in message log |
-| Death/decay | Corpses, decay timer, loot drops on kill |
-| Save/load | 4 save slots with menu-driven save/load |
+| Inventory     | Pickup, use, drop items with visible UI           |
+| Simulation    | Structured `tick()` + `get_turn()` game loop      |
+| Event bus     | Combat/death events in message log                |
+| Death/decay   | Corpses, decay timer, loot drops on kill          |
+| Save/load     | 4 save slots with menu-driven save/load           |
 
 ```sh
 cargo run --bin mge_cli -- engine/scripts/lua/demos/roguelike_mvp.lua
@@ -148,14 +208,14 @@ Controls: `WASD` move · `e` attack · `.` wait · `q` quit
 
 ## Documentation
 
-| Doc | Description |
-|---|---|
-| [docs/dev.md](docs/dev.md) | Developer setup & test guide |
-| [docs/idea.md](docs/idea.md) | Architecture and design |
-| [docs/api.md](docs/api.md) | Unified scripting API (Lua, Python, WASM) |
-| [docs/plugin_abi.md](docs/plugin_abi.md) | C ABI plugin authoring |
-| [docs/examples.md](docs/examples.md) | Usage examples (Lua, Python, Rust, C) |
-| [docs/worldgen.md](docs/worldgen.md) | Worldgen plugin system |
-| [docs/ROADMAP.md](docs/ROADMAP.md) | Project roadmap |
-| [docs/process.md](docs/process.md) | Development workflow |
-| [docs/genres/](docs/genres/) | Genre requirement definitions |
+| Doc                                      | Description                               |
+| ---------------------------------------- | ----------------------------------------- |
+| [docs/dev.md](docs/dev.md)               | Developer setup & test guide              |
+| [docs/idea.md](docs/idea.md)             | Architecture and design                   |
+| [docs/api.md](docs/api.md)               | Unified scripting API (Lua, Python, WASM) |
+| [docs/plugin_abi.md](docs/plugin_abi.md) | C ABI plugin authoring                    |
+| [docs/examples.md](docs/examples.md)     | Usage examples (Lua, Python, Rust, C)     |
+| [docs/worldgen.md](docs/worldgen.md)     | Worldgen plugin system                    |
+| [docs/ROADMAP.md](docs/ROADMAP.md)       | Project roadmap                           |
+| [docs/process.md](docs/process.md)       | Development workflow                      |
+| [docs/genres/](docs/genres/)             | Genre requirement definitions             |
