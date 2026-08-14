@@ -46,6 +46,24 @@ pub extern "C" fn test_map_api() -> i32 {
             out_ptr: *mut u8,
             out_len: i32,
         ) -> i32;
+        fn entities_in_zlevel(z: i32, out_ptr: *mut u8, out_len: i32) -> i32;
+    }
+
+    #[link(wasm_import_module = "entity")]
+    unsafe extern "C" {
+        fn spawn_entity() -> u32;
+        fn move_entity_3d(entity_id: u32, dx: f32, dy: f32, dz: f32);
+    }
+
+    #[link(wasm_import_module = "component")]
+    unsafe extern "C" {
+        fn set_component(
+            entity: u32,
+            name_ptr: *const u8,
+            name_len: i32,
+            json_ptr: *const u8,
+            json_len: i32,
+        );
     }
 
     unsafe {
@@ -109,6 +127,41 @@ pub extern "C" fn test_map_api() -> i32 {
         apply_generated_map(map_json.as_ptr(), map_json.len() as i32);
         let count2 = get_map_cell_count();
         if count2 != 1 { return 0; }
+
+        // z-level: spawn an entity with a flat Position at z=5
+        let eid = spawn_entity();
+        let comp_name = "Position";
+        let pos_json = "{\"x\":1.0,\"y\":2.0,\"z\":5.0}";
+        set_component(
+            eid,
+            comp_name.as_ptr(),
+            comp_name.len() as i32,
+            pos_json.as_ptr(),
+            pos_json.len() as i32,
+        );
+
+        // entities_in_zlevel(5) should return exactly this entity
+        let mut buf6 = [0u8; 4096];
+        let w6 = entities_in_zlevel(5, buf6.as_mut_ptr(), buf6.len() as i32);
+        if w6 != 1 { return 0; }
+        let ids6 = core::slice::from_raw_parts(buf6.as_ptr() as *const u32, w6 as usize);
+        if ids6[0] != eid { return 0; }
+
+        // entities_in_zlevel(0) should not contain it
+        let mut buf7 = [0u8; 4096];
+        let w7 = entities_in_zlevel(0, buf7.as_mut_ptr(), buf7.len() as i32);
+        if w7 != 0 { return 0; }
+
+        // move_entity_3d shifts z from 5 to 3
+        move_entity_3d(eid, 0.0, 0.0, -2.0);
+        let mut buf8 = [0u8; 4096];
+        let w8 = entities_in_zlevel(3, buf8.as_mut_ptr(), buf8.len() as i32);
+        if w8 != 1 { return 0; }
+        let ids8 = core::slice::from_raw_parts(buf8.as_ptr() as *const u32, w8 as usize);
+        if ids8[0] != eid { return 0; }
+        let mut buf9 = [0u8; 4096];
+        let w9 = entities_in_zlevel(5, buf9.as_mut_ptr(), buf9.len() as i32);
+        if w9 != 0 { return 0; }
 
         1
     }
