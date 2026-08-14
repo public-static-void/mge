@@ -368,17 +368,70 @@ impl WasmWorld {
     }
 
     /// Move an entity
+    ///
+    /// Mutates `x`/`y` (Square) or `q`/`r` (Hex) in place, preserving `z` and
+    /// every other field. Province (`id`-only) positions are left unchanged.
+    /// When the entity has no Position, a flat default at the requested delta
+    /// with `z: 0.0` is created.
     pub fn move_entity(&mut self, entity_id: u32, dx: f32, dy: f32) {
-        // This implementation assumes a "Position" component with "x" and "y" fields.
         let comps = self.components.entry("Position".to_string()).or_default();
-        let pos = comps
-            .entry(entity_id)
-            .or_insert_with(|| serde_json::json!({"x": 0.0, "y": 0.0}));
+        if let std::collections::hash_map::Entry::Vacant(e) = comps.entry(entity_id) {
+            e.insert(serde_json::json!({"x": dx as f64, "y": dy as f64, "z": 0.0}));
+            return;
+        }
+        let pos = comps.get_mut(&entity_id).unwrap();
+        let obj = match pos.as_object_mut() {
+            Some(obj) => obj,
+            None => return,
+        };
+        if obj.contains_key("x") {
+            let x = obj.get("x").and_then(|v| v.as_f64()).unwrap_or(0.0) + dx as f64;
+            let y = obj.get("y").and_then(|v| v.as_f64()).unwrap_or(0.0) + dy as f64;
+            obj.insert("x".to_string(), serde_json::json!(x));
+            obj.insert("y".to_string(), serde_json::json!(y));
+        } else if obj.contains_key("q") {
+            let q = obj.get("q").and_then(|v| v.as_f64()).unwrap_or(0.0) + dx as f64;
+            let r = obj.get("r").and_then(|v| v.as_f64()).unwrap_or(0.0) + dy as f64;
+            obj.insert("q".to_string(), serde_json::json!(q));
+            obj.insert("r".to_string(), serde_json::json!(r));
+        }
+        // Province ("id"-only) and other position shapes are left unchanged.
+    }
 
-        let x = pos.get("x").and_then(|v| v.as_f64()).unwrap_or(0.0) + dx as f64;
-        let y = pos.get("y").and_then(|v| v.as_f64()).unwrap_or(0.0) + dy as f64;
-
-        *pos = serde_json::json!({"x": x, "y": y});
+    /// Move an entity in three dimensions (flat Position format).
+    ///
+    /// Square positions shift `x`/`y`/`z` by `dx`/`dy`/`dz`; Hex positions shift
+    /// `q`/`r`/`z` by `dx`/`dy`/`dz`. Province (`id`-only) positions are left
+    /// unchanged. When the entity has no Position, a flat default at the
+    /// requested `x`/`y` delta with `z: 0.0` is created, mirroring
+    /// [`move_entity`](Self::move_entity).
+    pub fn move_entity_3d(&mut self, entity_id: u32, dx: f32, dy: f32, dz: f32) {
+        let comps = self.components.entry("Position".to_string()).or_default();
+        if let std::collections::hash_map::Entry::Vacant(e) = comps.entry(entity_id) {
+            e.insert(serde_json::json!({"x": dx as f64, "y": dy as f64, "z": 0.0}));
+            return;
+        }
+        let pos = comps.get_mut(&entity_id).unwrap();
+        let obj = match pos.as_object_mut() {
+            Some(obj) => obj,
+            None => return,
+        };
+        if obj.contains_key("x") {
+            let x = obj.get("x").and_then(|v| v.as_f64()).unwrap_or(0.0) + dx as f64;
+            let y = obj.get("y").and_then(|v| v.as_f64()).unwrap_or(0.0) + dy as f64;
+            let z = obj.get("z").and_then(|v| v.as_f64()).unwrap_or(0.0) + dz as f64;
+            obj.insert("x".to_string(), serde_json::json!(x));
+            obj.insert("y".to_string(), serde_json::json!(y));
+            obj.insert("z".to_string(), serde_json::json!(z));
+        } else if obj.contains_key("q") {
+            let q = obj.get("q").and_then(|v| v.as_f64()).unwrap_or(0.0) + dx as f64;
+            let r = obj.get("r").and_then(|v| v.as_f64()).unwrap_or(0.0) + dy as f64;
+            let z = obj.get("z").and_then(|v| v.as_f64()).unwrap_or(0.0) + dz as f64;
+            obj.insert("q".to_string(), serde_json::json!(q));
+            obj.insert("r".to_string(), serde_json::json!(r));
+            obj.insert("z".to_string(), serde_json::json!(z));
+        }
+        // Province ("id"-only) and other position shapes are left unchanged.
     }
 
     /// Damage an entity.
@@ -1623,6 +1676,27 @@ impl WasmWorld {
                             .get("id")
                             .and_then(|v| v.as_str())
                             .is_some_and(|pid| pid == cid),
+                    })
+            })
+            .collect()
+    }
+
+    /// Returns entity IDs whose flat Position is on the given z-level.
+    ///
+    /// Matches both Square (`x`/`y`/`z`) and Hex (`q`/`r`/`z`) flat positions;
+    /// id-only (Province) positions never match.
+    pub fn entities_in_zlevel(&self, z: i32) -> Vec<u32> {
+        self.entities
+            .iter()
+            .copied()
+            .filter(|&eid| {
+                self.components
+                    .get("Position")
+                    .and_then(|m| m.get(&eid))
+                    .is_some_and(|pos| {
+                        let has_coord = pos.get("x").is_some() || pos.get("q").is_some();
+                        has_coord
+                            && pos.get("z").and_then(|v| v.as_f64()).unwrap_or(0.0) as i32 == z
                     })
             })
             .collect()
