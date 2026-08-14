@@ -229,8 +229,8 @@ Identical API surface in Lua, Python, and WASM:
 - **Components:** `set_component(id, name, data)`, `get_component(id, name)`, `remove_component(id, name)`, `list_components()`, `get_component_schema(name)`
 - **Queries:** `get_entities()`, `get_entities_with_component(name)`, `count_entities_with_type(type)`
 - **Map:** `add_cell(x,y,z)`, `add_neighbor(from,to)`, `get_all_cells()`, `find_path(start, goal)`, `entities_in_cell(cell)`
-- **Movement:** `move_entity(id, dx, dy)`, `move_all(dx, dy)`
-- **Combat:** `damage_entity(id, amount)`, `damage_all(amount)`
+- **Movement:** `move_entity(id, dx, dy)`, `move_entity_3d(id, dx, dy, dz)`
+- **Combat:** `damage_entity(id, amount)`
 - **Mode:** `set_mode(mode)`, `get_mode()`, `get_available_modes()`
 - **Simulation:** `tick()`, `get_turn()`, `process_deaths()`, `process_decay()`
 - **Worldgen:** `register_worldgen_plugin()`, `invoke_worldgen_plugin()`

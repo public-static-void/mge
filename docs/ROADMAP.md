@@ -36,7 +36,7 @@
 - [x] Movement system (entity positioning and translation)
 - [x] Region, province, and territory map system
 - [x] Map generation, validation, and postprocessing hooks
-- [ ] Z-level / multi-layer map support
+- [x] Z-level / multi-layer map support
 - [ ] Multi-scale map navigation
 - [x] Procedural dungeon generation
 - [ ] Fluid simulation (water, magma)

@@ -67,8 +67,8 @@ engine_macros (proc-macro)
 - Component CRUD — `set_component`, `get_component`, `remove_component`, `list_components`
 - Queries — `get_entities`, `get_entities_with_component`, `count_entities_with_type`
 - Map — `add_cell`, `add_neighbor`, `get_all_cells`, `find_path`, `entities_in_cell`
-- Movement — `move_entity`, `move_all`
-- Combat — `damage_entity`, `damage_all`
+- Movement — `move_entity`
+- Combat — `damage_entity`
 - Mode — `set_mode`, `get_mode`, `get_available_modes`
 - Simulation — `tick`, `get_turn`, `process_deaths`, `process_decay`
 - Worldgen — `register_worldgen_plugin`, `invoke_worldgen_plugin`

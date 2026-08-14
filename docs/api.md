@@ -58,11 +58,21 @@
 | `add_cell(x, y, z)`                | Add a cell to the map at coordinates (x, y, z) |
 | `add_neighbor(from, to)`           | Add a neighbor relationship between two cells  |
 | `entities_in_cell(cell)`           | List all entity IDs in the given cell          |
+| `entities_in_zlevel(z)`            | List all entity IDs on the given z-level       |
 | `find_path(start_cell, goal_cell)` | Find a path between two cells                  |
 | `get_all_cells()`                  | List all cells in the current map              |
 | `get_map_cell_count()`             | Get the number of cells in the map             |
 | `get_map_topology_type()`          | Get the topology type of the map               |
 | `get_neighbors(cell)`              | List neighbors of a given cell                 |
+
+---
+
+## Movement
+
+| Function                               | Description                                                                 |
+| -------------------------------------- | --------------------------------------------------------------------------- |
+| `move_entity(id, dx, dy)`              | Move an entity by (dx, dy). Square positions only (2D, legacy)              |
+| `move_entity_3d(id, dx, dy, dz)`       | Move an entity by (dx, dy, dz). Square and Hex positions, z-aware           |
 
 ---
 
