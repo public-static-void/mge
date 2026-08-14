@@ -112,6 +112,15 @@ pub fn register_entity_api(linker: &mut Linker<Arc<Mutex<WasmWorld>>>) -> anyhow
 
     linker.func_wrap(
         "entity",
+        "move_entity_3d",
+        |caller: Caller<'_, Arc<Mutex<WasmWorld>>>, entity_id: u32, dx: f32, dy: f32, dz: f32| {
+            let mut world = caller.data().lock().unwrap();
+            world.move_entity_3d(entity_id, dx, dy, dz);
+        },
+    )?;
+
+    linker.func_wrap(
+        "entity",
         "damage_entity",
         |caller: Caller<'_, Arc<Mutex<WasmWorld>>>, entity_id: u32, amount: f32| {
             let mut world = caller.data().lock().unwrap();
