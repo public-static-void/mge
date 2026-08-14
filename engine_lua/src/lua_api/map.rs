@@ -153,6 +153,19 @@ pub fn register_map_api(lua: &Lua, globals: &Table, world: Rc<RefCell<World>>) -
     })?;
     globals.set("entities_in_cell", entities_in_cell)?;
 
+    // entities_in_zlevel(z)
+    let world_entities_in_zlevel = world.clone();
+    let entities_in_zlevel = lua.create_function_mut(move |lua, z: i32| {
+        let world = world_entities_in_zlevel.borrow();
+        let entities = world.entities_in_zlevel(z);
+        let arr = lua.create_table()?;
+        for (i, eid) in entities.iter().enumerate() {
+            arr.set(i + 1, *eid)?;
+        }
+        Ok(LuaValue::Table(arr))
+    })?;
+    globals.set("entities_in_zlevel", entities_in_zlevel)?;
+
     // --- get_cell_metadata(cell) ---
     let world_get_cell_meta = world.clone();
     let get_cell_metadata = lua.create_function_mut(move |lua, cell: LuaValue| {
