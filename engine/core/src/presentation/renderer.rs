@@ -107,6 +107,40 @@ impl TerminalRenderer {
             buffer: vec![vec![None; width as usize]; height as usize],
         }
     }
+
+    /// Render the current buffer into the provided writer.
+    /// Returns `Err` on write/flush failure; buffer is cleared only after a
+    /// successful flush (matches prior `present()` semantics).
+    pub fn present_to(&mut self, out: &mut impl std::io::Write) -> std::io::Result<()> {
+        // Guard: zero-dimension renderer has no pixels to display (kept: documents intent).
+        if self.width == 0 || self.height == 0 {
+            return Ok(());
+        }
+        for row in &self.buffer {
+            for cell in row {
+                match cell {
+                    Some(cmd) => {
+                        let r = cmd.color.0;
+                        let g = cmd.color.1;
+                        let b = cmd.color.2;
+                        write!(out, "\x1b[38;2;{};{};{}m{}\x1b[0m", r, g, b, cmd.glyph)?;
+                    }
+                    None => {
+                        write!(out, " ")?;
+                    }
+                }
+            }
+            writeln!(out)?;
+        }
+        out.flush()?;
+        // Clear buffer for next frame
+        for row in &mut self.buffer {
+            for cell in row.iter_mut() {
+                *cell = None;
+            }
+        }
+        Ok(())
+    }
 }
 
 impl PresentationRenderer for TerminalRenderer {
@@ -122,40 +156,8 @@ impl PresentationRenderer for TerminalRenderer {
     }
 
     fn present(&mut self) {
-        // Guard: zero-dimension renderer has no pixels to display.
-        // Avoids stdout interaction entirely (prevents stray output in CI
-        // when the fd-level capture pipe may transiently receive data).
-        if self.width == 0 || self.height == 0 {
-            return;
-        }
-        // Uses BufWriter + stdout().lock() to avoid per-cell heap allocation (R003/AC007).
-        // ANSI 24-bit escapes are always emitted; no fallback for legacy terminals (NFR001).
-        use std::io::Write;
         let stdout = std::io::stdout();
-        let mut out = std::io::BufWriter::new(stdout.lock());
-        for row in &self.buffer {
-            for cell in row {
-                match cell {
-                    Some(cmd) => {
-                        let r = cmd.color.0;
-                        let g = cmd.color.1;
-                        let b = cmd.color.2;
-                        write!(out, "\x1b[38;2;{};{};{}m{}\x1b[0m", r, g, b, cmd.glyph)
-                            .expect("write to stdout");
-                    }
-                    None => {
-                        write!(out, " ").expect("write to stdout");
-                    }
-                }
-            }
-            writeln!(out).expect("write newline to stdout");
-        }
-        out.flush().expect("flush stdout");
-        // Clear buffer for next frame
-        for row in &mut self.buffer {
-            for cell in row.iter_mut() {
-                *cell = None;
-            }
-        }
+        let mut out = stdout.lock();
+        self.present_to(&mut out).expect("write to stdout");
     }
 }
