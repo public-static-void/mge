@@ -15,6 +15,8 @@ pub trait EntityApi {
     fn is_entity_alive(&self, entity_id: u32) -> bool;
     /// Move an entity
     fn move_entity(&self, entity_id: u32, dx: f32, dy: f32);
+    /// Move an entity in three dimensions
+    fn move_entity_3d(&self, entity_id: u32, dx: f32, dy: f32, dz: f32);
     /// Damage an entity
     fn damage_entity(&self, entity_id: u32, amount: f32);
     /// Damage a specific body part of an entity
@@ -57,6 +59,12 @@ impl EntityApi for PyWorld {
     fn move_entity(&self, entity_id: u32, dx: f32, dy: f32) {
         let mut world = self.inner.borrow_mut();
         world.move_entity(entity_id, dx, dy);
+    }
+
+    /// Move an entity in three dimensions
+    fn move_entity_3d(&self, entity_id: u32, dx: f32, dy: f32, dz: f32) {
+        let mut world = self.inner.borrow_mut();
+        world.move_entity_3d(entity_id, dx, dy, dz);
     }
 
     /// Damage an entity
