@@ -302,16 +302,30 @@ pub struct Viewport {
     pub width: i32,
     /// The height
     pub height: i32,
+    /// The z level (0 = ground level)
+    pub z: i32,
 }
 
 impl Viewport {
-    /// Create a new viewport
+    /// Create a new viewport on z level 0
     pub fn new(x: i32, y: i32, width: i32, height: i32) -> Self {
         Self {
             x,
             y,
             width,
             height,
+            z: 0,
+        }
+    }
+
+    /// Create a new viewport on an explicit z level
+    pub fn with_z(x: i32, y: i32, width: i32, height: i32, z: i32) -> Self {
+        Self {
+            x,
+            y,
+            width,
+            height,
+            z,
         }
     }
 
