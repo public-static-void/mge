@@ -14,6 +14,18 @@
 //! Uses integer fractions for slope tracking — no floating point.
 //! Processes 4 quadrants (north, south, east, west), scanning rows outward
 //! and splitting the visible cone when walls are encountered.
+//!
+//! ## Per-z-level contract
+//!
+//! FOV is strictly per-z-level. [`RecursiveShadowcasting`] keeps the origin's
+//! `z` constant for every cell it tests and inserts (all keys are built as
+//! `CellKey::Square { x, y, z: oz }`), so sight never crosses levels on square
+//! grids. [`BfsFovAlgorithm`] is per-z only because traversal follows
+//! [`MapTopology::neighbors`] — it reaches another z-level only through an
+//! explicit cross-z neighbor edge (production maps define none; only tests add
+//! them). A visible set computed for an observer on level A therefore never
+//! contains cells on level B, and renderers may safely pass that set together
+//! with the observer's z filter.
 
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -67,6 +79,10 @@ fn is_transparent(topology: &dyn MapTopology, cell: &CellKey) -> bool {
 /// This is the default FOV algorithm for square grids. Based on Albert Ford's
 /// symmetric shadowcasting. Handles arbitrary wall configurations and produces
 /// symmetric visibility.
+///
+/// Strictly per-z: the origin's `z` is held constant for every cell tested and
+/// inserted, so visibility never leaks across z-levels — an observer on level A
+/// never sees same-`(x, y)` cells on level B.
 ///
 /// Only works with [`CellKey::Square`] variants — returns empty for other
 /// topologies.
@@ -133,6 +149,12 @@ impl FovAlgorithm for RecursiveShadowcasting {
 ///
 /// Range is measured in graph-distance steps (edges traversed), which on a
 /// regular hex grid corresponds to the hex distance.
+///
+/// Per-z caveat: traversal is purely edge-driven, so this algorithm crosses
+/// z-levels **only** via explicit cross-z neighbor edges (the flood fill never
+/// synthesizes them). Production maps define no cross-z edges, so BFS FOV is
+/// per-z in practice — an observer on level A never sees same-`(q, r)` cells on
+/// level B unless a test or plugin deliberately adds a cross-z edge.
 pub struct BfsFovAlgorithm;
 
 impl FovAlgorithm for BfsFovAlgorithm {
