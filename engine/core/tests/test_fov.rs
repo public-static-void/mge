@@ -681,3 +681,154 @@ fn hex_opaque_wall_visible() {
         "Cell behind opaque wall in corridor should not be visible"
     );
 }
+
+// ---------------------------------------------------------------------------
+// Per-z-level FOV tests (AC041)
+// ---------------------------------------------------------------------------
+
+/// Build a square map with two full z-levels (z=0 and z=1) over the same
+/// (x, y) extents. Each level has full 8-directional adjacency; there are no
+/// cross-z neighbor edges.
+fn two_level_plane(size: i32) -> Map {
+    let mut grid = SquareGridMap::new();
+    for z in 0..2 {
+        for x in -size..=size {
+            for y in -size..=size {
+                grid.add_cell(x, y, z);
+            }
+        }
+    }
+    for z in 0..2 {
+        for x in -size..=size {
+            for y in -size..=size {
+                for dx in [-1, 0, 1] {
+                    for dy in [-1, 0, 1] {
+                        if dx == 0 && dy == 0 {
+                            continue;
+                        }
+                        let nx = x + dx;
+                        let ny = y + dy;
+                        if nx >= -size && nx <= size && ny >= -size && ny <= size {
+                            grid.add_neighbor((x, y, z), (nx, ny, z));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    Map::new(Box::new(grid))
+}
+
+/// AC041 — RecursiveShadowcasting FOV is strictly per-z: an observer on z=1
+/// with same-(x,y) z=0 cells directly below sees zero z=0 cells, and
+/// symmetrically a z=0 observer sees zero z=1 cells.
+#[test]
+fn fov_square_is_per_z_level() {
+    let map = two_level_plane(5);
+
+    // Observer on z=1: every visible cell carries z=1, none leak from z=0.
+    let origin_z1 = CellKey::Square { x: 0, y: 0, z: 1 };
+    let visible_z1 = compute_fov(&map, &origin_z1, 5);
+    assert!(
+        visible_z1.contains(&origin_z1),
+        "origin on the observer's z must be visible"
+    );
+    assert!(
+        visible_z1
+            .iter()
+            .all(|c| matches!(c, CellKey::Square { z: 1, .. })),
+        "z=1 observer must see only z=1 cells"
+    );
+    assert!(
+        !visible_z1.contains(&CellKey::Square { x: 0, y: 0, z: 0 }),
+        "same-(x,y) z=0 cell must not leak into the z=1 observer's view"
+    );
+
+    // Symmetric: observer on z=0 sees zero z=1 cells.
+    let origin_z0 = CellKey::Square { x: 0, y: 0, z: 0 };
+    let visible_z0 = compute_fov(&map, &origin_z0, 5);
+    assert!(
+        visible_z0.contains(&origin_z0),
+        "origin on the observer's z must be visible"
+    );
+    assert!(
+        visible_z0
+            .iter()
+            .all(|c| matches!(c, CellKey::Square { z: 0, .. })),
+        "z=0 observer must see only z=0 cells"
+    );
+    assert!(
+        !visible_z0.contains(&CellKey::Square { x: 0, y: 0, z: 1 }),
+        "same-(x,y) z=1 cell must not leak into the z=0 observer's view"
+    );
+}
+
+/// Build a two-level hex map (z=0 and z=1) with the same (q, r) extents and
+/// 6-directional adjacency on each level; no cross-z neighbor edges.
+fn two_level_hex_plane(radius: i32) -> Map {
+    let mut grid = HexGridMap::new();
+    for z in 0..2 {
+        for q in -radius..=radius {
+            for r in -radius..=radius {
+                let s = -q - r;
+                if s.abs() <= radius {
+                    grid.add_cell(q, r, z);
+                }
+            }
+        }
+    }
+    let hex_dirs: [(i32, i32); 6] = [(1, 0), (-1, 0), (0, 1), (0, -1), (1, -1), (-1, 1)];
+    let all_cells: Vec<CellKey> = grid.all_cells();
+    for cell in &all_cells {
+        if let CellKey::Hex { q, r, z } = cell {
+            for &(dq, dr) in &hex_dirs {
+                let neighbor = CellKey::Hex {
+                    q: q + dq,
+                    r: r + dr,
+                    z: *z,
+                };
+                if grid.contains(&neighbor) {
+                    grid.add_neighbor((*q, *r, *z), (q + dq, r + dr, *z));
+                }
+            }
+        }
+    }
+    Map::new(Box::new(grid))
+}
+
+/// AC041 (BFS half) — BfsFovAlgorithm is per-z as long as no cross-z neighbor
+/// edges exist: a z=1 observer sees zero same-(q,r) z=0 hexes, and vice versa.
+#[test]
+fn fov_hex_bfs_is_per_z_level() {
+    let map = two_level_hex_plane(4);
+
+    let origin_z1 = CellKey::Hex { q: 0, r: 0, z: 1 };
+    let visible_z1 = compute_fov(&map, &origin_z1, 4);
+    assert!(
+        visible_z1.contains(&origin_z1),
+        "origin on the observer's z must be visible"
+    );
+    assert!(
+        visible_z1
+            .iter()
+            .all(|c| matches!(c, CellKey::Hex { z: 1, .. })),
+        "z=1 hex observer must see only z=1 hexes"
+    );
+    assert!(
+        !visible_z1.contains(&CellKey::Hex { q: 0, r: 0, z: 0 }),
+        "same-(q,r) z=0 hex must not leak into the z=1 observer's view"
+    );
+
+    let origin_z0 = CellKey::Hex { q: 0, r: 0, z: 0 };
+    let visible_z0 = compute_fov(&map, &origin_z0, 4);
+    assert!(
+        visible_z0
+            .iter()
+            .all(|c| matches!(c, CellKey::Hex { z: 0, .. })),
+        "z=0 hex observer must see only z=0 hexes"
+    );
+    assert!(
+        !visible_z0.contains(&CellKey::Hex { q: 0, r: 0, z: 1 }),
+        "same-(q,r) z=1 hex must not leak into the z=0 observer's view"
+    );
+}

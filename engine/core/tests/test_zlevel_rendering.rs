@@ -3,6 +3,7 @@ use engine_core::ecs::registry::ComponentRegistry;
 use engine_core::ecs::schema::load_schemas_from_dir_with_modes;
 use engine_core::ecs::world::World;
 use engine_core::map::cell_key::CellKey;
+use engine_core::map::fov::compute_fov;
 use engine_core::map::{Map, SquareGridMap};
 use engine_core::presentation::renderer::{RenderColor, TestRenderer};
 use engine_core::presentation::{PresentationSystem, Viewport};
@@ -229,5 +230,77 @@ fn test_zfilter_with_visibility_never_dims_other_z() {
     assert!(
         draws.iter().all(|cmd| cmd.glyph != 'E'),
         "z=0 entity must not be drawn when z filter is active"
+    );
+}
+
+/// AC042 — the observer's z-scoped `visible_cells` set passed to
+/// `render_map_with_visibility` with `Some(observer_z)` renders only that
+/// level: cross-z cells are filtered before visibility checks, so they never
+/// appear dimmed/unexplored.
+#[test]
+fn test_zfilter_with_observer_z_fov_renders_only_that_level() {
+    let (world, _, _) = build_two_level_world();
+    let map = world.map.as_ref().expect("two-level map should exist");
+    let observer = CellKey::Square { x: 0, y: 0, z: 1 };
+    let visible = compute_fov(map, &observer, 2);
+
+    // FOV is strictly per-z (AC041): the set contains only z=1 cells.
+    assert!(
+        visible
+            .iter()
+            .all(|c| matches!(c, CellKey::Square { z: 1, .. })),
+        "observer FOV must be z-scoped to z=1"
+    );
+    assert!(visible.contains(&observer), "origin must be visible");
+    // Only cells actually present in the map are drawn; the shadowcaster may
+    // also mark out-of-bounds cells as visible (opaque walls are visible).
+    // Range-2 circle from (0,0) covers 6 of the 9 z=1 map cells:
+    // (0,0),(1,0),(2,0),(0,1),(1,1),(0,2) — (2,1),(1,2),(2,2) are beyond it.
+    let visible_in_map = map
+        .all_cells()
+        .iter()
+        .filter(|c| visible.contains(c))
+        .count();
+    assert_eq!(visible_in_map, 6, "unexpected z-scoped FOV size in map");
+
+    let renderer = TestRenderer::new();
+    let mut system = PresentationSystem::new(renderer);
+    let viewport = Viewport::new(0, 0, 3, 3);
+    system.render_map_with_visibility(&world, &viewport, Some(&visible), None, Some(1));
+    let draws = &system.renderer.draws;
+
+    // Visible z=1 cells drawn normally as walls.
+    let wall_draws = draws.iter().filter(|cmd| cmd.glyph == '#').count();
+    assert_eq!(
+        wall_draws, visible_in_map,
+        "visible z=1 cells should be drawn normally"
+    );
+    // Same-z visibility logic unchanged: non-visible z=1 cells dimmed.
+    let dimmed = draws
+        .iter()
+        .filter(|cmd| cmd.color == RenderColor(25, 25, 25))
+        .count();
+    assert_eq!(
+        dimmed,
+        9 - visible_in_map,
+        "non-visible same-z cells should be dimmed"
+    );
+    // Cross-z cells absent, not dimmed: only the z=1 dim draws exist — if the
+    // z=0 level leaked through it would add 9 more dim floor cells.
+    let dot_draws = draws.iter().filter(|cmd| cmd.glyph == '.').count();
+    assert_eq!(
+        dot_draws, dimmed,
+        "z=0 cells must be filtered before visibility checks"
+    );
+    // z=1 entity (observer's level) drawn; z=0 entity absent.
+    assert!(
+        draws
+            .iter()
+            .any(|cmd| cmd.glyph == '@' && cmd.pos == (1, 1)),
+        "z=1 entity should be drawn on the observer's level"
+    );
+    assert!(
+        draws.iter().all(|cmd| cmd.glyph != 'E'),
+        "z=0 entity must not be drawn"
     );
 }
