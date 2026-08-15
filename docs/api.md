@@ -223,10 +223,10 @@
 
 ## Camera & Viewport
 
-| Function           | Description                               |
-| ------------------ | ----------------------------------------- |
-| `get_camera()`     | Get the camera position as {x, y}         |
-| `set_camera(x, y)` | Set the camera position (center viewport) |
+| Function                | Description                                          |
+| ----------------------- | ---------------------------------------------------- |
+| `get_camera()`          | Get the camera position as {x, y, z}                 |
+| `set_camera(x, y, z?)`  | Set the camera position (center viewport) and z-level |
 
 ---
 
