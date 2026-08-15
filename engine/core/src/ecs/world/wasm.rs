@@ -33,6 +33,9 @@ pub struct Camera {
     pub width: i32,
     /// Height of the camera viewport.
     pub height: i32,
+    /// Z-level of the camera viewport.
+    #[serde(default)]
+    pub z: i32,
 }
 
 /// A simplified job event record stored in WasmWorld.
@@ -980,13 +983,14 @@ impl WasmWorld {
         }
     }
 
-    /// Sets the camera viewport position and dimensions.
-    pub fn set_camera(&mut self, x: i32, y: i32, width: i32, height: i32) {
+    /// Sets the camera viewport position, dimensions, and z-level.
+    pub fn set_camera(&mut self, x: i32, y: i32, width: i32, height: i32, z: i32) {
         self.camera = Some(Camera {
             x,
             y,
             width,
             height,
+            z,
         });
     }
 
