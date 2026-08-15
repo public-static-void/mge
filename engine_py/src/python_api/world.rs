@@ -979,12 +979,14 @@ impl PyWorld {
         crate::python_api::map_api::clear_map_postprocessors(self)
     }
 
-    /// Set the camera position (creates camera entity if not present)
-    fn set_camera(&self, x: i64, y: i64) {
-        crate::python_api::camera_api::set_camera(self, x, y)
+    /// Set the camera position (creates camera entity if not present).
+    /// z defaults to 0 when omitted.
+    #[pyo3(signature = (x, y, z=0))]
+    fn set_camera(&self, x: i64, y: i64, z: i64) {
+        crate::python_api::camera_api::set_camera(self, x, y, z)
     }
 
-    /// Get the camera position as a dict {x, y}
+    /// Get the camera position as a dict {x, y, z}
     fn get_camera(&self, py: Python) -> PyObject {
         crate::python_api::camera_api::get_camera(self, py)
     }
