@@ -188,6 +188,11 @@ impl PyWorld {
         EntityApi::move_entity(self, entity_id, dx, dy)
     }
 
+    /// Move an entity by delta x, y, and z.
+    fn move_entity_3d(&self, entity_id: u32, dx: f32, dy: f32, dz: f32) {
+        EntityApi::move_entity_3d(self, entity_id, dx, dy, dz)
+    }
+
     /// Apply damage to an entity.
     fn damage_entity(&self, entity_id: u32, amount: f32) {
         EntityApi::damage_entity(self, entity_id, amount)
@@ -912,6 +917,11 @@ impl PyWorld {
         crate::python_api::map_api::entities_in_cell(self, py, cell)
     }
 
+    /// Get a list of entity IDs located on the given z-level.
+    fn entities_in_zlevel(&self, py: Python, z: i32) -> PyObject {
+        crate::python_api::map_api::entities_in_zlevel(self, py, z)
+    }
+
     /// Get metadata associated with a given cell.
     fn get_cell_metadata(&self, py: Python, cell: &Bound<'_, PyAny>) -> PyObject {
         crate::python_api::map_api::get_cell_metadata(self, py, cell)
@@ -969,12 +979,14 @@ impl PyWorld {
         crate::python_api::map_api::clear_map_postprocessors(self)
     }
 
-    /// Set the camera position (creates camera entity if not present)
-    fn set_camera(&self, x: i64, y: i64) {
-        crate::python_api::camera_api::set_camera(self, x, y)
+    /// Set the camera position (creates camera entity if not present).
+    /// z defaults to 0 when omitted.
+    #[pyo3(signature = (x, y, z=0))]
+    fn set_camera(&self, x: i64, y: i64, z: i64) {
+        crate::python_api::camera_api::set_camera(self, x, y, z)
     }
 
-    /// Get the camera position as a dict {x, y}
+    /// Get the camera position as a dict {x, y, z}
     fn get_camera(&self, py: Python) -> PyObject {
         crate::python_api::camera_api::get_camera(self, py)
     }

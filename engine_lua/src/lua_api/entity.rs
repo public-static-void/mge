@@ -85,6 +85,16 @@ pub fn register_entity_api(lua: &Lua, globals: &Table, world: Rc<RefCell<World>>
     })?;
     globals.set("move_entity", move_entity)?;
 
+    // move_entity_3d(entity, dx, dy, dz)
+    let world_move_entity_3d = world.clone();
+    let move_entity_3d =
+        lua.create_function_mut(move |_, (entity, dx, dy, dz): (u32, f32, f32, f32)| {
+            let mut world = world_move_entity_3d.borrow_mut();
+            world.move_entity_3d(entity, dx, dy, dz);
+            Ok(())
+        })?;
+    globals.set("move_entity_3d", move_entity_3d)?;
+
     // damage_entity(entity, amount)
     let world_damage_entity = world.clone();
     let damage_entity = lua.create_function_mut(move |_, (entity, amount): (u32, f32)| {

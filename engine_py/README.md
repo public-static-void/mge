@@ -45,14 +45,8 @@ This document describes the Python API for interacting with the Modular Game Eng
 - `move_entity(entity_id: int, dx: float, dy: float)`
   Move an entity by (dx, dy).
 
-- `move_all(dx: float, dy: float)`
-  Move all entities with Position component.
-
 - `damage_entity(entity_id: int, amount: float)`
   Damage an entity.
-
-- `damage_all(amount: float)`
-  Damage all entities with Health component.
 
 - `tick()`
   Advance the game simulation by one tick.

@@ -92,6 +92,34 @@ impl World {
         }
     }
 
+    /// Move an entity in three dimensions.
+    ///
+    /// Square positions shift `x`/`y`/`z` by `dx`/`dy`/`dz`; Hex positions shift
+    /// `q`/`r`/`z` by `dx`/`dy`/`dz`. Province positions and entities without a
+    /// Position are left unchanged. The full Position component is re-serialized,
+    /// preserving all other fields, mirroring [`move_entity`](Self::move_entity).
+    pub fn move_entity_3d(&mut self, entity: u32, dx: f32, dy: f32, dz: f32) {
+        if let Some(value) = self.get_component(entity, "Position").cloned()
+            && let Ok(mut pos_comp) = serde_json::from_value::<PositionComponent>(value)
+        {
+            match &mut pos_comp.pos {
+                Position::Square { x, y, z } => {
+                    *x += dx as i32;
+                    *y += dy as i32;
+                    *z += dz as i32;
+                }
+                Position::Hex { q, r, z } => {
+                    *q += dx as i32;
+                    *r += dy as i32;
+                    *z += dz as i32;
+                }
+                Position::Province { .. } => {}
+            }
+            let _ =
+                self.set_component(entity, "Position", serde_json::to_value(&pos_comp).unwrap());
+        }
+    }
+
     /// Damage an entity.
     ///
     /// When the entity has a Body component, damage is routed through PendingDamage
@@ -213,7 +241,10 @@ impl World {
             .collect()
     }
 
-    /// Returns all entity IDs in the given z-level (for SquareGridMap).
+    /// Returns all entity IDs on the given z-level.
+    ///
+    /// Matches both Square and Hex positions. Province positions (which have no
+    /// z concept) and entities without a Position never match.
     pub fn entities_in_zlevel(&self, z: i32) -> Vec<u32> {
         self.entities
             .iter()
@@ -222,11 +253,15 @@ impl World {
                 self.get_component(eid, "Position")
                     .and_then(|val| {
                         val.get("pos").and_then(|p| {
-                            if let Some(obj) = p.as_object()
-                                && let Some(sq) = obj.get("Square")
-                            {
-                                let zval = sq.get("z")?.as_i64()? as i32;
-                                return Some(zval == z);
+                            if let Some(obj) = p.as_object() {
+                                if let Some(sq) = obj.get("Square") {
+                                    let zval = sq.get("z")?.as_i64()? as i32;
+                                    return Some(zval == z);
+                                }
+                                if let Some(hex) = obj.get("Hex") {
+                                    let zval = hex.get("z")?.as_i64()? as i32;
+                                    return Some(zval == z);
+                                }
                             }
                             None
                         })

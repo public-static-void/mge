@@ -3,7 +3,7 @@ use engine_core::ecs::world::wasm::WasmWorld;
 use std::sync::{Arc, Mutex};
 use wasmtime::{Caller, Linker};
 
-/// Registers the map API (11 host functions).
+/// Registers the map API (12 host functions).
 pub fn register_map_api(linker: &mut Linker<Arc<Mutex<WasmWorld>>>) -> anyhow::Result<()> {
     linker.func_wrap(
         "wasm_map",
@@ -91,6 +91,22 @@ pub fn register_map_api(linker: &mut Linker<Arc<Mutex<WasmWorld>>>) -> anyhow::R
             let entities = {
                 let world = caller.data().lock().unwrap();
                 world.entities_in_cell(&cell_json)
+            };
+            write_u32_slice_to_wasm(&mut caller, out_ptr, &entities, out_len)
+        },
+    )?;
+
+    linker.func_wrap(
+        "wasm_map",
+        "entities_in_zlevel",
+        |mut caller: Caller<'_, Arc<Mutex<WasmWorld>>>,
+         z: i32,
+         out_ptr: i32,
+         out_len: i32|
+         -> i32 {
+            let entities = {
+                let world = caller.data().lock().unwrap();
+                world.entities_in_zlevel(z)
             };
             write_u32_slice_to_wasm(&mut caller, out_ptr, &entities, out_len)
         },

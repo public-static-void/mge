@@ -89,12 +89,20 @@ impl<R: PresentationRenderer> PresentationSystem<R> {
 
     /// Render the map without visibility filtering.
     /// Delegates to [`render_map_with_visibility`](Self::render_map_with_visibility)
-    /// with `None` for visible/explored cells.
+    /// with `None` for visible/explored cells and for the z filter (all-z overlay).
     pub fn render_map(&mut self, world: &crate::ecs::world::World, viewport: &Viewport) {
-        self.render_map_with_visibility(world, viewport, None, None);
+        self.render_map_with_visibility(world, viewport, None, None, None);
     }
 
-    /// Render the map with optional visibility and fog-of-war filtering.
+    /// Render the map with optional visibility, fog-of-war, and z-level filtering.
+    ///
+    /// `z: Option<i32>` selects the z-level to render:
+    /// - `None` renders every z-level overlaid (legacy 2D behavior — preserves
+    ///   `render_map` semantics and existing 2D tests).
+    /// - `Some(z)` renders exactly level `z`. Cells and entities on other levels
+    ///   are excluded **before** visibility checks, so they never appear as
+    ///   dimmed or unexplored terrain. Cells whose `CellKey` carries no z
+    ///   (`CellKey::Province`) pass the filter and are drawn on all levels.
     ///
     /// When both `visible_cells` and `explored_cells` are `Some`:
     /// - Cells NOT in `explored_cells` are drawn as black (unexplored).
@@ -112,6 +120,7 @@ impl<R: PresentationRenderer> PresentationSystem<R> {
         viewport: &Viewport,
         visible_cells: Option<&HashSet<CellKey>>,
         explored_cells: Option<&HashSet<CellKey>>,
+        z: Option<i32>,
     ) {
         use crate::presentation::layout::{CellLayout, HexLayout, SquareLayout};
 
@@ -128,6 +137,19 @@ impl<R: PresentationRenderer> PresentationSystem<R> {
 
         // Draw terrain/background
         for cell in map.all_cells() {
+            // z-filter: exclude cells on other z-levels BEFORE visibility checks
+            // so they never render dimmed/unexplored. Cells with no z
+            // (CellKey::Province) pass the filter and are drawn on all levels.
+            if let Some(filter_z) = z {
+                let matches = match &cell {
+                    CellKey::Square { z, .. } | CellKey::Hex { z, .. } => *z == filter_z,
+                    CellKey::Province { .. } => true,
+                };
+                if !matches {
+                    continue;
+                }
+            }
+
             let (sx, sy) = layout.cell_to_screen(&cell);
             if viewport.contains(sx, sy) {
                 let in_visible = visible_cells.map(|vis| vis.contains(&cell)).unwrap_or(true);
@@ -214,6 +236,23 @@ impl<R: PresentationRenderer> PresentationSystem<R> {
                 } else {
                     (0, 0, None)
                 };
+
+                // z-filter: exclude entities on other z-levels BEFORE visibility
+                // checks so they never render dimmed. Entities with no resolvable
+                // Position cell are skipped when a filter is active; Province
+                // entities carry no z and are drawn on all levels.
+                if let Some(filter_z) = z {
+                    let matches = match &entity_cell {
+                        Some(CellKey::Square { z, .. }) | Some(CellKey::Hex { z, .. }) => {
+                            *z == filter_z
+                        }
+                        Some(CellKey::Province { .. }) => true,
+                        None => false,
+                    };
+                    if !matches {
+                        continue;
+                    }
+                }
 
                 // Skip entities in non-visible cells
                 let in_visible = match (&visible_cells, &entity_cell) {
@@ -302,16 +341,30 @@ pub struct Viewport {
     pub width: i32,
     /// The height
     pub height: i32,
+    /// The z level (0 = ground level)
+    pub z: i32,
 }
 
 impl Viewport {
-    /// Create a new viewport
+    /// Create a new viewport on z level 0
     pub fn new(x: i32, y: i32, width: i32, height: i32) -> Self {
         Self {
             x,
             y,
             width,
             height,
+            z: 0,
+        }
+    }
+
+    /// Create a new viewport on an explicit z level
+    pub fn with_z(x: i32, y: i32, width: i32, height: i32, z: i32) -> Self {
+        Self {
+            x,
+            y,
+            width,
+            height,
+            z,
         }
     }
 

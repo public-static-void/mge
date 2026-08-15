@@ -36,7 +36,7 @@
 - [x] Movement system (entity positioning and translation)
 - [x] Region, province, and territory map system
 - [x] Map generation, validation, and postprocessing hooks
-- [ ] Z-level / multi-layer map support
+- [x] Z-level / multi-layer map support
 - [ ] Multi-scale map navigation
 - [x] Procedural dungeon generation
 - [ ] Fluid simulation (water, magma)
@@ -66,6 +66,7 @@
 ## Presentation Layer
 
 - [x] Camera viewport (scrollable camera with world-space mapping)
+- [x] Z-stacked camera viewport (camera z, per-z FOV, renderer z-filtering)
 - [x] Terminal UI widget library (button, label, checkbox, dropdown, text input, context menu, panel, event log)
 - [x] UI layout system (linear arrangement, z-ordering)
 - [x] UI event handling and propagation

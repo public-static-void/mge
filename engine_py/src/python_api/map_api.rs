@@ -79,6 +79,17 @@ pub fn entities_in_cell(pyworld: &PyWorld, py: Python, cell: &Bound<'_, PyAny>) 
     serde_pyobject::to_pyobject(py, &entities).unwrap().into()
 }
 
+/// Get a list of entity IDs located on the given z-level.
+///
+/// Matches both Square and Hex positions. Province positions (which have no
+/// z concept) and entities without a Position never match.
+/// Returns a Python list of entity IDs on the z-level.
+pub fn entities_in_zlevel(pyworld: &PyWorld, py: Python, z: i32) -> PyObject {
+    let world = pyworld.inner.borrow();
+    let entities = world.entities_in_zlevel(z);
+    serde_pyobject::to_pyobject(py, &entities).unwrap().into()
+}
+
 /// Get metadata associated with a given cell.
 ///
 /// `cell` is a Python object representing a cell key.
