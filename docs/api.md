@@ -225,8 +225,8 @@
 
 | Function                | Description                                          |
 | ----------------------- | ---------------------------------------------------- |
-| `get_camera()`          | Get the camera position as {x, y, z}                 |
-| `set_camera(x, y, z?)`  | Set the camera position (center viewport) and z-level |
+| `get_camera()`                                    | Get the camera position as {x, y, z}                                          |
+| `set_camera(x, y, z?)`<br>`set_camera(x, y, z=0)` | Set the camera position (center viewport) and z-level (z omitted ⇒ 0). Lua: `z?`; Python: `z=0`. |
 
 ---
 
