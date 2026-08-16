@@ -230,6 +230,7 @@ Identical API surface in Lua, Python, and WASM:
 - **Queries:** `get_entities()`, `get_entities_with_component(name)`, `count_entities_with_type(type)`
 - **Map:** `add_cell(x,y,z)`, `add_neighbor(from,to)`, `get_all_cells()`, `find_path(start, goal)`, `entities_in_cell(cell)`
 - **Movement:** `move_entity(id, dx, dy)`, `move_entity_3d(id, dx, dy, dz)`
+- **Camera:** `set_camera(x, y, z?)`, `get_camera() → {x, y, z}` — identical in all three bridges (Lua `z?`, Python `z=0`, WASM guest passes z explicitly; WASM JSON string is the bridge transport, not a shape difference)
 - **Combat:** `damage_entity(id, amount)`
 - **Mode:** `set_mode(mode)`, `get_mode()`, `get_available_modes()`
 - **Simulation:** `tick()`, `get_turn()`, `process_deaths()`, `process_decay()`
