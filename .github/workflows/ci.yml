@@ -150,7 +150,7 @@ jobs:
       - name: Run Lua tests
         run: |
           export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(pwd)/plugins
-          ./run_lua_tests.sh
+          make test-lua
 
   test-python:
     runs-on: ubuntu-latest
