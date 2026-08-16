@@ -67,16 +67,32 @@ pub fn register_map_api(lua: &Lua, globals: &Table, world: Rc<RefCell<World>>) -
     globals.set("get_all_cells", get_all_cells)?;
 
     // add_cell(x, y, z)
+    // Topology-aware: square maps interpret args as (x, y, z); hex maps as (q, r, z);
+    // province/none maps no-op (unchanged for non-square today).
     let world_add_cell = world.clone();
     let add_cell = lua.create_function_mut(move |_, (x, y, z): (i32, i32, i32)| {
         let mut world = world_add_cell.borrow_mut();
-        if let Some(map) = &mut world.map
-            && let Some(square) = map
-                .topology
-                .as_any_mut()
-                .downcast_mut::<engine_core::map::SquareGridMap>()
-        {
-            square.add_cell(x, y, z);
+        if let Some(map) = &mut world.map {
+            match map.topology_type() {
+                "hex" => {
+                    if let Some(hex) = map
+                        .topology
+                        .as_any_mut()
+                        .downcast_mut::<engine_core::map::HexGridMap>()
+                    {
+                        hex.add_cell(x, y, z);
+                    }
+                }
+                _ => {
+                    if let Some(square) = map
+                        .topology
+                        .as_any_mut()
+                        .downcast_mut::<engine_core::map::SquareGridMap>()
+                    {
+                        square.add_cell(x, y, z);
+                    }
+                }
+            }
         }
         Ok(())
     })?;
@@ -126,13 +142,29 @@ pub fn register_map_api(lua: &Lua, globals: &Table, world: Rc<RefCell<World>>) -
         }
         let from_xyz = table_to_xyz(lua, from)?;
         let to_xyz = table_to_xyz(lua, to)?;
-        if let Some(map) = &mut world.map
-            && let Some(square) = map
-                .topology
-                .as_any_mut()
-                .downcast_mut::<engine_core::map::SquareGridMap>()
-        {
-            square.add_neighbor(from_xyz, to_xyz);
+        // Topology-aware: square maps keep (x, y, z); hex maps interpret as (q, r, z);
+        // province/none maps no-op (unchanged for non-square today).
+        if let Some(map) = &mut world.map {
+            match map.topology_type() {
+                "hex" => {
+                    if let Some(hex) = map
+                        .topology
+                        .as_any_mut()
+                        .downcast_mut::<engine_core::map::HexGridMap>()
+                    {
+                        hex.add_neighbor(from_xyz, to_xyz);
+                    }
+                }
+                _ => {
+                    if let Some(square) = map
+                        .topology
+                        .as_any_mut()
+                        .downcast_mut::<engine_core::map::SquareGridMap>()
+                    {
+                        square.add_neighbor(from_xyz, to_xyz);
+                    }
+                }
+            }
         }
         Ok(())
     })?;
