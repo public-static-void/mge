@@ -52,16 +52,31 @@ pub fn get_neighbors(pyworld: &PyWorld, py: Python, cell: &Bound<'_, PyAny>) -> 
 
 /// Add a directed neighbor edge from one cell to another.
 ///
-/// `from` and `to` are tuples of coordinates `(x, y, z)`.
+/// `from` and `to` are tuples of coordinates `(x, y, z)`, interpreted as
+/// `(q, r, z)` on hex maps. No-op on province/none maps (unchanged for non-square today).
 pub fn add_neighbor(pyworld: &PyWorld, from: (i32, i32, i32), to: (i32, i32, i32)) {
     let mut world = pyworld.inner.borrow_mut();
-    if let Some(map) = &mut world.map
-        && let Some(square) = map
-            .topology
-            .as_any_mut()
-            .downcast_mut::<engine_core::map::SquareGridMap>()
-    {
-        square.add_neighbor(from, to);
+    if let Some(map) = &mut world.map {
+        match map.topology_type() {
+            "hex" => {
+                if let Some(hex) = map
+                    .topology
+                    .as_any_mut()
+                    .downcast_mut::<engine_core::map::HexGridMap>()
+                {
+                    hex.add_neighbor(from, to);
+                }
+            }
+            _ => {
+                if let Some(square) = map
+                    .topology
+                    .as_any_mut()
+                    .downcast_mut::<engine_core::map::SquareGridMap>()
+                {
+                    square.add_neighbor(from, to);
+                }
+            }
+        }
     }
 }
 
@@ -240,14 +255,31 @@ pub fn apply_chunk(pyworld: Py<PyWorld>, py: Python, chunk: &Bound<'_, PyAny>) -
 }
 
 /// Add a cell to the map.
+///
+/// Topology-aware: square maps interpret args as `(x, y, z)`; hex maps as `(q, r, z)`;
+/// province/none maps no-op (unchanged for non-square today).
 pub fn add_cell(pyworld: &PyWorld, x: i32, y: i32, z: i32) {
     let mut world = pyworld.inner.borrow_mut();
-    if let Some(map) = &mut world.map
-        && let Some(square) = map
-            .topology
-            .as_any_mut()
-            .downcast_mut::<engine_core::map::SquareGridMap>()
-    {
-        square.add_cell(x, y, z);
+    if let Some(map) = &mut world.map {
+        match map.topology_type() {
+            "hex" => {
+                if let Some(hex) = map
+                    .topology
+                    .as_any_mut()
+                    .downcast_mut::<engine_core::map::HexGridMap>()
+                {
+                    hex.add_cell(x, y, z);
+                }
+            }
+            _ => {
+                if let Some(square) = map
+                    .topology
+                    .as_any_mut()
+                    .downcast_mut::<engine_core::map::SquareGridMap>()
+                {
+                    square.add_cell(x, y, z);
+                }
+            }
+        }
     }
 }

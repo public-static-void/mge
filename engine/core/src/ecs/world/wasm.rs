@@ -23,16 +23,17 @@ pub struct TimeOfDay {
 }
 
 /// Camera state for the WASM world.
+///
+/// Flat `{x, y, z}` viewport, identical in shape to the Lua/Python camera
+/// surfaces. `width`/`height` were removed in the parity revert (R008); old
+/// saved state carrying those fields still deserializes because serde ignores
+/// unknown fields (no `deny_unknown_fields`).
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct Camera {
     /// X position of the camera viewport.
     pub x: i32,
     /// Y position of the camera viewport.
     pub y: i32,
-    /// Width of the camera viewport.
-    pub width: i32,
-    /// Height of the camera viewport.
-    pub height: i32,
     /// Z-level of the camera viewport.
     #[serde(default)]
     pub z: i32,
@@ -983,15 +984,13 @@ impl WasmWorld {
         }
     }
 
-    /// Sets the camera viewport position, dimensions, and z-level.
-    pub fn set_camera(&mut self, x: i32, y: i32, width: i32, height: i32, z: i32) {
-        self.camera = Some(Camera {
-            x,
-            y,
-            width,
-            height,
-            z,
-        });
+    /// Sets the camera viewport position and z-level.
+    ///
+    /// 3-arg parity form (`x`, `y`, `z`) matching Lua `set_camera(x, y, z?)`
+    /// and Python `set_camera(x, y, z=0)` — the identical camera surface
+    /// across all three scripting bridges (R008).
+    pub fn set_camera(&mut self, x: i32, y: i32, z: i32) {
+        self.camera = Some(Camera { x, y, z });
     }
 
     /// Returns the current camera state as a JSON string, or None if unset.
@@ -1581,13 +1580,26 @@ impl WasmWorld {
             .unwrap_or_default()
     }
 
-    /// Adds a square cell at (x, y, z). Sets topology type to "square" if unset.
+    /// Adds a cell at (x, y, z). Sets topology type to "square" if unset.
+    ///
+    /// Topology dispatch (R003): `"hex"` → `CellKey::Hex { q: x, r: y, z }`;
+    /// `"square"`/`"none"`/empty → `CellKey::Square` (topology defaults to
+    /// `"square"` when unset, byte-identical to the pre-parity behavior);
+    /// `"province"` → no cell appended (province is intentionally z-less —
+    /// `CellKey::Province` carries only an id, R007).
     pub fn add_cell(&mut self, x: i32, y: i32, z: i32) {
         let map = self.map.get_or_insert_with(WasmMap::default);
         if map.topology_type.is_empty() || map.topology_type == "none" {
             map.topology_type = "square".to_string();
         }
-        let cell = CellKey::Square { x, y, z };
+        if map.topology_type == "province" {
+            return;
+        }
+        let cell = if map.topology_type == "hex" {
+            CellKey::Hex { q: x, r: y, z }
+        } else {
+            CellKey::Square { x, y, z }
+        };
         if !map.cells.contains(&cell) {
             map.cells.push(cell);
         }

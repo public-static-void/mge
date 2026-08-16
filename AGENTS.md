@@ -30,7 +30,7 @@ cargo fmt --all
 # 3. Test — all suites green
 cargo test --all                                          # Rust
 make test-python                                          # Python
-./run_lua_tests.sh                                        # Lua (requires C plugin .so)
+make test-lua                                              # Lua (requires C plugin .so)
 make test-wasm                                            # WASM
 ```
 
@@ -76,7 +76,7 @@ make clean                  # cargo clean
 | All tests | `make test` |
 | Rust only | `make test-rust` (alias: `cargo test --all`) |
 | Python tests | `cd engine_py && source .venv/bin/activate && pytest tests/ -k <filter>` |
-| Lua tests | `./run_lua_tests.sh <module_filter> [function_filter]` |
+| Lua tests | `make test-lua LUA_FILTER=<module_filter> [<function_filter>]` (exact names: module = `test_*.lua` stem, e.g. `test_loot`, not `loot`; function = exact key; function filter without module filter unsupported) |
 | WASM tests | `make test-wasm` (alias: `cargo test -p engine_wasm`) |
 | Schema validation | `make validate-schema` |
 | Single Rust test | `cargo test -p engine_core --test <test_file> <test_name>` |
@@ -230,6 +230,7 @@ Identical API surface in Lua, Python, and WASM:
 - **Queries:** `get_entities()`, `get_entities_with_component(name)`, `count_entities_with_type(type)`
 - **Map:** `add_cell(x,y,z)`, `add_neighbor(from,to)`, `get_all_cells()`, `find_path(start, goal)`, `entities_in_cell(cell)`
 - **Movement:** `move_entity(id, dx, dy)`, `move_entity_3d(id, dx, dy, dz)`
+- **Camera:** `set_camera(x, y, z?)`, `get_camera() → {x, y, z}` — identical in all three bridges (Lua `z?`, Python `z=0`, WASM guest passes z explicitly; WASM JSON string is the bridge transport, not a shape difference)
 - **Combat:** `damage_entity(id, amount)`
 - **Mode:** `set_mode(mode)`, `get_mode()`, `get_available_modes()`
 - **Simulation:** `tick()`, `get_turn()`, `process_deaths()`, `process_decay()`

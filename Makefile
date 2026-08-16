@@ -5,6 +5,9 @@
 
 # ====== CONFIGURABLE VARIABLES ======
 SCHEMA_DIR := engine/assets/schemas
+# LUA_FILTER forwards module/function filters to the Lua test runner.
+# Empty (default) = full suite; e.g. LUA_FILTER=test_hex_zlevel runs one module.
+LUA_FILTER :=
 
 # ====== HELP TARGET ======
 help:
@@ -72,7 +75,7 @@ test-python: build-python
 test-lua:
 	@echo "Running Lua tests..."
 	cargo build --package engine_lua --bin mge_lua_test_runner
-	./run_lua_tests.sh
+	./run_lua_tests.sh $(LUA_FILTER)
 
 # ====== WASM TEST TARGET ======
 test-wasm:

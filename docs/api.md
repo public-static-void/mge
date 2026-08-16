@@ -55,8 +55,8 @@
 
 | Function                           | Description                                    |
 | ---------------------------------- | ---------------------------------------------- |
-| `add_cell(x, y, z)`                | Add a cell to the map at coordinates (x, y, z) |
-| `add_neighbor(from, to)`           | Add a neighbor relationship between two cells  |
+| `add_cell(x, y, z)`                | Add a cell to the map at coordinates (x, y, z) — topology-aware, see note below |
+| `add_neighbor(from, to)`           | Add a neighbor relationship between two cells — topology-aware, see note below |
 | `entities_in_cell(cell)`           | List all entity IDs in the given cell          |
 | `entities_in_zlevel(z)`            | List all entity IDs on the given z-level       |
 | `find_path(start_cell, goal_cell)` | Find a path between two cells                  |
@@ -64,6 +64,8 @@
 | `get_map_cell_count()`             | Get the number of cells in the map             |
 | `get_map_topology_type()`          | Get the topology type of the map               |
 | `get_neighbors(cell)`              | List neighbors of a given cell                 |
+
+> **Topology-aware:** `add_cell`/`add_neighbor` dispatch on the current map topology — **square**: coordinates are `(x, y, z)` (byte-identical to the classic behavior); **hex**: the same three ints are interpreted as `(q, r, z)` (Lua tables / Python tuples stay positional `{q, r, z}`; named `{q=, r=, z=}` tables are not supported); **province**: no-op — province cells are intentionally z-less (`CellKey::Province { id }` carries no coordinate fields), so no cell is added and no neighbor is recorded on province maps.
 
 ---
 
@@ -223,10 +225,14 @@
 
 ## Camera & Viewport
 
-| Function                | Description                                          |
-| ----------------------- | ---------------------------------------------------- |
-| `get_camera()`                                    | Get the camera position as {x, y, z}                                          |
-| `set_camera(x, y, z?)`<br>`set_camera(x, y, z=0)` | Set the camera position (center viewport) and z-level (z omitted ⇒ 0). Lua: `z?`; Python: `z=0`. |
+One identical surface in Lua, Python, and WASM:
+
+| Function | Description |
+| -------- | ----------- |
+| `get_camera()` | Get the camera position as `{x, y, z}` — same shape in all three bridges (WASM: the host returns a JSON string `{"x","y","z"}`, which the guest parses to the same shape as the Lua table / Python dict) |
+| `set_camera(x, y, z?)`<br>`set_camera(x, y, z=0)`<br>`set_camera(x, y, z)` (WASM) | Set the camera position (center viewport) and z-level. Lua: `z?` optional, omitted ⇒ 0; Python: `z=0` default; WASM: `z` passed explicitly by the guest. Identical signature in all three bridges. |
+
+> On hex maps, Lua/Python store the camera position as `pos.Hex { q, r, z }` (topology-aware); `get_camera()` returns `{x, y, z}` on all topologies. The WASM camera is a flat parity-only viewport — the host does not render.
 
 ---
 

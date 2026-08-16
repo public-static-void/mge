@@ -8,9 +8,9 @@ pub fn register_camera_api(linker: &mut Linker<Arc<Mutex<WasmWorld>>>) -> anyhow
     linker.func_wrap(
         "camera",
         "set_camera",
-        |caller: Caller<'_, Arc<Mutex<WasmWorld>>>, x: i32, y: i32, w: i32, h: i32, z: i32| {
+        |caller: Caller<'_, Arc<Mutex<WasmWorld>>>, x: i32, y: i32, z: i32| {
             let mut world = caller.data().lock().unwrap();
-            world.set_camera(x, y, w, h, z);
+            world.set_camera(x, y, z);
             Ok(())
         },
     )?;
