@@ -991,6 +991,70 @@ impl PyWorld {
         crate::python_api::camera_api::get_camera(self, py)
     }
 
+    // ---- MULTI-SCALE MAP ----
+
+    /// Register a named map from a GeneratedMap JSON dict. Error on duplicate name.
+    fn register_map(&self, name: String, map: &Bound<'_, PyAny>) -> PyResult<()> {
+        crate::python_api::multiscale_map::register_map(self, name, map)
+    }
+
+    /// Set the active map to a registered map. Error on unknown name.
+    fn set_active_map(&self, name: String) -> PyResult<()> {
+        crate::python_api::multiscale_map::set_active_map(self, name)
+    }
+
+    /// List registered map names.
+    fn get_map_names(&self) -> Vec<String> {
+        crate::python_api::multiscale_map::get_map_names(self)
+    }
+
+    /// Current active map name.
+    fn get_active_map_name(&self) -> String {
+        crate::python_api::multiscale_map::get_active_map_name(self)
+    }
+
+    /// Link a source map cell to a target map cell. Error on unknown map name.
+    fn link_maps(
+        &self,
+        source_map: String,
+        source_cell: &Bound<'_, PyAny>,
+        target_map: String,
+        target_cell: &Bound<'_, PyAny>,
+    ) -> PyResult<()> {
+        crate::python_api::multiscale_map::link_maps(
+            self,
+            source_map,
+            source_cell,
+            target_map,
+            target_cell,
+        )
+    }
+
+    /// Transition to the named map, camera at entry cell. Error on unknown map name.
+    fn enter_map(&self, name: String, entry_cell: &Bound<'_, PyAny>) -> PyResult<()> {
+        crate::python_api::multiscale_map::enter_map(self, name, entry_cell)
+    }
+
+    /// Return to the previously active map. Error if no prior map.
+    fn exit_map(&self) -> PyResult<()> {
+        crate::python_api::multiscale_map::exit_map(self)
+    }
+
+    /// Map a source cell to the linked target cell. None if unlinked.
+    fn map_cell(&self, py: Python, source_map: String, source_cell: &Bound<'_, PyAny>) -> PyObject {
+        crate::python_api::multiscale_map::map_cell(self, py, source_map, source_cell)
+    }
+
+    /// Reverse-map a target cell to the linked source cell. None if unlinked.
+    fn unmap_cell(
+        &self,
+        py: Python,
+        target_map: String,
+        target_cell: &Bound<'_, PyAny>,
+    ) -> PyObject {
+        crate::python_api::multiscale_map::unmap_cell(self, py, target_map, target_cell)
+    }
+
     // ---- LOOT TABLE ----
 
     /// Define a named loot table from a list of entry dicts.

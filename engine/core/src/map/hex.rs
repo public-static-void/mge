@@ -115,4 +115,8 @@ impl MapTopology for HexGridMap {
     fn get_cell_metadata(&self, cell: &CellKey) -> Option<&Value> {
         self.cell_metadata.get(cell)
     }
+
+    fn clone_box(&self) -> Box<dyn MapTopology> {
+        Box::new(self.clone())
+    }
 }

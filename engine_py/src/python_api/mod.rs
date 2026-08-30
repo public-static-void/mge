@@ -53,6 +53,8 @@ pub mod material;
 pub mod mode;
 /// Movement API
 pub mod movement;
+/// Multi-scale map navigation API
+pub mod multiscale_map;
 /// Region API
 pub mod region;
 /// Save/Load API

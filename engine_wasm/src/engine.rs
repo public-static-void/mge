@@ -25,6 +25,7 @@ use crate::host_api::map::register_map_api;
 use crate::host_api::material::register_material_api;
 use crate::host_api::mode::register_mode_api;
 use crate::host_api::movement_ops::register_movement_ops_api;
+use crate::host_api::multiscale_map::register_multiscale_map_api;
 use crate::host_api::region::register_region_api;
 use crate::host_api::save_load::register_save_load_api;
 use crate::host_api::system::register_system_api;
@@ -176,6 +177,7 @@ impl WasmScriptEngine {
         register_job_ai_api(&mut linker)?;
         register_job_events_api(&mut linker)?;
         register_map_api(&mut linker)?;
+        register_multiscale_map_api(&mut linker)?;
         register_world_userdata_api(&mut linker)?;
         register_ui_api(&mut linker)?;
         register_ui_tree_api(&mut linker)?;

@@ -104,6 +104,24 @@ pub struct World {
     /// Map
     #[serde(skip)]
     pub map: Option<Map>,
+    /// Named map registry (runtime-only, not serialized). `World.map` remains the active map.
+    #[serde(skip)]
+    pub maps: HashMap<String, Map>,
+    /// Name of the map currently held in `World.map`.
+    #[serde(skip)]
+    pub active_map: String,
+    /// Region id -> local map name (transition anchor, runtime-only).
+    #[serde(skip)]
+    pub region_map_links: HashMap<String, String>,
+    /// Region id -> entry cell on the linked local map (runtime-only).
+    #[serde(skip)]
+    pub region_entry_cells: HashMap<String, CellKey>,
+    /// Source map name -> link to target map (scale-generic transitions, runtime-only).
+    #[serde(skip)]
+    pub map_links: HashMap<String, MapLink>,
+    /// Active-map history for `exit_map()` (runtime-only).
+    #[serde(skip)]
+    pub map_stack: Vec<String>,
     /// Visible cells per entity (transient FOV state, not serialized)
     #[serde(skip)]
     pub visible_cells: HashMap<u32, HashSet<CellKey>>,
@@ -160,6 +178,21 @@ pub struct World {
     pub equipment_set_registry: EquipmentSetRegistry,
 }
 
+/// A scale-generic link from a source map to a target map.
+///
+/// The source cell and target cell are topology-generic [`CellKey`]s, so a link
+/// may connect any two topologies (square/hex/province in any combination).
+/// Mapping is defined by explicit link entries, not geometric projection.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MapLink {
+    /// Name of the target map.
+    pub target_map: String,
+    /// Cell on the source map that anchors the link.
+    pub source_cell: CellKey,
+    /// Cell on the target map that anchors the link.
+    pub target_cell: CellKey,
+}
+
 /// Default FOV algorithm factory (used by serde `#[serde(skip, default)]`).
 fn default_fov_algorithm() -> Box<dyn FovAlgorithm> {
     Box::new(RecursiveShadowcasting)
@@ -199,6 +232,12 @@ impl World {
                 crate::systems::job::effect_processor_registry::EffectProcessorRegistry::new(),
             ))),
             map: None,
+            maps: HashMap::new(),
+            active_map: String::new(),
+            region_map_links: HashMap::new(),
+            region_entry_cells: HashMap::new(),
+            map_links: HashMap::new(),
+            map_stack: Vec::new(),
             visible_cells: HashMap::new(),
             explored_cells: HashMap::new(),
             event_queues: HashMap::new(),

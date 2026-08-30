@@ -67,6 +67,7 @@ engine_macros (proc-macro)
 - Component CRUD — `set_component`, `get_component`, `remove_component`, `list_components`
 - Queries — `get_entities`, `get_entities_with_component`, `count_entities_with_type`
 - Map — `add_cell`, `add_neighbor`, `get_all_cells`, `find_path`, `entities_in_cell`
+- Multi-scale maps — `register_map`, `set_active_map`, `get_map_names`, `get_active_map_name`, `link_maps`, `enter_map`, `exit_map`, `map_cell`, `unmap_cell` (topology/map-type orthogonal, scale-generic link-based transitions)
 - Movement — `move_entity`
 - Combat — `damage_entity`
 - Mode — `set_mode`, `get_mode`, `get_available_modes`

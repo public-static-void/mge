@@ -118,4 +118,8 @@ impl MapTopology for ProvinceMap {
             None
         }
     }
+
+    fn clone_box(&self) -> Box<dyn MapTopology> {
+        Box::new(self.clone())
+    }
 }

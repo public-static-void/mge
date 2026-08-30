@@ -6,7 +6,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 /// Helper: parse a CellKey from a serde_json::Value, supporting both enum and ergonomic square form.
-fn parse_cell_key(cell_json: serde_json::Value) -> Result<CellKey, mlua::Error> {
+pub(crate) fn parse_cell_key(cell_json: serde_json::Value) -> Result<CellKey, mlua::Error> {
     // Try standard enum deserialization first
     if let Ok(cell_key) = serde_json::from_value::<CellKey>(cell_json.clone()) {
         return Ok(cell_key);

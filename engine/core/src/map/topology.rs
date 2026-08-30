@@ -21,4 +21,12 @@ pub trait MapTopology: Send + Sync {
     fn set_cell_metadata(&mut self, cell: &CellKey, data: Value);
     /// Gets the cell metadata
     fn get_cell_metadata(&self, cell: &CellKey) -> Option<&Value>;
+    /// Returns a boxed clone of this topology (dyn-compatible clone).
+    fn clone_box(&self) -> Box<dyn MapTopology>;
+}
+
+impl Clone for Box<dyn MapTopology> {
+    fn clone(&self) -> Self {
+        self.clone_box()
+    }
 }

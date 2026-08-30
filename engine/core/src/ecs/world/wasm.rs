@@ -74,6 +74,19 @@ pub struct WasmMap {
     pub cell_metadata: HashMap<String, JsonValue>,
 }
 
+/// A scale-generic link from a source map to a target map (WASM bridge mirror
+/// of core `MapLink`). Cells are topology-generic [`CellKey`]s, so a link may
+/// connect any two topologies (square/hex/province in any combination).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WasmMapLink {
+    /// Name of the target map.
+    pub target_map: String,
+    /// Cell on the source map that anchors the link.
+    pub source_cell: CellKey,
+    /// Cell on the target map that anchors the link.
+    pub target_cell: CellKey,
+}
+
 /// Injectable input source for `WasmWorld::get_user_input()`.
 ///
 /// Defaults to `Stdin` which blocks on `std::io::stdin().read_line()`.
@@ -119,6 +132,18 @@ pub struct WasmWorld {
     /// Map data for spatial operations
     #[serde(default)]
     pub map: Option<WasmMap>,
+    /// Named map registry (runtime-only, not serialized). `WasmWorld.map` remains the active map.
+    #[serde(skip)]
+    pub maps: HashMap<String, WasmMap>,
+    /// Name of the map currently held in `WasmWorld.map`.
+    #[serde(skip)]
+    pub active_map: String,
+    /// Source map name -> link to target map (scale-generic transitions, runtime-only).
+    #[serde(skip)]
+    pub map_links: HashMap<String, WasmMapLink>,
+    /// Active-map history for `exit_map()` (runtime-only).
+    #[serde(skip)]
+    pub map_stack: Vec<String>,
     /// Export names discovered during WASM module instantiation
     #[serde(default)]
     pub discovered_export_names: Vec<String>,
@@ -280,6 +305,10 @@ impl WasmWorld {
             systems: HashMap::new(),
             component_schemas: HashMap::new(),
             map: None,
+            maps: HashMap::new(),
+            active_map: String::new(),
+            map_links: HashMap::new(),
+            map_stack: Vec::new(),
             discovered_export_names: Vec::new(),
             map_validator_names: Vec::new(),
             map_postprocessor_names: Vec::new(),
@@ -1911,6 +1940,135 @@ impl WasmWorld {
         self.map.as_ref().map(|m| m.cells.len() as i32).unwrap_or(0)
     }
 
+    // ---- Multi-scale Map Navigation API ----
+
+    /// Register a named map from a `map.json`-shaped JSON string. Errors on duplicate name.
+    ///
+    /// Mirrors the Lua/Python `register_map(name, map_json)` surface (issue 61
+    /// parity): `map_json` carries `topology` + `cells` (with optional per-cell
+    /// `neighbors`/`metadata`), converted to a [`WasmMap`] for the bridge state.
+    pub fn register_map(&mut self, name: &str, map_json: &str) -> Result<(), String> {
+        if self.maps.contains_key(name) {
+            return Err(format!("Map '{name}' is already registered"));
+        }
+        let map = wasm_map_from_map_json(map_json)?;
+        self.maps.insert(name.to_string(), map);
+        Ok(())
+    }
+
+    /// Set the active map to a registered map. Errors on unknown name.
+    pub fn set_active_map(&mut self, name: &str) -> Result<(), String> {
+        let map = self
+            .maps
+            .get(name)
+            .ok_or_else(|| format!("Map '{name}' is not registered"))?;
+        self.map = Some(map.clone());
+        self.active_map = name.to_string();
+        Ok(())
+    }
+
+    /// List all registered map names (unspecified order).
+    pub fn get_map_names(&self) -> Vec<String> {
+        self.maps.keys().cloned().collect()
+    }
+
+    /// Name of the current active map.
+    pub fn get_active_map_name(&self) -> String {
+        self.active_map.clone()
+    }
+
+    /// Link a source map cell to a target map cell. Errors on unknown map name.
+    ///
+    /// The link is stored per source map (a map's exit target). Both cells are
+    /// topology-generic [`CellKey`]s, so any two topologies may be linked.
+    pub fn link_maps(
+        &mut self,
+        source_map: &str,
+        source_cell: CellKey,
+        target_map: &str,
+        target_cell: CellKey,
+    ) -> Result<(), String> {
+        if !self.maps.contains_key(source_map) {
+            return Err(format!("Map '{source_map}' is not registered"));
+        }
+        if !self.maps.contains_key(target_map) {
+            return Err(format!("Map '{target_map}' is not registered"));
+        }
+        self.map_links.insert(
+            source_map.to_string(),
+            WasmMapLink {
+                target_map: target_map.to_string(),
+                source_cell,
+                target_cell,
+            },
+        );
+        Ok(())
+    }
+
+    /// Transition: set the active map to `name` and position the camera at `entry_cell`.
+    ///
+    /// Pushes the current active map onto the map stack (so `exit_map()` can
+    /// return to it). Errors on unknown map name. Province cells carry no
+    /// x/y/z, so the flat camera falls back to zeros (mirroring core
+    /// `set_camera_position`).
+    pub fn enter_map(&mut self, name: &str, entry_cell: CellKey) -> Result<(), String> {
+        let map = self
+            .maps
+            .get(name)
+            .ok_or_else(|| format!("Map '{name}' is not registered"))?;
+        if !self.active_map.is_empty() {
+            self.map_stack.push(self.active_map.clone());
+        }
+        self.map = Some(map.clone());
+        self.active_map = name.to_string();
+        let (x, y, z) = match entry_cell {
+            CellKey::Square { x, y, z } => (x, y, z),
+            CellKey::Hex { q, r, z } => (q, r, z),
+            CellKey::Province { .. } => (0, 0, 0),
+        };
+        self.camera = Some(Camera { x, y, z });
+        Ok(())
+    }
+
+    /// Transition: return to the previously active map (pop the map stack).
+    ///
+    /// Errors if the stack is empty (no prior map).
+    pub fn exit_map(&mut self) -> Result<(), String> {
+        let prev = self
+            .map_stack
+            .pop()
+            .ok_or_else(|| "Cannot exit map: no previous map on the stack".to_string())?;
+        let map = self
+            .maps
+            .get(&prev)
+            .ok_or_else(|| format!("Map '{prev}' is not registered"))?;
+        self.map = Some(map.clone());
+        self.active_map = prev;
+        Ok(())
+    }
+
+    /// Map a cell on `source_map` to the linked cell on the target map.
+    ///
+    /// Returns `None` if no link exists from that source cell.
+    pub fn map_cell(&self, source_map: &str, source_cell: &CellKey) -> Option<CellKey> {
+        let link = self.map_links.get(source_map)?;
+        if &link.source_cell == source_cell {
+            Some(link.target_cell.clone())
+        } else {
+            None
+        }
+    }
+
+    /// Reverse mapping: map a cell on `target_map` back to the linked source cell.
+    ///
+    /// Returns `None` if no link exists to that target cell.
+    pub fn unmap_cell(&self, target_map: &str, target_cell: &CellKey) -> Option<CellKey> {
+        self.map_links
+            .values()
+            .find(|link| link.target_map == target_map && &link.target_cell == target_cell)
+            .map(|link| link.source_cell.clone())
+    }
+
     // ---- FOV API ----
 
     /// Returns visible cells for an entity, or None if not computed.
@@ -2923,4 +3081,133 @@ impl ResourceReservationOps for WasmWorld {
         let json_str = serde_json::to_string(&value).map_err(|e| e.to_string())?;
         self.set_component(entity, name, &json_str)
     }
+}
+
+/// Convert a `map.json`-shaped JSON string to a [`WasmMap`].
+///
+/// Mirrors `Map::from_json` semantics for the WASM bridge: `topology` selects
+/// the cell coordinate keys (`x`/`y`/`z` for square, `q`/`r`/`z` for hex,
+/// `id` for province). Explicit per-cell `neighbors` are carried into the
+/// adjacency map; when absent, square/hex adjacency is inferred from the cell
+/// set (4-way / 6-way) exactly as the core deserializer does, so a registered
+/// map behaves identically across all three bridges. Province neighbors must
+/// be explicit.
+fn wasm_map_from_map_json(map_json: &str) -> Result<WasmMap, String> {
+    let value: JsonValue =
+        serde_json::from_str(map_json).map_err(|e| format!("Failed to parse map JSON: {e}"))?;
+    let topology = value
+        .get("topology")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| "Map JSON missing 'topology'".to_string())?;
+    let cells = value
+        .get("cells")
+        .and_then(|v| v.as_array())
+        .ok_or_else(|| "Map JSON missing 'cells' array".to_string())?;
+
+    let mut map = WasmMap {
+        topology_type: topology.to_string(),
+        ..WasmMap::default()
+    };
+
+    let cell_from_json = |cell: &JsonValue| -> Result<CellKey, String> {
+        match topology {
+            "square" => Ok(CellKey::Square {
+                x: cell.get("x").and_then(|v| v.as_i64()).unwrap_or(0) as i32,
+                y: cell.get("y").and_then(|v| v.as_i64()).unwrap_or(0) as i32,
+                z: cell.get("z").and_then(|v| v.as_i64()).unwrap_or(0) as i32,
+            }),
+            "hex" => Ok(CellKey::Hex {
+                q: cell.get("q").and_then(|v| v.as_i64()).unwrap_or(0) as i32,
+                r: cell.get("r").and_then(|v| v.as_i64()).unwrap_or(0) as i32,
+                z: cell.get("z").and_then(|v| v.as_i64()).unwrap_or(0) as i32,
+            }),
+            "province" => Ok(CellKey::Province {
+                id: cell
+                    .get("id")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| "Province cell missing 'id'".to_string())?
+                    .to_string(),
+            }),
+            other => Err(format!("Unknown topology '{other}'")),
+        }
+    };
+
+    // First pass: add all cells so neighbor inference can reference the set.
+    for cell in cells {
+        let key = cell_from_json(cell)?;
+        if !map.cells.contains(&key) {
+            map.cells.push(key);
+        }
+    }
+
+    // Second pass: explicit neighbors, inferred adjacency, and metadata.
+    for cell in cells {
+        let key = cell_from_json(cell)?;
+        let key_str = serde_json::to_string(&key).unwrap();
+
+        if let Some(neighs) = cell.get("neighbors").and_then(|v| v.as_array()) {
+            let mut neighbor_keys = Vec::new();
+            for n in neighs {
+                let nkey = cell_from_json(n)?;
+                let nkey_str = serde_json::to_string(&nkey).unwrap();
+                if !neighbor_keys.contains(&nkey_str) {
+                    neighbor_keys.push(nkey_str);
+                }
+            }
+            map.neighbors.insert(key_str.clone(), neighbor_keys);
+        } else {
+            let candidates: Vec<CellKey> = match topology {
+                "square" => match key {
+                    CellKey::Square { x, y, z } => [
+                        CellKey::Square { x: x + 1, y, z },
+                        CellKey::Square { x: x - 1, y, z },
+                        CellKey::Square { x, y: y + 1, z },
+                        CellKey::Square { x, y: y - 1, z },
+                    ]
+                    .to_vec(),
+                    _ => Vec::new(),
+                },
+                "hex" => match key {
+                    CellKey::Hex { q, r, z } => [
+                        CellKey::Hex { q: q + 1, r, z },
+                        CellKey::Hex { q: q - 1, r, z },
+                        CellKey::Hex { q, r: r + 1, z },
+                        CellKey::Hex { q, r: r - 1, z },
+                        CellKey::Hex {
+                            q: q + 1,
+                            r: r - 1,
+                            z,
+                        },
+                        CellKey::Hex {
+                            q: q - 1,
+                            r: r + 1,
+                            z,
+                        },
+                    ]
+                    .to_vec(),
+                    _ => Vec::new(),
+                },
+                // Province adjacency must be explicit.
+                _ => Vec::new(),
+            };
+            let mut neighbor_keys = Vec::new();
+            for candidate in candidates {
+                if map.cells.contains(&candidate) {
+                    let nkey_str = serde_json::to_string(&candidate).unwrap();
+                    if !neighbor_keys.contains(&nkey_str) {
+                        neighbor_keys.push(nkey_str);
+                    }
+                }
+            }
+            if !neighbor_keys.is_empty() {
+                map.neighbors.insert(key_str.clone(), neighbor_keys);
+            }
+        }
+
+        if let Some(meta) = cell.get("metadata") {
+            map.cell_metadata.insert(key_str, meta.clone());
+        }
+    }
+
+    Ok(map)
 }

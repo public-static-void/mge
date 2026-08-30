@@ -272,33 +272,55 @@ impl World {
     }
 
     /// Returns all cells (as serde_json::Value) assigned to the given region_id.
+    ///
+    /// A `RegionAssignment` whose `cell` is `{ "Region": { "id": R } }` is
+    /// resolved recursively to the actual cells of region `R` (cells whose
+    /// `region_id` includes `R`), so callers never receive the opaque `Region`
+    /// JSON. A visited set guards against region-reference cycles.
     pub fn cells_in_region(&self, region_id: &str) -> Vec<serde_json::Value> {
-        self.get_entities_with_component("RegionAssignment")
-            .into_iter()
-            .filter_map(|eid| {
-                self.get_component(eid, "RegionAssignment").and_then(|val| {
-                    let cell = val.get("cell").cloned()?;
-                    let rid = val.get("region_id");
-                    match rid {
-                        Some(serde_json::Value::String(s)) => {
-                            if s == region_id {
-                                Some(cell)
-                            } else {
-                                None
-                            }
-                        }
-                        Some(serde_json::Value::Array(arr)) => {
-                            if arr.iter().any(|v| v.as_str() == Some(region_id)) {
-                                Some(cell)
-                            } else {
-                                None
-                            }
-                        }
-                        _ => None,
-                    }
-                })
-            })
-            .collect()
+        let mut visited = std::collections::HashSet::new();
+        let mut out = Vec::new();
+        self.collect_region_cells(region_id, &mut visited, &mut out);
+        out
+    }
+
+    /// Recursive helper for [`cells_in_region`](Self::cells_in_region).
+    fn collect_region_cells(
+        &self,
+        region_id: &str,
+        visited: &mut std::collections::HashSet<String>,
+        out: &mut Vec<serde_json::Value>,
+    ) {
+        if !visited.insert(region_id.to_string()) {
+            return;
+        }
+        for eid in self.get_entities_with_component("RegionAssignment") {
+            let Some(val) = self.get_component(eid, "RegionAssignment") else {
+                continue;
+            };
+            let Some(cell) = val.get("cell").cloned() else {
+                continue;
+            };
+            let matches = match val.get("region_id") {
+                Some(serde_json::Value::String(s)) => s == region_id,
+                Some(serde_json::Value::Array(arr)) => {
+                    arr.iter().any(|v| v.as_str() == Some(region_id))
+                }
+                _ => false,
+            };
+            if !matches {
+                continue;
+            }
+            if let Some(nested) = cell
+                .get("Region")
+                .and_then(|r| r.get("id"))
+                .and_then(|v| v.as_str())
+            {
+                self.collect_region_cells(nested, visited, out);
+            } else {
+                out.push(cell);
+            }
+        }
     }
 
     /// Returns all entity IDs assigned to the given region ID (supports multi-region).
