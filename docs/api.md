@@ -236,6 +236,28 @@ One identical surface in Lua, Python, and WASM:
 
 ---
 
+## Multi-Scale Map Navigation
+
+One identical surface in Lua, Python, and WASM — 9 functions for registering named maps, switching between them, and mapping cells across scales:
+
+| Function | Description |
+| -------- | ----------- |
+| `register_map(name, map)` | Register a named map from a `map.json`-shaped table/dict/JSON string (`topology` + `cells`, optional per-cell `neighbors`/`metadata`). Errors on duplicate name. |
+| `set_active_map(name)` | Set the active map to a registered map. Errors on unknown name; does not reposition the camera. |
+| `get_map_names()` | List all registered map names. |
+| `get_active_map_name()` | Name of the current active map. |
+| `link_maps(source_map, source_cell, target_map, target_cell)` | Link a source-map cell to a target-map cell (one link per source map). Errors on unknown map name. |
+| `enter_map(name, entry_cell)` | Transition to a registered map and position the camera at `entry_cell` (pushes the previous map onto the stack). Errors on unknown name. |
+| `exit_map()` | Return to the previously active map (pops the stack). Errors if the stack is empty. |
+| `map_cell(source_map, source_cell)` | Map a source-map cell to the linked target-map cell. Returns `nil`/`None`/`-1` when unlinked. |
+| `unmap_cell(target_map, target_cell)` | Reverse mapping: target-map cell back to the linked source-map cell. Returns `nil`/`None`/`-1` when unlinked. |
+
+> **Cells are topology-generic:** `entry_cell`/`source_cell`/`target_cell`/`cell` are Position-shaped — `{Square={x,y,z}}` / `{Hex={q,r,z}}` / `{Province={id}}` (WASM: JSON strings of the same shape). Any two topologies may be linked (e.g. province → square).
+>
+> **Map type/scale is carried by the name only:** the engine does not interpret a map's name as a topology. `"overmap"` is a convention for the highest-scale map, never a reserved name — a square map named `"overmap"` and a province map named `"strategic"` are both valid and independent.
+
+---
+
 ## Time and Turn
 
 | Function            | Description                                   |
