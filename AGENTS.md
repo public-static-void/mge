@@ -229,6 +229,7 @@ Identical API surface in Lua, Python, and WASM:
 - **Components:** `set_component(id, name, data)`, `get_component(id, name)`, `remove_component(id, name)`, `list_components()`, `get_component_schema(name)`
 - **Queries:** `get_entities()`, `get_entities_with_component(name)`, `count_entities_with_type(type)`
 - **Map:** `add_cell(x,y,z)`, `add_neighbor(from,to)`, `get_all_cells()`, `find_path(start, goal)`, `entities_in_cell(cell)`
+- **Multi-Scale Maps:** `register_map(name, map_json)`, `set_active_map(name)`, `get_map_names()`, `get_active_map_name()`, `link_maps(source_map, source_cell, target_map, target_cell)`, `enter_map(name, entry_cell)`, `exit_map()`, `map_cell(source_map, source_cell)`, `unmap_cell(target_map, target_cell)` — topology (square/hex/province) and map type (overmap/field/strategic/tactical) are orthogonal; `"overmap"` is a convention, never a reserved topology
 - **Movement:** `move_entity(id, dx, dy)`, `move_entity_3d(id, dx, dy, dz)`
 - **Camera:** `set_camera(x, y, z?)`, `get_camera() → {x, y, z}` — identical in all three bridges (Lua `z?`, Python `z=0`, WASM guest passes z explicitly; WASM JSON string is the bridge transport, not a shape difference)
 - **Combat:** `damage_entity(id, amount)`
