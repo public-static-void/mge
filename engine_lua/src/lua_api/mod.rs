@@ -57,6 +57,9 @@ pub mod material;
 pub mod mode;
 /// Movement API
 pub mod movement_ops;
+/// Multi-scale map navigation API (register_map, set_active_map, get_map_names,
+/// get_active_map_name, link_maps, enter_map, exit_map, map_cell, unmap_cell)
+pub mod multiscale_map;
 /// Region API
 pub mod region;
 /// Save/Load API
@@ -111,6 +114,7 @@ pub fn register_all_api_functions(
     death_decay::register_death_decay_api(lua, globals, world.clone())?;
     time_of_day::register_time_of_day_api(lua, globals, world.clone())?;
     map::register_map_api(lua, globals, world.clone())?;
+    multiscale_map::register_multiscale_map_api(lua, globals, world.clone())?;
     economic::register_economic_api(lua, globals, world.clone())?;
     movement_ops::register_movement_ops_api(lua, globals, world.clone())?;
     dungeon::register_dungeon_api(lua, globals)?;
