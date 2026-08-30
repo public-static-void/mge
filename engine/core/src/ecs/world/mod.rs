@@ -104,6 +104,18 @@ pub struct World {
     /// Map
     #[serde(skip)]
     pub map: Option<Map>,
+    /// Named map registry (runtime-only, not serialized). `World.map` remains the active map.
+    #[serde(skip)]
+    pub maps: HashMap<String, Map>,
+    /// Name of the map currently held in `World.map`.
+    #[serde(skip)]
+    pub active_map: String,
+    /// Region id -> local map name (transition anchor, runtime-only).
+    #[serde(skip)]
+    pub region_map_links: HashMap<String, String>,
+    /// Region id -> entry cell on the linked local map (runtime-only).
+    #[serde(skip)]
+    pub region_entry_cells: HashMap<String, CellKey>,
     /// Visible cells per entity (transient FOV state, not serialized)
     #[serde(skip)]
     pub visible_cells: HashMap<u32, HashSet<CellKey>>,
@@ -199,6 +211,10 @@ impl World {
                 crate::systems::job::effect_processor_registry::EffectProcessorRegistry::new(),
             ))),
             map: None,
+            maps: HashMap::new(),
+            active_map: String::new(),
+            region_map_links: HashMap::new(),
+            region_entry_cells: HashMap::new(),
             visible_cells: HashMap::new(),
             explored_cells: HashMap::new(),
             event_queues: HashMap::new(),

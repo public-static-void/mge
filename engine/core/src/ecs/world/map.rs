@@ -80,4 +80,34 @@ impl World {
         }
         Ok(())
     }
+
+    /// Register a named map. Errors on duplicate name.
+    pub fn register_map(&mut self, name: &str, map: Map) -> Result<(), String> {
+        if self.maps.contains_key(name) {
+            return Err(format!("Map '{name}' is already registered"));
+        }
+        self.maps.insert(name.to_string(), map);
+        Ok(())
+    }
+
+    /// Set the active map to a registered map. Errors on unknown name.
+    pub fn set_active_map(&mut self, name: &str) -> Result<(), String> {
+        let map = self
+            .maps
+            .get(name)
+            .ok_or_else(|| format!("Map '{name}' is not registered"))?;
+        self.map = Some(map.clone());
+        self.active_map = name.to_string();
+        Ok(())
+    }
+
+    /// List all registered map names (unspecified order).
+    pub fn get_map_names(&self) -> Vec<String> {
+        self.maps.keys().cloned().collect()
+    }
+
+    /// Name of the current active map.
+    pub fn get_active_map_name(&self) -> String {
+        self.active_map.clone()
+    }
 }

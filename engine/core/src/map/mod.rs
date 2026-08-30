@@ -29,6 +29,7 @@ pub use square::SquareGridMap;
 pub use topology::MapTopology;
 
 /// The main Map type (boxed trait object for dynamic dispatch).
+#[derive(Clone)]
 pub struct Map {
     /// The underlying MapTopology.
     pub topology: Box<dyn MapTopology>,
