@@ -798,6 +798,7 @@ impl WasmWorld {
     pub fn tick(&mut self) {
         self.turn += 1;
         self.advance_time_of_day();
+        self.simulate_fluid();
     }
 
     /// Returns the current turn number.
@@ -1779,6 +1780,288 @@ impl WasmWorld {
         let meta = self.map.as_ref()?.cell_metadata.get(&key)?;
         let fluid = meta.get("fluid")?;
         Some(serde_json::to_string(fluid).unwrap_or_default())
+    }
+
+    /// Run the fluid simulation on the WASM map for one tick.
+    ///
+    /// Replicates the core `FluidSimulationSystem` algorithm (horizontal
+    /// flooding, z-flow, magma-water interaction, blocking keys) against the
+    /// WASM world's string-keyed `cell_metadata`. Deterministic cell ordering
+    /// mirrors the core system (z desc, x asc, y asc, Province last by id).
+    pub fn simulate_fluid(&mut self) {
+        use crate::systems::fluid::{FLUID_BLOCK_LEVEL, FLUID_MAX_LEVEL};
+        use std::cmp::Reverse;
+        use std::collections::HashMap;
+
+        /// Per-type fluid levels.
+        #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+        struct FluidState {
+            water: i64,
+            magma: i64,
+        }
+        impl FluidState {
+            fn total(self) -> i64 {
+                self.water + self.magma
+            }
+            fn is_empty(self) -> bool {
+                self.water == 0 && self.magma == 0
+            }
+        }
+
+        fn read_fluid(meta: &JsonValue) -> FluidState {
+            let Some(fluid) = meta.get("fluid") else {
+                return FluidState::default();
+            };
+            if let Some(level) = fluid.get("level").and_then(JsonValue::as_i64) {
+                match fluid.get("type").and_then(JsonValue::as_str) {
+                    Some("water") => FluidState {
+                        water: level.max(0),
+                        magma: 0,
+                    },
+                    Some("magma") => FluidState {
+                        water: 0,
+                        magma: level.max(0),
+                    },
+                    _ => FluidState::default(),
+                }
+            } else {
+                FluidState {
+                    water: fluid
+                        .get("water")
+                        .and_then(JsonValue::as_i64)
+                        .unwrap_or(0)
+                        .max(0),
+                    magma: fluid
+                        .get("magma")
+                        .and_then(JsonValue::as_i64)
+                        .unwrap_or(0)
+                        .max(0),
+                }
+            }
+        }
+
+        fn fluid_json(state: FluidState) -> JsonValue {
+            if state.water > 0 && state.magma > 0 {
+                serde_json::json!({ "water": state.water, "magma": state.magma })
+            } else if state.water > 0 {
+                serde_json::json!({ "type": "water", "level": state.water })
+            } else if state.magma > 0 {
+                serde_json::json!({ "type": "magma", "level": state.magma })
+            } else {
+                serde_json::json!({ "type": "water", "level": 0 })
+            }
+        }
+
+        fn cell_below_key(cell: &CellKey) -> Option<CellKey> {
+            match cell {
+                CellKey::Square { x, y, z } => Some(CellKey::Square {
+                    x: *x,
+                    y: *y,
+                    z: z - 1,
+                }),
+                CellKey::Hex { q, r, z } => Some(CellKey::Hex {
+                    q: *q,
+                    r: *r,
+                    z: z - 1,
+                }),
+                CellKey::Province { .. } => None,
+            }
+        }
+
+        fn sort_key(cell: &CellKey) -> (u8, Reverse<i32>, i32, i32, String) {
+            match cell {
+                CellKey::Square { x, y, z } => (0, Reverse(*z), *x, *y, String::new()),
+                CellKey::Hex { q, r, z } => (0, Reverse(*z), *q, *r, String::new()),
+                CellKey::Province { id } => (1, Reverse(0), 0, 0, id.clone()),
+            }
+        }
+
+        let map = match self.map.as_ref() {
+            Some(m) => m,
+            None => return,
+        };
+
+        // Snapshot: clone cells, neighbors, and metadata so we can release the
+        // immutable borrow before calling self.send_event() and applying writes.
+        let mut cells = map.cells.clone();
+        cells.sort_by_key(sort_key);
+
+        let has_fluid = cells.iter().any(|cell| {
+            let key = serde_json::to_string(cell).unwrap_or_default();
+            map.cell_metadata
+                .get(&key)
+                .map(|meta| read_fluid(meta).total() > 0)
+                .unwrap_or(false)
+        });
+        if !has_fluid {
+            return;
+        }
+
+        let cell_keys_json: Vec<String> = cells
+            .iter()
+            .filter_map(|c| serde_json::to_string(c).ok())
+            .collect();
+        let neighbor_keys: HashMap<String, Vec<String>> = map
+            .neighbors
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect();
+        let initial_meta: HashMap<String, JsonValue> = cell_keys_json
+            .iter()
+            .filter_map(|k| map.cell_metadata.get(k).map(|v| (k.clone(), v.clone())))
+            .collect();
+        // Release map borrow — all reads are done from the snapshots above.
+        // ... (immutable borrow ends here)
+
+        let mut pending: HashMap<String, JsonValue> = HashMap::new();
+        let mut pre_fluid_blocking: HashMap<String, (Option<bool>, Option<bool>)> = HashMap::new();
+        let mut steam_events: Vec<String> = Vec::new();
+
+        for (i, cell) in cells.iter().enumerate() {
+            let key = &cell_keys_json[i];
+            let meta = pending
+                .get(key)
+                .or(initial_meta.get(key))
+                .cloned()
+                .unwrap_or_default();
+            let mut state = read_fluid(&meta);
+            if state.is_empty() {
+                continue;
+            }
+
+            // Magma-water interaction.
+            if state.water > 0 && state.magma > 0 {
+                state.water -= 1;
+                state.magma -= 1;
+                steam_events.push(
+                    serde_json::json!({
+                        "cell": cell,
+                        "water": state.water,
+                        "magma": state.magma
+                    })
+                    .to_string(),
+                );
+            }
+
+            // Downward z-flow.
+            if let Some(below) = cell_below_key(cell) {
+                let below_key = serde_json::to_string(&below).unwrap_or_default();
+                if cells.contains(&below) {
+                    let below_meta = pending
+                        .get(&below_key)
+                        .or(initial_meta.get(&below_key))
+                        .cloned()
+                        .unwrap_or_default();
+                    let mut below_state = read_fluid(&below_meta);
+                    let before = below_state;
+                    if state.water > 0 && below_state.water < FLUID_MAX_LEVEL {
+                        let t = state.water.min(1).min(FLUID_MAX_LEVEL - below_state.water);
+                        state.water -= t;
+                        below_state.water += t;
+                    }
+                    if state.magma > 0 && below_state.magma < FLUID_MAX_LEVEL {
+                        let t = state.magma.min(1).min(FLUID_MAX_LEVEL - below_state.magma);
+                        state.magma -= t;
+                        below_state.magma += t;
+                    }
+                    if below_state != before {
+                        pending.insert(below_key, fluid_json(below_state));
+                    }
+                }
+            }
+
+            // Horizontal flooding.
+            let neighbors = neighbor_keys.get(key).cloned().unwrap_or_default();
+            let mut sorted_neighbors: Vec<String> = neighbors
+                .iter()
+                .filter_map(|n| {
+                    let _ck: CellKey = serde_json::from_str(n).ok()?;
+                    Some(n.clone())
+                })
+                .collect();
+            sorted_neighbors.sort_by(|a, b| {
+                let ka: CellKey = serde_json::from_str(a).unwrap();
+                let kb: CellKey = serde_json::from_str(b).unwrap();
+                sort_key(&ka).cmp(&sort_key(&kb))
+            });
+            for neighbor_key in sorted_neighbors {
+                let neighbor_exists = cells
+                    .iter()
+                    .any(|c| serde_json::to_string(c).ok().as_deref() == Some(&neighbor_key));
+                if !neighbor_exists {
+                    continue;
+                }
+                let neighbor_meta = pending
+                    .get(&neighbor_key)
+                    .or(initial_meta.get(&neighbor_key))
+                    .cloned()
+                    .unwrap_or_default();
+                let mut neighbor_state = read_fluid(&neighbor_meta);
+                let before = neighbor_state;
+                if neighbor_state.water < state.water {
+                    let t = ((state.water - neighbor_state.water) / 2)
+                        .min(1)
+                        .min(FLUID_MAX_LEVEL - neighbor_state.water);
+                    if t > 0 {
+                        state.water -= t;
+                        neighbor_state.water += t;
+                    }
+                }
+                if neighbor_state.magma < state.magma {
+                    let t = ((state.magma - neighbor_state.magma) / 2)
+                        .min(1)
+                        .min(FLUID_MAX_LEVEL - neighbor_state.magma);
+                    if t > 0 {
+                        state.magma -= t;
+                        neighbor_state.magma += t;
+                    }
+                }
+                if neighbor_state != before {
+                    pending.insert(neighbor_key, fluid_json(neighbor_state));
+                }
+            }
+
+            // Write back source cell.
+            pending.insert(key.clone(), fluid_json(state));
+
+            // Blocking keys.
+            if state.total() >= FLUID_BLOCK_LEVEL {
+                if !pre_fluid_blocking.contains_key(key) {
+                    let walkable = meta.get("walkable").and_then(JsonValue::as_bool);
+                    let transparent = meta.get("transparent").and_then(JsonValue::as_bool);
+                    pre_fluid_blocking.insert(key.clone(), (walkable, transparent));
+                }
+                pending.insert(
+                    key.clone(),
+                    serde_json::json!({
+                        "fluid": fluid_json(state),
+                        "walkable": false,
+                        "transparent": false
+                    }),
+                );
+            } else if let Some((walkable, transparent)) = pre_fluid_blocking.remove(key) {
+                pending.insert(
+                    key.clone(),
+                    serde_json::json!({
+                        "fluid": fluid_json(state),
+                        "walkable": walkable.unwrap_or(true),
+                        "transparent": transparent.unwrap_or(true)
+                    }),
+                );
+            }
+        }
+
+        // Send steam events (self borrow released).
+        for payload in &steam_events {
+            let _ = self.send_event("steam", payload);
+        }
+
+        // Apply all pending metadata writes.
+        if let Some(map) = self.map.as_mut() {
+            for (k, v) in pending {
+                map.cell_metadata.insert(k, v);
+            }
+        }
     }
 
     /// BFS shortest path between two cells. Returns None if no path exists.
