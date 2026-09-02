@@ -17,6 +17,17 @@ impl World {
         self.map.as_ref().and_then(|m| m.get_cell_metadata(cell))
     }
 
+    /// Merge a patch into the cell metadata, preserving existing keys.
+    ///
+    /// If no map is present, this is a no-op. This is the safe write path for
+    /// systems like fluid simulation that must not clobber existing metadata
+    /// (`walkable`, `transparent`, `terrain`, etc.).
+    pub fn merge_cell_metadata(&mut self, cell: &crate::map::CellKey, patch: serde_json::Value) {
+        if let Some(map) = &mut self.map {
+            map.merge_cell_metadata(cell, patch);
+        }
+    }
+
     /// Find path from start to goal using the world's map and cell metadata.
     pub fn find_path(
         &self,

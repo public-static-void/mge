@@ -3,7 +3,7 @@ use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 
 use super::cell_key::CellKey;
-use super::topology::MapTopology;
+use super::topology::{MapTopology, deep_merge};
 
 /// A province map
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -116,6 +116,17 @@ impl MapTopology for ProvinceMap {
             self.cell_metadata.get(id)
         } else {
             None
+        }
+    }
+
+    /// Merge a patch into the cell metadata, preserving existing keys.
+    fn merge_cell_metadata(&mut self, cell: &CellKey, patch: Value) {
+        if let CellKey::Province { id } = cell {
+            let merged = match self.cell_metadata.get(id) {
+                Some(existing) => deep_merge(existing, &patch),
+                None => patch,
+            };
+            self.cell_metadata.insert(id.clone(), merged);
         }
     }
 
