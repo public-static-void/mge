@@ -15,6 +15,7 @@ use engine_core::systems::economic::{EconomicSystem, load_recipes_from_dir};
 use engine_core::systems::equipment_effect_aggregation::EquipmentEffectAggregationSystem;
 use engine_core::systems::equipment_logic::EquipmentLogicSystem;
 use engine_core::systems::faction_reputation::FactionReputationSystem;
+use engine_core::systems::fluid::FluidSimulationSystem;
 use engine_core::systems::fog::FogUpdateSystem;
 use engine_core::systems::fov::FovUpdateSystem;
 use engine_core::systems::inventory::InventoryConstraintSystem;
@@ -296,6 +297,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         world.borrow_mut().register_system(ProcessDeaths);
         world.borrow_mut().register_system(ProcessDecay);
         world.borrow_mut().register_system(FactionReputationSystem);
+        world
+            .borrow_mut()
+            .register_system(FluidSimulationSystem::default());
         world.borrow_mut().register_system(FovUpdateSystem);
         world.borrow_mut().register_system(FogUpdateSystem);
 

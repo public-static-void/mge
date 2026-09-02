@@ -24,6 +24,7 @@ use engine_core::loot::LootEntry;
 use engine_core::systems::body_part_damage::BodyPartDamageSystem;
 use engine_core::systems::economic::{EconomicSystem, load_recipes_from_dir};
 use engine_core::systems::faction_reputation::FactionReputationSystem;
+use engine_core::systems::fluid::FluidSimulationSystem;
 use engine_core::systems::fog::FogUpdateSystem;
 use engine_core::systems::fov::FovUpdateSystem;
 use engine_core::systems::job::job_board::JobBoard;
@@ -133,6 +134,7 @@ impl PyWorld {
         world.register_system(ResearchSystem);
         world.register_system(engine_core::systems::job::JobSystem);
         world.register_system(FactionReputationSystem);
+        world.register_system(FluidSimulationSystem::default());
         world.register_system(FovUpdateSystem);
         world.register_system(FogUpdateSystem);
         world.register_system(engine_core::systems::death_decay::ProcessDeaths);
@@ -934,6 +936,23 @@ impl PyWorld {
         metadata: &Bound<'_, PyAny>,
     ) -> PyResult<()> {
         crate::python_api::map_api::set_cell_metadata(self, cell, metadata)
+    }
+
+    /// Get the fluid state for a cell, if any.
+    ///
+    /// Returns the `"fluid"` value from the cell's metadata as a Python object,
+    /// or `None` when the cell has no metadata or no `"fluid"` key.
+    fn get_fluid(&self, py: Python, cell: &Bound<'_, PyAny>) -> PyObject {
+        let world = self.inner.borrow();
+        let cell_key: engine_core::map::CellKey = match pythonize::depythonize(cell) {
+            Ok(val) => val,
+            Err(_) => return py.None(),
+        };
+        if let Some(fluid) = world.get_fluid(&cell_key) {
+            serde_pyobject::to_pyobject(py, fluid).unwrap().into()
+        } else {
+            py.None()
+        }
     }
 
     /// Find a path between two cells using the map's pathfinding system.

@@ -1769,6 +1769,18 @@ impl WasmWorld {
         }
     }
 
+    /// Returns the fluid state for a cell, if any.
+    ///
+    /// Extracts the `"fluid"` value from the cell's metadata. Returns `None`
+    /// when the cell has no metadata or no `"fluid"` key.
+    pub fn get_fluid(&self, cell_json: &str) -> Option<String> {
+        let cell_key: CellKey = serde_json::from_str(cell_json).ok()?;
+        let key = serde_json::to_string(&cell_key).ok()?;
+        let meta = self.map.as_ref()?.cell_metadata.get(&key)?;
+        let fluid = meta.get("fluid")?;
+        Some(serde_json::to_string(fluid).unwrap_or_default())
+    }
+
     /// BFS shortest path between two cells. Returns None if no path exists.
     pub fn find_path(&self, start_json: &str, goal_json: &str) -> Option<String> {
         use std::collections::VecDeque;

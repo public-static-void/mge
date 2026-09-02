@@ -17,6 +17,16 @@ impl World {
         self.map.as_ref().and_then(|m| m.get_cell_metadata(cell))
     }
 
+    /// Get the fluid state for a cell, if any.
+    ///
+    /// Returns the `"fluid"` value from the cell's metadata — either the
+    /// canonical single-type form `{"type": ..., "level": ...}` or the dual form
+    /// `{"water": ..., "magma": ...}`. Returns `None` when the cell has no
+    /// metadata or no `"fluid"` key.
+    pub fn get_fluid(&self, cell: &crate::map::CellKey) -> Option<&serde_json::Value> {
+        self.get_cell_metadata(cell)?.get("fluid")
+    }
+
     /// Merge a patch into the cell metadata, preserving existing keys.
     ///
     /// If no map is present, this is a no-op. This is the safe write path for

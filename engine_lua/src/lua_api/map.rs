@@ -225,6 +225,20 @@ pub fn register_map_api(lua: &Lua, globals: &Table, world: Rc<RefCell<World>>) -
         })?;
     globals.set("set_cell_metadata", set_cell_metadata)?;
 
+    // --- get_fluid(cell) ---
+    let world_get_fluid = world.clone();
+    let get_fluid = lua.create_function_mut(move |lua, cell: LuaValue| {
+        let world = world_get_fluid.borrow();
+        let cell_json = lua_value_to_json(lua, cell, None)?;
+        let cell_key = parse_cell_key(cell_json)?;
+        if let Some(fluid) = world.get_fluid(&cell_key) {
+            Ok(json_to_lua_table(lua, fluid)?)
+        } else {
+            Ok(LuaValue::Nil)
+        }
+    })?;
+    globals.set("get_fluid", get_fluid)?;
+
     // find_path(start_cell, goal_cell)
     let world_find_path = world.clone();
     let find_path = lua.create_function_mut(move |lua, (start, goal): (LuaValue, LuaValue)| {
