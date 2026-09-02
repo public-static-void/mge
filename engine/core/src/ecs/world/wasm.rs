@@ -1965,7 +1965,10 @@ impl WasmWorld {
                         below_state.magma += t;
                     }
                     if below_state != before {
-                        pending.insert(below_key, fluid_json(below_state));
+                        pending.insert(
+                            below_key,
+                            serde_json::json!({ "fluid": fluid_json(below_state) }),
+                        );
                     }
                 }
             }
@@ -2017,12 +2020,18 @@ impl WasmWorld {
                     }
                 }
                 if neighbor_state != before {
-                    pending.insert(neighbor_key, fluid_json(neighbor_state));
+                    pending.insert(
+                        neighbor_key,
+                        serde_json::json!({ "fluid": fluid_json(neighbor_state) }),
+                    );
                 }
             }
 
             // Write back source cell.
-            pending.insert(key.clone(), fluid_json(state));
+            pending.insert(
+                key.clone(),
+                serde_json::json!({ "fluid": fluid_json(state) }),
+            );
 
             // Blocking keys.
             if state.total() >= FLUID_BLOCK_LEVEL {
