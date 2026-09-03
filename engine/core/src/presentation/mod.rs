@@ -14,8 +14,8 @@ pub mod ui;
 
 use crate::map::cell_key::CellKey;
 use crate::presentation::renderer::{
-    COLOR_BLACK, COLOR_DIM_GRAY, COLOR_GRAY, COLOR_VERY_DIM, PresentationRenderer, RenderColor,
-    RenderCommand,
+    COLOR_BLACK, COLOR_BLUE, COLOR_DIM_GRAY, COLOR_GRAY, COLOR_RED, COLOR_VERY_DIM,
+    PresentationRenderer, RenderColor, RenderCommand,
 };
 use std::collections::HashSet;
 
@@ -173,7 +173,7 @@ impl<R: PresentationRenderer> PresentationSystem<R> {
                     }
                     // Visible: render terrain normally (also handles explored_cells=None + visible)
                     (true, _) => {
-                        if let Some(meta) = meta {
+                        let (mut glyph, mut color) = if let Some(meta) = meta {
                             if let Some(terrain) = meta.get("terrain").and_then(|v| v.as_str()) {
                                 match terrain {
                                     "wall" => ('#', COLOR_GRAY),
@@ -185,7 +185,36 @@ impl<R: PresentationRenderer> PresentationSystem<R> {
                             }
                         } else {
                             ('.', COLOR_DIM_GRAY)
+                        };
+                        // Override with fluid glyph when fluid level > 0.
+                        if let Some(meta) = meta
+                            && let Some(fluid) = meta.get("fluid")
+                        {
+                            let level =
+                                fluid
+                                    .get("level")
+                                    .and_then(|v| v.as_i64())
+                                    .unwrap_or_else(|| {
+                                        // Dual-form: use max(water, magma).
+                                        let w = fluid
+                                            .get("water")
+                                            .and_then(|v| v.as_i64())
+                                            .unwrap_or(0);
+                                        let m = fluid
+                                            .get("magma")
+                                            .and_then(|v| v.as_i64())
+                                            .unwrap_or(0);
+                                        w.max(m)
+                                    });
+                            if level > 0 {
+                                glyph = '~';
+                                color = match fluid.get("type").and_then(|v| v.as_str()) {
+                                    Some("magma") => COLOR_RED,
+                                    _ => COLOR_BLUE,
+                                };
+                            }
                         }
+                        (glyph, color)
                     }
                 };
                 self.renderer.queue_draw(RenderCommand {

@@ -3,7 +3,7 @@ use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 
 use super::cell_key::CellKey;
-use super::topology::MapTopology;
+use super::topology::{MapTopology, deep_merge};
 
 type CellSet = HashSet<CellKey>;
 
@@ -114,6 +114,15 @@ impl MapTopology for SquareGridMap {
     /// Get the metadata of a cell
     fn get_cell_metadata(&self, cell: &CellKey) -> Option<&Value> {
         self.cell_metadata.get(cell)
+    }
+
+    /// Merge a patch into the cell metadata, preserving existing keys.
+    fn merge_cell_metadata(&mut self, cell: &CellKey, patch: Value) {
+        let merged = match self.cell_metadata.get(cell) {
+            Some(existing) => deep_merge(existing, &patch),
+            None => patch,
+        };
+        self.cell_metadata.insert(cell.clone(), merged);
     }
 
     fn clone_box(&self) -> Box<dyn MapTopology> {

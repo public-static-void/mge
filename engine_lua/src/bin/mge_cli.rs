@@ -15,6 +15,7 @@ use engine_core::systems::economic::{EconomicSystem, load_recipes_from_dir};
 use engine_core::systems::equipment_effect_aggregation::EquipmentEffectAggregationSystem;
 use engine_core::systems::equipment_logic::EquipmentLogicSystem;
 use engine_core::systems::faction_reputation::FactionReputationSystem;
+use engine_core::systems::fluid::FluidSimulationSystem;
 use engine_core::systems::fog::FogUpdateSystem;
 use engine_core::systems::fov::FovUpdateSystem;
 use engine_core::systems::job::JobSystem;
@@ -175,6 +176,7 @@ fn main() {
         world.register_system(ResearchSystem);
         world.register_system(JobSystem);
         world.register_system(FactionReputationSystem);
+        world.register_system(FluidSimulationSystem::default());
         world.register_system(FovUpdateSystem);
         world.register_system(FogUpdateSystem);
         world.register_system(ProcessDeaths);
@@ -269,6 +271,7 @@ fn main() {
         world.register_system(ResearchSystem);
         world.register_system(JobSystem);
         world.register_system(FactionReputationSystem);
+        world.register_system(FluidSimulationSystem::default());
         world.register_system(FovUpdateSystem);
         world.register_system(FogUpdateSystem);
         world.register_system(ProcessDeaths);

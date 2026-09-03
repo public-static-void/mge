@@ -20,6 +20,8 @@ pub mod equipment_effect_aggregation;
 pub mod equipment_logic;
 /// Faction reputation system
 pub mod faction_reputation;
+/// Fluid simulation system (water, magma)
+pub mod fluid;
 /// Fog-of-war update system
 pub mod fog;
 /// Field-of-view update system
@@ -50,6 +52,7 @@ pub const SYSTEM_EXECUTION_ORDER: &[&str] = &[
     "JobSystem",
     "EconomicSystem",
     "FactionReputationSystem",
+    "FluidSimulationSystem",
     "FovUpdateSystem",
     "ProcessDeaths",
     "ProcessDecay",

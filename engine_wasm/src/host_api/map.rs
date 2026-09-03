@@ -3,7 +3,7 @@ use engine_core::ecs::world::wasm::WasmWorld;
 use std::sync::{Arc, Mutex};
 use wasmtime::{Caller, Linker};
 
-/// Registers the map API (12 host functions).
+/// Registers the map API (13 host functions).
 pub fn register_map_api(linker: &mut Linker<Arc<Mutex<WasmWorld>>>) -> anyhow::Result<()> {
     linker.func_wrap(
         "wasm_map",
@@ -148,6 +148,28 @@ pub fn register_map_api(linker: &mut Linker<Arc<Mutex<WasmWorld>>>) -> anyhow::R
                 .expect("Failed to read metadata JSON from WASM memory");
             let mut world = caller.data().lock().unwrap();
             world.set_cell_metadata(&cell_json, &meta_json);
+        },
+    )?;
+
+    linker.func_wrap(
+        "wasm_map",
+        "get_fluid",
+        |mut caller: Caller<'_, Arc<Mutex<WasmWorld>>>,
+         cell_ptr: i32,
+         cell_len: i32,
+         out_ptr: i32,
+         out_len: i32|
+         -> i32 {
+            let cell_json = read_wasm_string(&mut caller, cell_ptr, cell_len)
+                .expect("Failed to read cell JSON from WASM memory");
+            let result = {
+                let world = caller.data().lock().unwrap();
+                world.get_fluid(&cell_json)
+            };
+            match result {
+                Some(data) => write_string_to_wasm(&mut caller, out_ptr, out_len, &data) as i32,
+                None => -1,
+            }
         },
     )?;
 

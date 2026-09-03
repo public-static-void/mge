@@ -87,6 +87,11 @@ impl Map {
         self.topology.get_cell_metadata(cell)
     }
 
+    /// Merge a patch into the cell metadata, preserving existing keys.
+    pub fn merge_cell_metadata(&mut self, cell: &CellKey, patch: Value) {
+        self.topology.merge_cell_metadata(cell, patch);
+    }
+
     /// Find the path between two cells.
     pub fn find_path(&self, start: &CellKey, goal: &CellKey) -> Option<PathfindingResult> {
         crate::map::pathfinding::find_path(
