@@ -215,9 +215,17 @@ fn magma_water_interaction_reduces_both_and_emits_steam() {
     // Second tick: both reach 0.
     system.run(&mut world);
     let meta = world.get_cell_metadata(&c).unwrap();
-    // The empty state is written in the canonical single-type form; the merge
-    // helper preserves the prior dual-form keys, so assert the effective level.
-    assert_eq!(meta["fluid"]["level"], 0, "effective fluid level reaches 0");
+    // After dual→empty transition, fluid metadata is the canonical empty form.
+    // Verify no stale dual-form keys (water, magma) are present.
+    assert_eq!(meta["fluid"], json!({"type": "water", "level": 0}));
+    assert!(
+        meta["fluid"].get("water").is_none(),
+        "no stale dual-form 'water' key"
+    );
+    assert!(
+        meta["fluid"].get("magma").is_none(),
+        "no stale dual-form 'magma' key"
+    );
     world.update_event_buses::<JsonValue>();
     let steam = world.drain_events::<JsonValue>("steam");
     assert_eq!(steam.len(), 1, "one steam event after second tick");

@@ -79,11 +79,13 @@ fn read_fluid(meta: &Value) -> FluidState {
     }
 }
 
-/// Writes the fluid state into a cell's metadata via the merge helper.
+/// Writes the fluid state into a cell's metadata, replacing the `"fluid"`
+/// sub-object entirely via read-modify-set.
 ///
-/// The canonical single-type form is written when only one fluid type is
-/// present; the dual form is written when both coexist. An empty state is
-/// written as `{"type": "water", "level": 0}` (level 0 means no fluid).
+/// A naive merge would preserve stale keys from a prior fluid form (e.g.,
+/// dual-form `water`/`magma` keys surviving into the empty form). Reading
+/// the current metadata, inserting the new value at the `"fluid"` key, and
+/// writing back eliminates stale keys while preserving sibling metadata.
 fn write_fluid(world: &mut World, cell: &CellKey, state: FluidState) {
     let fluid_value = if state.water > 0 && state.magma > 0 {
         json!({ "water": state.water, "magma": state.magma })
@@ -94,7 +96,11 @@ fn write_fluid(world: &mut World, cell: &CellKey, state: FluidState) {
     } else {
         json!({ "type": "water", "level": 0 })
     };
-    world.merge_cell_metadata(cell, json!({ "fluid": fluid_value }));
+    let mut meta = world.get_cell_metadata(cell).cloned().unwrap_or(json!({}));
+    if let Some(obj) = meta.as_object_mut() {
+        obj.insert("fluid".to_string(), fluid_value);
+    }
+    world.set_cell_metadata(cell, meta);
 }
 
 /// Returns the cell directly below `cell`, if the topology has z-levels.
