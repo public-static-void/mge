@@ -19,6 +19,12 @@ pub const COLOR_BLUE: RenderColor = RenderColor(0, 0, 255);
 pub const COLOR_GRAY: RenderColor = RenderColor(128, 128, 128);
 pub const COLOR_DIM_GRAY: RenderColor = RenderColor(60, 60, 60);
 
+/// Teal — brackish water.
+pub const COLOR_TEAL: RenderColor = RenderColor(0, 128, 128);
+
+/// Dark blue — salt water.
+pub const COLOR_DARK_BLUE: RenderColor = RenderColor(0, 0, 128);
+
 /// Very dim color for cells outside the visible set.
 pub const COLOR_VERY_DIM: RenderColor = RenderColor(25, 25, 25);
 
