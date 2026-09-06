@@ -70,3 +70,74 @@ def test_fluid_spreads_after_tick(make_world):
     neighbor = world.get_fluid({"Square": {"x": 1, "y": 0, "z": 0}})
     assert neighbor is not None
     assert neighbor["level"] > 0
+
+
+def test_water_defaults_to_fresh_shallow_flowing(make_world):
+    world = make_world()
+    _make_plane(world)
+    world.set_cell_metadata(
+        {"Square": {"x": 0, "y": 0, "z": 0}},
+        {"fluid": {"type": "water", "level": 4}},
+    )
+    world.tick()
+    fluid = world.get_fluid({"Square": {"x": 0, "y": 0, "z": 0}})
+    assert fluid is not None
+    assert fluid["water_type"] == "fresh"
+    assert fluid["depth"] == "shallow"
+    assert fluid["flow_state"] == "flowing"
+
+
+def test_taxonomy_fields_round_trip(make_world):
+    world = make_world()
+    _make_plane(world)
+    world.set_cell_metadata(
+        {"Square": {"x": 0, "y": 0, "z": 0}},
+        {
+            "fluid": {
+                "type": "water",
+                "level": 4,
+                "water_type": "salt",
+                "depth": "deep",
+                "flow_state": "stale",
+            }
+        },
+    )
+    world.tick()
+    fluid = world.get_fluid({"Square": {"x": 0, "y": 0, "z": 0}})
+    assert fluid is not None
+    assert fluid["water_type"] == "salt"
+    assert fluid["depth"] == "deep"
+    assert fluid["flow_state"] == "stale"
+
+
+def test_magma_has_no_taxonomy(make_world):
+    world = make_world()
+    _make_plane(world)
+    world.set_cell_metadata(
+        {"Square": {"x": 1, "y": 1, "z": 0}},
+        {"fluid": {"type": "magma", "level": 3}},
+    )
+    world.tick()
+    fluid = world.get_fluid({"Square": {"x": 1, "y": 1, "z": 0}})
+    assert fluid is not None
+    assert fluid["type"] == "magma"
+    assert "water_type" not in fluid
+    assert "depth" not in fluid
+    assert "flow_state" not in fluid
+
+
+def test_mixing_fresh_into_salt_yields_brackish(make_world):
+    world = make_world()
+    _make_plane(world)
+    world.set_cell_metadata(
+        {"Square": {"x": 0, "y": 0, "z": 0}},
+        {"fluid": {"type": "water", "level": 8, "water_type": "fresh"}},
+    )
+    world.set_cell_metadata(
+        {"Square": {"x": 1, "y": 0, "z": 0}},
+        {"fluid": {"type": "water", "level": 1, "water_type": "salt"}},
+    )
+    world.tick()
+    receiver = world.get_fluid({"Square": {"x": 1, "y": 0, "z": 0}})
+    assert receiver is not None
+    assert receiver["water_type"] == "brackish"

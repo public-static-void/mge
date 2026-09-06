@@ -133,6 +133,61 @@ pub extern "C" fn test_fluid_api() -> i32 {
             return 0;
         }
 
+        // Test 4: explicit taxonomy fields round-trip through get_fluid.
+        let cell_c = "{\"Square\":{\"x\":2,\"y\":2,\"z\":0}}";
+        let meta_tax = "{\"fluid\":{\"type\":\"water\",\"level\":4,\"water_type\":\"salt\",\"depth\":\"deep\",\"flow_state\":\"stale\"}}";
+        set_cell_metadata(
+            cell_c.as_ptr(),
+            cell_c.len() as i32,
+            meta_tax.as_ptr(),
+            meta_tax.len() as i32,
+        );
+        let mut buf4 = [0u8; 256];
+        let w4 = get_fluid(
+            cell_c.as_ptr(),
+            cell_c.len() as i32,
+            buf4.as_mut_ptr(),
+            buf4.len() as i32,
+        );
+        if w4 <= 0 {
+            return 0;
+        }
+        let tax_json = core::str::from_utf8(&buf4[..w4 as usize]).unwrap_or("");
+        if !tax_json.contains("\"water_type\":\"salt\"")
+            || !tax_json.contains("\"depth\":\"deep\"")
+            || !tax_json.contains("\"flow_state\":\"stale\"")
+        {
+            return 0;
+        }
+
+        // Test 5: a fresh water cell gains default taxonomy after a tick.
+        let cell_d = "{\"Square\":{\"x\":0,\"y\":1,\"z\":0}}";
+        let meta_fresh = "{\"fluid\":{\"type\":\"water\",\"level\":4}}";
+        set_cell_metadata(
+            cell_d.as_ptr(),
+            cell_d.len() as i32,
+            meta_fresh.as_ptr(),
+            meta_fresh.len() as i32,
+        );
+        tick();
+        let mut buf5 = [0u8; 256];
+        let w5 = get_fluid(
+            cell_d.as_ptr(),
+            cell_d.len() as i32,
+            buf5.as_mut_ptr(),
+            buf5.len() as i32,
+        );
+        if w5 <= 0 {
+            return 0;
+        }
+        let fresh_json = core::str::from_utf8(&buf5[..w5 as usize]).unwrap_or("");
+        if !fresh_json.contains("\"water_type\":\"fresh\"")
+            || !fresh_json.contains("\"depth\":\"shallow\"")
+            || !fresh_json.contains("\"flow_state\":\"flowing\"")
+        {
+            return 0;
+        }
+
         1
     }
 }
