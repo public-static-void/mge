@@ -37,6 +37,11 @@
       "type": "string",
       "enum": ["flowing", "stale", "swampy"],
       "description": "Flow state driven by inflow/outflow history. Water cells only."
+    },
+    "ticks_without_inflow": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Consecutive ticks with no water inflow. Drives flow-state transitions. Water cells only."
     }
   },
   "modes": ["colony", "roguelike", "simulation"]
