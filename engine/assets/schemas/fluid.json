@@ -1,0 +1,43 @@
+{
+  "title": "Fluid",
+  "type": "object",
+  "description": "Cell metadata for fluid simulation. Water cells may carry a water-type taxonomy (water_type, depth, flow_state); magma cells never do.",
+  "properties": {
+    "type": {
+      "type": "string",
+      "enum": ["water", "magma"],
+      "description": "Single-type fluid form discriminator."
+    },
+    "level": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Fluid level for the single-type form."
+    },
+    "water": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Water level in the dual water+magma form."
+    },
+    "magma": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Magma level in the dual water+magma form."
+    },
+    "water_type": {
+      "type": "string",
+      "enum": ["fresh", "brackish", "salt"],
+      "description": "Water-type taxonomy. Water cells only."
+    },
+    "depth": {
+      "type": "string",
+      "enum": ["shallow", "deep"],
+      "description": "Depth level, stored explicitly and independent of fluid level. Water cells only."
+    },
+    "flow_state": {
+      "type": "string",
+      "enum": ["flowing", "stale", "swampy"],
+      "description": "Flow state driven by inflow/outflow history. Water cells only."
+    }
+  },
+  "modes": ["colony", "roguelike", "simulation"]
+}

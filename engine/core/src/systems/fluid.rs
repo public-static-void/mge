@@ -10,7 +10,7 @@ use crate::ecs::world::World;
 use crate::map::CellKey;
 use serde_json::{Value, json};
 use std::cmp::Reverse;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 /// Fluid level at which a cell becomes impassable and opaque.
 ///
@@ -25,11 +25,122 @@ pub const FLUID_BLOCK_LEVEL: i64 = 3;
 /// receiving cell never exceeds this value.
 pub const FLUID_MAX_LEVEL: i64 = 8;
 
-/// Per-type fluid levels in a single cell.
+/// Ticks a water cell must go without inflow before it becomes `stale`.
+pub const STALE_AFTER_TICKS: u32 = 5;
+
+/// Ticks a shallow, stale water cell must go without outflow before it becomes
+/// `swampy`.
+pub const SWAMPY_AFTER_TICKS: u32 = 10;
+
+/// Water-type taxonomy for a water cell.
+///
+/// `fresh` = salinity 0.0, `brackish` = 0.5, `salt` = 1.0. Mixing recomputes
+/// the type from continuous salinity (see [`mix_water_type`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum WaterType {
+    #[default]
+    Fresh,
+    Brackish,
+    Salt,
+}
+
+impl WaterType {
+    /// Salinity contribution of this type (0.0 fresh, 0.5 brackish, 1.0 salt).
+    pub fn salinity(self) -> f64 {
+        match self {
+            WaterType::Fresh => 0.0,
+            WaterType::Brackish => 0.5,
+            WaterType::Salt => 1.0,
+        }
+    }
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            WaterType::Fresh => "fresh",
+            WaterType::Brackish => "brackish",
+            WaterType::Salt => "salt",
+        }
+    }
+
+    pub fn from_name(s: &str) -> WaterType {
+        match s {
+            "brackish" => WaterType::Brackish,
+            "salt" => WaterType::Salt,
+            _ => WaterType::Fresh,
+        }
+    }
+}
+
+/// Depth level of a water cell.
+///
+/// Stored explicitly and independent of fluid level (a deep cell may hold a
+/// low level and vice versa). Only shallow cells can become `swampy`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum DepthLevel {
+    #[default]
+    Shallow,
+    Deep,
+}
+
+impl DepthLevel {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            DepthLevel::Shallow => "shallow",
+            DepthLevel::Deep => "deep",
+        }
+    }
+
+    pub fn from_name(s: &str) -> DepthLevel {
+        match s {
+            "deep" => DepthLevel::Deep,
+            _ => DepthLevel::Shallow,
+        }
+    }
+}
+
+/// Flow state of a water cell, driven by inflow/outflow history.
+///
+/// `flowing` after inflow, `stale` after [`STALE_AFTER_TICKS`] without inflow,
+/// `swampy` when shallow and stale for [`SWAMPY_AFTER_TICKS`] without outflow.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum FlowState {
+    #[default]
+    Flowing,
+    Stale,
+    Swampy,
+}
+
+impl FlowState {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            FlowState::Flowing => "flowing",
+            FlowState::Stale => "stale",
+            FlowState::Swampy => "swampy",
+        }
+    }
+
+    pub fn from_name(s: &str) -> FlowState {
+        match s {
+            "stale" => FlowState::Stale,
+            "swampy" => FlowState::Swampy,
+            _ => FlowState::Flowing,
+        }
+    }
+}
+
+/// Per-type fluid levels and water taxonomy in a single cell.
+///
+/// Taxonomy fields (`water_type`, `depth`, `flow_state`) describe the water
+/// portion and are only meaningful when `water > 0`. Magma cells never carry
+/// them.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 struct FluidState {
     water: i64,
     magma: i64,
+    water_type: WaterType,
+    depth: DepthLevel,
+    flow_state: FlowState,
+    ticks_without_inflow: u32,
 }
 
 impl FluidState {
@@ -42,29 +153,111 @@ impl FluidState {
     }
 }
 
+/// Recomputes a receiving cell's water type from continuous salinity after a
+/// water transfer.
+///
+/// The receiver's pre-transfer water is all of its current type; the incoming
+/// water is all of `incoming_type`. `salinity = (existing_volume * existing
+/// salinity + incoming_volume * incoming salinity) / total_water`. Result:
+/// `salt` if >= 0.75, `brackish` if >= 0.25, else `fresh`. Skipped when the
+/// receiving cell has no water (division by zero).
+fn mix_water_type(receiver: &mut FluidState, incoming_volume: i64, incoming_type: WaterType) {
+    if receiver.water <= 0 {
+        return;
+    }
+    let existing_volume = receiver.water - incoming_volume;
+    let salinity = (existing_volume as f64 * receiver.water_type.salinity()
+        + incoming_volume as f64 * incoming_type.salinity())
+        / receiver.water as f64;
+    receiver.water_type = if salinity >= 0.75 {
+        WaterType::Salt
+    } else if salinity >= 0.25 {
+        WaterType::Brackish
+    } else {
+        WaterType::Fresh
+    };
+}
+
+/// Advances a water cell's flow state based on whether it received inflow this
+/// tick.
+///
+/// Inflow resets the counter and restores `flowing`. No inflow increments the
+/// counter (saturating at [`SWAMPY_AFTER_TICKS`]); past [`STALE_AFTER_TICKS`]
+/// the cell becomes `stale`, and a shallow stale cell past
+/// [`SWAMPY_AFTER_TICKS`] becomes `swampy`. Cells without water are untouched.
+fn update_flow_state(state: &mut FluidState, received_inflow: bool) {
+    if state.water == 0 {
+        return;
+    }
+    if received_inflow {
+        state.ticks_without_inflow = 0;
+        state.flow_state = FlowState::Flowing;
+    } else {
+        state.ticks_without_inflow = state
+            .ticks_without_inflow
+            .saturating_add(1)
+            .min(SWAMPY_AFTER_TICKS);
+        if state.ticks_without_inflow >= STALE_AFTER_TICKS {
+            state.flow_state = FlowState::Stale;
+        }
+        if state.flow_state == FlowState::Stale
+            && state.depth == DepthLevel::Shallow
+            && state.ticks_without_inflow >= SWAMPY_AFTER_TICKS
+        {
+            state.flow_state = FlowState::Swampy;
+        }
+    }
+}
+
 /// Reads the fluid state from a cell's metadata.
 ///
 /// Accepts both the canonical single-type form (`{"type": ..., "level": ...}`)
 /// and the dual form (`{"water": ..., "magma": ...}`) used when both fluid
-/// types coexist in one cell.
+/// types coexist in one cell. Taxonomy fields (`water_type`, `depth`,
+/// `flow_state`) are parsed when present and default otherwise, so existing
+/// serialized forms without them continue to parse.
 fn read_fluid(meta: &Value) -> FluidState {
     let Some(fluid) = meta.get("fluid") else {
         return FluidState::default();
     };
+    let taxonomy = |state: FluidState| FluidState {
+        water_type: fluid
+            .get("water_type")
+            .and_then(Value::as_str)
+            .map(WaterType::from_name)
+            .unwrap_or_default(),
+        depth: fluid
+            .get("depth")
+            .and_then(Value::as_str)
+            .map(DepthLevel::from_name)
+            .unwrap_or_default(),
+        flow_state: fluid
+            .get("flow_state")
+            .and_then(Value::as_str)
+            .map(FlowState::from_name)
+            .unwrap_or_default(),
+        ticks_without_inflow: fluid
+            .get("ticks_without_inflow")
+            .and_then(Value::as_u64)
+            .unwrap_or(0) as u32,
+        ..state
+    };
     if let Some(level) = fluid.get("level").and_then(Value::as_i64) {
         match fluid.get("type").and_then(Value::as_str) {
-            Some("water") => FluidState {
+            Some("water") => taxonomy(FluidState {
                 water: level.max(0),
                 magma: 0,
-            },
+                ..Default::default()
+            }),
             Some("magma") => FluidState {
                 water: 0,
                 magma: level.max(0),
+                ..Default::default()
             },
             _ => FluidState::default(),
         }
     } else {
-        FluidState {
+        taxonomy(FluidState {
             water: fluid
                 .get("water")
                 .and_then(Value::as_i64)
@@ -75,7 +268,8 @@ fn read_fluid(meta: &Value) -> FluidState {
                 .and_then(Value::as_i64)
                 .unwrap_or(0)
                 .max(0),
-        }
+            ..Default::default()
+        })
     }
 }
 
@@ -88,9 +282,23 @@ fn read_fluid(meta: &Value) -> FluidState {
 /// writing back eliminates stale keys while preserving sibling metadata.
 fn write_fluid(world: &mut World, cell: &CellKey, state: FluidState) {
     let fluid_value = if state.water > 0 && state.magma > 0 {
-        json!({ "water": state.water, "magma": state.magma })
+        json!({
+            "water": state.water,
+            "magma": state.magma,
+            "water_type": state.water_type.as_str(),
+            "depth": state.depth.as_str(),
+            "flow_state": state.flow_state.as_str(),
+            "ticks_without_inflow": state.ticks_without_inflow,
+        })
     } else if state.water > 0 {
-        json!({ "type": "water", "level": state.water })
+        json!({
+            "type": "water",
+            "level": state.water,
+            "water_type": state.water_type.as_str(),
+            "depth": state.depth.as_str(),
+            "flow_state": state.flow_state.as_str(),
+            "ticks_without_inflow": state.ticks_without_inflow,
+        })
     } else if state.magma > 0 {
         json!({ "type": "magma", "level": state.magma })
     } else {
@@ -181,6 +389,10 @@ impl System for FluidSimulationSystem {
             return;
         }
 
+        // Cells that received net water inflow this tick, used to drive
+        // flow-state transitions in a second pass after all transfers.
+        let mut received_inflow: HashSet<CellKey> = HashSet::new();
+
         for cell in &cells {
             let mut state = world
                 .get_cell_metadata(cell)
@@ -213,8 +425,12 @@ impl System for FluidSimulationSystem {
                         .map(read_fluid)
                         .unwrap_or_default();
                     let before = below_state;
-                    transfer_down(&mut state.water, &mut below_state.water);
+                    let water_in = transfer_down(&mut state.water, &mut below_state.water);
                     transfer_down(&mut state.magma, &mut below_state.magma);
+                    if water_in > 0 {
+                        received_inflow.insert(below.clone());
+                        mix_water_type(&mut below_state, water_in, state.water_type);
+                    }
                     if below_state != before {
                         write_fluid(world, &below, below_state);
                     }
@@ -243,8 +459,12 @@ impl System for FluidSimulationSystem {
                     .map(read_fluid)
                     .unwrap_or_default();
                 let before = neighbor_state;
-                transfer_horizontal(&mut state.water, &mut neighbor_state.water);
+                let water_in = transfer_horizontal(&mut state.water, &mut neighbor_state.water);
                 transfer_horizontal(&mut state.magma, &mut neighbor_state.magma);
+                if water_in > 0 {
+                    received_inflow.insert(neighbor.clone());
+                    mix_water_type(&mut neighbor_state, water_in, state.water_type);
+                }
                 if neighbor_state != before {
                     write_fluid(world, &neighbor, neighbor_state);
                 }
@@ -252,6 +472,23 @@ impl System for FluidSimulationSystem {
 
             write_fluid(world, cell, state);
             self.update_blocking_keys(world, cell, state);
+        }
+
+        // Second pass: advance flow states from inflow history. Only cells
+        // whose flow state actually changed are written (write-on-change guard).
+        for cell in &cells {
+            let mut state = world
+                .get_cell_metadata(cell)
+                .map(read_fluid)
+                .unwrap_or_default();
+            if state.water == 0 {
+                continue;
+            }
+            let before = state;
+            update_flow_state(&mut state, received_inflow.contains(cell));
+            if state != before {
+                write_fluid(world, cell, state);
+            }
         }
     }
 }
@@ -293,24 +530,33 @@ impl FluidSimulationSystem {
 
 /// Transfers one unit of fluid downward, capped by the receiving cell's
 /// remaining capacity. Falls back to horizontal spreading when the cell below
-/// is full (transfer of 0).
-fn transfer_down(level: &mut i64, below_level: &mut i64) {
+/// is full (transfer of 0). Returns the amount transferred.
+fn transfer_down(level: &mut i64, below_level: &mut i64) -> i64 {
     if *level > 0 && *below_level < FLUID_MAX_LEVEL {
         let transfer = (*level).min(1).min(FLUID_MAX_LEVEL - *below_level);
         *level -= transfer;
         *below_level += transfer;
+        transfer
+    } else {
+        0
     }
 }
 
 /// Transfers `min(1, floor((L - L')) / 2)` units from a higher-level cell to a
-/// lower-level neighbor, capped by the neighbor's remaining capacity.
-fn transfer_horizontal(level: &mut i64, neighbor_level: &mut i64) {
+/// lower-level neighbor, capped by the neighbor's remaining capacity. Returns
+/// the amount transferred.
+fn transfer_horizontal(level: &mut i64, neighbor_level: &mut i64) -> i64 {
     if *neighbor_level < *level {
         let transfer = (*level - *neighbor_level) / 2;
         let transfer = transfer.min(1).min(FLUID_MAX_LEVEL - *neighbor_level);
         if transfer > 0 {
             *level -= transfer;
             *neighbor_level += transfer;
+            transfer
+        } else {
+            0
         }
+    } else {
+        0
     }
 }
