@@ -1789,15 +1789,22 @@ impl WasmWorld {
     /// WASM world's string-keyed `cell_metadata`. Deterministic cell ordering
     /// mirrors the core system (z desc, x asc, y asc, Province last by id).
     pub fn simulate_fluid(&mut self) {
-        use crate::systems::fluid::{FLUID_BLOCK_LEVEL, FLUID_MAX_LEVEL};
+        use crate::systems::fluid::{
+            DepthLevel, FLUID_BLOCK_LEVEL, FLUID_MAX_LEVEL, FlowState, STALE_AFTER_TICKS,
+            SWAMPY_AFTER_TICKS, WaterType,
+        };
         use std::cmp::Reverse;
         use std::collections::HashMap;
 
-        /// Per-type fluid levels.
+        /// Per-type fluid levels and water taxonomy in a single cell.
         #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
         struct FluidState {
             water: i64,
             magma: i64,
+            water_type: WaterType,
+            depth: DepthLevel,
+            flow_state: FlowState,
+            ticks_without_inflow: u32,
         }
         impl FluidState {
             fn total(self) -> i64 {
@@ -1812,20 +1819,44 @@ impl WasmWorld {
             let Some(fluid) = meta.get("fluid") else {
                 return FluidState::default();
             };
+            let taxonomy = |state: FluidState| FluidState {
+                water_type: fluid
+                    .get("water_type")
+                    .and_then(JsonValue::as_str)
+                    .map(WaterType::from_name)
+                    .unwrap_or_default(),
+                depth: fluid
+                    .get("depth")
+                    .and_then(JsonValue::as_str)
+                    .map(DepthLevel::from_name)
+                    .unwrap_or_default(),
+                flow_state: fluid
+                    .get("flow_state")
+                    .and_then(JsonValue::as_str)
+                    .map(FlowState::from_name)
+                    .unwrap_or_default(),
+                ticks_without_inflow: fluid
+                    .get("ticks_without_inflow")
+                    .and_then(JsonValue::as_u64)
+                    .unwrap_or(0) as u32,
+                ..state
+            };
             if let Some(level) = fluid.get("level").and_then(JsonValue::as_i64) {
                 match fluid.get("type").and_then(JsonValue::as_str) {
-                    Some("water") => FluidState {
+                    Some("water") => taxonomy(FluidState {
                         water: level.max(0),
                         magma: 0,
-                    },
+                        ..Default::default()
+                    }),
                     Some("magma") => FluidState {
                         water: 0,
                         magma: level.max(0),
+                        ..Default::default()
                     },
                     _ => FluidState::default(),
                 }
             } else {
-                FluidState {
+                taxonomy(FluidState {
                     water: fluid
                         .get("water")
                         .and_then(JsonValue::as_i64)
@@ -1836,19 +1867,79 @@ impl WasmWorld {
                         .and_then(JsonValue::as_i64)
                         .unwrap_or(0)
                         .max(0),
-                }
+                    ..Default::default()
+                })
             }
         }
 
         fn fluid_json(state: FluidState) -> JsonValue {
             if state.water > 0 && state.magma > 0 {
-                serde_json::json!({ "water": state.water, "magma": state.magma })
+                serde_json::json!({
+                    "water": state.water,
+                    "magma": state.magma,
+                    "water_type": state.water_type.as_str(),
+                    "depth": state.depth.as_str(),
+                    "flow_state": state.flow_state.as_str(),
+                    "ticks_without_inflow": state.ticks_without_inflow,
+                })
             } else if state.water > 0 {
-                serde_json::json!({ "type": "water", "level": state.water })
+                serde_json::json!({
+                    "type": "water",
+                    "level": state.water,
+                    "water_type": state.water_type.as_str(),
+                    "depth": state.depth.as_str(),
+                    "flow_state": state.flow_state.as_str(),
+                    "ticks_without_inflow": state.ticks_without_inflow,
+                })
             } else if state.magma > 0 {
                 serde_json::json!({ "type": "magma", "level": state.magma })
             } else {
                 serde_json::json!({ "type": "water", "level": 0 })
+            }
+        }
+
+        fn mix_water_type(
+            receiver: &mut FluidState,
+            incoming_volume: i64,
+            incoming_type: WaterType,
+        ) {
+            if receiver.water <= 0 {
+                return;
+            }
+            let existing_volume = receiver.water - incoming_volume;
+            let salinity = (existing_volume as f64 * receiver.water_type.salinity()
+                + incoming_volume as f64 * incoming_type.salinity())
+                / receiver.water as f64;
+            receiver.water_type = if salinity >= 0.75 {
+                WaterType::Salt
+            } else if salinity >= 0.25 {
+                WaterType::Brackish
+            } else {
+                WaterType::Fresh
+            };
+        }
+
+        fn update_flow_state(state: &mut FluidState, received_inflow: bool) {
+            if state.water == 0 {
+                return;
+            }
+            if received_inflow {
+                state.ticks_without_inflow = 0;
+                state.flow_state = FlowState::Flowing;
+            } else {
+                state.ticks_without_inflow = state
+                    .ticks_without_inflow
+                    .saturating_add(1)
+                    .min(SWAMPY_AFTER_TICKS);
+                if state.ticks_without_inflow >= STALE_AFTER_TICKS {
+                    state.flow_state = FlowState::Stale;
+                }
+                if state.flow_state == FlowState::Stale
+                    && state.depth == DepthLevel::Shallow
+                    && state.ticks_without_inflow >= SWAMPY_AFTER_TICKS
+                {
+                    state.flow_state = FlowState::Swampy;
+                }
             }
         }
 
@@ -1916,6 +2007,7 @@ impl WasmWorld {
         let mut pending: HashMap<String, JsonValue> = HashMap::new();
         let mut pre_fluid_blocking: HashMap<String, (Option<bool>, Option<bool>)> = HashMap::new();
         let mut steam_events: Vec<String> = Vec::new();
+        let mut received_inflow: HashSet<String> = HashSet::new();
 
         for (i, cell) in cells.iter().enumerate() {
             let key = &cell_keys_json[i];
@@ -1954,15 +2046,21 @@ impl WasmWorld {
                         .unwrap_or_default();
                     let mut below_state = read_fluid(&below_meta);
                     let before = below_state;
+                    let mut water_in = 0i64;
                     if state.water > 0 && below_state.water < FLUID_MAX_LEVEL {
                         let t = state.water.min(1).min(FLUID_MAX_LEVEL - below_state.water);
                         state.water -= t;
                         below_state.water += t;
+                        water_in = t;
                     }
                     if state.magma > 0 && below_state.magma < FLUID_MAX_LEVEL {
                         let t = state.magma.min(1).min(FLUID_MAX_LEVEL - below_state.magma);
                         state.magma -= t;
                         below_state.magma += t;
+                    }
+                    if water_in > 0 {
+                        received_inflow.insert(below_key.clone());
+                        mix_water_type(&mut below_state, water_in, state.water_type);
                     }
                     if below_state != before {
                         pending.insert(
@@ -2001,6 +2099,7 @@ impl WasmWorld {
                     .unwrap_or_default();
                 let mut neighbor_state = read_fluid(&neighbor_meta);
                 let before = neighbor_state;
+                let mut water_in = 0i64;
                 if neighbor_state.water < state.water {
                     let t = ((state.water - neighbor_state.water) / 2)
                         .min(1)
@@ -2008,6 +2107,7 @@ impl WasmWorld {
                     if t > 0 {
                         state.water -= t;
                         neighbor_state.water += t;
+                        water_in = t;
                     }
                 }
                 if neighbor_state.magma < state.magma {
@@ -2018,6 +2118,10 @@ impl WasmWorld {
                         state.magma -= t;
                         neighbor_state.magma += t;
                     }
+                }
+                if water_in > 0 {
+                    received_inflow.insert(neighbor_key.clone());
+                    mix_water_type(&mut neighbor_state, water_in, state.water_type);
                 }
                 if neighbor_state != before {
                     pending.insert(
@@ -2056,6 +2160,29 @@ impl WasmWorld {
                         "walkable": walkable.unwrap_or(true),
                         "transparent": transparent.unwrap_or(true)
                     }),
+                );
+            }
+        }
+
+        // Second pass: advance flow states from inflow history. Only cells whose
+        // flow state changed are written (write-on-change guard).
+        for (i, _cell) in cells.iter().enumerate() {
+            let key = &cell_keys_json[i];
+            let meta = pending
+                .get(key)
+                .or(initial_meta.get(key))
+                .cloned()
+                .unwrap_or_default();
+            let mut state = read_fluid(&meta);
+            if state.water == 0 {
+                continue;
+            }
+            let before = state;
+            update_flow_state(&mut state, received_inflow.contains(key));
+            if state != before {
+                pending.insert(
+                    key.clone(),
+                    serde_json::json!({ "fluid": fluid_json(state) }),
                 );
             }
         }
