@@ -39,7 +39,7 @@
 - [x] Z-level / multi-layer map support
 - [x] Multi-scale map navigation
 - [x] Procedural dungeon generation
-- [ ] Fluid simulation (water, magma)
+- [x] Fluid simulation (water, magma)
 - [x] Field-of-view and lighting simulation
 - [x] Fog of war and visibility system
 - [ ] AI behaviors (enemy tactics, patrol routes)

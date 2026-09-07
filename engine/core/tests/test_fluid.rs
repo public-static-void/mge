@@ -8,7 +8,7 @@
 use engine_core::ecs::system::System;
 use engine_core::ecs::world::World;
 use engine_core::map::{CellKey, Map, SquareGridMap};
-use engine_core::systems::fluid::FluidSimulationSystem;
+use engine_core::systems::fluid::{FluidSimulationSystem, STALE_AFTER_TICKS, SWAMPY_AFTER_TICKS};
 use serde_json::{Value as JsonValue, json};
 
 #[path = "helpers/world.rs"]
@@ -52,6 +52,17 @@ fn fluid_level(world: &World, c: &CellKey) -> i64 {
 /// Sum of all fluid levels across the given cells (conservation check).
 fn total_fluid(world: &World, cells: &[CellKey]) -> i64 {
     cells.iter().map(|c| fluid_level(world, c)).sum()
+}
+
+/// Reads a taxonomy string field from a cell's fluid metadata, or `None` when
+/// the field is absent.
+fn fluid_taxonomy(world: &World, c: &CellKey, field: &str) -> Option<String> {
+    world
+        .get_cell_metadata(c)
+        .and_then(|m| m.get("fluid"))
+        .and_then(|f| f.get(field))
+        .and_then(JsonValue::as_str)
+        .map(str::to_string)
 }
 
 // --- AC001: merge helper preserves existing metadata ---
@@ -304,4 +315,209 @@ fn non_destructive_metadata_preserved_on_fluid_and_non_fluid_cells() {
         assert_eq!(meta["terrain"], "floor", "terrain preserved on {c:?}");
         assert_eq!(meta["cost"], 1, "cost preserved on {c:?}");
     }
+}
+
+// --- Water-type taxonomy: default parsing (AC001) ---
+
+#[test]
+fn water_cell_defaults_to_fresh_shallow_flowing() {
+    let mut world = square_world(&[(0, 0, 0)]);
+    let c = cell(0, 0, 0);
+    world.merge_cell_metadata(&c, json!({"fluid": {"type": "water", "level": 4}}));
+
+    let mut system = FluidSimulationSystem::default();
+    system.run(&mut world);
+
+    assert_eq!(
+        fluid_taxonomy(&world, &c, "water_type").as_deref(),
+        Some("fresh")
+    );
+    assert_eq!(
+        fluid_taxonomy(&world, &c, "depth").as_deref(),
+        Some("shallow")
+    );
+    assert_eq!(
+        fluid_taxonomy(&world, &c, "flow_state").as_deref(),
+        Some("flowing")
+    );
+}
+
+// --- Water-type taxonomy: round-trip through write/read (AC002) ---
+
+#[test]
+fn taxonomy_fields_round_trip_through_tick() {
+    let mut world = square_world(&[(0, 0, 0)]);
+    let c = cell(0, 0, 0);
+    world.merge_cell_metadata(
+        &c,
+        json!({"fluid": {"type": "water", "level": 4, "water_type": "salt", "depth": "deep", "flow_state": "stale"}}),
+    );
+
+    let mut system = FluidSimulationSystem::default();
+    system.run(&mut world);
+
+    assert_eq!(
+        fluid_taxonomy(&world, &c, "water_type").as_deref(),
+        Some("salt")
+    );
+    assert_eq!(fluid_taxonomy(&world, &c, "depth").as_deref(), Some("deep"));
+    assert_eq!(
+        fluid_taxonomy(&world, &c, "flow_state").as_deref(),
+        Some("stale")
+    );
+}
+
+// --- Magma cells carry no taxonomy fields (AC003) ---
+
+#[test]
+fn magma_cell_carries_no_taxonomy_fields() {
+    let mut world = square_world(&[(0, 0, 0)]);
+    let c = cell(0, 0, 0);
+    world.merge_cell_metadata(&c, json!({"fluid": {"type": "magma", "level": 4}}));
+
+    let mut system = FluidSimulationSystem::default();
+    system.run(&mut world);
+
+    let fluid = world.get_cell_metadata(&c).unwrap()["fluid"].clone();
+    assert_eq!(fluid["type"], "magma");
+    assert!(fluid.get("water_type").is_none(), "magma has no water_type");
+    assert!(fluid.get("depth").is_none(), "magma has no depth");
+    assert!(fluid.get("flow_state").is_none(), "magma has no flow_state");
+}
+
+// --- Water-type mixing: fresh into salt yields brackish (AC004) ---
+
+#[test]
+fn mixing_fresh_into_salt_yields_brackish() {
+    let mut world = square_world(&[(0, 0, 0), (1, 0, 0)]);
+    let source = cell(0, 0, 0);
+    let receiver = cell(1, 0, 0);
+    world.merge_cell_metadata(
+        &source,
+        json!({"fluid": {"type": "water", "level": 8, "water_type": "fresh"}}),
+    );
+    world.merge_cell_metadata(
+        &receiver,
+        json!({"fluid": {"type": "water", "level": 1, "water_type": "salt"}}),
+    );
+
+    let mut system = FluidSimulationSystem::default();
+    system.run(&mut world);
+
+    // Receiver (salt level 1) gains one fresh unit: salinity = 1/2 = 0.5.
+    assert_eq!(
+        fluid_taxonomy(&world, &receiver, "water_type").as_deref(),
+        Some("brackish")
+    );
+}
+
+// --- Water-type mixing: salt into brackish yields salt (AC005) ---
+
+#[test]
+fn mixing_salt_into_brackish_yields_salt() {
+    let mut world = square_world(&[(0, 0, 0), (1, 0, 0)]);
+    let source = cell(0, 0, 0);
+    let receiver = cell(1, 0, 0);
+    world.merge_cell_metadata(
+        &source,
+        json!({"fluid": {"type": "water", "level": 8, "water_type": "salt"}}),
+    );
+    world.merge_cell_metadata(
+        &receiver,
+        json!({"fluid": {"type": "water", "level": 1, "water_type": "brackish"}}),
+    );
+
+    let mut system = FluidSimulationSystem::default();
+    system.run(&mut world);
+
+    // Receiver (brackish level 1) gains one salt unit: salinity = (0.5+1)/2 = 0.75.
+    assert_eq!(
+        fluid_taxonomy(&world, &receiver, "water_type").as_deref(),
+        Some("salt")
+    );
+}
+
+// --- Flow state: inflow resets counter and restores flowing (AC006) ---
+
+#[test]
+fn inflow_resets_stale_cell_to_flowing() {
+    let mut world = square_world(&[(0, 0, 0), (1, 0, 0)]);
+    let source = cell(0, 0, 0);
+    let receiver = cell(1, 0, 0);
+    world.merge_cell_metadata(&source, json!({"fluid": {"type": "water", "level": 8}}));
+    world.merge_cell_metadata(
+        &receiver,
+        json!({"fluid": {"type": "water", "level": 1, "flow_state": "stale"}}),
+    );
+
+    let mut system = FluidSimulationSystem::default();
+    system.run(&mut world);
+
+    assert_eq!(
+        fluid_taxonomy(&world, &receiver, "flow_state").as_deref(),
+        Some("flowing")
+    );
+}
+
+// --- Flow state: no inflow for STALE_AFTER_TICKS yields stale (AC007) ---
+
+#[test]
+fn isolated_water_becomes_stale_after_threshold() {
+    let mut world = square_world(&[(0, 0, 0)]);
+    let c = cell(0, 0, 0);
+    world.merge_cell_metadata(&c, json!({"fluid": {"type": "water", "level": 4}}));
+
+    let mut system = FluidSimulationSystem::default();
+    for _ in 0..STALE_AFTER_TICKS {
+        system.run(&mut world);
+    }
+
+    assert_eq!(
+        fluid_taxonomy(&world, &c, "flow_state").as_deref(),
+        Some("stale")
+    );
+}
+
+// --- Flow state: shallow stale cell becomes swampy (AC008) ---
+
+#[test]
+fn shallow_stale_water_becomes_swampy_after_threshold() {
+    let mut world = square_world(&[(0, 0, 0)]);
+    let c = cell(0, 0, 0);
+    world.merge_cell_metadata(
+        &c,
+        json!({"fluid": {"type": "water", "level": 4, "depth": "shallow"}}),
+    );
+
+    let mut system = FluidSimulationSystem::default();
+    for _ in 0..SWAMPY_AFTER_TICKS {
+        system.run(&mut world);
+    }
+
+    assert_eq!(
+        fluid_taxonomy(&world, &c, "flow_state").as_deref(),
+        Some("swampy")
+    );
+}
+
+// --- Flow state: deep stale cell does not become swampy (AC009) ---
+
+#[test]
+fn deep_stale_water_does_not_become_swampy() {
+    let mut world = square_world(&[(0, 0, 0)]);
+    let c = cell(0, 0, 0);
+    world.merge_cell_metadata(
+        &c,
+        json!({"fluid": {"type": "water", "level": 4, "depth": "deep"}}),
+    );
+
+    let mut system = FluidSimulationSystem::default();
+    for _ in 0..SWAMPY_AFTER_TICKS {
+        system.run(&mut world);
+    }
+
+    assert_eq!(
+        fluid_taxonomy(&world, &c, "flow_state").as_deref(),
+        Some("stale")
+    );
 }

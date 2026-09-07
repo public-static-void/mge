@@ -14,8 +14,8 @@ pub mod ui;
 
 use crate::map::cell_key::CellKey;
 use crate::presentation::renderer::{
-    COLOR_BLACK, COLOR_BLUE, COLOR_DIM_GRAY, COLOR_GRAY, COLOR_RED, COLOR_VERY_DIM,
-    PresentationRenderer, RenderColor, RenderCommand,
+    COLOR_BLACK, COLOR_BLUE, COLOR_DARK_BLUE, COLOR_DIM_GRAY, COLOR_GRAY, COLOR_RED, COLOR_TEAL,
+    COLOR_VERY_DIM, PresentationRenderer, RenderColor, RenderCommand,
 };
 use std::collections::HashSet;
 
@@ -207,11 +207,32 @@ impl<R: PresentationRenderer> PresentationSystem<R> {
                                         w.max(m)
                                     });
                             if level > 0 {
-                                glyph = '~';
-                                color = match fluid.get("type").and_then(|v| v.as_str()) {
-                                    Some("magma") => COLOR_RED,
-                                    _ => COLOR_BLUE,
-                                };
+                                // Magma keeps its red glyph; water color follows
+                                // water_type and glyph follows flow_state (with
+                                // depth as fallback).
+                                if fluid.get("type").and_then(|v| v.as_str()) == Some("magma") {
+                                    glyph = '~';
+                                    color = COLOR_RED;
+                                } else {
+                                    color = match fluid.get("water_type").and_then(|v| v.as_str()) {
+                                        Some("brackish") => COLOR_TEAL,
+                                        Some("salt") => COLOR_DARK_BLUE,
+                                        _ => COLOR_BLUE,
+                                    };
+                                    glyph = match fluid.get("flow_state").and_then(|v| v.as_str()) {
+                                        Some("stale") => '·',
+                                        Some("swampy") => '%',
+                                        _ => {
+                                            if fluid.get("depth").and_then(|v| v.as_str())
+                                                == Some("deep")
+                                            {
+                                                '≈'
+                                            } else {
+                                                '~'
+                                            }
+                                        }
+                                    };
+                                }
                             }
                         }
                         (glyph, color)
