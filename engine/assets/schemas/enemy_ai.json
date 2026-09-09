@@ -1,0 +1,50 @@
+{
+  "title": "EnemyAI",
+  "description": "Deterministic finite state machine for enemy behavior: idle, patrol, chase, attack, flee.",
+  "type": "object",
+  "properties": {
+    "state": {
+      "type": ["string", "null"],
+      "enum": ["idle", "patrol", "chase", "attack", "flee"],
+      "default": "idle",
+      "description": "Current AI state"
+    },
+    "alert_level": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "maximum": 1,
+      "default": 0,
+      "description": "Alert level (0 = calm, 1 = fully alert)"
+    },
+    "detection_range": {
+      "type": ["integer", "null"],
+      "minimum": 1,
+      "default": 8,
+      "description": "Range in cells within which the entity detects hostile targets"
+    },
+    "attack_range": {
+      "type": ["integer", "null"],
+      "minimum": 1,
+      "default": 1,
+      "description": "Range in cells within which the entity can attack"
+    },
+    "flee_threshold": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "maximum": 1,
+      "default": 0.25,
+      "description": "Health fraction below which the entity flees"
+    },
+    "target_faction": {
+      "type": ["string", "null"],
+      "default": null,
+      "description": "Faction ID to prioritize as target"
+    },
+    "target_entity": {
+      "type": ["integer", "null"],
+      "default": null,
+      "description": "Explicit entity ID to target"
+    }
+  },
+  "modes": ["colony", "roguelike", "simulation"]
+}
