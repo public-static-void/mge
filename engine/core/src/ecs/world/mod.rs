@@ -125,6 +125,9 @@ pub struct World {
     /// Visible cells per entity (transient FOV state, not serialized)
     #[serde(skip)]
     pub visible_cells: HashMap<u32, HashSet<CellKey>>,
+    /// Noise level per cell (transient, recomputed each tick by NoiseSystem, not serialized)
+    #[serde(skip)]
+    pub noise_map: HashMap<CellKey, f64>,
     /// Explored cells per entity (persistent fog-of-war state, serialized for save/load).
     /// Old saves without this field deserialize as empty (backward compatible).
     #[serde(default)]
@@ -239,6 +242,7 @@ impl World {
             map_links: HashMap::new(),
             map_stack: Vec::new(),
             visible_cells: HashMap::new(),
+            noise_map: HashMap::new(),
             explored_cells: HashMap::new(),
             event_queues: HashMap::new(),
             map_postprocessors: Vec::new(),
@@ -296,6 +300,16 @@ impl World {
     /// Reset (clear) fog-of-war for all entities.
     pub fn reset_all_fog(&mut self) {
         self.explored_cells.clear();
+    }
+
+    /// Get the noise level at a cell, if any was propagated this tick.
+    pub fn get_noise_at(&self, cell: &CellKey) -> Option<f64> {
+        self.noise_map.get(cell).copied()
+    }
+
+    /// Replace the entire noise map (called by NoiseSystem after propagation).
+    pub fn set_noise_map(&mut self, map: HashMap<CellKey, f64>) {
+        self.noise_map = map;
     }
 
     /// Determine the visibility state of a cell for an entity.
