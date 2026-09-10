@@ -34,34 +34,6 @@ function get_square_xy(pos)
 	return nil, nil
 end
 
-function monster_turn(player, map)
-	local px, py = get_square_xy(get_component(player, "Position"))
-	for _, mid in ipairs(get_monster_eids()) do
-		if is_entity_alive(mid) then
-			local mpos = get_component(mid, "Position")
-			local mx, my = get_square_xy(mpos)
-			if mx and my then
-				local dx = px - mx
-				local dy = py - my
-				if math.abs(dx) + math.abs(dy) == 1 then
-					print("The monster attacks you!")
-					local php = get_component(player, "Health")
-					-- Damage = base + (strength * 0.3)
-					local mstats = get_component(mid, "Stats") or {strength = 1}
-					local damage = 1.0 + (mstats.strength or 1.0) * 0.3
-					php.current = math.max(0, php.current - damage)
-					set_component(player, "Health", php)
-				else
-					-- Move towards player (simple AI)
-					local step_x = dx ~= 0 and (dx > 0 and 1 or -1) or 0
-					local step_y = (dx == 0 and dy ~= 0) and (dy > 0 and 1 or -1) or 0
-					try_move(mid, step_x, step_y, map)
-				end
-			end
-		end
-	end
-end
-
 function spawn_entities_from_map(map)
 	for y, row in ipairs(map.tiles) do
 		local new_row = row
@@ -71,18 +43,26 @@ function spawn_entities_from_map(map)
 			if ch == "@" then
 				local eid = spawn_entity()
 				set_component(eid, "Player", { name = "Hero" })
+				set_component(eid, "Type", { kind = "player" })
 				set_component(eid, "Renderable", { glyph = "@", color = "yellow" })
 				set_component(eid, "Position", pos)
 				set_component(eid, "Health", { current = 10, max = 10 })
 				set_component(eid, "BaseStats", { strength = 3, dexterity = 2, intelligence = 1 })
+				set_component(eid, "Faction", { faction_id = "player_faction", role = "leader" })
+				set_component(eid, "Sight", { range = 8 })
 				new_row = new_row:sub(1, x - 1) .. "." .. new_row:sub(x + 1)
 			elseif ch == "M" then
 				local eid = spawn_entity()
 				set_component(eid, "Monster", { name = "Goblin", ai = "basic" })
+				set_component(eid, "Type", { kind = "enemy" })
 				set_component(eid, "Renderable", { glyph = "M", color = "red" })
 				set_component(eid, "Position", pos)
 				set_component(eid, "Health", { current = 5, max = 5 })
 				set_component(eid, "BaseStats", { strength = 2, dexterity = 1 })
+				-- EnemyBehaviorSystem drives behavior automatically per tick
+				set_component(eid, "EnemyAI", { state = "idle", detection_range = 5, attack_range = 1, flee_threshold = 0.25, target_faction = "player_faction" })
+				set_component(eid, "Sight", { range = 5 })
+				set_component(eid, "Faction", { faction_id = "monsters", role = "hostile" })
 				new_row = new_row:sub(1, x - 1) .. "." .. new_row:sub(x + 1)
 			elseif ch == "!" then
 				local eid = spawn_entity()
@@ -282,7 +262,8 @@ function main()
 					error("Player position is missing x/y")
 				end
 			end
-			monster_turn(player, map)
+			-- EnemyBehaviorSystem drives monster AI automatically per tick
+			tick()
 		end
 
 		if not is_entity_alive(player) then

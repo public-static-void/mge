@@ -1,0 +1,45 @@
+{
+  "title": "PatrolRoute",
+  "description": "Defines a patrol route with waypoints for enemy movement.",
+  "type": "object",
+  "properties": {
+    "waypoints": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "Square": {
+            "type": "object",
+            "properties": {
+              "x": { "type": "integer" },
+              "y": { "type": "integer" },
+              "z": { "type": "integer" }
+            },
+            "required": ["x", "y", "z"]
+          }
+        },
+        "required": ["Square"]
+      },
+      "default": [],
+      "description": "Ordered list of waypoints (Square topology)"
+    },
+    "current_index": {
+      "type": ["integer", "null"],
+      "minimum": 0,
+      "default": 0,
+      "description": "Index of the current target waypoint"
+    },
+    "loop": {
+      "type": ["boolean", "null"],
+      "default": true,
+      "description": "Whether to loop back to the first waypoint after the last"
+    },
+    "wait_ticks": {
+      "type": ["integer", "null"],
+      "minimum": 0,
+      "default": 0,
+      "description": "Number of ticks to wait at each waypoint before advancing"
+    }
+  },
+  "modes": ["colony", "roguelike", "simulation"]
+}
