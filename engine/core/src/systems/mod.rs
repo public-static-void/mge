@@ -14,6 +14,8 @@ pub mod derived_stats;
 pub mod dungeon;
 /// Economic system
 pub mod economic;
+/// Enemy AI behavior system (deterministic FSM: idle/patrol/chase/attack/flee)
+pub mod enemy_behavior;
 /// Equipment effect aggregation system
 pub mod equipment_effect_aggregation;
 /// Equipment logic system
