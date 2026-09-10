@@ -56,6 +56,7 @@ pub const SYSTEM_EXECUTION_ORDER: &[&str] = &[
     "FactionReputationSystem",
     "FluidSimulationSystem",
     "FovUpdateSystem",
+    "EnemyBehaviorSystem",
     "ProcessDeaths",
     "ProcessDecay",
 ];

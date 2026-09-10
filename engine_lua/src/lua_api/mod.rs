@@ -3,6 +3,8 @@
 //! All API functions are registered into the same table, which is then
 //! exposed to the Lua script.
 
+/// AI Behaviors API (patrol routes, AI state management)
+pub mod ai_behaviors;
 /// Body API
 pub mod body;
 /// Camera API
@@ -124,6 +126,7 @@ pub fn register_all_api_functions(
     material::register_material_api(lua, globals, world.clone())?;
     tech_tree::register_tech_tree_api(lua, globals, world.clone())?;
     fov::register_fov_api(lua, globals, world.clone())?;
+    ai_behaviors::register_ai_behaviors_api(lua, globals, world.clone())?;
     unit_template::register_unit_template_api(lua, globals, world.clone())?;
     item_definition::register_item_definition_api(lua, globals, world.clone())?;
     equipment_set_designer::register_equipment_set_designer_api(lua, globals, world.clone())?;
