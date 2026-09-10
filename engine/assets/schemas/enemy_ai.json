@@ -1,11 +1,11 @@
 {
   "title": "EnemyAI",
-  "description": "Deterministic finite state machine for enemy behavior: idle, patrol, chase, attack, flee.",
+  "description": "Deterministic finite state machine for enemy behavior: idle, patrol, investigate, chase, attack, flee.",
   "type": "object",
   "properties": {
     "state": {
       "type": ["string", "null"],
-      "enum": ["idle", "patrol", "chase", "attack", "flee"],
+      "enum": ["idle", "patrol", "chase", "attack", "flee", "investigate"],
       "default": "idle",
       "description": "Current AI state"
     },
@@ -44,6 +44,20 @@
       "type": ["integer", "null"],
       "default": null,
       "description": "Explicit entity ID to target"
+    },
+    "noise_detection_threshold": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "maximum": 1,
+      "default": 0.3,
+      "description": "Noise level above which the entity begins investigating"
+    },
+    "alert_decay_rate": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "maximum": 1,
+      "default": 0.1,
+      "description": "Amount alert_level decreases per tick when no stimulus is present"
     }
   },
   "modes": ["colony", "roguelike", "simulation"]

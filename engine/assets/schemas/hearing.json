@@ -1,0 +1,29 @@
+{
+  "title": "Hearing",
+  "description": "Defines an entity's ability to detect noise.",
+  "type": "object",
+  "properties": {
+    "range": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 20,
+      "default": 5,
+      "description": "Maximum hearing range in cells"
+    },
+    "sensitivity": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 2,
+      "default": 1.0,
+      "description": "Noise sensitivity multiplier (1.0 = normal, 2.0 = twice as sensitive)"
+    },
+    "threshold": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "default": 0.1,
+      "description": "Minimum noise level to trigger detection"
+    }
+  },
+  "modes": ["colony", "roguelike", "simulation"]
+}
