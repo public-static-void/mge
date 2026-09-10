@@ -13,8 +13,8 @@ pub fn register_ai_behaviors_api(
 ) -> LuaResult<()> {
     // set_patrol_route(entity_id, waypoints_table) -> bool
     let w = world.clone();
-    let set_patrol_route_fn = lua.create_function_mut(
-        move |_, (entity_id, waypoints): (u32, Table)| {
+    let set_patrol_route_fn =
+        lua.create_function_mut(move |_, (entity_id, waypoints): (u32, Table)| {
             let mut world = w.borrow_mut();
 
             // Convert Lua table to JSON array of Position objects
@@ -41,8 +41,7 @@ pub fn register_ai_behaviors_api(
                 .set_component(entity_id, "PatrolRoute", data)
                 .map_err(mlua::Error::external)?;
             Ok(true)
-        },
-    )?;
+        })?;
     globals.set("set_patrol_route", set_patrol_route_fn)?;
 
     // get_patrol_route(entity_id) -> table | nil
@@ -91,8 +90,8 @@ pub fn register_ai_behaviors_api(
 
     // set_ai_state(entity_id, state_string) -> bool
     let w = world.clone();
-    let set_ai_state_fn = lua.create_function_mut(
-        move |_, (entity_id, state): (u32, String)| {
+    let set_ai_state_fn =
+        lua.create_function_mut(move |_, (entity_id, state): (u32, String)| {
             // Validate state
             let valid_states = ["idle", "patrol", "chase", "attack", "flee"];
             if !valid_states.contains(&state.as_str()) {
@@ -126,8 +125,7 @@ pub fn register_ai_behaviors_api(
                 .set_component(entity_id, "EnemyAI", data)
                 .map_err(mlua::Error::external)?;
             Ok(true)
-        },
-    )?;
+        })?;
     globals.set("set_ai_state", set_ai_state_fn)?;
 
     // get_ai_state(entity_id) -> table | nil
@@ -145,7 +143,8 @@ pub fn register_ai_behaviors_api(
                 if let Some(alert_level) = data.get("alert_level").and_then(|v| v.as_f64()) {
                     result.set("alert_level", alert_level)?;
                 }
-                if let Some(detection_range) = data.get("detection_range").and_then(|v| v.as_i64()) {
+                if let Some(detection_range) = data.get("detection_range").and_then(|v| v.as_i64())
+                {
                     result.set("detection_range", detection_range)?;
                 }
                 if let Some(attack_range) = data.get("attack_range").and_then(|v| v.as_i64()) {

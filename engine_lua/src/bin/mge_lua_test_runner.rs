@@ -302,9 +302,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .borrow_mut()
             .register_system(FluidSimulationSystem::default());
         world.borrow_mut().register_system(FovUpdateSystem);
-        world
-            .borrow_mut()
-            .register_system(EnemyBehaviorSystem);
+        world.borrow_mut().register_system(EnemyBehaviorSystem);
         world.borrow_mut().register_system(FogUpdateSystem);
 
         // --- Economic System registration ---
