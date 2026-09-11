@@ -26,6 +26,7 @@ use crate::host_api::material::register_material_api;
 use crate::host_api::mode::register_mode_api;
 use crate::host_api::movement_ops::register_movement_ops_api;
 use crate::host_api::multiscale_map::register_multiscale_map_api;
+use crate::host_api::noise::register_noise_api;
 use crate::host_api::region::register_region_api;
 use crate::host_api::save_load::register_save_load_api;
 use crate::host_api::system::register_system_api;
@@ -186,6 +187,7 @@ impl WasmScriptEngine {
         register_material_api(&mut linker)?;
         register_faction_api(&mut linker)?;
         register_fov_api(&mut linker)?;
+        register_noise_api(&mut linker)?;
         register_tech_tree_api(&mut linker)?;
         register_unit_template_api(&mut linker)?;
         register_designer_api(&mut linker)?;

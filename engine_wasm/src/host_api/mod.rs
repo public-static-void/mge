@@ -103,6 +103,9 @@ pub mod loot;
 /// Faction and reputation module (set_faction, get_faction, modify_reputation, get_reputation)
 pub mod faction;
 
+/// Noise and detection module (emit_noise, get_noise_at, set_hearing, get_hearing)
+pub mod noise;
+
 /// Field-of-view module (get_visible_cells, is_visible, set_sight, get_sight)
 pub mod fov;
 
