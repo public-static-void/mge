@@ -55,6 +55,8 @@ pub mod mode;
 pub mod movement;
 /// Multi-scale map navigation API
 pub mod multiscale_map;
+/// Noise and detection API
+pub mod noise;
 /// Region API
 pub mod region;
 /// Save/Load API

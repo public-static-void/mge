@@ -13,6 +13,7 @@ use crate::python_api::job_query::JobQueryApi;
 use crate::python_api::material::MaterialApi;
 use crate::python_api::mode::ModeApi;
 use crate::python_api::movement::MovementApi;
+use crate::python_api::noise::NoiseApi;
 use crate::python_api::region::RegionApi;
 use crate::python_api::save_load::SaveLoadApi;
 use crate::python_api::time_of_day::TimeOfDayApi;
@@ -23,12 +24,14 @@ use engine_core::ecs::world::World;
 use engine_core::loot::LootEntry;
 use engine_core::systems::body_part_damage::BodyPartDamageSystem;
 use engine_core::systems::economic::{EconomicSystem, load_recipes_from_dir};
+use engine_core::systems::enemy_behavior::EnemyBehaviorSystem;
 use engine_core::systems::faction_reputation::FactionReputationSystem;
 use engine_core::systems::fluid::FluidSimulationSystem;
 use engine_core::systems::fog::FogUpdateSystem;
 use engine_core::systems::fov::FovUpdateSystem;
 use engine_core::systems::job::job_board::JobBoard;
 use engine_core::systems::job::types::loader::load_job_types_from_dir;
+use engine_core::systems::noise::NoiseSystem;
 use engine_core::systems::research::ResearchSystem;
 use engine_core::tech_tree;
 use pyo3::Python;
@@ -136,6 +139,8 @@ impl PyWorld {
         world.register_system(FactionReputationSystem);
         world.register_system(FluidSimulationSystem::default());
         world.register_system(FovUpdateSystem);
+        world.register_system(NoiseSystem);
+        world.register_system(EnemyBehaviorSystem);
         world.register_system(FogUpdateSystem);
         world.register_system(engine_core::systems::death_decay::ProcessDeaths);
         world.register_system(engine_core::systems::death_decay::ProcessDecay);
@@ -457,6 +462,29 @@ impl PyWorld {
     /// Switch the active FOV algorithm by registered name.
     fn set_fov_algorithm(&self, name: &str) {
         FovApi::set_fov_algorithm(self, name)
+    }
+
+    // ---- NOISE ----
+
+    /// Set/update the NoiseEmitter component on an entity. Returns True on success.
+    fn emit_noise(&self, entity: u32, intensity: f64, radius: u32) -> bool {
+        NoiseApi::emit_noise(self, entity, intensity, radius)
+    }
+
+    /// Get the noise level at a cell. Returns 0.0 when no noise was propagated.
+    fn get_noise_at(&self, x: i32, y: i32, z: i32) -> f64 {
+        NoiseApi::get_noise_at(self, x, y, z)
+    }
+
+    /// Set/update the Hearing component on an entity. Returns True on success.
+    #[pyo3(signature = (entity, range, sensitivity=1.0))]
+    fn set_hearing(&self, entity: u32, range: u32, sensitivity: f64) -> bool {
+        NoiseApi::set_hearing(self, entity, range, sensitivity)
+    }
+
+    /// Get the Hearing component data for an entity as a Python dict, or None.
+    fn get_hearing(&self, py: Python<'_>, entity: u32) -> PyResult<Option<PyObject>> {
+        NoiseApi::get_hearing(self, py, entity)
     }
 
     // ---- FOG OF WAR ----

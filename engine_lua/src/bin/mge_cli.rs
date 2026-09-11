@@ -20,6 +20,7 @@ use engine_core::systems::fluid::FluidSimulationSystem;
 use engine_core::systems::fog::FogUpdateSystem;
 use engine_core::systems::fov::FovUpdateSystem;
 use engine_core::systems::job::JobSystem;
+use engine_core::systems::noise::NoiseSystem;
 use engine_core::systems::research::ResearchSystem;
 use engine_core::systems::stat_calculation::StatCalculationSystem;
 use engine_core::worldgen::WorldgenRegistry;
@@ -179,6 +180,7 @@ fn main() {
         world.register_system(FactionReputationSystem);
         world.register_system(FluidSimulationSystem::default());
         world.register_system(FovUpdateSystem);
+        world.register_system(NoiseSystem);
         world.register_system(EnemyBehaviorSystem);
         world.register_system(FogUpdateSystem);
         world.register_system(ProcessDeaths);
@@ -275,6 +277,7 @@ fn main() {
         world.register_system(FactionReputationSystem);
         world.register_system(FluidSimulationSystem::default());
         world.register_system(FovUpdateSystem);
+        world.register_system(NoiseSystem);
         world.register_system(EnemyBehaviorSystem);
         world.register_system(FogUpdateSystem);
         world.register_system(ProcessDeaths);
