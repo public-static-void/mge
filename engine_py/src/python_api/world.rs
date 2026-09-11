@@ -19,6 +19,7 @@ use crate::python_api::save_load::SaveLoadApi;
 use crate::python_api::time_of_day::TimeOfDayApi;
 use crate::python_api::turn::TurnApi;
 use crate::python_api::unit_template::UnitTemplateApi;
+use crate::python_api::weather::WeatherApi;
 use crate::system_bridge::SystemBridge;
 use engine_core::ecs::world::World;
 use engine_core::loot::LootEntry;
@@ -33,6 +34,7 @@ use engine_core::systems::job::job_board::JobBoard;
 use engine_core::systems::job::types::loader::load_job_types_from_dir;
 use engine_core::systems::noise::NoiseSystem;
 use engine_core::systems::research::ResearchSystem;
+use engine_core::systems::weather::WeatherSystem;
 use engine_core::tech_tree;
 use pyo3::Python;
 use pyo3::prelude::*;
@@ -138,6 +140,7 @@ impl PyWorld {
         world.register_system(engine_core::systems::job::JobSystem);
         world.register_system(FactionReputationSystem);
         world.register_system(FluidSimulationSystem::default());
+        world.register_system(WeatherSystem);
         world.register_system(FovUpdateSystem);
         world.register_system(NoiseSystem);
         world.register_system(EnemyBehaviorSystem);
@@ -523,6 +526,24 @@ impl PyWorld {
     /// Get the time of day
     fn get_time_of_day(&self, py: Python) -> PyObject {
         TimeOfDayApi::get_time_of_day(self, py)
+    }
+
+    // ---- WEATHER ----
+
+    /// Get the current weather state as a dict with condition, intensity, duration_remaining.
+    fn get_weather(&self, py: Python) -> PyObject {
+        WeatherApi::get_weather(self, py)
+    }
+
+    /// Set the weather directly (scripting control).
+    /// Unrecognized condition strings map to Clear; intensity is clamped to [0.0, 1.0].
+    fn set_weather(&self, condition: String, intensity: f64, duration: u32) {
+        WeatherApi::set_weather(self, condition, intensity, duration)
+    }
+
+    /// Get the current visibility modifier (0.0–1.0, 1.0 = no reduction).
+    fn get_weather_visibility_modifier(&self) -> f64 {
+        WeatherApi::get_weather_visibility_modifier(self)
     }
 
     /// Add a cell to the map
