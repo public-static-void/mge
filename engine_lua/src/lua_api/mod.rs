@@ -80,6 +80,8 @@ pub mod turn;
 pub mod ui;
 /// Unit template API
 pub mod unit_template;
+/// Weather API (get_weather, set_weather, get_weather_visibility_modifier)
+pub mod weather;
 /// World API
 pub mod world;
 /// Worldgen API
@@ -133,5 +135,6 @@ pub fn register_all_api_functions(
     unit_template::register_unit_template_api(lua, globals, world.clone())?;
     item_definition::register_item_definition_api(lua, globals, world.clone())?;
     equipment_set_designer::register_equipment_set_designer_api(lua, globals, world.clone())?;
+    weather::register_weather_api(lua, globals, world.clone())?;
     Ok(())
 }
