@@ -71,6 +71,7 @@ engine_macros (proc-macro)
 - Movement — `move_entity`
 - Combat — `damage_entity`
 - Mode — `set_mode`, `get_mode`, `get_available_modes`
+- Noise — `emit_noise`, `get_noise_at`, `set_hearing`, `get_hearing` (BFS sound propagation, Hearing-based AI detection, Stealth modifier)
 - Simulation — `tick`, `get_turn`, `process_deaths`, `process_decay`
 - Worldgen — `register_worldgen_plugin`, `invoke_worldgen_plugin`
 - Jobs — full job system (board, query, mutation, events, AI assignment)

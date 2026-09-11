@@ -234,6 +234,7 @@ Identical API surface in Lua, Python, and WASM:
 - **Camera:** `set_camera(x, y, z?)`, `get_camera() → {x, y, z}` — identical in all three bridges (Lua `z?`, Python `z=0`, WASM guest passes z explicitly; WASM JSON string is the bridge transport, not a shape difference)
 - **Combat:** `damage_entity(id, amount)`
 - **Mode:** `set_mode(mode)`, `get_mode()`, `get_available_modes()`
+- **Noise:** `emit_noise(entity_id, intensity, radius)`, `get_noise_at(x, y, z)`, `set_hearing(entity_id, range, sensitivity?)`, `get_hearing(entity_id)` — NoiseSystem propagates sound via BFS with linear falloff (opaque cells block); Hearing-based AI detection escalates `alert_level` (idle → investigate → chase); Stealth `noise_modifier` reduces emission
 - **Simulation:** `tick()`, `get_turn()`, `process_deaths()`, `process_decay()`
 - **Worldgen:** `register_worldgen_plugin()`, `invoke_worldgen_plugin()`
 - **Jobs:** full job system API (board, query, mutation, events, AI assignment)
