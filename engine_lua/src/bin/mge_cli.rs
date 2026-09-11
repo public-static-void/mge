@@ -23,6 +23,7 @@ use engine_core::systems::job::JobSystem;
 use engine_core::systems::noise::NoiseSystem;
 use engine_core::systems::research::ResearchSystem;
 use engine_core::systems::stat_calculation::StatCalculationSystem;
+use engine_core::systems::weather::WeatherSystem;
 use engine_core::worldgen::WorldgenRegistry;
 use engine_lua::ScriptEngine;
 use std::cell::RefCell;
@@ -179,6 +180,7 @@ fn main() {
         world.register_system(JobSystem);
         world.register_system(FactionReputationSystem);
         world.register_system(FluidSimulationSystem::default());
+        world.register_system(WeatherSystem);
         world.register_system(FovUpdateSystem);
         world.register_system(NoiseSystem);
         world.register_system(EnemyBehaviorSystem);
@@ -276,6 +278,7 @@ fn main() {
         world.register_system(JobSystem);
         world.register_system(FactionReputationSystem);
         world.register_system(FluidSimulationSystem::default());
+        world.register_system(WeatherSystem);
         world.register_system(FovUpdateSystem);
         world.register_system(NoiseSystem);
         world.register_system(EnemyBehaviorSystem);
