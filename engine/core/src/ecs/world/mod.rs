@@ -44,6 +44,67 @@ pub type MapPostprocessor = Arc<dyn Fn(&mut World) -> Result<(), String> + Send 
 /// Map validator function
 pub type MapValidator = Arc<dyn Fn(&serde_json::Value) -> Result<(), String> + Send + Sync>;
 
+/// Weather condition variants — six distinct atmospheric states.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum WeatherCondition {
+    #[default]
+    Clear,
+    Cloudy,
+    Rain,
+    Snow,
+    Storm,
+    Fog,
+}
+
+impl WeatherCondition {
+    /// Returns a lowercase string representation for cross-language bridging.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            WeatherCondition::Clear => "clear",
+            WeatherCondition::Cloudy => "cloudy",
+            WeatherCondition::Rain => "rain",
+            WeatherCondition::Snow => "snow",
+            WeatherCondition::Storm => "storm",
+            WeatherCondition::Fog => "fog",
+        }
+    }
+
+    /// Parse a condition string (case-insensitive). Unrecognized strings default to Clear.
+    pub fn from_name(s: &str) -> Self {
+        match s.to_lowercase().as_str() {
+            "cloudy" => WeatherCondition::Cloudy,
+            "rain" => WeatherCondition::Rain,
+            "snow" => WeatherCondition::Snow,
+            "storm" => WeatherCondition::Storm,
+            "fog" => WeatherCondition::Fog,
+            _ => WeatherCondition::Clear,
+        }
+    }
+}
+
+/// Persistent weather state — stored on World, serialized for save/load.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WeatherState {
+    pub condition: WeatherCondition,
+    /// Atmospheric intensity 0.0–1.0 (drives visibility modifier scaling).
+    pub intensity: f64,
+    /// Ticks remaining in the current condition before a transition.
+    pub duration_remaining: u32,
+    /// Deterministic RNG seed, persisted across ticks for save/load determinism.
+    pub rng_state: [u8; 32],
+}
+
+impl Default for WeatherState {
+    fn default() -> Self {
+        Self {
+            condition: WeatherCondition::Clear,
+            intensity: 0.0,
+            duration_remaining: 0,
+            rng_state: [0u8; 32],
+        }
+    }
+}
+
 /// Time of day
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct TimeOfDay {
@@ -70,6 +131,9 @@ pub struct World {
     pub turn: u32,
     /// Current time of day.
     pub time_of_day: TimeOfDay,
+    /// Global weather state (persistent, serialized for save/load).
+    #[serde(default)]
+    pub weather: WeatherState,
     /// Component registry
     #[serde(skip)]
     pub registry: Arc<Mutex<ComponentRegistry>>,
@@ -128,6 +192,10 @@ pub struct World {
     /// Noise level per cell (transient, recomputed each tick by NoiseSystem, not serialized)
     #[serde(skip)]
     pub noise_map: HashMap<CellKey, f64>,
+    /// Weather-driven visibility multiplier (0.0–1.0, 1.0 = no reduction).
+    /// Recomputed each tick by WeatherSystem, not persisted.
+    #[serde(skip)]
+    pub visibility_modifier: f64,
     /// Explored cells per entity (persistent fog-of-war state, serialized for save/load).
     /// Old saves without this field deserialize as empty (backward compatible).
     #[serde(default)]
@@ -222,6 +290,7 @@ impl World {
             current_mode: "colony".to_string(),
             turn: 0,
             time_of_day: TimeOfDay::default(),
+            weather: WeatherState::default(),
             registry,
             systems: SystemRegistry::new(),
             event_buses: crate::ecs::event_bus_registry::EventBusRegistry::new(),
@@ -243,6 +312,7 @@ impl World {
             map_stack: Vec::new(),
             visible_cells: HashMap::new(),
             noise_map: HashMap::new(),
+            visibility_modifier: 1.0,
             explored_cells: HashMap::new(),
             event_queues: HashMap::new(),
             map_postprocessors: Vec::new(),

@@ -40,6 +40,8 @@ pub mod noise;
 pub mod research;
 /// Stat calculation system
 pub mod stat_calculation;
+/// Weather system (deterministic global weather state)
+pub mod weather;
 
 /// Deterministic system execution order per specification R011.
 ///
@@ -57,6 +59,7 @@ pub const SYSTEM_EXECUTION_ORDER: &[&str] = &[
     "EconomicSystem",
     "FactionReputationSystem",
     "FluidSimulationSystem",
+    "WeatherSystem",
     "FovUpdateSystem",
     "NoiseSystem",
     "EnemyBehaviorSystem",
