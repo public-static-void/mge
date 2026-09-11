@@ -43,7 +43,7 @@
 - [x] Field-of-view and lighting simulation
 - [x] Fog of war and visibility system
 - [x] AI behaviors (enemy tactics, patrol routes)
-- [ ] Noise and detection mechanics
+- [x] Noise and detection mechanics
 - [x] Item generation and loot tables
 - [x] Material and property system
 - [x] Time-of-day and season cycle

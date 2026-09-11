@@ -1,0 +1,32 @@
+{
+  "title": "NoiseEmitter",
+  "description": "Makes an entity emit noise each tick, propagable by NoiseSystem.",
+  "type": "object",
+  "properties": {
+    "intensity": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 10,
+      "default": 1.0,
+      "description": "Noise intensity (0 = silent, 10 = deafening)"
+    },
+    "radius": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 20,
+      "default": 5,
+      "description": "Noise propagation radius in cells"
+    },
+    "active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether this emitter is currently active"
+    },
+    "action_type": {
+      "type": ["string", "null"],
+      "default": null,
+      "description": "Optional tag for the noise source (e.g. movement, combat)"
+    }
+  },
+  "modes": ["colony", "roguelike", "simulation"]
+}

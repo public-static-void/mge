@@ -236,6 +236,10 @@ pub struct WasmWorld {
     #[serde(default)]
     pub material_definitions: HashMap<String, JsonValue>,
 
+    /// Transient noise map (recomputed each tick by NoiseSystem, not serialized).
+    #[serde(skip)]
+    pub noise_map: HashMap<CellKey, f64>,
+
     /// Active FOV algorithm name (for display/debugging).
     #[serde(skip, default = "default_fov_algo_name")]
     pub fov_algorithm_name: String,
@@ -322,6 +326,7 @@ impl WasmWorld {
             job_event_log: Vec::new(),
             visible_cells: HashMap::new(),
             explored_cells: HashMap::new(),
+            noise_map: HashMap::new(),
             widget_registry: HashMap::new(),
             widget_types: HashMap::new(),
             widget_parents: HashMap::new(),
@@ -2544,6 +2549,18 @@ impl WasmWorld {
             .map(|cells| cells.contains(cell))
             .unwrap_or(false);
         if explored { 1 } else { 0 }
+    }
+
+    // ---- Noise API ----
+
+    /// Get the noise level at a cell, if any was propagated this tick.
+    pub fn get_noise_at(&self, cell: &CellKey) -> Option<f64> {
+        self.noise_map.get(cell).copied()
+    }
+
+    /// Replace the entire noise map (called by NoiseSystem after propagation).
+    pub fn set_noise_map(&mut self, map: HashMap<CellKey, f64>) {
+        self.noise_map = map;
     }
 
     // ---- UI Widget API ----

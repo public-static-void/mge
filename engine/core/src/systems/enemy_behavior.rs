@@ -1,7 +1,8 @@
 //! Enemy AI behavior system with deterministic finite state machine.
 //!
-//! Implements R003–R013: idle/patrol/chase/attack/flee states, target selection,
-//! A* pathfinding movement, deterministic RNG, and collect-then-apply pattern.
+//! Implements R003–R018: idle/patrol/investigate/chase/attack/flee states, target selection,
+//! A* pathfinding movement, deterministic RNG, noise detection via Hearing, and
+//! collect-then-apply pattern.
 
 use crate::ecs::system::System;
 use crate::ecs::world::World;
@@ -24,7 +25,7 @@ impl System for EnemyBehaviorSystem {
     }
 
     fn dependencies(&self) -> &'static [&'static str] {
-        &["FovUpdateSystem"]
+        &["FovUpdateSystem", "NoiseSystem"]
     }
 
     fn run(&mut self, world: &mut World) {
@@ -45,7 +46,7 @@ impl System for EnemyBehaviorSystem {
                 continue;
             };
             let health = world.get_component(eid, "Health").cloned();
-            let _sight = world.get_component(eid, "Sight").cloned();
+            let _hearing = world.get_component(eid, "Hearing").cloned();
 
             let state = ai
                 .get("state")
@@ -57,6 +58,7 @@ impl System for EnemyBehaviorSystem {
                 "idle" => tick_idle(world, eid, &ai, &position, health.as_ref()),
                 "patrol" => tick_patrol(world, eid, &ai, &position, health.as_ref()),
                 "chase" => tick_chase(world, eid, &ai, &position, health.as_ref()),
+                "investigate" => tick_investigate(world, eid, &ai, &position, health.as_ref()),
                 "attack" => tick_attack(world, eid, &ai, &position, health.as_ref()),
                 "flee" => tick_flee(world, eid, &ai, &position, health.as_ref()),
                 _ => None,
@@ -303,7 +305,8 @@ fn default_decision(eid: u32, ai: JsonValue) -> EnemyDecision {
 // State tick functions
 // ---------------------------------------------------------------------------
 
-/// R006 — idle: detect hostile → chase; has PatrolRoute → patrol; else stay idle.
+/// R006/R015 — idle: visual contact → chase; noise detection → investigate/chase;
+/// has PatrolRoute → patrol; else stay idle.
 fn tick_idle(
     world: &World,
     eid: u32,
@@ -314,7 +317,7 @@ fn tick_idle(
     let my_pos = CellKey::from_position(position)?;
     let visible = world.get_visible_cells(eid);
 
-    // R006: Detect hostile within detection_range → chase
+    // R006/R016: Visual contact within detection_range → chase (alert_level = 1.0)
     if let Some(target) = select_target(world, eid, ai, visible) {
         let detection_range = ai
             .get("detection_range")
@@ -330,12 +333,18 @@ fn tick_idle(
             let mut d = default_decision(eid, ai.clone());
             d.new_ai["state"] = json!("chase");
             d.new_ai["current_target"] = json!(target);
+            d.new_ai["alert_level"] = json!(1.0);
             if let Some((x, y, z)) = cell_to_xyz(&my_pos) {
                 d.new_ai["home_position"] = json!({"Square": {"x": x, "y": y, "z": z}});
             }
             d.new_ai["lost_target_ticks"] = json!(0);
             return Some(d);
         }
+    }
+
+    // R015: Noise detection via Hearing — escalate alert_level, transition to investigate/chase
+    if let Some(d) = noise_detection(world, eid, ai, &my_pos) {
+        return Some(d);
     }
 
     // R006: Has PatrolRoute → patrol
@@ -348,7 +357,8 @@ fn tick_idle(
     None
 }
 
-/// R007 — patrol: move toward waypoints, advance index, detect hostile → chase.
+/// R007/R015 — patrol: move toward waypoints, advance index, detect hostile → chase,
+/// noise detection → investigate/chase.
 fn tick_patrol(
     world: &World,
     eid: u32,
@@ -359,7 +369,7 @@ fn tick_patrol(
     let my_pos = CellKey::from_position(position)?;
     let visible = world.get_visible_cells(eid);
 
-    // R007: Detect hostile → chase (priority over patrol movement)
+    // R007/R016: Visual contact → chase (alert_level = 1.0, priority over patrol movement)
     if let Some(target) = select_target(world, eid, ai, visible) {
         let detection_range = ai
             .get("detection_range")
@@ -373,12 +383,18 @@ fn tick_patrol(
             let mut d = default_decision(eid, ai.clone());
             d.new_ai["state"] = json!("chase");
             d.new_ai["current_target"] = json!(target);
+            d.new_ai["alert_level"] = json!(1.0);
             if let Some((x, y, z)) = cell_to_xyz(&my_pos) {
                 d.new_ai["home_position"] = json!({"Square": {"x": x, "y": y, "z": z}});
             }
             d.new_ai["lost_target_ticks"] = json!(0);
             return Some(d);
         }
+    }
+
+    // R015: Noise detection via Hearing — escalate alert_level, transition to investigate/chase
+    if let Some(d) = noise_detection(world, eid, ai, &my_pos) {
+        return Some(d);
     }
 
     let route = world.get_component(eid, "PatrolRoute")?.clone();
@@ -451,6 +467,74 @@ fn tick_patrol(
     None
 }
 
+/// R015 — investigate: visual contact → chase; noise escalation → chase at >0.7;
+/// no movement; decay to idle when alert_level reaches 0.
+fn tick_investigate(
+    world: &World,
+    eid: u32,
+    ai: &JsonValue,
+    position: &JsonValue,
+    _health: Option<&JsonValue>,
+) -> Option<EnemyDecision> {
+    let my_pos = CellKey::from_position(position)?;
+    let visible = world.get_visible_cells(eid);
+
+    // R015/R016: Visual contact → chase (alert_level = 1.0)
+    if let Some(target) = select_target(world, eid, ai, visible) {
+        let detection_range = ai
+            .get("detection_range")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(8) as i32;
+        let target_pos = world
+            .get_component(target, "Position")
+            .and_then(CellKey::from_position)?;
+        let dist = manhattan_distance(&my_pos, &target_pos);
+        if dist <= detection_range {
+            let mut d = default_decision(eid, ai.clone());
+            d.new_ai["state"] = json!("chase");
+            d.new_ai["current_target"] = json!(target);
+            d.new_ai["alert_level"] = json!(1.0);
+            if let Some((x, y, z)) = cell_to_xyz(&my_pos) {
+                d.new_ai["home_position"] = json!({"Square": {"x": x, "y": y, "z": z}});
+            }
+            d.new_ai["lost_target_ticks"] = json!(0);
+            return Some(d);
+        }
+    }
+
+    // R015: Noise detection — escalate to chase at >0.7, otherwise stay investigating
+    if let Some(mut d) = noise_detection(world, eid, ai, &my_pos) {
+        let alert = d
+            .new_ai
+            .get("alert_level")
+            .and_then(|v| v.as_f64())
+            .unwrap_or(0.0);
+        let state = d
+            .new_ai
+            .get("state")
+            .and_then(|v| v.as_str())
+            .unwrap_or("investigate");
+        // R015: No stimulus + alert_level == 0 → idle
+        if state == "investigate" && alert == 0.0 {
+            d.new_ai["state"] = json!("idle");
+        }
+        return Some(d);
+    }
+
+    // No Hearing component or already calm — settle to idle
+    let mut d = default_decision(eid, ai.clone());
+    let alert = d
+        .new_ai
+        .get("alert_level")
+        .and_then(|v| v.as_f64())
+        .unwrap_or(0.0);
+    if alert == 0.0 {
+        d.new_ai["state"] = json!("idle");
+        return Some(d);
+    }
+    None
+}
+
 /// R008 — chase: move toward target, transition to attack/flee/idle.
 fn tick_chase(
     world: &World,
@@ -467,10 +551,21 @@ fn tick_chase(
         .and_then(|v| v.as_u64())
         .map(|v| v as u32);
 
-    // R008: If no target or target dead, return home
+    // R008: If no target or target dead, chase noise if present, else return home
     let target_id = match target_id {
         Some(id) if world.is_entity_alive(id) => id,
-        _ => return return_to_home(world, eid, ai),
+        _ => {
+            // R015: Target lost but noise present — continue chase toward the noise source
+            if world.get_noise_at(&my_pos).unwrap_or(0.0) > 0.0 {
+                let mut d = default_decision(eid, ai.clone());
+                d.new_ai["lost_target_ticks"] = json!(0);
+                if let Some(new_pos) = move_toward_noise(world, &my_pos) {
+                    d.new_position = Some(new_pos);
+                }
+                return Some(d);
+            }
+            return return_to_home(world, eid, ai);
+        }
     };
 
     let target_visible = visible
@@ -652,6 +747,65 @@ fn should_flee(ai: &JsonValue, health: Option<&JsonValue>) -> bool {
     }
 }
 
+/// R015: Evaluate noise stimulus for an entity with Hearing.
+///
+/// Returns a decision when the entity has Hearing and either noise is detected
+/// (alert_level incremented by `noise × sensitivity`, capped at 1.0, with state
+/// transitions at `noise_detection_threshold` → investigate and 0.7 → chase) or
+/// alert_level decays by `alert_decay_rate` when no noise is present (floored at 0).
+/// Returns None when the entity has no Hearing or is already calm with no noise.
+fn noise_detection(
+    world: &World,
+    eid: u32,
+    ai: &JsonValue,
+    my_pos: &CellKey,
+) -> Option<EnemyDecision> {
+    let hearing = world.get_component(eid, "Hearing").cloned()?;
+    let sensitivity = hearing
+        .get("sensitivity")
+        .and_then(|v| v.as_f64())
+        .unwrap_or(1.0);
+    let threshold = hearing
+        .get("threshold")
+        .and_then(|v| v.as_f64())
+        .unwrap_or(0.1);
+
+    let noise_level = world.get_noise_at(my_pos).unwrap_or(0.0);
+    let mut d = default_decision(eid, ai.clone());
+    let current_alert = d
+        .new_ai
+        .get("alert_level")
+        .and_then(|v| v.as_f64())
+        .unwrap_or(0.0);
+
+    if noise_level >= threshold * sensitivity {
+        let new_alert = (current_alert + noise_level * sensitivity).min(1.0);
+        d.new_ai["alert_level"] = json!(new_alert);
+        if new_alert > 0.7 {
+            d.new_ai["state"] = json!("chase");
+        } else if new_alert
+            > ai.get("noise_detection_threshold")
+                .and_then(|v| v.as_f64())
+                .unwrap_or(0.3)
+        {
+            d.new_ai["state"] = json!("investigate");
+        }
+        return Some(d);
+    }
+
+    // R017: No noise stimulus — decay alert_level by alert_decay_rate, floored at 0
+    if current_alert > 0.0 {
+        let decay_rate = ai
+            .get("alert_decay_rate")
+            .and_then(|v| v.as_f64())
+            .unwrap_or(0.1);
+        d.new_ai["alert_level"] = json!((current_alert - decay_rate).max(0.0));
+        return Some(d);
+    }
+
+    None
+}
+
 /// Return to home_position after losing target.
 fn return_to_home(world: &World, eid: u32, ai: &JsonValue) -> Option<EnemyDecision> {
     let my_pos = world
@@ -696,6 +850,26 @@ fn flee_from(world: &World, from: &CellKey, target: &CellKey) -> Option<(i32, i3
             if best.is_none_or(|(_, d)| dist > d) {
                 best = Some(((nx, ny, nz), dist));
             }
+        }
+    }
+
+    best.map(|(pos, _)| pos)
+}
+
+/// R015: Move one step toward the neighbor with the highest noise level.
+fn move_toward_noise(world: &World, from: &CellKey) -> Option<(i32, i32, i32)> {
+    let map = world.map.as_ref()?;
+    let neighbors = map.neighbors(from);
+    let current_noise = world.get_noise_at(from).unwrap_or(0.0);
+
+    let mut best: Option<((i32, i32, i32), f64)> = None;
+    for n in &neighbors {
+        let noise = world.get_noise_at(n).unwrap_or(0.0);
+        if noise > current_noise
+            && best.is_none_or(|(_, n)| noise > n)
+            && let Some(xyz) = cell_to_xyz(n)
+        {
+            best = Some((xyz, noise));
         }
     }
 

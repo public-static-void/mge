@@ -1,0 +1,15 @@
+{
+  "title": "Stealth",
+  "description": "Reduces noise emitted by an entity.",
+  "type": "object",
+  "properties": {
+    "noise_modifier": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "default": 1.0,
+      "description": "Noise multiplier (1.0 = no reduction, 0.0 = silent)"
+    }
+  },
+  "modes": ["colony", "roguelike", "simulation"]
+}

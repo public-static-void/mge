@@ -62,6 +62,8 @@ pub mod movement_ops;
 /// Multi-scale map navigation API (register_map, set_active_map, get_map_names,
 /// get_active_map_name, link_maps, enter_map, exit_map, map_cell, unmap_cell)
 pub mod multiscale_map;
+/// Noise and detection API (emit_noise, get_noise_at, set_hearing, get_hearing)
+pub mod noise;
 /// Region API
 pub mod region;
 /// Save/Load API
@@ -126,6 +128,7 @@ pub fn register_all_api_functions(
     material::register_material_api(lua, globals, world.clone())?;
     tech_tree::register_tech_tree_api(lua, globals, world.clone())?;
     fov::register_fov_api(lua, globals, world.clone())?;
+    noise::register_noise_api(lua, globals, world.clone())?;
     ai_behaviors::register_ai_behaviors_api(lua, globals, world.clone())?;
     unit_template::register_unit_template_api(lua, globals, world.clone())?;
     item_definition::register_item_definition_api(lua, globals, world.clone())?;

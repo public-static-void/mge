@@ -34,6 +34,8 @@ pub mod inventory;
 pub mod job;
 /// Movement system
 pub mod movement_system;
+/// Noise propagation system
+pub mod noise;
 /// Research system
 pub mod research;
 /// Stat calculation system
@@ -56,6 +58,7 @@ pub const SYSTEM_EXECUTION_ORDER: &[&str] = &[
     "FactionReputationSystem",
     "FluidSimulationSystem",
     "FovUpdateSystem",
+    "NoiseSystem",
     "EnemyBehaviorSystem",
     "ProcessDeaths",
     "ProcessDecay",
