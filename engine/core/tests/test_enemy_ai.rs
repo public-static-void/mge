@@ -154,7 +154,7 @@ fn enemy_system_name() {
 #[test]
 fn enemy_system_dependencies() {
     let system = EnemyBehaviorSystem;
-    assert_eq!(system.dependencies(), &["FovUpdateSystem"]);
+    assert_eq!(system.dependencies(), &["FovUpdateSystem", "NoiseSystem"]);
 }
 
 #[test]
