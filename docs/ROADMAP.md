@@ -47,7 +47,7 @@
 - [x] Item generation and loot tables
 - [x] Material and property system
 - [x] Time-of-day and season cycle
-- [ ] Weather and climate system
+- [x] Weather and climate system
 - [ ] Building and construction system
 - [ ] Administration and zone management
 - [ ] Temperature and environment simulation
