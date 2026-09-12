@@ -22,6 +22,9 @@ pub mod dungeon;
 /// Time of day module
 pub mod time_of_day;
 
+/// Weather module
+pub mod weather;
+
 /// UI module
 pub mod ui;
 

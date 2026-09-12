@@ -3,8 +3,10 @@ use crate::ecs::item::ItemRegistry;
 use crate::ecs::template::UnitTemplateRegistry;
 use crate::ecs::world::component::enforce_schema_defaults;
 use crate::ecs::world::loadout::EquipmentIssue;
+use crate::ecs::world::{WeatherCondition, WeatherState};
 use crate::loot::LootTableRegistry;
 use crate::map::CellKey;
+use crate::systems::weather::compute_visibility_modifier;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use std::collections::{HashMap, HashSet};
@@ -114,6 +116,12 @@ pub struct WasmWorld {
     pub turn: u32,
     /// Time of day
     pub time_of_day: TimeOfDay,
+    /// Global weather state (persistent, serialized for save/load).
+    #[serde(default)]
+    pub weather: WeatherState,
+    /// Transient visibility modifier (recomputed each tick, not serialized).
+    #[serde(skip)]
+    pub visibility_modifier: f64,
     /// Camera state
     #[serde(default)]
     pub camera: Option<Camera>,
@@ -303,6 +311,8 @@ impl WasmWorld {
                 minute: 0,
                 day: 0,
             },
+            weather: WeatherState::default(),
+            visibility_modifier: 1.0,
             camera: None,
             event_buses: HashMap::new(),
             event_reader_positions: HashMap::new(),
@@ -804,6 +814,10 @@ impl WasmWorld {
         self.turn += 1;
         self.advance_time_of_day();
         self.simulate_fluid();
+        // Recompute the transient visibility modifier from weather state,
+        // mirroring WeatherSystem's per-tick recompute (R008/R009).
+        self.visibility_modifier =
+            compute_visibility_modifier(self.weather.condition, self.weather.intensity);
     }
 
     /// Returns the current turn number.
@@ -904,6 +918,27 @@ impl WasmWorld {
     /// Returns the current time of day.
     pub fn get_time_of_day(&self) -> TimeOfDay {
         self.time_of_day
+    }
+
+    /// Returns the current weather state.
+    pub fn get_weather(&self) -> WeatherState {
+        self.weather.clone()
+    }
+
+    /// Sets the weather state directly (scripting control).
+    ///
+    /// Unrecognized condition strings map to Clear; intensity is clamped to
+    /// [0.0, 1.0]; duration 0 forces a transition on the next tick in worlds
+    /// that run WeatherSystem.
+    pub fn set_weather(&mut self, condition: &str, intensity: f64, duration: u32) {
+        self.weather.condition = WeatherCondition::from_name(condition);
+        self.weather.intensity = intensity.clamp(0.0, 1.0);
+        self.weather.duration_remaining = duration;
+    }
+
+    /// Returns the current visibility modifier (1.0 = no reduction).
+    pub fn get_weather_visibility_modifier(&self) -> f64 {
+        self.visibility_modifier
     }
 
     /// Reads a line of user input from the configured input source.
