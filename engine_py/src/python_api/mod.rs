@@ -71,6 +71,8 @@ pub mod turn;
 pub mod ui;
 /// Unit template API
 pub mod unit_template;
+/// Weather API
+pub mod weather;
 /// World API
 pub mod world;
 

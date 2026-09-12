@@ -26,6 +26,7 @@ use engine_core::systems::job::{
 use engine_core::systems::noise::NoiseSystem;
 use engine_core::systems::research::ResearchSystem;
 use engine_core::systems::stat_calculation::StatCalculationSystem;
+use engine_core::systems::weather::WeatherSystem;
 use engine_lua::ScriptEngine;
 use gag::BufferRedirect;
 use regex::Regex;
@@ -302,6 +303,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         world
             .borrow_mut()
             .register_system(FluidSimulationSystem::default());
+        world.borrow_mut().register_system(WeatherSystem);
         world.borrow_mut().register_system(FovUpdateSystem);
         world.borrow_mut().register_system(NoiseSystem);
         world.borrow_mut().register_system(EnemyBehaviorSystem);

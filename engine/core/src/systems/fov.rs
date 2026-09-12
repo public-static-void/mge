@@ -52,14 +52,20 @@ impl System for FovUpdateSystem {
             for (&entity, data) in sight_components.iter() {
                 let range = data.get("range").and_then(|v| v.as_u64()).unwrap_or(8) as u32;
 
+                // Weather-driven visibility reduction: effective range scales with
+                // the modifier set by WeatherSystem (fog/rain/storms reduce sight).
+                let effective_range =
+                    (range as f64 * world.visibility_modifier).round().max(1.0) as u32;
+
                 if let Some(pos) = world
                     .get_component(entity, "Position")
                     .and_then(CellKey::from_position)
                 {
-                    let visible =
-                        world
-                            .fov_algorithm()
-                            .compute_fov(&pos, range, map.topology.as_ref());
+                    let visible = world.fov_algorithm().compute_fov(
+                        &pos,
+                        effective_range,
+                        map.topology.as_ref(),
+                    );
 
                     let visible: HashSet<CellKey> = visible
                         .into_iter()
