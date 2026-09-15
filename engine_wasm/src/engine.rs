@@ -2,6 +2,7 @@ use crate::host_api::body::register_body_api;
 use crate::host_api::body_part_damage::register_body_part_damage_api;
 use crate::host_api::camera::register_camera_api;
 use crate::host_api::component::register_component_api;
+use crate::host_api::construction::register_construction_api;
 use crate::host_api::death_decay::register_death_decay_api;
 use crate::host_api::designer::register_designer_api;
 use crate::host_api::dungeon::register_dungeon_api;
@@ -154,6 +155,7 @@ impl WasmScriptEngine {
         let mut linker = Linker::new(&engine);
         register_entity_api(&mut linker)?;
         register_component_api(&mut linker)?;
+        register_construction_api(&mut linker)?;
         register_turn_api(&mut linker)?;
         register_mode_api(&mut linker)?;
         register_death_decay_api(&mut linker)?;

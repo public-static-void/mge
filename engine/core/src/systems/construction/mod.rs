@@ -11,13 +11,16 @@
 //! Cancel/demolish semantics are part of this module: [`cancel_construction`]
 //! refunds delivered materials and retires the ghost plus its job, while
 //! [`demolish_building`] removes completed `Building` entities with no refund.
-//! The bridge op surface (Lua/Python/WASM) is layered later. This module owns
-//! the core loop plus teardown: [`place_blueprint`], [`cancel_construction`],
-//! [`demolish_building`], and [`ConstructionSystem`].
+//! The bridge op surface (Lua/Python/WASM) calls into these core functions
+//! with identical argument order and return shapes; each bridge enforces the
+//! colony-mode gate before delegating. This module owns
+//! the core loop plus teardown: [`place_blueprint`], [`get_construction_state`],
+//! [`cancel_construction`], [`demolish_building`], and [`ConstructionSystem`].
 
 /// Construction progress and completion system.
 pub mod system;
 
 pub use system::{
-    ConstructionSystem, cancel_construction, cell_position_json, demolish_building, place_blueprint,
+    ConstructionSystem, cancel_construction, cell_position_json, demolish_building,
+    get_construction_state, place_blueprint,
 };

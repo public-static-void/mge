@@ -9,6 +9,8 @@ pub mod body;
 pub mod camera_api;
 /// Component API
 pub mod component;
+/// Construction API (place_blueprint, get_construction_state, cancel_construction, demolish_building)
+pub mod construction;
 /// Death/decay API
 pub mod death_decay;
 /// Designer API (item definitions, equipment sets, loadouts)

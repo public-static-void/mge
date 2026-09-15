@@ -756,6 +756,42 @@ impl PyWorld {
         crate::python_api::job_reservation::run_resource_reservation_system(self)
     }
 
+    // ---- CONSTRUCTION ----
+
+    /// Place a validated construction blueprint; returns the site entity id.
+    /// Identical arg order to the Lua/WASM surface:
+    /// `(building_type, cell, required_materials, required_work)`.
+    fn place_blueprint(
+        &self,
+        building_type: String,
+        cell: Bound<'_, PyAny>,
+        required_materials: Bound<'_, PyAny>,
+        required_work: i64,
+    ) -> PyResult<u32> {
+        crate::python_api::construction::place_blueprint(
+            self,
+            building_type,
+            &cell,
+            &required_materials,
+            required_work,
+        )
+    }
+
+    /// Return `{ state, progress, required_work, building_type }` for a site.
+    fn get_construction_state(&self, py: Python, site_id: u32) -> PyResult<PyObject> {
+        crate::python_api::construction::get_construction_state(self, py, site_id)
+    }
+
+    /// Cancel a pre-completion site; returns True.
+    fn cancel_construction(&self, site_id: u32) -> PyResult<bool> {
+        crate::python_api::construction::cancel_construction(self, site_id)
+    }
+
+    /// Demolish a completed building; returns True.
+    fn demolish_building(&self, building_id: u32) -> PyResult<bool> {
+        crate::python_api::construction::demolish_building(self, building_id)
+    }
+
     /// Returns a list of all registered job type names.
     fn get_job_types(&self) -> PyResult<Vec<String>> {
         crate::python_api::job_board::get_job_types(self)

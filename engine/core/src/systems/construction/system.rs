@@ -154,6 +154,65 @@ pub fn place_blueprint(
     Ok(site_id)
 }
 
+/// Returns the observable construction state for a site.
+///
+/// In colony mode returns `{ state, progress, required_work, building_type }`
+/// from the live `ConstructionSite` component; for a completed site (which
+/// carries `Building` instead) returns `state: "complete"` with the building
+/// type and `progress`/`required_work` derived from `integrity`. Unknown ids
+/// and non-colony modes are errors.
+pub fn get_construction_state(world: &World, site_id: u32) -> Result<JsonValue, String> {
+    if world.get_mode() != "colony" {
+        return Err(format!(
+            "get_construction_state: world is in '{}' mode; construction requires 'colony' mode",
+            world.get_mode()
+        ));
+    }
+    if let Some(site) = world.get_component(site_id, "ConstructionSite") {
+        let state = site
+            .get("state")
+            .and_then(|v| v.as_str())
+            .unwrap_or("pending")
+            .to_string();
+        let progress = site.get("progress").and_then(|v| v.as_i64()).unwrap_or(0);
+        let required_work = site
+            .get("required_work")
+            .and_then(|v| v.as_i64())
+            .unwrap_or(1);
+        let building_type = site
+            .get("building_type")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+        return Ok(json!({
+            "state": state,
+            "progress": progress,
+            "required_work": required_work,
+            "building_type": building_type,
+        }));
+    }
+    if let Some(building) = world.get_component(site_id, "Building") {
+        let building_type = building
+            .get("building_type")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+        let integrity = building
+            .get("integrity")
+            .and_then(|v| v.as_i64())
+            .unwrap_or(0);
+        return Ok(json!({
+            "state": "complete",
+            "progress": integrity,
+            "required_work": integrity,
+            "building_type": building_type,
+        }));
+    }
+    Err(format!(
+        "get_construction_state: unknown construction site {site_id}"
+    ))
+}
+
 /// Cancels a pre-completion construction site.
 ///
 /// Rejects unknown ids, sites already in a terminal state (`complete` /

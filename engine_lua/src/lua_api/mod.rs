@@ -11,6 +11,8 @@ pub mod body;
 pub mod camera;
 /// Component API
 pub mod component;
+/// Construction API
+pub mod construction;
 /// Death/Decay API
 pub mod death_decay;
 /// Dungeon Generation API
@@ -122,6 +124,7 @@ pub fn register_all_api_functions(
     map::register_map_api(lua, globals, world.clone())?;
     multiscale_map::register_multiscale_map_api(lua, globals, world.clone())?;
     economic::register_economic_api(lua, globals, world.clone())?;
+    construction::register_construction_api(lua, globals, world.clone())?;
     movement_ops::register_movement_ops_api(lua, globals, world.clone())?;
     dungeon::register_dungeon_api(lua, globals)?;
     job_ai::register_job_ai_api(lua, globals, world.clone())?;

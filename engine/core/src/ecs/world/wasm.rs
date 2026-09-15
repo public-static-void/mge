@@ -814,6 +814,7 @@ impl WasmWorld {
         self.turn += 1;
         self.advance_time_of_day();
         self.simulate_fluid();
+        self.tick_construction();
         // Recompute the transient visibility modifier from weather state,
         // mirroring WeatherSystem's per-tick recompute (R008/R009).
         self.visibility_modifier =
@@ -1541,6 +1542,448 @@ impl WasmWorld {
                     Some(serde_json::to_string(arr).unwrap_or_default())
                 }
             })
+    }
+
+    // ---- Construction API ----
+
+    /// Parses a cell JSON string into a [`CellKey`], accepting the enum form
+    /// (`{"Square":{...}}`) and pos-wrapped shapes (`{"pos":{...}}`).
+    fn parse_construction_cell(cell_json: &str) -> Result<CellKey, String> {
+        let val: JsonValue =
+            serde_json::from_str(cell_json).map_err(|e| format!("Invalid cell JSON: {e}"))?;
+        if let Ok(key) = serde_json::from_value::<CellKey>(val.clone()) {
+            return Ok(key);
+        }
+        CellKey::from_position(&val).ok_or_else(|| "Invalid cell key format".to_string())
+    }
+
+    /// Parses a materials JSON array string into integer `(kind, amount)` pairs.
+    fn parse_construction_materials(materials_json: &str) -> Result<Vec<(String, i64)>, String> {
+        let val: JsonValue = serde_json::from_str(materials_json)
+            .map_err(|e| format!("Invalid required_materials JSON: {e}"))?;
+        let arr = val
+            .as_array()
+            .ok_or_else(|| "required_materials must be an array".to_string())?;
+        let mut out = Vec::with_capacity(arr.len());
+        for item in arr {
+            let kind = item
+                .get("kind")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| "material entry missing string 'kind'".to_string())?
+                .to_string();
+            let amount = item
+                .get("amount")
+                .and_then(|v| {
+                    v.as_i64()
+                        .or_else(|| v.as_u64().and_then(|u| i64::try_from(u).ok()))
+                })
+                .ok_or_else(|| "material entry missing integer 'amount'".to_string())?;
+            out.push((kind, amount));
+        }
+        Ok(out)
+    }
+
+    /// Flat `Position` value for a cell, matching the WASM world's flat
+    /// position convention (`x`/`y`/`z`, `q`/`r`/`z`, or id-only).
+    fn flat_position_json(cell: &CellKey) -> JsonValue {
+        match cell {
+            CellKey::Square { x, y, z } => serde_json::json!({"x": x, "y": y, "z": z}),
+            CellKey::Hex { q, r, z } => serde_json::json!({"q": q, "r": r, "z": z}),
+            CellKey::Province { id } => serde_json::json!({"id": id}),
+        }
+    }
+
+    /// True when a flat `Position` value sits on the given cell.
+    fn flat_position_matches(pos: &JsonValue, cell: &CellKey) -> bool {
+        match cell {
+            CellKey::Square { x, y, z } => {
+                pos.get("x").and_then(|v| v.as_i64()) == Some(*x as i64)
+                    && pos.get("y").and_then(|v| v.as_i64()) == Some(*y as i64)
+                    && pos.get("z").and_then(|v| v.as_i64()) == Some(*z as i64)
+            }
+            CellKey::Hex { q, r, z } => {
+                pos.get("q").and_then(|v| v.as_i64()) == Some(*q as i64)
+                    && pos.get("r").and_then(|v| v.as_i64()) == Some(*r as i64)
+                    && pos.get("z").and_then(|v| v.as_i64()) == Some(*z as i64)
+            }
+            CellKey::Province { id } => pos.get("id").and_then(|v| v.as_str()) == Some(id.as_str()),
+        }
+    }
+
+    /// True when the cell variant matches the WASM map topology type.
+    fn construction_topology_matches(cell: &CellKey, topology_type: &str) -> bool {
+        match cell {
+            CellKey::Square { .. } => topology_type == "square",
+            CellKey::Hex { .. } => topology_type == "hex",
+            CellKey::Province { .. } => topology_type == "province",
+        }
+    }
+
+    /// Places a validated blueprint; returns the site entity id.
+    ///
+    /// Argument order mirrors the Lua/Python surface:
+    /// `(building_type, cell_json, materials_json, required_work)`.
+    /// Outside colony mode returns a mode-gated error.
+    pub fn place_blueprint(
+        &mut self,
+        building_type: &str,
+        cell_json: &str,
+        materials_json: &str,
+        required_work: i64,
+    ) -> Result<u32, String> {
+        if self.get_mode() != "colony" {
+            return Err(format!(
+                "place_blueprint: world is in '{}' mode; construction requires 'colony' mode",
+                self.get_mode()
+            ));
+        }
+        let cell = Self::parse_construction_cell(cell_json)?;
+        let materials = Self::parse_construction_materials(materials_json)?;
+        if materials.is_empty() {
+            return Err("place_blueprint: required_materials must not be empty".to_string());
+        }
+        for (kind, amount) in &materials {
+            if *amount < 1 {
+                return Err(format!(
+                    "place_blueprint: material '{kind}' has amount {amount}; amounts must be >= 1"
+                ));
+            }
+        }
+        if required_work < 1 {
+            return Err(format!(
+                "place_blueprint: required_work is {required_work}; must be >= 1"
+            ));
+        }
+        let topology = self.get_map_topology_type();
+        if topology == "none" {
+            return Err("place_blueprint: no active map".to_string());
+        }
+        if !Self::construction_topology_matches(&cell, &topology) {
+            return Err(format!(
+                "place_blueprint: cell topology does not match active map topology '{topology}'"
+            ));
+        }
+        let in_map = self.map.as_ref().is_some_and(|m| m.cells.contains(&cell));
+        if !in_map {
+            return Err("place_blueprint: target cell is not on the active map".to_string());
+        }
+        let occupied = self.entities.iter().copied().any(|eid| {
+            let is_structure = self
+                .components
+                .get("Building")
+                .is_some_and(|m| m.contains_key(&eid))
+                || self
+                    .components
+                    .get("ConstructionSite")
+                    .is_some_and(|m| m.contains_key(&eid));
+            is_structure
+                && self
+                    .components
+                    .get("Position")
+                    .and_then(|m| m.get(&eid))
+                    .is_some_and(|pos| Self::flat_position_matches(pos, &cell))
+        });
+        if occupied {
+            return Err("place_blueprint: target cell is already occupied".to_string());
+        }
+
+        let cell_value = serde_json::to_value(&cell).unwrap_or(JsonValue::Null);
+        let materials_value: Vec<JsonValue> = materials
+            .iter()
+            .map(|(kind, amount)| serde_json::json!({ "kind": kind, "amount": amount }))
+            .collect();
+
+        let site_id = self.spawn_entity();
+        self.components
+            .entry("Position".to_string())
+            .or_default()
+            .insert(site_id, Self::flat_position_json(&cell));
+        let job_id = self.spawn_entity();
+        let job = serde_json::json!({
+            "id": job_id,
+            "job_type": "construct",
+            "category": "construction",
+            "state": "pending",
+            "target": site_id,
+            "target_position": cell_value,
+            "resource_requirements": materials_value,
+            "required_progress": required_work,
+            "priority": 0,
+        });
+        self.components
+            .entry("Job".to_string())
+            .or_default()
+            .insert(job_id, job);
+        let site = serde_json::json!({
+            "building_type": building_type,
+            "target_position": cell_value,
+            "required_materials": materials
+                .iter()
+                .map(|(kind, amount)| serde_json::json!({ "kind": kind, "amount": amount }))
+                .collect::<Vec<JsonValue>>(),
+            "progress": 0,
+            "required_work": required_work,
+            "state": "pending",
+            "reserved_stockpile": null,
+            "assigned_job": job_id,
+        });
+        self.components
+            .entry("ConstructionSite".to_string())
+            .or_default()
+            .insert(site_id, site);
+        Ok(site_id)
+    }
+
+    /// Returns `{ state, progress, required_work, building_type }` as a JSON
+    /// string. Completed sites (carrying `Building`) report `state: "complete"`.
+    pub fn get_construction_state(&self, site_id: u32) -> Result<String, String> {
+        if self.get_mode() != "colony" {
+            return Err(format!(
+                "get_construction_state: world is in '{}' mode; construction requires 'colony' mode",
+                self.get_mode()
+            ));
+        }
+        if let Some(site) = self
+            .components
+            .get("ConstructionSite")
+            .and_then(|m| m.get(&site_id))
+        {
+            let state = serde_json::json!({
+                "state": site.get("state").and_then(|v| v.as_str()).unwrap_or("pending"),
+                "progress": site.get("progress").and_then(|v| v.as_i64()).unwrap_or(0),
+                "required_work": site.get("required_work").and_then(|v| v.as_i64()).unwrap_or(1),
+                "building_type": site.get("building_type").and_then(|v| v.as_str()).unwrap_or(""),
+            });
+            return Ok(serde_json::to_string(&state).unwrap_or_default());
+        }
+        if let Some(building) = self
+            .components
+            .get("Building")
+            .and_then(|m| m.get(&site_id))
+        {
+            let integrity = building
+                .get("integrity")
+                .and_then(|v| v.as_i64())
+                .unwrap_or(0);
+            let state = serde_json::json!({
+                "state": "complete",
+                "progress": integrity,
+                "required_work": integrity,
+                "building_type": building.get("building_type").and_then(|v| v.as_str()).unwrap_or(""),
+            });
+            return Ok(serde_json::to_string(&state).unwrap_or_default());
+        }
+        Err(format!(
+            "get_construction_state: unknown construction site {site_id}"
+        ))
+    }
+
+    /// Cancels a pre-completion site: flips the linked job to `cancelled` and
+    /// despawns the ghost. Cancel-after-complete and unknown ids are errors.
+    pub fn cancel_construction(&mut self, site_id: u32) -> Result<bool, String> {
+        if self.get_mode() != "colony" {
+            return Err(format!(
+                "cancel_construction: world is in '{}' mode; construction requires 'colony' mode",
+                self.get_mode()
+            ));
+        }
+        let site = match self
+            .components
+            .get("ConstructionSite")
+            .and_then(|m| m.get(&site_id))
+            .cloned()
+        {
+            Some(site) => site,
+            None => {
+                if self
+                    .components
+                    .get("Building")
+                    .is_some_and(|m| m.contains_key(&site_id))
+                {
+                    return Err(format!(
+                        "cancel_construction: site {site_id} is already complete; use demolish_building"
+                    ));
+                }
+                return Err(format!(
+                    "cancel_construction: unknown construction site {site_id}"
+                ));
+            }
+        };
+        let state = site.get("state").and_then(|v| v.as_str()).unwrap_or("");
+        if matches!(state, "complete" | "cancelled") {
+            return Err(format!(
+                "cancel_construction: site {site_id} is already '{state}'; use demolish_building for completed buildings"
+            ));
+        }
+        if let Some(job_id) = site
+            .get("assigned_job")
+            .and_then(|v| v.as_u64())
+            .map(|id| id as u32)
+            && let Some(job) = self
+                .components
+                .get_mut("Job")
+                .and_then(|m| m.get_mut(&job_id))
+            && let Some(obj) = job.as_object_mut()
+        {
+            obj.insert(
+                "reserved_resources".to_string(),
+                JsonValue::Array(Vec::new()),
+            );
+            obj.insert("reserved_stockpile".to_string(), JsonValue::Null);
+            obj.insert("state".to_string(), serde_json::json!("cancelled"));
+        }
+        self.despawn_entity(site_id);
+        Ok(true)
+    }
+
+    /// Demolishes a completed building with no material refund.
+    /// In-progress sites and unknown ids are errors.
+    pub fn demolish_building(&mut self, building_id: u32) -> Result<bool, String> {
+        if self.get_mode() != "colony" {
+            return Err(format!(
+                "demolish_building: world is in '{}' mode; construction requires 'colony' mode",
+                self.get_mode()
+            ));
+        }
+        if self
+            .components
+            .get("ConstructionSite")
+            .is_some_and(|m| m.contains_key(&building_id))
+        {
+            return Err(format!(
+                "demolish_building: entity {building_id} is an in-progress construction site; use cancel_construction"
+            ));
+        }
+        if !self
+            .components
+            .get("Building")
+            .is_some_and(|m| m.contains_key(&building_id))
+        {
+            return Err(format!("demolish_building: unknown building {building_id}"));
+        }
+        self.despawn_entity(building_id);
+        Ok(true)
+    }
+
+    /// Advances every non-terminal construction site by one work tick.
+    ///
+    /// The WASM world runs no job/reservation simulation, so each tick
+    /// increments `progress` by 1 and completes at
+    /// `progress >= required_work` by emitting `construction_completed` and
+    /// replacing `ConstructionSite` with `Building` (position preserved).
+    /// Deterministic ascending-entity order mirrors the core system.
+    pub fn tick_construction(&mut self) {
+        let mut sites: Vec<u32> = self
+            .components
+            .get("ConstructionSite")
+            .map(|m| m.keys().copied().collect())
+            .unwrap_or_default();
+        sites.sort_unstable();
+        for site_id in sites {
+            let Some(site) = self
+                .components
+                .get("ConstructionSite")
+                .and_then(|m| m.get(&site_id))
+                .cloned()
+            else {
+                continue;
+            };
+            let state = site.get("state").and_then(|v| v.as_str()).unwrap_or("");
+            if matches!(state, "complete" | "cancelled") {
+                continue;
+            }
+            if let Some(job_id) = site
+                .get("assigned_job")
+                .and_then(|v| v.as_u64())
+                .map(|id| id as u32)
+            {
+                let job_state = self
+                    .components
+                    .get("Job")
+                    .and_then(|m| m.get(&job_id))
+                    .and_then(|j| j.get("state"))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                if matches!(job_state.as_str(), "cancelled" | "failed" | "blocked") {
+                    continue;
+                }
+            }
+            let required_work = site
+                .get("required_work")
+                .and_then(|v| v.as_i64())
+                .unwrap_or(1)
+                .max(1);
+            let progress = site.get("progress").and_then(|v| v.as_i64()).unwrap_or(0) + 1;
+            if progress >= required_work {
+                self.complete_wasm_site(site_id, &site, required_work);
+            } else if let Some(stored) = self
+                .components
+                .get_mut("ConstructionSite")
+                .and_then(|m| m.get_mut(&site_id))
+            {
+                stored["progress"] = serde_json::json!(progress);
+                stored["state"] = serde_json::json!("in_progress");
+            }
+        }
+    }
+
+    /// Completes one WASM construction site into a `Building`.
+    fn complete_wasm_site(&mut self, site_id: u32, site: &JsonValue, required_work: i64) {
+        let building_type = site
+            .get("building_type")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+        let requirements = site
+            .get("required_materials")
+            .cloned()
+            .unwrap_or(JsonValue::Array(Vec::new()));
+        let position = self
+            .components
+            .get("Position")
+            .and_then(|m| m.get(&site_id))
+            .cloned()
+            .unwrap_or(JsonValue::Null);
+        if let Some(job_id) = site
+            .get("assigned_job")
+            .and_then(|v| v.as_u64())
+            .map(|id| id as u32)
+            && let Some(job) = self
+                .components
+                .get_mut("Job")
+                .and_then(|m| m.get_mut(&job_id))
+            && let Some(obj) = job.as_object_mut()
+        {
+            obj.insert("state".to_string(), serde_json::json!("complete"));
+            obj.insert("progress".to_string(), serde_json::json!(required_work));
+        }
+        if let Some(sites) = self.components.get_mut("ConstructionSite") {
+            sites.remove(&site_id);
+        }
+        self.components
+            .entry("Building".to_string())
+            .or_default()
+            .insert(
+                site_id,
+                serde_json::json!({
+                    "building_type": building_type,
+                    "materials_used": requirements,
+                    "integrity": required_work,
+                    "passable": false,
+                    "blocks_sight": false,
+                }),
+            );
+        let event = serde_json::json!({
+            "site_id": site_id,
+            "building_id": site_id,
+            "building_type": building_type,
+            "position": position,
+        });
+        let _ = self.send_event(
+            "construction_completed",
+            &serde_json::to_string(&event).unwrap_or_default(),
+        );
     }
 
     // ---- Body API ----
