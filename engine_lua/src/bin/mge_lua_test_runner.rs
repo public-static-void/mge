@@ -9,6 +9,7 @@ use engine_core::plugins::loader::load_plugin_and_register_worldgen_threadsafe;
 use engine_core::plugins::types::EngineApi;
 use engine_core::systems::body_equipment_sync::BodyEquipmentSyncSystem;
 use engine_core::systems::body_part_damage::BodyPartDamageSystem;
+use engine_core::systems::construction::ConstructionSystem;
 use engine_core::systems::death_decay::{ProcessDeaths, ProcessDecay};
 use engine_core::systems::derived_stats::DerivedStatsSystem;
 use engine_core::systems::economic::{EconomicSystem, load_recipes_from_dir};
@@ -313,6 +314,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let recipes = load_recipes_from_dir(recipes_dir().to_str().unwrap());
         let economic_system = EconomicSystem::with_recipes(recipes);
         world.borrow_mut().register_system(economic_system);
+        world
+            .borrow_mut()
+            .register_system(ConstructionSystem::new());
 
         // --- Job System registration ---
         let job_types = load_job_types_from_dir(jobs_dir().to_str().unwrap());

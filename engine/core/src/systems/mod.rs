@@ -6,6 +6,8 @@
 pub mod body_equipment_sync;
 /// Body part damage distribution system
 pub mod body_part_damage;
+/// Building construction system
+pub mod construction;
 /// Death and decay system
 pub mod death_decay;
 /// Derived stats calculation system
@@ -57,6 +59,7 @@ pub const SYSTEM_EXECUTION_ORDER: &[&str] = &[
     "ResearchSystem",
     "JobSystem",
     "EconomicSystem",
+    "ConstructionSystem",
     "FactionReputationSystem",
     "FluidSimulationSystem",
     "WeatherSystem",

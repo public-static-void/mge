@@ -7,7 +7,7 @@ fn test_wasm_world_reservation_flow() {
 
     // Create a stockpile entity
     let stockpile_eid = world.spawn_entity();
-    let stockpile_data = serde_json::json!({"resources": {"iron_ore": 100.0}});
+    let stockpile_data = serde_json::json!({"resources": {"iron_ore": 100}});
     world
         .set_component(
             stockpile_eid,
@@ -20,8 +20,8 @@ fn test_wasm_world_reservation_flow() {
     let stockpile_str = world.get_component(stockpile_eid, "Stockpile").unwrap();
     let stockpile_val: JsonValue = serde_json::from_str(&stockpile_str).unwrap();
     assert_eq!(
-        stockpile_val["resources"]["iron_ore"], 100.0,
-        "Stockpile should have iron_ore 100.0"
+        stockpile_val["resources"]["iron_ore"], 100,
+        "Stockpile should have iron_ore 100"
     );
 
     // Create a job entity
@@ -97,7 +97,7 @@ fn test_wasm_world_reservation_insufficient_resources() {
 
     // Stockpile with insufficient resources
     let stockpile_eid = world.spawn_entity();
-    let stockpile_data = serde_json::json!({"resources": {"iron_ore": 5.0}});
+    let stockpile_data = serde_json::json!({"resources": {"iron_ore": 5}});
     world
         .set_component(
             stockpile_eid,

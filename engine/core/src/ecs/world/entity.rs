@@ -210,33 +210,31 @@ impl World {
     }
 
     /// Returns all entity IDs in the given cell.
+    ///
+    /// Matches Square positions by exact `x,y,z` and Hex positions by exact
+    /// `q,r,z`. Province cells use capacity-1 occupancy semantics: only
+    /// entities carrying a `Building` or `ConstructionSite` component count
+    /// as occupants of the province, so placement validation never falls
+    /// through silently on Hex/Province queries.
     pub fn entities_in_cell(&self, cell: &crate::map::CellKey) -> Vec<u32> {
         self.entities
             .iter()
             .copied()
             .filter(|&eid| {
-                self.get_component(eid, "Position")
-                    .and_then(|val| {
-                        val.get("pos").and_then(|p| {
-                            if let Some(obj) = p.as_object()
-                                && let Some(sq) = obj.get("Square")
-                            {
-                                let x = sq.get("x")?.as_i64()? as i32;
-                                let y = sq.get("y")?.as_i64()? as i32;
-                                let z = sq.get("z")?.as_i64()? as i32;
-                                if let crate::map::CellKey::Square {
-                                    x: cx,
-                                    y: cy,
-                                    z: cz,
-                                } = cell
-                                {
-                                    return Some(*cx == x && *cy == y && *cz == z);
-                                }
-                            }
-                            None
-                        })
-                    })
-                    .unwrap_or(false)
+                let Some(val) = self.get_component(eid, "Position") else {
+                    return false;
+                };
+                let Some(key) = crate::map::CellKey::from_position(val) else {
+                    return false;
+                };
+                if key != *cell {
+                    return false;
+                }
+                if matches!(cell, crate::map::CellKey::Province { .. }) {
+                    return self.has_component(eid, "Building")
+                        || self.has_component(eid, "ConstructionSite");
+                }
+                true
             })
             .collect()
     }
