@@ -48,7 +48,7 @@
 - [x] Material and property system
 - [x] Time-of-day and season cycle
 - [x] Weather and climate system
-- [ ] Building and construction system
+- [x] Building and construction system
 - [ ] Administration and zone management
 - [ ] Temperature and environment simulation
 - [ ] Ecosystem and wildlife simulation
