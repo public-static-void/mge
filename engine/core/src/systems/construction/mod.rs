@@ -8,11 +8,16 @@
 //! consumes materials exactly once on delivery, ticks work progress, and
 //! completes the site into a `Building`.
 //!
-//! Cancel/demolish semantics live in a later milestone; the bridge op
-//! surface (Lua/Python/WASM) is also layered later. This module owns the
-//! core loop only: [`place_blueprint`] plus [`ConstructionSystem`].
+//! Cancel/demolish semantics are part of this module: [`cancel_construction`]
+//! refunds delivered materials and retires the ghost plus its job, while
+//! [`demolish_building`] removes completed `Building` entities with no refund.
+//! The bridge op surface (Lua/Python/WASM) is layered later. This module owns
+//! the core loop plus teardown: [`place_blueprint`], [`cancel_construction`],
+//! [`demolish_building`], and [`ConstructionSystem`].
 
 /// Construction progress and completion system.
 pub mod system;
 
-pub use system::{ConstructionSystem, cell_position_json, place_blueprint};
+pub use system::{
+    ConstructionSystem, cancel_construction, cell_position_json, demolish_building, place_blueprint,
+};

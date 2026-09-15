@@ -154,6 +154,122 @@ pub fn place_blueprint(
     Ok(site_id)
 }
 
+/// Cancels a pre-completion construction site.
+///
+/// Rejects unknown ids, sites already in a terminal state (`complete` /
+/// `cancelled`), and completed buildings (which carry `Building` instead of
+/// `ConstructionSite` — use [`demolish_building`] for those). On success the
+/// linked job's reservation is cleared (`reserved_resources` emptied,
+/// `reserved_stockpile` nulled so the stateless reservation pass cannot
+/// re-reserve it), already-delivered materials are refunded to the reserving
+/// stockpile, the linked job is flipped to `cancelled` (the next `JobSystem`
+/// tick then releases the worker and emits `job_cancelled` via the existing
+/// cancellation path), and the ghost entity is despawned. Returns `true`.
+pub fn cancel_construction(world: &mut World, site_id: u32) -> Result<bool, String> {
+    let site = match world.get_component(site_id, "ConstructionSite").cloned() {
+        Some(site) => site,
+        None => {
+            if world.has_component(site_id, "Building") {
+                return Err(format!(
+                    "cancel_construction: site {site_id} is already complete; use demolish_building"
+                ));
+            }
+            return Err(format!(
+                "cancel_construction: unknown construction site {site_id}"
+            ));
+        }
+    };
+    let state = site.get("state").and_then(|v| v.as_str()).unwrap_or("");
+    if matches!(state, "complete" | "cancelled") {
+        return Err(format!(
+            "cancel_construction: site {site_id} is already '{state}'; use demolish_building for completed buildings"
+        ));
+    }
+
+    if let Some(job_id) = site
+        .get("assigned_job")
+        .and_then(|v| v.as_u64())
+        .map(|id| id as u32)
+        && let Some(mut job) = world.get_component(job_id, "Job").cloned()
+    {
+        refund_delivered(world, &site, &job);
+        if let Some(obj) = job.as_object_mut() {
+            obj.insert("reserved_resources".to_string(), json!([]));
+            obj.insert("reserved_stockpile".to_string(), JsonValue::Null);
+            obj.insert("state".to_string(), json!("cancelled"));
+        }
+        let _ = world.set_component(job_id, "Job", job);
+    }
+
+    world.despawn_entity(site_id);
+    Ok(true)
+}
+
+/// Adds the linked job's `delivered_resources` back to the reserving
+/// stockpile (the site's `reserved_stockpile`, falling back to the job's).
+/// Integer-only, matching the consume-on-delivery accounting. Missing
+/// stockpiles or empty deliveries are no-ops.
+fn refund_delivered(world: &mut World, site: &JsonValue, job: &JsonValue) {
+    let delivered: Vec<JsonValue> = job
+        .get("delivered_resources")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+    if delivered.is_empty() {
+        return;
+    }
+    let stockpile_id = site
+        .get("reserved_stockpile")
+        .and_then(|v| v.as_u64())
+        .or_else(|| job.get("reserved_stockpile").and_then(|v| v.as_u64()))
+        .map(|id| id as u32);
+    let Some(stockpile_id) = stockpile_id else {
+        return;
+    };
+    let Some(mut stockpile) = world.get_component(stockpile_id, "Stockpile").cloned() else {
+        return;
+    };
+    let Some(resources) = stockpile
+        .get_mut("resources")
+        .and_then(|v| v.as_object_mut())
+    else {
+        return;
+    };
+    for item in &delivered {
+        let kind = item.get("kind").and_then(|v| v.as_str()).unwrap_or("");
+        if kind.is_empty() {
+            continue;
+        }
+        let amount = item.get("amount").map(amount_as_i64).unwrap_or(0);
+        if amount <= 0 {
+            continue;
+        }
+        let available = resources.get(kind).map(amount_as_i64).unwrap_or(0);
+        resources.insert(kind.to_string(), json!(available + amount));
+    }
+    let _ = world.set_component(stockpile_id, "Stockpile", stockpile);
+}
+
+/// Demolishes a completed building with no material refund.
+///
+/// Only entities carrying `Building` are accepted: in-progress sites (which
+/// carry `ConstructionSite`) are rejected so active jobs are never disturbed,
+/// and unknown ids are rejected. The linked construction job is already
+/// `complete` (its worker was released at completion) and is left in place as
+/// history. Returns `true`.
+pub fn demolish_building(world: &mut World, building_id: u32) -> Result<bool, String> {
+    if world.has_component(building_id, "ConstructionSite") {
+        return Err(format!(
+            "demolish_building: entity {building_id} is an in-progress construction site; use cancel_construction"
+        ));
+    }
+    if !world.has_component(building_id, "Building") {
+        return Err(format!("demolish_building: unknown building {building_id}"));
+    }
+    world.despawn_entity(building_id);
+    Ok(true)
+}
+
 /// Reads a JSON amount as a non-negative integer with no float conversion.
 fn amount_as_i64(value: &JsonValue) -> i64 {
     value
