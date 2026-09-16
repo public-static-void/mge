@@ -16,32 +16,28 @@ fn test_cells_by_region_kind() {
     grid.add_cell(0, 1, 0);
     world.map = Some(engine_core::map::Map::new(Box::new(grid)));
 
-    // Assign region assignments with kinds
+    // Region records carry the kind; assignments reference regions by id only.
+    for (id, kind) in [("room_1", "room"), ("stockpile_1", "stockpile")] {
+        let eid = world.spawn_entity();
+        world
+            .set_component(eid, "Region", json!({"id": id, "kind": kind}))
+            .unwrap();
+    }
+
+    // Assign cells to regions (no `kind` on assignments — the schema has none).
     let cell_assignments = vec![
-        (
-            json!({"Square": {"x": 0, "y": 0, "z": 0}}),
-            "room_1",
-            "room",
-        ),
-        (
-            json!({"Square": {"x": 1, "y": 0, "z": 0}}),
-            "room_1",
-            "room",
-        ),
-        (
-            json!({"Square": {"x": 0, "y": 1, "z": 0}}),
-            "stockpile_1",
-            "stockpile",
-        ),
+        (json!({"Square": {"x": 0, "y": 0, "z": 0}}), "room_1"),
+        (json!({"Square": {"x": 1, "y": 0, "z": 0}}), "room_1"),
+        (json!({"Square": {"x": 0, "y": 1, "z": 0}}), "stockpile_1"),
     ];
 
-    for (cell, region_id, kind) in cell_assignments {
+    for (cell, region_id) in cell_assignments {
         let eid = world.spawn_entity();
         world
             .set_component(
                 eid,
                 "RegionAssignment",
-                json!({"cell": cell, "region_id": region_id, "kind": kind}),
+                json!({"cell": cell, "region_id": region_id}),
             )
             .unwrap();
     }
@@ -56,4 +52,7 @@ fn test_cells_by_region_kind() {
     let stockpile_cells = world.cells_in_region_kind("stockpile");
     assert!(stockpile_cells.contains(&json!({"Square": {"x": 0, "y": 1, "z": 0}})));
     assert!(!stockpile_cells.contains(&json!({"Square": {"x": 1, "y": 0, "z": 0}})));
+
+    // Unknown kind resolves to no cells.
+    assert!(world.cells_in_region_kind("no_such_kind").is_empty());
 }
