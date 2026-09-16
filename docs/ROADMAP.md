@@ -49,7 +49,7 @@
 - [x] Time-of-day and season cycle
 - [x] Weather and climate system
 - [x] Building and construction system
-- [ ] Administration and zone management
+- [x] Administration and zone management
 - [ ] Temperature and environment simulation
 - [ ] Ecosystem and wildlife simulation
 - [ ] Vehicle support

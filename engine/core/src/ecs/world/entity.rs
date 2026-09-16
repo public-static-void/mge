@@ -274,7 +274,10 @@ impl World {
     /// A `RegionAssignment` whose `cell` is `{ "Region": { "id": R } }` is
     /// resolved recursively to the actual cells of region `R` (cells whose
     /// `region_id` includes `R`), so callers never receive the opaque `Region`
-    /// JSON. A visited set guards against region-reference cycles.
+    /// JSON. A visited set guards against region-reference cycles. Zone ids
+    /// act as region ids: `ZoneRect` records for the id expand to Square
+    /// cells at query time (rect interiors persist compactly, never as
+    /// per-cell entities).
     pub fn cells_in_region(&self, region_id: &str) -> Vec<serde_json::Value> {
         let mut visited = std::collections::HashSet::new();
         let mut out = Vec::new();
@@ -319,6 +322,9 @@ impl World {
                 out.push(cell);
             }
         }
+        let mut seen: std::collections::HashSet<String> =
+            out.iter().map(|v| v.to_string()).collect();
+        self.expand_zone_rects(region_id, out, &mut seen);
     }
 
     /// Returns all entity IDs assigned to the given region ID (supports multi-region).
@@ -341,30 +347,90 @@ impl World {
     }
 
     /// Returns all entities assigned to regions of the given kind.
+    ///
+    /// Kind resolves through the region and zone record tables: entities
+    /// whose `Region.kind` matches are included, as are entities whose
+    /// `Region.id` names a zone carrying that kind (zone id acts as a region
+    /// id, so zone members resolve through the same surface).
     pub fn entities_in_region_kind(&self, kind: &str) -> Vec<u32> {
+        let zone_ids: std::collections::HashSet<String> = self
+            .get_entities_with_component("Zone")
+            .into_iter()
+            .filter_map(|eid| {
+                let val = self.get_component(eid, "Zone")?;
+                if val.get("kind").and_then(|k| k.as_str()) != Some(kind) {
+                    return None;
+                }
+                val.get("id")?.as_str().map(str::to_string)
+            })
+            .collect();
         self.get_entities_with_component("Region")
             .into_iter()
             .filter(|&eid| {
-                self.get_component(eid, "Region")
-                    .and_then(|val| val.get("kind"))
-                    .and_then(|k| k.as_str())
-                    .map(|k| k == kind)
-                    .unwrap_or(false)
+                let Some(val) = self.get_component(eid, "Region") else {
+                    return false;
+                };
+                if val.get("kind").and_then(|k| k.as_str()) == Some(kind) {
+                    return true;
+                }
+                match val.get("id") {
+                    Some(serde_json::Value::String(s)) => zone_ids.contains(s),
+                    Some(serde_json::Value::Array(arr)) => arr
+                        .iter()
+                        .filter_map(|v| v.as_str())
+                        .any(|s| zone_ids.contains(s)),
+                    _ => false,
+                }
             })
             .collect()
     }
 
     /// Returns all cells assigned to regions of the given kind.
+    ///
+    /// Kind resolves through the region and zone record tables: every `Region`
+    /// or `Zone` component whose `kind` matches contributes its `id`(s), and
+    /// the result is the union of [`cells_in_region`](Self::cells_in_region)
+    /// expansions for those ids (recursive `Region`-cell resolution with
+    /// a cycle guard, plus `ZoneRect` query-time expansion). The
+    /// `RegionAssignment` schema carries no `kind` field, so assignments are
+    /// never filtered on one.
     pub fn cells_in_region_kind(&self, kind: &str) -> Vec<serde_json::Value> {
-        self.get_entities_with_component("RegionAssignment")
-            .into_iter()
-            .filter_map(|eid| {
-                self.get_component(eid, "RegionAssignment").and_then(|val| {
-                    let k = val.get("kind").and_then(|v| v.as_str());
-                    let cell = val.get("cell").cloned();
-                    if k == Some(kind) { cell } else { None }
-                })
-            })
-            .collect()
+        let mut region_ids = Vec::new();
+        for eid in self.get_entities_with_component("Region") {
+            let Some(val) = self.get_component(eid, "Region") else {
+                continue;
+            };
+            if val.get("kind").and_then(|k| k.as_str()) != Some(kind) {
+                continue;
+            }
+            match val.get("id") {
+                Some(serde_json::Value::String(s)) => region_ids.push(s.clone()),
+                Some(serde_json::Value::Array(arr)) => {
+                    for v in arr {
+                        if let Some(s) = v.as_str() {
+                            region_ids.push(s.to_string());
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        for eid in self.get_entities_with_component("Zone") {
+            let Some(val) = self.get_component(eid, "Zone") else {
+                continue;
+            };
+            if val.get("kind").and_then(|k| k.as_str()) != Some(kind) {
+                continue;
+            }
+            if let Some(id) = val.get("id").and_then(|v| v.as_str()) {
+                region_ids.push(id.to_string());
+            }
+        }
+        let mut visited = std::collections::HashSet::new();
+        let mut out = Vec::new();
+        for rid in region_ids {
+            self.collect_region_cells(&rid, &mut visited, &mut out);
+        }
+        out
     }
 }

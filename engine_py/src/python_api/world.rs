@@ -14,7 +14,7 @@ use crate::python_api::material::MaterialApi;
 use crate::python_api::mode::ModeApi;
 use crate::python_api::movement::MovementApi;
 use crate::python_api::noise::NoiseApi;
-use crate::python_api::region::RegionApi;
+use crate::python_api::region::{RegionApi, ZoneApi};
 use crate::python_api::save_load::SaveLoadApi;
 use crate::python_api::time_of_day::TimeOfDayApi;
 use crate::python_api::turn::TurnApi;
@@ -375,6 +375,55 @@ impl PyWorld {
     /// Get cells in kind of region
     fn get_cells_in_region_kind(&self, py: Python, kind: String) -> PyResult<PyObject> {
         RegionApi::get_cells_in_region_kind(self, py, kind)
+    }
+
+    // ---- ZONE ----
+
+    /// Designate a zone; returns the unique zone id string.
+    /// `shape` is `{"rect": {"x0","y0","z","x1","y1"}}` or `{"cells": [...]}`.
+    /// Identical argument order to the Lua/WASM surface.
+    fn designate_zone(
+        &self,
+        kind: String,
+        label: Option<String>,
+        shape: Bound<'_, PyAny>,
+    ) -> PyResult<String> {
+        ZoneApi::designate_zone(self, kind, label, &shape)
+    }
+
+    /// Remove a zone; returns False for unknown ids.
+    fn remove_zone(&self, zone_id: String) -> PyResult<bool> {
+        ZoneApi::remove_zone(self, zone_id)
+    }
+
+    /// Rename a zone; returns False for unknown ids.
+    fn rename_zone(&self, zone_id: String, label: String) -> PyResult<bool> {
+        ZoneApi::rename_zone(self, zone_id, label)
+    }
+
+    /// Change a zone's kind; returns False for unknown ids.
+    fn set_zone_kind(&self, zone_id: String, kind: String) -> PyResult<bool> {
+        ZoneApi::set_zone_kind(self, zone_id, kind)
+    }
+
+    /// Assign explicit cells to a zone; duplicates ignored idempotently.
+    fn assign_cells_to_zone(&self, zone_id: String, cells: Bound<'_, PyAny>) -> PyResult<bool> {
+        ZoneApi::assign_cells_to_zone(self, zone_id, &cells)
+    }
+
+    /// Unassign explicit cells from a zone; unmembered cells ignored idempotently.
+    fn unassign_cells_from_zone(&self, zone_id: String, cells: Bound<'_, PyAny>) -> PyResult<bool> {
+        ZoneApi::unassign_cells_from_zone(self, zone_id, &cells)
+    }
+
+    /// List zones as `{id, label, kind, cell_count}` dicts.
+    fn list_zones(&self, py: Python) -> PyResult<PyObject> {
+        ZoneApi::list_zones(self, py)
+    }
+
+    /// Get a zone as `{id, label, kind, rects, cells}`, or None for unknown ids.
+    fn get_zone(&self, py: Python, zone_id: String) -> PyResult<Option<PyObject>> {
+        ZoneApi::get_zone(self, py, zone_id)
     }
 
     // ---- MISC ----

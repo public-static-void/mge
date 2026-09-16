@@ -37,6 +37,9 @@ mod resources;
 mod save_load;
 mod systems;
 mod template;
+mod zone;
+
+pub use zone::ZoneShape;
 
 /// Map postprocessor function
 pub type MapPostprocessor = Arc<dyn Fn(&mut World) -> Result<(), String> + Send + Sync>;
@@ -125,6 +128,9 @@ pub struct World {
     /// Map from component name to a map of entity IDs to component data.
     pub components: HashMap<String, HashMap<u32, JsonValue>>,
     next_id: u32,
+    /// Monotonic zone id counter (`zone-{n}`). Serialized for save/load.
+    #[serde(default)]
+    next_zone_id: u64,
     /// Current game mode.
     pub current_mode: String,
     /// Current turn number.
@@ -287,6 +293,7 @@ impl World {
             entities: Vec::new(),
             components: HashMap::new(),
             next_id: 1,
+            next_zone_id: 1,
             current_mode: "colony".to_string(),
             turn: 0,
             time_of_day: TimeOfDay::default(),
