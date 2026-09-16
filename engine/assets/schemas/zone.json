@@ -1,0 +1,22 @@
+{
+  "title": "Zone",
+  "type": "object",
+  "description": "Zone record for colony zone management (designate/manage/query MVP). One entity per zone; rect geometry rides in ZoneRect, explicit cells in RegionAssignment.",
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Unique zone identifier (addressable through the region id path)"
+    },
+    "label": {
+      "type": ["string", "null"],
+      "description": "Human-readable name",
+      "default": null
+    },
+    "kind": {
+      "type": "string",
+      "description": "Zone type (e.g., 'stockpile', 'farm', 'room')"
+    }
+  },
+  "required": ["id", "kind"],
+  "modes": ["colony", "roguelike", "editor"]
+}

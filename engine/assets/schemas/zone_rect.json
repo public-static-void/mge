@@ -1,0 +1,18 @@
+{
+  "title": "ZoneRect",
+  "type": "object",
+  "description": "Compact rectangular zone geometry: one record per rect regardless of area. Expanded to cells at query time.",
+  "properties": {
+    "zone_id": {
+      "type": "string",
+      "description": "Zone this rect belongs to"
+    },
+    "x0": { "type": "integer" },
+    "y0": { "type": "integer" },
+    "z": { "type": "integer" },
+    "x1": { "type": "integer" },
+    "y1": { "type": "integer" }
+  },
+  "required": ["zone_id", "x0", "y0", "z", "x1", "y1"],
+  "modes": ["colony", "roguelike", "editor"]
+}

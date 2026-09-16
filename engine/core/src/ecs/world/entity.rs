@@ -274,7 +274,10 @@ impl World {
     /// A `RegionAssignment` whose `cell` is `{ "Region": { "id": R } }` is
     /// resolved recursively to the actual cells of region `R` (cells whose
     /// `region_id` includes `R`), so callers never receive the opaque `Region`
-    /// JSON. A visited set guards against region-reference cycles.
+    /// JSON. A visited set guards against region-reference cycles. Zone ids
+    /// act as region ids: `ZoneRect` records for the id expand to Square
+    /// cells at query time (rect interiors persist compactly, never as
+    /// per-cell entities).
     pub fn cells_in_region(&self, region_id: &str) -> Vec<serde_json::Value> {
         let mut visited = std::collections::HashSet::new();
         let mut out = Vec::new();
@@ -319,6 +322,9 @@ impl World {
                 out.push(cell);
             }
         }
+        let mut seen: std::collections::HashSet<String> =
+            out.iter().map(|v| v.to_string()).collect();
+        self.expand_zone_rects(region_id, out, &mut seen);
     }
 
     /// Returns all entity IDs assigned to the given region ID (supports multi-region).
@@ -356,12 +362,13 @@ impl World {
 
     /// Returns all cells assigned to regions of the given kind.
     ///
-    /// Kind resolves through the region record table: every `Region`
-    /// component whose `kind` matches contributes its `id`(s), and the
-    /// result is the union of [`cells_in_region`](Self::cells_in_region)
+    /// Kind resolves through the region and zone record tables: every `Region`
+    /// or `Zone` component whose `kind` matches contributes its `id`(s), and
+    /// the result is the union of [`cells_in_region`](Self::cells_in_region)
     /// expansions for those ids (recursive `Region`-cell resolution with
-    /// a cycle guard). The `RegionAssignment` schema carries no `kind`
-    /// field, so assignments are never filtered on one.
+    /// a cycle guard, plus `ZoneRect` query-time expansion). The
+    /// `RegionAssignment` schema carries no `kind` field, so assignments are
+    /// never filtered on one.
     pub fn cells_in_region_kind(&self, kind: &str) -> Vec<serde_json::Value> {
         let mut region_ids = Vec::new();
         for eid in self.get_entities_with_component("Region") {
@@ -381,6 +388,17 @@ impl World {
                     }
                 }
                 _ => {}
+            }
+        }
+        for eid in self.get_entities_with_component("Zone") {
+            let Some(val) = self.get_component(eid, "Zone") else {
+                continue;
+            };
+            if val.get("kind").and_then(|k| k.as_str()) != Some(kind) {
+                continue;
+            }
+            if let Some(id) = val.get("id").and_then(|v| v.as_str()) {
+                region_ids.push(id.to_string());
             }
         }
         let mut visited = std::collections::HashSet::new();
