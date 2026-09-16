@@ -37,3 +37,5 @@ mod wasm_ui_api;
 mod wasm_world_userdata_api;
 mod wasm_worldgen_api;
 mod wasm_worldgen_registration;
+mod wasm_zone_api;
+mod wasm_zone_parity;
