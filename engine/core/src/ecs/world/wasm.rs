@@ -1350,45 +1350,93 @@ impl WasmWorld {
     }
 
     /// Returns all cells (from RegionAssignment component) assigned to the given region_id.
+    ///
+    /// A `RegionAssignment` whose `cell` is `{ "Region": { "id": R } }` is
+    /// resolved recursively to the actual cells of region `R`, so callers
+    /// never receive the opaque `Region` JSON. A visited set guards against
+    /// region-reference cycles. Mirrors `World::cells_in_region`.
     pub fn cells_in_region(&self, region_id: &str) -> Vec<JsonValue> {
-        self.get_entities_with_component("RegionAssignment")
-            .into_iter()
-            .filter_map(|eid| {
-                self.components
-                    .get("RegionAssignment")
-                    .and_then(|m| m.get(&eid))
-                    .and_then(|val| {
-                        let cell = val.get("cell").cloned()?;
-                        let rid = val.get("region_id");
-                        match rid {
-                            Some(JsonValue::String(s)) if s == region_id => Some(cell),
-                            Some(JsonValue::Array(arr))
-                                if arr.iter().any(|v| v.as_str() == Some(region_id)) =>
-                            {
-                                Some(cell)
-                            }
-                            _ => None,
-                        }
-                    })
-            })
-            .collect()
+        let mut visited = HashSet::new();
+        let mut out = Vec::new();
+        self.collect_region_cells(region_id, &mut visited, &mut out);
+        out
+    }
+
+    /// Recursive helper for [`cells_in_region`](Self::cells_in_region).
+    fn collect_region_cells(
+        &self,
+        region_id: &str,
+        visited: &mut HashSet<String>,
+        out: &mut Vec<JsonValue>,
+    ) {
+        if !visited.insert(region_id.to_string()) {
+            return;
+        }
+        for eid in self.get_entities_with_component("RegionAssignment") {
+            let Some(val) = self
+                .components
+                .get("RegionAssignment")
+                .and_then(|m| m.get(&eid))
+            else {
+                continue;
+            };
+            let Some(cell) = val.get("cell").cloned() else {
+                continue;
+            };
+            let matches = match val.get("region_id") {
+                Some(JsonValue::String(s)) => s == region_id,
+                Some(JsonValue::Array(arr)) => arr.iter().any(|v| v.as_str() == Some(region_id)),
+                _ => false,
+            };
+            if !matches {
+                continue;
+            }
+            if let Some(nested) = cell
+                .get("Region")
+                .and_then(|r| r.get("id"))
+                .and_then(|v| v.as_str())
+            {
+                self.collect_region_cells(nested, visited, out);
+            } else {
+                out.push(cell);
+            }
+        }
     }
 
     /// Returns all cells (from RegionAssignment component) assigned to regions of the given kind.
+    ///
+    /// Kind resolves through the region record table: every `Region`
+    /// component whose `kind` matches contributes its `id`(s), and the
+    /// result is the union of [`cells_in_region`](Self::cells_in_region)
+    /// expansions for those ids. The `RegionAssignment` schema carries no
+    /// `kind` field, so assignments are never filtered on one.
     pub fn cells_in_region_kind(&self, kind: &str) -> Vec<JsonValue> {
-        self.get_entities_with_component("RegionAssignment")
-            .into_iter()
-            .filter_map(|eid| {
-                self.components
-                    .get("RegionAssignment")
-                    .and_then(|m| m.get(&eid))
-                    .and_then(|val| {
-                        let k = val.get("kind").and_then(|v| v.as_str());
-                        let cell = val.get("cell").cloned()?;
-                        if k == Some(kind) { Some(cell) } else { None }
-                    })
-            })
-            .collect()
+        let mut region_ids = Vec::new();
+        for eid in self.get_entities_with_component("Region") {
+            let Some(val) = self.components.get("Region").and_then(|m| m.get(&eid)) else {
+                continue;
+            };
+            if val.get("kind").and_then(|k| k.as_str()) != Some(kind) {
+                continue;
+            }
+            match val.get("id") {
+                Some(JsonValue::String(s)) => region_ids.push(s.clone()),
+                Some(JsonValue::Array(arr)) => {
+                    for v in arr {
+                        if let Some(s) = v.as_str() {
+                            region_ids.push(s.to_string());
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        let mut visited = HashSet::new();
+        let mut out = Vec::new();
+        for rid in region_ids {
+            self.collect_region_cells(&rid, &mut visited, &mut out);
+        }
+        out
     }
 
     // ---- Economic API ----
