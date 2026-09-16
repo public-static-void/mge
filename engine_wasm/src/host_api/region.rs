@@ -4,6 +4,18 @@ use std::sync::{Arc, Mutex};
 use wasmtime::{Caller, Linker};
 
 /// Registers the region API (4 host functions).
+///
+/// Zone management adds 8 more host functions under the same `region`
+/// module with identical names to the Lua/Python surface:
+/// `designate_zone`, `remove_zone`, `rename_zone`, `set_zone_kind`,
+/// `assign_cells_to_zone`, `unassign_cells_from_zone`, `list_zones`,
+/// `get_zone`. `shape`/`cells` arguments and `list_zones`/`get_zone`
+/// returns travel as JSON strings: `shape` is
+/// `{"rect": {x0, y0, z, x1, y1}}` or `{"cells": [...]}`; `label` for
+/// `designate_zone` is JSON (`"name"` or `null`). Boolean results are
+/// tri-state: `1` true, `0` false (unknown id), `-1` gate/validation
+/// error. `get_zone` writes the zone JSON on success and returns `-1`
+/// for unknown ids or gate errors.
 pub fn register_region_api(linker: &mut Linker<Arc<Mutex<WasmWorld>>>) -> anyhow::Result<()> {
     linker.func_wrap(
         "region",
@@ -80,6 +92,184 @@ pub fn register_region_api(linker: &mut Linker<Arc<Mutex<WasmWorld>>>) -> anyhow
             };
             let json = serde_json::to_string(&cells).unwrap_or_else(|_| "[]".to_string());
             write_string_to_wasm(&mut caller, out_ptr, out_len, &json) as i32
+        },
+    )?;
+
+    linker.func_wrap(
+        "region",
+        "designate_zone",
+        |mut caller: Caller<'_, Arc<Mutex<WasmWorld>>>,
+         kind_ptr: i32,
+         kind_len: i32,
+         label_ptr: i32,
+         label_len: i32,
+         shape_ptr: i32,
+         shape_len: i32,
+         out_ptr: i32,
+         out_len: i32|
+         -> i32 {
+            let kind =
+                read_wasm_string(&mut caller, kind_ptr, kind_len).expect("Failed to read kind");
+            let label_json =
+                read_wasm_string(&mut caller, label_ptr, label_len).expect("Failed to read label");
+            let shape_json =
+                read_wasm_string(&mut caller, shape_ptr, shape_len).expect("Failed to read shape");
+            let label: Option<String> = match serde_json::from_str(&label_json) {
+                Ok(label) => label,
+                Err(_) => return -1,
+            };
+            let zone_id = {
+                let mut world = caller.data().lock().unwrap();
+                match world.designate_zone(&kind, label.as_deref(), &shape_json) {
+                    Ok(id) => id,
+                    Err(_) => return -1,
+                }
+            };
+            write_string_to_wasm(&mut caller, out_ptr, out_len, &zone_id) as i32
+        },
+    )?;
+
+    linker.func_wrap(
+        "region",
+        "remove_zone",
+        |mut caller: Caller<'_, Arc<Mutex<WasmWorld>>>,
+         zone_id_ptr: i32,
+         zone_id_len: i32|
+         -> i32 {
+            let zone_id = read_wasm_string(&mut caller, zone_id_ptr, zone_id_len)
+                .expect("Failed to read zone_id");
+            let mut world = caller.data().lock().unwrap();
+            match world.remove_zone(&zone_id) {
+                Ok(true) => 1,
+                Ok(false) => 0,
+                Err(_) => -1,
+            }
+        },
+    )?;
+
+    linker.func_wrap(
+        "region",
+        "rename_zone",
+        |mut caller: Caller<'_, Arc<Mutex<WasmWorld>>>,
+         zone_id_ptr: i32,
+         zone_id_len: i32,
+         label_ptr: i32,
+         label_len: i32|
+         -> i32 {
+            let zone_id = read_wasm_string(&mut caller, zone_id_ptr, zone_id_len)
+                .expect("Failed to read zone_id");
+            let label =
+                read_wasm_string(&mut caller, label_ptr, label_len).expect("Failed to read label");
+            let mut world = caller.data().lock().unwrap();
+            match world.rename_zone(&zone_id, &label) {
+                Ok(true) => 1,
+                Ok(false) => 0,
+                Err(_) => -1,
+            }
+        },
+    )?;
+
+    linker.func_wrap(
+        "region",
+        "set_zone_kind",
+        |mut caller: Caller<'_, Arc<Mutex<WasmWorld>>>,
+         zone_id_ptr: i32,
+         zone_id_len: i32,
+         kind_ptr: i32,
+         kind_len: i32|
+         -> i32 {
+            let zone_id = read_wasm_string(&mut caller, zone_id_ptr, zone_id_len)
+                .expect("Failed to read zone_id");
+            let kind =
+                read_wasm_string(&mut caller, kind_ptr, kind_len).expect("Failed to read kind");
+            let mut world = caller.data().lock().unwrap();
+            match world.set_zone_kind(&zone_id, &kind) {
+                Ok(true) => 1,
+                Ok(false) => 0,
+                Err(_) => -1,
+            }
+        },
+    )?;
+
+    linker.func_wrap(
+        "region",
+        "assign_cells_to_zone",
+        |mut caller: Caller<'_, Arc<Mutex<WasmWorld>>>,
+         zone_id_ptr: i32,
+         zone_id_len: i32,
+         cells_ptr: i32,
+         cells_len: i32|
+         -> i32 {
+            let zone_id = read_wasm_string(&mut caller, zone_id_ptr, zone_id_len)
+                .expect("Failed to read zone_id");
+            let cells_json =
+                read_wasm_string(&mut caller, cells_ptr, cells_len).expect("Failed to read cells");
+            let mut world = caller.data().lock().unwrap();
+            match world.assign_cells_to_zone(&zone_id, &cells_json) {
+                Ok(true) => 1,
+                Ok(false) => 0,
+                Err(_) => -1,
+            }
+        },
+    )?;
+
+    linker.func_wrap(
+        "region",
+        "unassign_cells_from_zone",
+        |mut caller: Caller<'_, Arc<Mutex<WasmWorld>>>,
+         zone_id_ptr: i32,
+         zone_id_len: i32,
+         cells_ptr: i32,
+         cells_len: i32|
+         -> i32 {
+            let zone_id = read_wasm_string(&mut caller, zone_id_ptr, zone_id_len)
+                .expect("Failed to read zone_id");
+            let cells_json =
+                read_wasm_string(&mut caller, cells_ptr, cells_len).expect("Failed to read cells");
+            let mut world = caller.data().lock().unwrap();
+            match world.unassign_cells_from_zone(&zone_id, &cells_json) {
+                Ok(true) => 1,
+                Ok(false) => 0,
+                Err(_) => -1,
+            }
+        },
+    )?;
+
+    linker.func_wrap(
+        "region",
+        "list_zones",
+        |mut caller: Caller<'_, Arc<Mutex<WasmWorld>>>, out_ptr: i32, out_len: i32| -> i32 {
+            let zones = {
+                let world = caller.data().lock().unwrap();
+                world.list_zones()
+            };
+            let json = serde_json::to_string(&zones).unwrap_or_else(|_| "[]".to_string());
+            write_string_to_wasm(&mut caller, out_ptr, out_len, &json) as i32
+        },
+    )?;
+
+    linker.func_wrap(
+        "region",
+        "get_zone",
+        |mut caller: Caller<'_, Arc<Mutex<WasmWorld>>>,
+         zone_id_ptr: i32,
+         zone_id_len: i32,
+         out_ptr: i32,
+         out_len: i32|
+         -> i32 {
+            let zone_id = read_wasm_string(&mut caller, zone_id_ptr, zone_id_len)
+                .expect("Failed to read zone_id");
+            let zone = {
+                let world = caller.data().lock().unwrap();
+                world.get_zone(&zone_id)
+            };
+            match zone {
+                Some(zone) => {
+                    let json = serde_json::to_string(&zone).unwrap_or_else(|_| "{}".to_string());
+                    write_string_to_wasm(&mut caller, out_ptr, out_len, &json) as i32
+                }
+                None => -1,
+            }
         },
     )?;
 
