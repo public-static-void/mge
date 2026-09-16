@@ -347,15 +347,40 @@ impl World {
     }
 
     /// Returns all entities assigned to regions of the given kind.
+    ///
+    /// Kind resolves through the region and zone record tables: entities
+    /// whose `Region.kind` matches are included, as are entities whose
+    /// `Region.id` names a zone carrying that kind (zone id acts as a region
+    /// id, so zone members resolve through the same surface).
     pub fn entities_in_region_kind(&self, kind: &str) -> Vec<u32> {
+        let zone_ids: std::collections::HashSet<String> = self
+            .get_entities_with_component("Zone")
+            .into_iter()
+            .filter_map(|eid| {
+                let val = self.get_component(eid, "Zone")?;
+                if val.get("kind").and_then(|k| k.as_str()) != Some(kind) {
+                    return None;
+                }
+                val.get("id")?.as_str().map(str::to_string)
+            })
+            .collect();
         self.get_entities_with_component("Region")
             .into_iter()
             .filter(|&eid| {
-                self.get_component(eid, "Region")
-                    .and_then(|val| val.get("kind"))
-                    .and_then(|k| k.as_str())
-                    .map(|k| k == kind)
-                    .unwrap_or(false)
+                let Some(val) = self.get_component(eid, "Region") else {
+                    return false;
+                };
+                if val.get("kind").and_then(|k| k.as_str()) == Some(kind) {
+                    return true;
+                }
+                match val.get("id") {
+                    Some(serde_json::Value::String(s)) => zone_ids.contains(s),
+                    Some(serde_json::Value::Array(arr)) => arr
+                        .iter()
+                        .filter_map(|v| v.as_str())
+                        .any(|s| zone_ids.contains(s)),
+                    _ => false,
+                }
             })
             .collect()
     }
