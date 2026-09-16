@@ -166,13 +166,21 @@ impl ResourceReservationSystem {
         true
     }
 
-    /// Reads a JSON amount as a non-negative integer with no float conversion.
-    /// Non-integer values (floats, strings, missing) read as zero, and
-    /// negatives clamp to zero, so reservation math stays integer-only.
+    /// Reads a JSON amount as a non-negative integer with a float-tolerant read boundary.
+    /// Integer variants pass through exactly; finite floats truncate toward zero
+    /// (100.0 reads as 100, 9.7 reads as 9, never rounding up into
+    /// over-reservation). Non-finite floats, strings, nulls, missing values,
+    /// and u64 overflow read as zero; negatives clamp to zero. Truncation
+    /// happens once here, so reservation math downstream stays integer-only.
     fn amount_as_i64(value: &JsonValue) -> i64 {
         value
             .as_i64()
             .or_else(|| value.as_u64().and_then(|u| i64::try_from(u).ok()))
+            .or_else(|| {
+                value
+                    .as_f64()
+                    .and_then(|f| if f.is_finite() { Some(f as i64) } else { None })
+            })
             .unwrap_or(0)
             .max(0)
     }
