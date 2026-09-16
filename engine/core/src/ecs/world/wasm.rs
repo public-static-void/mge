@@ -267,6 +267,10 @@ pub struct WasmWorld {
     /// Equipment set registry for named loadout blueprints.
     #[serde(skip)]
     pub equipment_set_registry: EquipmentSetRegistry,
+
+    /// Auto-incrementing zone id counter (zone ids are `zone-{n}`).
+    #[serde(default)]
+    pub next_zone_id: u64,
 }
 
 fn default_fov_algo_name() -> String {
@@ -353,6 +357,7 @@ impl WasmWorld {
             template_registry: UnitTemplateRegistry::new(),
             item_registry: ItemRegistry::new(),
             equipment_set_registry: EquipmentSetRegistry::new(),
+            next_zone_id: 1,
         }
     }
 
@@ -1334,17 +1339,40 @@ impl WasmWorld {
     }
 
     /// Returns all entities whose Region component has the given kind.
+    ///
+    /// Kind resolves through the region and zone record tables: entities
+    /// whose `Region.kind` matches are included, as are entities whose
+    /// `Region.id` names a zone carrying that kind. Mirrors
+    /// `World::entities_in_region_kind`.
     pub fn entities_in_region_kind(&self, kind: &str) -> Vec<u32> {
+        let zone_ids: HashSet<String> = self
+            .get_entities_with_component("Zone")
+            .into_iter()
+            .filter_map(|eid| {
+                let val = self.components.get("Zone")?.get(&eid)?;
+                if val.get("kind").and_then(|k| k.as_str()) != Some(kind) {
+                    return None;
+                }
+                val.get("id")?.as_str().map(str::to_string)
+            })
+            .collect();
         self.get_entities_with_component("Region")
             .into_iter()
             .filter(|&eid| {
-                self.components
-                    .get("Region")
-                    .and_then(|m| m.get(&eid))
-                    .and_then(|val| val.get("kind"))
-                    .and_then(|k| k.as_str())
-                    .map(|k| k == kind)
-                    .unwrap_or(false)
+                let Some(val) = self.components.get("Region").and_then(|m| m.get(&eid)) else {
+                    return false;
+                };
+                if val.get("kind").and_then(|k| k.as_str()) == Some(kind) {
+                    return true;
+                }
+                match val.get("id") {
+                    Some(JsonValue::String(s)) => zone_ids.contains(s),
+                    Some(JsonValue::Array(arr)) => arr
+                        .iter()
+                        .filter_map(|v| v.as_str())
+                        .any(|s| zone_ids.contains(s)),
+                    _ => false,
+                }
             })
             .collect()
     }
@@ -1401,15 +1429,18 @@ impl WasmWorld {
                 out.push(cell);
             }
         }
+        let mut seen: HashSet<String> = out.iter().map(|v| v.to_string()).collect();
+        self.expand_zone_rects(region_id, out, &mut seen);
     }
 
     /// Returns all cells (from RegionAssignment component) assigned to regions of the given kind.
     ///
-    /// Kind resolves through the region record table: every `Region`
-    /// component whose `kind` matches contributes its `id`(s), and the
-    /// result is the union of [`cells_in_region`](Self::cells_in_region)
+    /// Kind resolves through the region and zone record tables: every `Region`
+    /// or `Zone` component whose `kind` matches contributes its `id`(s), and
+    /// the result is the union of [`cells_in_region`](Self::cells_in_region)
     /// expansions for those ids. The `RegionAssignment` schema carries no
-    /// `kind` field, so assignments are never filtered on one.
+    /// `kind` field, so assignments are never filtered on one. Mirrors
+    /// `World::cells_in_region_kind`.
     pub fn cells_in_region_kind(&self, kind: &str) -> Vec<JsonValue> {
         let mut region_ids = Vec::new();
         for eid in self.get_entities_with_component("Region") {
@@ -1431,12 +1462,526 @@ impl WasmWorld {
                 _ => {}
             }
         }
+        for eid in self.get_entities_with_component("Zone") {
+            let Some(val) = self.components.get("Zone").and_then(|m| m.get(&eid)) else {
+                continue;
+            };
+            if val.get("kind").and_then(|k| k.as_str()) != Some(kind) {
+                continue;
+            }
+            if let Some(id) = val.get("id").and_then(|v| v.as_str()) {
+                region_ids.push(id.to_string());
+            }
+        }
         let mut visited = HashSet::new();
         let mut out = Vec::new();
         for rid in region_ids {
             self.collect_region_cells(&rid, &mut visited, &mut out);
         }
         out
+    }
+
+    // ---- Zone API ----
+    //
+    // Mirrors `World` zone ops (`engine/core/src/ecs/world/zone.rs`) with
+    // JSON-string transport for `shape`/`cells` arguments, matching the
+    // host-API convention. `shape_json` is `{"rect": {x0, y0, z, x1, y1}}`
+    // (Square-topology inclusive rectangle) or `{"cells": [...]}` (explicit
+    // cell list). Rect interiors persist as one `ZoneRect` record and expand
+    // at query time, so no per-cell fan-out occurs.
+
+    /// Colony gate shared by all mutating zone ops.
+    fn zone_gate(&self, op: &str) -> Result<(), String> {
+        if self.get_mode() != "colony" {
+            return Err(format!(
+                "{op}: world is in '{}' mode; zone management requires 'colony' mode",
+                self.get_mode()
+            ));
+        }
+        Ok(())
+    }
+
+    /// Entity ids carrying a `Zone` record with the given id.
+    fn zone_record_entities(&self, zone_id: &str) -> Vec<u32> {
+        self.get_entities_with_component("Zone")
+            .into_iter()
+            .filter(|&eid| {
+                self.components
+                    .get("Zone")
+                    .and_then(|m| m.get(&eid))
+                    .and_then(|v| v.get("id"))
+                    .and_then(|v| v.as_str())
+                    == Some(zone_id)
+            })
+            .collect()
+    }
+
+    /// True when the value is a usable zone cell: a Square/Hex/Province cell
+    /// or a nested `Region` reference.
+    fn is_valid_zone_cell(cell: &JsonValue) -> bool {
+        if CellKey::from_position(cell).is_some() {
+            return true;
+        }
+        cell.get("Region")
+            .and_then(|r| r.get("id"))
+            .and_then(|v| v.as_str())
+            .is_some()
+    }
+
+    /// Extracts an integer rect coordinate, naming the offending field.
+    fn zone_rect_int(rect: &JsonValue, key: &str) -> Result<i64, String> {
+        rect.get(key)
+            .and_then(|v| {
+                v.as_i64()
+                    .or_else(|| v.as_u64().and_then(|u| i64::try_from(u).ok()))
+            })
+            .ok_or_else(|| format!("designate_zone: shape.rect missing integer '{key}'"))
+    }
+
+    /// Designates a zone, returning its unique id.
+    ///
+    /// Rect designations persist as one `ZoneRect` record (constant storage
+    /// regardless of area); explicit cells persist as `RegionAssignment`
+    /// entities keyed by the zone id. Errors on empty `kind`, malformed
+    /// rects (naming the offending field), invalid cells, and outside
+    /// `colony` mode.
+    pub fn designate_zone(
+        &mut self,
+        kind: &str,
+        label: Option<&str>,
+        shape_json: &str,
+    ) -> Result<String, String> {
+        self.zone_gate("designate_zone")?;
+        if kind.is_empty() {
+            return Err("designate_zone: 'kind' must be a non-empty string".to_string());
+        }
+        let shape: JsonValue = serde_json::from_str(shape_json)
+            .map_err(|e| format!("designate_zone: invalid shape JSON: {e}"))?;
+        let shape_obj = shape
+            .as_object()
+            .ok_or_else(|| "designate_zone: shape must contain 'rect' or 'cells'".to_string())?;
+        enum ParsedShape {
+            Rect {
+                x0: i64,
+                y0: i64,
+                z: i64,
+                x1: i64,
+                y1: i64,
+            },
+            Cells(Vec<JsonValue>),
+        }
+        let parsed = if let Some(rect) = shape_obj.get("rect") {
+            let (x0, y0, z, x1, y1) = (
+                Self::zone_rect_int(rect, "x0")?,
+                Self::zone_rect_int(rect, "y0")?,
+                Self::zone_rect_int(rect, "z")?,
+                Self::zone_rect_int(rect, "x1")?,
+                Self::zone_rect_int(rect, "y1")?,
+            );
+            if x0 > x1 {
+                return Err(format!(
+                    "designate_zone: rect 'x0' ({x0}) must be <= 'x1' ({x1})"
+                ));
+            }
+            if y0 > y1 {
+                return Err(format!(
+                    "designate_zone: rect 'y0' ({y0}) must be <= 'y1' ({y1})"
+                ));
+            }
+            ParsedShape::Rect { x0, y0, z, x1, y1 }
+        } else if let Some(cells) = shape_obj.get("cells") {
+            let arr = cells
+                .as_array()
+                .ok_or_else(|| "designate_zone: shape.cells must be an array".to_string())?;
+            for (i, cell) in arr.iter().enumerate() {
+                if !Self::is_valid_zone_cell(cell) {
+                    return Err(format!(
+                        "designate_zone: cells[{i}] is not a valid Square/Hex cell or Region reference"
+                    ));
+                }
+            }
+            ParsedShape::Cells(arr.clone())
+        } else {
+            return Err("designate_zone: shape must contain 'rect' or 'cells'".to_string());
+        };
+
+        let zone_id = format!("zone-{}", self.next_zone_id);
+        self.next_zone_id += 1;
+
+        let record = self.spawn_entity();
+        self.components
+            .entry("Zone".to_string())
+            .or_default()
+            .insert(
+                record,
+                serde_json::json!({"id": zone_id, "kind": kind, "label": label}),
+            );
+
+        match parsed {
+            ParsedShape::Rect { x0, y0, z, x1, y1 } => {
+                let rect = self.spawn_entity();
+                self.components
+                    .entry("ZoneRect".to_string())
+                    .or_default()
+                    .insert(
+                        rect,
+                        serde_json::json!({"zone_id": zone_id, "x0": x0, "y0": y0, "z": z, "x1": x1, "y1": y1}),
+                    );
+            }
+            ParsedShape::Cells(cells) => {
+                for cell in cells {
+                    let assignment = self.spawn_entity();
+                    self.components
+                        .entry("RegionAssignment".to_string())
+                        .or_default()
+                        .insert(
+                            assignment,
+                            serde_json::json!({"cell": cell, "region_id": zone_id}),
+                        );
+                }
+            }
+        }
+        Ok(zone_id)
+    }
+
+    /// Removes a zone and all of its cell assignments.
+    ///
+    /// Returns `Ok(false)` for unknown ids without touching other zones.
+    pub fn remove_zone(&mut self, zone_id: &str) -> Result<bool, String> {
+        self.zone_gate("remove_zone")?;
+        if self.zone_record_entities(zone_id).is_empty() {
+            return Ok(false);
+        }
+        for eid in self.zone_record_entities(zone_id) {
+            self.despawn_entity(eid);
+        }
+        let rects: Vec<u32> = self
+            .get_entities_with_component("ZoneRect")
+            .into_iter()
+            .filter(|&eid| {
+                self.components
+                    .get("ZoneRect")
+                    .and_then(|m| m.get(&eid))
+                    .and_then(|v| v.get("zone_id"))
+                    .and_then(|v| v.as_str())
+                    == Some(zone_id)
+            })
+            .collect();
+        for eid in rects {
+            self.despawn_entity(eid);
+        }
+        let assignments: Vec<u32> = self
+            .get_entities_with_component("RegionAssignment")
+            .into_iter()
+            .filter(|&eid| {
+                let Some(val) = self
+                    .components
+                    .get("RegionAssignment")
+                    .and_then(|m| m.get(&eid))
+                else {
+                    return false;
+                };
+                match val.get("region_id") {
+                    Some(JsonValue::String(s)) => s == zone_id,
+                    Some(JsonValue::Array(arr)) => arr.iter().any(|v| v.as_str() == Some(zone_id)),
+                    _ => false,
+                }
+            })
+            .collect();
+        for eid in assignments {
+            let strip_to_empty = self
+                .components
+                .get("RegionAssignment")
+                .and_then(|m| m.get(&eid))
+                .and_then(|v| v.get("region_id"))
+                .map(|rid| match rid {
+                    JsonValue::Array(arr) => {
+                        arr.iter().filter(|v| v.as_str() != Some(zone_id)).count() == 0
+                    }
+                    _ => true,
+                })
+                .unwrap_or(true);
+            if strip_to_empty {
+                self.despawn_entity(eid);
+            } else if let Some(val) = self
+                .components
+                .get_mut("RegionAssignment")
+                .and_then(|m| m.get_mut(&eid))
+                && let Some(arr) = val.get_mut("region_id").and_then(|v| v.as_array_mut())
+            {
+                arr.retain(|v| v.as_str() != Some(zone_id));
+            }
+        }
+        Ok(true)
+    }
+
+    /// Renames a zone by replacing its label. Returns `Ok(false)` for
+    /// unknown ids. Labels are non-unique; only ids are.
+    pub fn rename_zone(&mut self, zone_id: &str, label: &str) -> Result<bool, String> {
+        self.zone_gate("rename_zone")?;
+        let Some(eid) = self.zone_record_entities(zone_id).into_iter().next() else {
+            return Ok(false);
+        };
+        if let Some(record) = self
+            .components
+            .get_mut("Zone")
+            .and_then(|m| m.get_mut(&eid))
+            && let Some(obj) = record.as_object_mut()
+        {
+            obj.insert("label".to_string(), serde_json::json!(label));
+        }
+        Ok(true)
+    }
+
+    /// Changes a zone's kind, rejecting empty kinds naming the field.
+    /// Returns `Ok(false)` for unknown ids.
+    pub fn set_zone_kind(&mut self, zone_id: &str, kind: &str) -> Result<bool, String> {
+        self.zone_gate("set_zone_kind")?;
+        if kind.is_empty() {
+            return Err("set_zone_kind: 'kind' must be a non-empty string".to_string());
+        }
+        let Some(eid) = self.zone_record_entities(zone_id).into_iter().next() else {
+            return Ok(false);
+        };
+        if let Some(record) = self
+            .components
+            .get_mut("Zone")
+            .and_then(|m| m.get_mut(&eid))
+            && let Some(obj) = record.as_object_mut()
+        {
+            obj.insert("kind".to_string(), serde_json::json!(kind));
+        }
+        Ok(true)
+    }
+
+    /// Explicit cells directly assigned to a zone (raw stored values).
+    fn zone_member_cells(&self, zone_id: &str) -> Vec<JsonValue> {
+        let mut cells = Vec::new();
+        for eid in self.get_entities_with_component("RegionAssignment") {
+            let Some(val) = self
+                .components
+                .get("RegionAssignment")
+                .and_then(|m| m.get(&eid))
+            else {
+                continue;
+            };
+            let matches = match val.get("region_id") {
+                Some(JsonValue::String(s)) => s == zone_id,
+                Some(JsonValue::Array(arr)) => arr.iter().any(|v| v.as_str() == Some(zone_id)),
+                _ => false,
+            };
+            if matches && let Some(cell) = val.get("cell").cloned() {
+                cells.push(cell);
+            }
+        }
+        cells
+    }
+
+    /// Assigns explicit cells to a zone, ignoring cells that are already
+    /// members (idempotent). `cells_json` is a JSON array string. Returns
+    /// `Ok(false)` for unknown ids.
+    pub fn assign_cells_to_zone(
+        &mut self,
+        zone_id: &str,
+        cells_json: &str,
+    ) -> Result<bool, String> {
+        self.zone_gate("assign_cells_to_zone")?;
+        if self.zone_record_entities(zone_id).is_empty() {
+            return Ok(false);
+        }
+        let cells: Vec<JsonValue> = serde_json::from_str(cells_json)
+            .map_err(|e| format!("assign_cells_to_zone: invalid cells JSON: {e}"))?;
+        for (i, cell) in cells.iter().enumerate() {
+            if !Self::is_valid_zone_cell(cell) {
+                return Err(format!(
+                    "assign_cells_to_zone: cells[{i}] is not a valid Square/Hex cell or Region reference"
+                ));
+            }
+        }
+        let member: HashSet<String> = self
+            .zone_member_cells(zone_id)
+            .iter()
+            .map(|c| c.to_string())
+            .collect();
+        for cell in cells {
+            if member.contains(&cell.to_string()) {
+                continue;
+            }
+            let assignment = self.spawn_entity();
+            self.components
+                .entry("RegionAssignment".to_string())
+                .or_default()
+                .insert(
+                    assignment,
+                    serde_json::json!({"cell": cell, "region_id": zone_id}),
+                );
+        }
+        Ok(true)
+    }
+
+    /// Removes explicit cells from a zone, ignoring cells that are not
+    /// members (idempotent). Rect interiors are unaffected. Returns
+    /// `Ok(false)` for unknown ids.
+    pub fn unassign_cells_from_zone(
+        &mut self,
+        zone_id: &str,
+        cells_json: &str,
+    ) -> Result<bool, String> {
+        self.zone_gate("unassign_cells_from_zone")?;
+        if self.zone_record_entities(zone_id).is_empty() {
+            return Ok(false);
+        }
+        let cells: Vec<JsonValue> = serde_json::from_str(cells_json)
+            .map_err(|e| format!("unassign_cells_from_zone: invalid cells JSON: {e}"))?;
+        let targets: HashSet<String> = cells.iter().map(|c| c.to_string()).collect();
+        if targets.is_empty() {
+            return Ok(true);
+        }
+        let assignments: Vec<u32> = self
+            .get_entities_with_component("RegionAssignment")
+            .into_iter()
+            .filter(|&eid| {
+                let Some(val) = self
+                    .components
+                    .get("RegionAssignment")
+                    .and_then(|m| m.get(&eid))
+                else {
+                    return false;
+                };
+                let zone_matches = match val.get("region_id") {
+                    Some(JsonValue::String(s)) => s == zone_id,
+                    Some(JsonValue::Array(arr)) => arr.iter().any(|v| v.as_str() == Some(zone_id)),
+                    _ => false,
+                };
+                zone_matches
+                    && val
+                        .get("cell")
+                        .is_some_and(|cell| targets.contains(&cell.to_string()))
+            })
+            .collect();
+        for eid in assignments {
+            let strip_to_empty = self
+                .components
+                .get("RegionAssignment")
+                .and_then(|m| m.get(&eid))
+                .and_then(|v| v.get("region_id"))
+                .map(|rid| match rid {
+                    JsonValue::Array(arr) => {
+                        arr.iter().filter(|v| v.as_str() != Some(zone_id)).count() == 0
+                    }
+                    _ => true,
+                })
+                .unwrap_or(true);
+            if strip_to_empty {
+                self.despawn_entity(eid);
+            } else if let Some(val) = self
+                .components
+                .get_mut("RegionAssignment")
+                .and_then(|m| m.get_mut(&eid))
+                && let Some(arr) = val.get_mut("region_id").and_then(|v| v.as_array_mut())
+            {
+                arr.retain(|v| v.as_str() != Some(zone_id));
+            }
+        }
+        Ok(true)
+    }
+
+    /// Lists all zones as `{id, label, kind, cell_count}` sorted by id.
+    /// Read path: ungated.
+    pub fn list_zones(&self) -> Vec<JsonValue> {
+        let mut zones: Vec<(String, JsonValue)> = self
+            .get_entities_with_component("Zone")
+            .into_iter()
+            .filter_map(|eid| {
+                let val = self.components.get("Zone")?.get(&eid)?.clone();
+                let id = val.get("id")?.as_str()?.to_string();
+                Some((id, val))
+            })
+            .collect();
+        zones.sort_by(|a, b| a.0.cmp(&b.0));
+        zones
+            .into_iter()
+            .map(|(id, val)| {
+                serde_json::json!({
+                    "id": id,
+                    "label": val.get("label").cloned().unwrap_or(JsonValue::Null),
+                    "kind": val.get("kind").cloned().unwrap_or(JsonValue::Null),
+                    "cell_count": self.cells_in_region(&id).len(),
+                })
+            })
+            .collect()
+    }
+
+    /// Returns `{id, label, kind, rects, cells}` for a zone, or `None`.
+    /// Read path: ungated.
+    pub fn get_zone(&self, zone_id: &str) -> Option<JsonValue> {
+        let record = self
+            .zone_record_entities(zone_id)
+            .into_iter()
+            .next()
+            .and_then(|eid| self.components.get("Zone")?.get(&eid).cloned())?;
+        let mut rects: Vec<JsonValue> = self
+            .get_entities_with_component("ZoneRect")
+            .into_iter()
+            .filter_map(|eid| {
+                let val = self.components.get("ZoneRect")?.get(&eid)?;
+                if val.get("zone_id")?.as_str()? != zone_id {
+                    return None;
+                }
+                Some(serde_json::json!({
+                    "x0": val.get("x0"),
+                    "y0": val.get("y0"),
+                    "z": val.get("z"),
+                    "x1": val.get("x1"),
+                    "y1": val.get("y1"),
+                }))
+            })
+            .collect();
+        rects.sort_by_key(|a| a.to_string());
+        let cells = self.zone_member_cells(zone_id);
+        Some(serde_json::json!({
+            "id": record.get("id"),
+            "label": record.get("label").cloned().unwrap_or(JsonValue::Null),
+            "kind": record.get("kind"),
+            "rects": rects,
+            "cells": cells,
+        }))
+    }
+
+    /// Expands the `ZoneRect` records of a zone id into Square cell values.
+    /// Mirrors `World::expand_zone_rects`: cells already present in `out`
+    /// are skipped so rect interiors never duplicate explicit assignments.
+    fn expand_zone_rects(
+        &self,
+        zone_id: &str,
+        out: &mut Vec<JsonValue>,
+        seen: &mut HashSet<String>,
+    ) {
+        for eid in self.get_entities_with_component("ZoneRect") {
+            let Some(val) = self.components.get("ZoneRect").and_then(|m| m.get(&eid)) else {
+                continue;
+            };
+            if val.get("zone_id").and_then(|v| v.as_str()) != Some(zone_id) {
+                continue;
+            }
+            let (Some(x0), Some(y0), Some(z), Some(x1), Some(y1)) = (
+                val.get("x0").and_then(|v| v.as_i64()),
+                val.get("y0").and_then(|v| v.as_i64()),
+                val.get("z").and_then(|v| v.as_i64()),
+                val.get("x1").and_then(|v| v.as_i64()),
+                val.get("y1").and_then(|v| v.as_i64()),
+            ) else {
+                continue;
+            };
+            for x in x0..=x1 {
+                for y in y0..=y1 {
+                    let cell = serde_json::json!({"Square": {"x": x, "y": y, "z": z}});
+                    if seen.insert(cell.to_string()) {
+                        out.push(cell);
+                    }
+                }
+            }
+        }
     }
 
     // ---- Economic API ----
