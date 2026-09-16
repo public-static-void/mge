@@ -44,6 +44,8 @@ pub mod research;
 pub mod stat_calculation;
 /// Weather system (deterministic global weather state)
 pub mod weather;
+/// Zone state validation system
+pub mod zone;
 
 /// Deterministic system execution order per specification R011.
 ///
@@ -60,6 +62,7 @@ pub const SYSTEM_EXECUTION_ORDER: &[&str] = &[
     "JobSystem",
     "EconomicSystem",
     "ConstructionSystem",
+    "ZoneSystem",
     "FactionReputationSystem",
     "FluidSimulationSystem",
     "WeatherSystem",
