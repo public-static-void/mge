@@ -355,16 +355,39 @@ impl World {
     }
 
     /// Returns all cells assigned to regions of the given kind.
+    ///
+    /// Kind resolves through the region record table: every `Region`
+    /// component whose `kind` matches contributes its `id`(s), and the
+    /// result is the union of [`cells_in_region`](Self::cells_in_region)
+    /// expansions for those ids (recursive `Region`-cell resolution with
+    /// a cycle guard). The `RegionAssignment` schema carries no `kind`
+    /// field, so assignments are never filtered on one.
     pub fn cells_in_region_kind(&self, kind: &str) -> Vec<serde_json::Value> {
-        self.get_entities_with_component("RegionAssignment")
-            .into_iter()
-            .filter_map(|eid| {
-                self.get_component(eid, "RegionAssignment").and_then(|val| {
-                    let k = val.get("kind").and_then(|v| v.as_str());
-                    let cell = val.get("cell").cloned();
-                    if k == Some(kind) { cell } else { None }
-                })
-            })
-            .collect()
+        let mut region_ids = Vec::new();
+        for eid in self.get_entities_with_component("Region") {
+            let Some(val) = self.get_component(eid, "Region") else {
+                continue;
+            };
+            if val.get("kind").and_then(|k| k.as_str()) != Some(kind) {
+                continue;
+            }
+            match val.get("id") {
+                Some(serde_json::Value::String(s)) => region_ids.push(s.clone()),
+                Some(serde_json::Value::Array(arr)) => {
+                    for v in arr {
+                        if let Some(s) = v.as_str() {
+                            region_ids.push(s.to_string());
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        let mut visited = std::collections::HashSet::new();
+        let mut out = Vec::new();
+        for rid in region_ids {
+            self.collect_region_cells(&rid, &mut visited, &mut out);
+        }
+        out
     }
 }
