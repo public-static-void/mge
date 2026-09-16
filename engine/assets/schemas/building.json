@@ -1,0 +1,23 @@
+{
+  "title": "Building",
+  "type": "object",
+  "properties": {
+    "building_type": { "type": "string" },
+    "materials_used": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "kind": { "type": "string" },
+          "amount": { "type": "integer", "minimum": 0 }
+        },
+        "required": ["kind", "amount"]
+      }
+    },
+    "integrity": { "type": "integer", "minimum": 0 },
+    "passable": { "type": "boolean", "default": false },
+    "blocks_sight": { "type": "boolean", "default": false }
+  },
+  "required": ["building_type", "materials_used", "integrity"],
+  "modes": ["colony"]
+}

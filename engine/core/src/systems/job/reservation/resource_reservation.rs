@@ -68,6 +68,9 @@ impl ResourceReservationSystem {
         }
 
         // Process jobs and allocate resources strictly in this order, so only what is left can be reserved.
+        // Stockpiles are visited in ascending entity-id order for determinism.
+        let mut stockpile_order: Vec<u32> = stockpile_working.keys().copied().collect();
+        stockpile_order.sort_unstable();
         for &job_eid in &job_eids {
             let job = match world.get_component_value(job_eid, "Job") {
                 Some(j) => j,
@@ -83,12 +86,16 @@ impl ResourceReservationSystem {
                 _ => continue,
             };
 
-            for (&stockpile_eid, resources) in stockpile_working.iter_mut() {
+            for &stockpile_eid in &stockpile_order {
+                let resources = match stockpile_working.get_mut(&stockpile_eid) {
+                    Some(r) => r,
+                    None => continue,
+                };
                 if Self::can_reserve(resources, &requirements) {
                     for req in &requirements {
                         let kind = req.get("kind").and_then(|v| v.as_str()).unwrap_or("");
-                        let amount = req.get("amount").and_then(|v| v.as_f64()).unwrap_or(0.0);
-                        let available = resources.get(kind).and_then(|v| v.as_f64()).unwrap_or(0.0);
+                        let amount = req.get("amount").map(Self::amount_as_i64).unwrap_or(0);
+                        let available = resources.get(kind).map(Self::amount_as_i64).unwrap_or(0);
                         resources.insert(kind.to_string(), JsonValue::from(available - amount));
                     }
                     let mut job = job;
@@ -142,21 +149,40 @@ impl ResourceReservationSystem {
     }
 
     /// Internal: checks if all requirements can be reserved from the given resources.
-    /// Uses `as_f64` for cross-compatibility: serde_json 1.0.116+ changed `as_i64` to return
-    /// `None` for float-number variants, while stockpile values are commonly floats (e.g. 100.0).
+    /// Integer-only: amounts are non-negative integers end-to-end, so reserved
+    /// and consumed totals cannot drift through float truncation.
     fn can_reserve(
         resources: &serde_json::Map<String, JsonValue>,
         requirements: &[JsonValue],
     ) -> bool {
         for req in requirements {
             let kind = req.get("kind").and_then(|v| v.as_str()).unwrap_or("");
-            let amount = req.get("amount").and_then(|v| v.as_f64()).unwrap_or(0.0);
-            let available = resources.get(kind).and_then(|v| v.as_f64()).unwrap_or(0.0);
+            let amount = req.get("amount").map(Self::amount_as_i64).unwrap_or(0);
+            let available = resources.get(kind).map(Self::amount_as_i64).unwrap_or(0);
             if available < amount {
                 return false;
             }
         }
         true
+    }
+
+    /// Reads a JSON amount as a non-negative integer with a float-tolerant read boundary.
+    /// Integer variants pass through exactly; finite floats truncate toward zero
+    /// (100.0 reads as 100, 9.7 reads as 9, never rounding up into
+    /// over-reservation). Non-finite floats, strings, nulls, missing values,
+    /// and u64 overflow read as zero; negatives clamp to zero. Truncation
+    /// happens once here, so reservation math downstream stays integer-only.
+    fn amount_as_i64(value: &JsonValue) -> i64 {
+        value
+            .as_i64()
+            .or_else(|| value.as_u64().and_then(|u| i64::try_from(u).ok()))
+            .or_else(|| {
+                value
+                    .as_f64()
+                    .and_then(|f| if f.is_finite() { Some(f as i64) } else { None })
+            })
+            .unwrap_or(0)
+            .max(0)
     }
 }
 

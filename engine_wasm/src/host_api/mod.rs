@@ -8,6 +8,9 @@ pub mod entity;
 /// Component module
 pub mod component;
 
+/// Construction module (place_blueprint, get_construction_state, cancel_construction, demolish_building)
+pub mod construction;
+
 /// Turn module
 pub mod turn;
 
