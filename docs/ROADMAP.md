@@ -50,7 +50,7 @@
 - [x] Weather and climate system
 - [x] Building and construction system
 - [x] Administration and zone management
-- [ ] Temperature and environment simulation
+- [x] Temperature and environment simulation
 - [ ] Ecosystem and wildlife simulation
 - [ ] Vehicle support
 - [ ] Crafting system (recipes, tools, materials)
