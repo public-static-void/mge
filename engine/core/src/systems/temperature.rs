@@ -22,6 +22,20 @@ impl Default for TemperatureState {
     }
 }
 
+/// Humidity modifier band in °C: `H = (humidity - 0.5) * 2 * HUMIDITY_BAND`.
+/// Bound here; applied by the humidity/pressure increment.
+pub const HUMIDITY_BAND: f64 = 3.0;
+/// Pressure modifier band in °C: `P = clamp((pressure - 1013.0) * 0.05, ±PRESSURE_BAND)`.
+/// Bound here; applied by the humidity/pressure increment.
+pub const PRESSURE_BAND: f64 = 2.0;
+/// Diffusion rate for the single per-tick relaxation pass over the transient
+/// cell temperature map. Bound here; applied by the diffusion increment.
+pub const DIFFUSION_RATE: f64 = 0.2;
+/// Default relative humidity (`[0.0, 1.0]`) for saves predating the field.
+pub const DEFAULT_HUMIDITY: f64 = 0.5;
+/// Default atmospheric pressure in hPa for saves predating the field.
+pub const DEFAULT_PRESSURE: f64 = 1013.0;
+
 /// System: Derives the global ambient temperature each tick and exchanges heat
 /// with every `Body` part in place.
 ///
@@ -31,6 +45,9 @@ impl Default for TemperatureState {
 /// drifts toward ambient at a rate scaled by its stored `insulation`, threshold
 /// crossings emit `cold_stress` / `heat_stress` events, and extreme exposure
 /// queues `PendingDamage` for `BodyPartDamageSystem` on the following tick.
+///
+/// `insulation` is read-only input here: [`EquipmentEffectAggregationSystem`]
+/// is its sole writer.
 pub struct TemperatureSystem;
 
 impl System for TemperatureSystem {
