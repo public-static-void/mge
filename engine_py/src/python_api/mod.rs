@@ -65,6 +65,8 @@ pub mod region;
 pub mod save_load;
 /// Tech Tree and Research API
 pub mod tech_tree;
+/// Temperature API
+pub mod temperature;
 /// Time API
 pub mod time_of_day;
 /// Turn API

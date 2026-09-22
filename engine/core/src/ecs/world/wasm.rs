@@ -3,9 +3,10 @@ use crate::ecs::item::ItemRegistry;
 use crate::ecs::template::UnitTemplateRegistry;
 use crate::ecs::world::component::enforce_schema_defaults;
 use crate::ecs::world::loadout::EquipmentIssue;
-use crate::ecs::world::{WeatherCondition, WeatherState};
+use crate::ecs::world::{Season, WeatherCondition, WeatherState};
 use crate::loot::LootTableRegistry;
 use crate::map::CellKey;
+use crate::systems::temperature::{TemperatureState, compute_ambient_temperature};
 use crate::systems::weather::compute_visibility_modifier;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
@@ -119,6 +120,9 @@ pub struct WasmWorld {
     /// Global weather state (persistent, serialized for save/load).
     #[serde(default)]
     pub weather: WeatherState,
+    /// Global ambient temperature state (persistent, serialized for save/load).
+    #[serde(default)]
+    pub temperature: TemperatureState,
     /// Transient visibility modifier (recomputed each tick, not serialized).
     #[serde(skip)]
     pub visibility_modifier: f64,
@@ -316,6 +320,7 @@ impl WasmWorld {
                 day: 0,
             },
             weather: WeatherState::default(),
+            temperature: TemperatureState::default(),
             visibility_modifier: 1.0,
             camera: None,
             event_buses: HashMap::new(),
@@ -824,6 +829,20 @@ impl WasmWorld {
         // mirroring WeatherSystem's per-tick recompute (R008/R009).
         self.visibility_modifier =
             compute_visibility_modifier(self.weather.condition, self.weather.intensity);
+        // Recompute ambient temperature override-aware, mirroring
+        // TemperatureSystem's per-tick rule (SPEC R013).
+        if let Some(override_value) = self.temperature.manual_override {
+            self.temperature.ambient = override_value;
+        } else {
+            let season = Season::from_day(self.time_of_day.day);
+            self.temperature.ambient = compute_ambient_temperature(
+                season,
+                self.weather.condition,
+                self.weather.intensity,
+                self.time_of_day.hour,
+                self.time_of_day.minute,
+            );
+        }
     }
 
     /// Returns the current turn number.
@@ -945,6 +964,29 @@ impl WasmWorld {
     /// Returns the current visibility modifier (1.0 = no reduction).
     pub fn get_weather_visibility_modifier(&self) -> f64 {
         self.visibility_modifier
+    }
+
+    /// Returns the current global ambient temperature in °C.
+    pub fn get_temperature(&self) -> f64 {
+        self.temperature.ambient
+    }
+
+    /// Holds ambient at `ambient` °C: clamps to `[-60, 60]`, sets the manual
+    /// override (tick derivation is skipped while it is set), applies it
+    /// immediately, and emits a `temperature_changed` event.
+    pub fn set_temperature(&mut self, ambient: f64) {
+        let clamped = ambient.clamp(-60.0, 60.0);
+        let old_ambient = self.temperature.ambient;
+        self.temperature.ambient = clamped;
+        self.temperature.manual_override = Some(clamped);
+        let payload = serde_json::json!({
+            "old_ambient": old_ambient,
+            "new_ambient": clamped,
+        });
+        let _ = self.send_event(
+            "temperature_changed",
+            &serde_json::to_string(&payload).unwrap_or_default(),
+        );
     }
 
     /// Reads a line of user input from the configured input source.

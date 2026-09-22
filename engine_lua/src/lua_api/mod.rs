@@ -74,6 +74,8 @@ pub mod save_load;
 pub mod system;
 /// Tech Tree and Research API
 pub mod tech_tree;
+/// Temperature API (get_temperature, set_temperature)
+pub mod temperature;
 /// Time of Day API
 pub mod time_of_day;
 /// Turn API
@@ -139,5 +141,6 @@ pub fn register_all_api_functions(
     item_definition::register_item_definition_api(lua, globals, world.clone())?;
     equipment_set_designer::register_equipment_set_designer_api(lua, globals, world.clone())?;
     weather::register_weather_api(lua, globals, world.clone())?;
+    temperature::register_temperature_api(lua, globals, world.clone())?;
     Ok(())
 }
