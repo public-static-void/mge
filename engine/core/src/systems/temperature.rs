@@ -75,6 +75,8 @@ impl System for TemperatureSystem {
                 world.weather.intensity,
                 world.time_of_day.hour,
                 world.time_of_day.minute,
+                world.weather.humidity,
+                world.weather.pressure,
             );
         }
         let ambient = world.temperature.ambient;
@@ -140,17 +142,25 @@ impl System for TemperatureSystem {
     }
 }
 
-/// Compute the global ambient temperature in °C from season, weather, and time.
+/// Compute the global ambient temperature in °C from season, weather, time,
+/// humidity, and pressure.
 ///
-/// `ambient = season_base + weather_delta + diurnal`, clamped to `[-60, 60]`,
-/// with `diurnal = 5·cos(2π·(t−14)/24)` peaking at 14:00. Pure function: no RNG,
-/// no wall-clock reads, so identical inputs always yield identical outputs.
+/// `ambient = season_base + weather_delta + diurnal + humidity_delta +
+/// pressure_delta`, clamped to `[-60, 60]`, with `diurnal = 5·cos(2π·(t−14)/24)`
+/// peaking at 14:00, `humidity_delta = (humidity − 0.5) * 6.0` (band ±3 °C),
+/// and `pressure_delta = clamp((pressure − 1013.0) * 0.05, ±2.0)`. At the
+/// canonical neutral point (`humidity = 0.5`, `pressure = 1013.0`) both
+/// modifiers are exactly zero, reproducing the legacy ambient value. Pure
+/// function: no RNG, no wall-clock reads, so identical inputs always yield
+/// identical outputs.
 pub fn compute_ambient_temperature(
     season: Season,
     condition: WeatherCondition,
     intensity: f64,
     hour: u8,
     minute: u8,
+    humidity: f64,
+    pressure: f64,
 ) -> f64 {
     let season_base = match season {
         Season::Winter => -10.0,
@@ -168,7 +178,10 @@ pub fn compute_ambient_temperature(
     };
     let t = f64::from(hour) + f64::from(minute) / 60.0;
     let diurnal = 5.0 * (2.0 * std::f64::consts::PI * (t - 14.0) / 24.0).cos();
-    (season_base + weather_delta + diurnal).clamp(-60.0, 60.0)
+    let humidity_delta = (humidity - DEFAULT_HUMIDITY) * 2.0 * HUMIDITY_BAND;
+    let pressure_delta =
+        ((pressure - DEFAULT_PRESSURE) * 0.05).clamp(-PRESSURE_BAND, PRESSURE_BAND);
+    (season_base + weather_delta + diurnal + humidity_delta + pressure_delta).clamp(-60.0, 60.0)
 }
 
 /// Advance every part (including nested `children`) toward ambient.
