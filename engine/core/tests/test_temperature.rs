@@ -20,7 +20,7 @@ use world_io_helper::save_and_load_roundtrip;
 
 use engine_core::ecs::system::System;
 use engine_core::ecs::world::{Season, WeatherCondition, World};
-use engine_core::map::{Map, SquareGridMap};
+use engine_core::map::{CellKey, Map, SquareGridMap};
 use engine_core::material::{resolve_item_conductivity, set_entity_material};
 use engine_core::systems::SYSTEM_EXECUTION_ORDER;
 use engine_core::systems::body_equipment_sync::BodyEquipmentSyncSystem;
@@ -1148,4 +1148,250 @@ fn weather_tick_keeps_humidity_and_pressure_within_bands_deterministically() {
     // Humidity must have moved away from its start (walk is never trivially
     // flat across 50 ticks with forced transitions).
     assert_ne!(first.get_humidity(), 0.5);
+}
+
+// --- Increment C: per-cell diffusion + drift source change ---
+
+/// Two adjacent cells with a bidirectional link.
+fn two_cell_world() -> World {
+    let mut world = make_test_world();
+    let mut grid = SquareGridMap::new();
+    grid.add_cell(0, 0, 0);
+    grid.add_cell(1, 0, 0);
+    grid.add_neighbor((0, 0, 0), (1, 0, 0));
+    grid.add_neighbor((1, 0, 0), (0, 0, 0));
+    world.map = Some(Map::new(Box::new(grid)));
+    world
+}
+
+/// Three cells in a row with bidirectional links; the middle cell is opaque.
+fn walled_row_world() -> World {
+    let mut world = make_test_world();
+    let mut grid = SquareGridMap::new();
+    grid.add_cell(0, 0, 0);
+    grid.add_cell(1, 0, 0);
+    grid.add_cell(2, 0, 0);
+    for (from, to) in [
+        ((0, 0, 0), (1, 0, 0)),
+        ((1, 0, 0), (0, 0, 0)),
+        ((1, 0, 0), (2, 0, 0)),
+        ((2, 0, 0), (1, 0, 0)),
+    ] {
+        grid.add_neighbor(from, to);
+    }
+    let mut map = Map::new(Box::new(grid));
+    map.set_cell_metadata(&CellKey::Square { x: 1, y: 0, z: 0 }, json!({"transparent": false}));
+    world.map = Some(map);
+    world
+}
+
+/// Spawn an entity carrying a `HeatSource` at `(x, y, 0)`.
+fn spawn_heat_source(world: &mut World, x: i32, y: i32, intensity: f64) -> u32 {
+    let entity = world.spawn_entity();
+    world
+        .set_component(
+            entity,
+            "HeatSource",
+            json!({"intensity": intensity, "active": true}),
+        )
+        .unwrap();
+    world
+        .set_component(
+            entity,
+            "Position",
+            json!({"pos": {"Square": {"x": x, "y": y, "z": 0}}}),
+        )
+        .unwrap();
+    entity
+}
+
+#[test]
+fn adjacent_cells_relax_toward_each_other_in_one_pass() {
+    let mut world = two_cell_world();
+    hold_ambient(&mut world, 0.0);
+    spawn_heat_source(&mut world, 0, 0, 20.0);
+    TemperatureSystem.run(&mut world);
+    // Seeded 20.0/0.0, then T_new(c) = T(c) + 0.2 * (avg(neighbors) - T(c)).
+    assert!((world.get_cell_temperature(0, 0, 0) - 16.0).abs() < 1e-9);
+    assert!((world.get_cell_temperature(1, 0, 0) - 4.0).abs() < 1e-9);
+}
+
+#[test]
+fn opaque_cells_neither_give_nor_receive_heat() {
+    let mut world = walled_row_world();
+    hold_ambient(&mut world, 0.0);
+    spawn_heat_source(&mut world, 0, 0, 20.0);
+    TemperatureSystem.run(&mut world);
+    assert!((world.get_cell_temperature(0, 0, 0) - 20.0).abs() < 1e-9);
+    assert!((world.get_cell_temperature(1, 0, 0) - 0.0).abs() < 1e-9);
+    assert!((world.get_cell_temperature(2, 0, 0) - 0.0).abs() < 1e-9);
+}
+
+#[test]
+fn cell_temperature_falls_back_to_ambient_without_a_map_entry() {
+    let world = make_test_world();
+    assert!(world.temperature_map.is_empty());
+    assert_eq!(world.get_cell_temperature(3, 4, 0), world.get_temperature());
+
+    let mut mapped = two_cell_world();
+    hold_ambient(&mut mapped, 7.5);
+    TemperatureSystem.run(&mut mapped);
+    assert_eq!(mapped.get_cell_temperature(9, 9, 9), 7.5);
+}
+
+#[test]
+fn body_drift_reads_the_entity_cell_not_ambient() {
+    let mut world = two_cell_world();
+    hold_ambient(&mut world, 0.0);
+    spawn_heat_source(&mut world, 0, 0, 20.0);
+    let entity = world.spawn_entity();
+    world
+        .set_component(
+            entity,
+            "Body",
+            json!({ "parts": [part("torso", json!(0.0), json!(0.0), json!(0.0))] }),
+        )
+        .unwrap();
+    world
+        .set_component(
+            entity,
+            "Position",
+            json!({"pos": {"Square": {"x": 0, "y": 0, "z": 0}}}),
+        )
+        .unwrap();
+    TemperatureSystem.run(&mut world);
+    // Heated cell relaxes 20.0 -> 16.0; part drifts 0.0 -> 0.0 + 16.0 * 0.05.
+    assert!((part_temperature(&world, entity, 0) - 0.8).abs() < 1e-9);
+}
+
+#[test]
+fn inactive_and_unplaced_heat_sources_add_nothing() {
+    let mut world = two_cell_world();
+    hold_ambient(&mut world, 0.0);
+    let idle = world.spawn_entity();
+    world
+        .set_component(idle, "HeatSource", json!({"intensity": 20.0}))
+        .unwrap();
+    world
+        .set_component(
+            idle,
+            "Position",
+            json!({"pos": {"Square": {"x": 0, "y": 0, "z": 0}}}),
+        )
+        .unwrap();
+    // Deactivate after placement (schema default is active).
+    world
+        .set_component(
+            idle,
+            "HeatSource",
+            json!({"intensity": 20.0, "active": false}),
+        )
+        .unwrap();
+    let homeless = world.spawn_entity();
+    world
+        .set_component(homeless, "HeatSource", json!({"intensity": 20.0}))
+        .unwrap();
+    let away = world.spawn_entity();
+    world
+        .set_component(away, "HeatSource", json!({"intensity": 20.0}))
+        .unwrap();
+    world
+        .set_component(
+            away,
+            "Position",
+            json!({"pos": {"Square": {"x": 5, "y": 5, "z": 0}}}),
+        )
+        .unwrap();
+    TemperatureSystem.run(&mut world);
+    assert!((world.get_cell_temperature(0, 0, 0) - 0.0).abs() < 1e-9);
+    assert!((world.get_cell_temperature(1, 0, 0) - 0.0).abs() < 1e-9);
+}
+
+#[test]
+fn diffusion_map_drops_on_save_and_recomputes_identically() {
+    let mut world = two_cell_world();
+    hold_ambient(&mut world, 0.0);
+    spawn_heat_source(&mut world, 0, 0, 20.0);
+    TemperatureSystem.run(&mut world);
+    assert!(!world.temperature_map.is_empty());
+
+    let json: serde_json::Value = serde_json::to_value(&world).unwrap();
+    assert!(json.get("temperature_map").is_none());
+    assert!(json.get("temperature_scratch").is_none());
+
+    let registry = world.registry.clone();
+    let mut loaded = save_and_load_roundtrip(&world, registry);
+    assert!(loaded.temperature_map.is_empty());
+
+    // The map itself is runtime-only, so re-attach the same topology (heat
+    // sources and the ambient override survive as serialized components and
+    // state); the next tick recomputes identical values.
+    let mut grid = SquareGridMap::new();
+    grid.add_cell(0, 0, 0);
+    grid.add_cell(1, 0, 0);
+    grid.add_neighbor((0, 0, 0), (1, 0, 0));
+    grid.add_neighbor((1, 0, 0), (0, 0, 0));
+    loaded.map = Some(Map::new(Box::new(grid)));
+    TemperatureSystem.run(&mut loaded);
+    assert_eq!(loaded.get_cell_temperature(0, 0, 0), world.get_cell_temperature(0, 0, 0));
+    assert_eq!(loaded.get_cell_temperature(1, 0, 0), world.get_cell_temperature(1, 0, 0));
+}
+
+#[test]
+fn diffusion_stays_deterministic_across_fifty_ticks() {
+    fn diffusion_world() -> World {
+        let mut world = two_cell_world();
+        hold_ambient(&mut world, 0.0);
+        spawn_heat_source(&mut world, 0, 0, 20.0);
+        let entity = world.spawn_entity();
+        world
+            .set_component(
+                entity,
+                "Body",
+                json!({ "parts": [part("torso", json!(10.0), json!(10.0), json!(0.0))] }),
+            )
+            .unwrap();
+        world
+            .set_component(
+                entity,
+                "Position",
+                json!({"pos": {"Square": {"x": 1, "y": 0, "z": 0}}}),
+            )
+            .unwrap();
+        world
+    }
+
+    let mut first = diffusion_world();
+    let mut second = diffusion_world();
+    for tick in 0..50 {
+        TemperatureSystem.run(&mut first);
+        TemperatureSystem.run(&mut second);
+        assert_eq!(
+            first.temperature_map, second.temperature_map,
+            "diffusion map diverged on tick {tick}"
+        );
+        assert_eq!(
+            first.get_component(2, "Body"),
+            second.get_component(2, "Body"),
+            "body temperatures diverged on tick {tick}"
+        );
+    }
+}
+
+#[test]
+fn diffusion_adds_no_system_order_entry() {
+    assert!(
+        !SYSTEM_EXECUTION_ORDER
+            .iter()
+            .any(|name| name.contains("Diffusion"))
+    );
+    let weather_pos = SYSTEM_EXECUTION_ORDER
+        .iter()
+        .position(|name| *name == "WeatherSystem")
+        .unwrap();
+    let temperature_pos = SYSTEM_EXECUTION_ORDER
+        .iter()
+        .position(|name| *name == "TemperatureSystem")
+        .unwrap();
+    assert_eq!(temperature_pos, weather_pos + 1);
 }
