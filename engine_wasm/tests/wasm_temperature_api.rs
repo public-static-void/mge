@@ -93,6 +93,8 @@ fn test_wasm_temperature_tick_derives_without_override() {
         world.weather.intensity,
         world.time_of_day.hour,
         world.time_of_day.minute,
+        world.weather.humidity,
+        world.weather.pressure,
     );
     assert!((world.get_temperature() - expected).abs() < 0.0001);
 }
