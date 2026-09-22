@@ -51,6 +51,7 @@
 - [x] Building and construction system
 - [x] Administration and zone management
 - [x] Temperature and environment simulation
+- [x] Temperature v2 (per-cell diffusion, humidity/pressure modifiers, insulation aggregation)
 - [ ] Ecosystem and wildlife simulation
 - [ ] Vehicle support
 - [ ] Crafting system (recipes, tools, materials)

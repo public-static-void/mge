@@ -1180,7 +1180,10 @@ fn walled_row_world() -> World {
         grid.add_neighbor(from, to);
     }
     let mut map = Map::new(Box::new(grid));
-    map.set_cell_metadata(&CellKey::Square { x: 1, y: 0, z: 0 }, json!({"transparent": false}));
+    map.set_cell_metadata(
+        &CellKey::Square { x: 1, y: 0, z: 0 },
+        json!({"transparent": false}),
+    );
     world.map = Some(map);
     world
 }
@@ -1333,8 +1336,14 @@ fn diffusion_map_drops_on_save_and_recomputes_identically() {
     grid.add_neighbor((1, 0, 0), (0, 0, 0));
     loaded.map = Some(Map::new(Box::new(grid)));
     TemperatureSystem.run(&mut loaded);
-    assert_eq!(loaded.get_cell_temperature(0, 0, 0), world.get_cell_temperature(0, 0, 0));
-    assert_eq!(loaded.get_cell_temperature(1, 0, 0), world.get_cell_temperature(1, 0, 0));
+    assert_eq!(
+        loaded.get_cell_temperature(0, 0, 0),
+        world.get_cell_temperature(0, 0, 0)
+    );
+    assert_eq!(
+        loaded.get_cell_temperature(1, 0, 0),
+        world.get_cell_temperature(1, 0, 0)
+    );
 }
 
 #[test]
@@ -1394,4 +1403,46 @@ fn diffusion_adds_no_system_order_entry() {
         .position(|name| *name == "TemperatureSystem")
         .unwrap();
     assert_eq!(temperature_pos, weather_pos + 1);
+}
+
+// --- Increment C bridges: get_cell_temperature contract (mirrored in the
+// Lua, Python, and WASM suites with the same exact values) ---
+
+#[test]
+fn isolated_heated_cell_holds_seed_plus_source() {
+    // A cell with no neighbor links has nothing to exchange with, so the
+    // bridge reports the seeded ambient plus the full source intensity.
+    let mut world = temperature_world();
+    hold_ambient(&mut world, 0.0);
+    spawn_heat_source(&mut world, 0, 0, 20.0);
+    TemperatureSystem.run(&mut world);
+    assert!((world.get_cell_temperature(0, 0, 0) - 20.0).abs() < 1e-5);
+}
+
+#[test]
+fn cell_bridge_distinguishes_z_levels() {
+    // Two stacked cells with no neighbor link stay independent: heat on the
+    // ground floor never reaches the floor above.
+    let mut world = make_test_world();
+    let mut grid = SquareGridMap::new();
+    grid.add_cell(0, 0, 0);
+    grid.add_cell(0, 0, 1);
+    world.map = Some(Map::new(Box::new(grid)));
+    hold_ambient(&mut world, 0.0);
+    spawn_heat_source(&mut world, 0, 0, 20.0);
+    TemperatureSystem.run(&mut world);
+    assert!((world.get_cell_temperature(0, 0, 0) - 20.0).abs() < 1e-5);
+    assert!((world.get_cell_temperature(0, 0, 1) - 0.0).abs() < 1e-5);
+}
+
+#[test]
+fn cell_bridge_absent_cell_tracks_live_ambient() {
+    // Off-map reads follow the current ambient, not a stale tick value.
+    let mut world = two_cell_world();
+    hold_ambient(&mut world, 0.0);
+    TemperatureSystem.run(&mut world);
+    assert!((world.get_cell_temperature(9, 9, 9) - 0.0).abs() < 1e-5);
+    hold_ambient(&mut world, -3.25);
+    TemperatureSystem.run(&mut world);
+    assert!((world.get_cell_temperature(9, 9, 9) - -3.25).abs() < 1e-5);
 }

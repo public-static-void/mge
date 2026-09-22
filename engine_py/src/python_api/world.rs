@@ -633,6 +633,13 @@ impl PyWorld {
         TemperatureApi::set_pressure(self, pressure)
     }
 
+    /// Per-cell temperature from the transient diffusion map, or global
+    /// ambient when the map is empty or the cell is absent. z defaults to 0.
+    #[pyo3(signature = (x, y, z=0))]
+    fn get_cell_temperature(&self, x: i32, y: i32, z: i32) -> f64 {
+        TemperatureApi::get_cell_temperature(self, x, y, z)
+    }
+
     /// Add a cell to the map
     fn add_cell(&self, x: i32, y: i32, z: i32) {
         crate::python_api::map_api::add_cell(self, x, y, z)

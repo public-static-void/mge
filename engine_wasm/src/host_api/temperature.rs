@@ -1,11 +1,13 @@
-//! Temperature API: get_temperature, set_temperature, humidity/pressure.
+//! Temperature API: get_temperature, set_temperature, humidity/pressure,
+//! cell temperature.
 
 use engine_core::ecs::world::wasm::WasmWorld;
 use std::sync::{Arc, Mutex};
 use wasmtime::{Caller, Linker};
 
 /// Registers the temperature API (get_temperature, set_temperature,
-/// get_humidity, set_humidity, get_pressure, set_pressure).
+/// get_humidity, set_humidity, get_pressure, set_pressure,
+/// get_cell_temperature).
 pub fn register_temperature_api(linker: &mut Linker<Arc<Mutex<WasmWorld>>>) -> anyhow::Result<()> {
     linker.func_wrap(
         "temperature",
@@ -61,6 +63,15 @@ pub fn register_temperature_api(linker: &mut Linker<Arc<Mutex<WasmWorld>>>) -> a
             let mut world = caller.data().lock().unwrap();
             world.set_pressure(pressure);
             0
+        },
+    )?;
+
+    linker.func_wrap(
+        "temperature",
+        "get_cell_temperature",
+        |caller: Caller<'_, Arc<Mutex<WasmWorld>>>, x: i32, y: i32, z: i32| -> f64 {
+            let world = caller.data().lock().unwrap();
+            world.get_cell_temperature(x, y, z)
         },
     )?;
 

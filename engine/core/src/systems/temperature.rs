@@ -246,7 +246,10 @@ fn recompute_temperature_map(world: &mut World, ambient: f64) {
             if !active {
                 continue;
             }
-            let intensity = data.get("intensity").and_then(|v| v.as_f64()).unwrap_or(0.0);
+            let intensity = data
+                .get("intensity")
+                .and_then(|v| v.as_f64())
+                .unwrap_or(0.0);
             if !intensity.is_finite() || intensity == 0.0 {
                 continue;
             }

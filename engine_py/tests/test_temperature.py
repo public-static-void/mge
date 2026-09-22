@@ -123,3 +123,36 @@ def test_humidity_pressure_shift_ambient(make_world):
     world.set_pressure(973.0)
     world.tick()
     assert abs((world.get_temperature() - neutral) + 2.0) < 0.5
+
+
+def _make_heated_pair(world):
+    world.add_cell(0, 0, 0)
+    world.add_cell(1, 0, 0)
+    world.add_neighbor((0, 0, 0), (1, 0, 0))
+    world.add_neighbor((1, 0, 0), (0, 0, 0))
+    source = world.spawn_entity()
+    world.set_component(source, "HeatSource", {"intensity": 20.0, "active": True})
+    world.set_component(
+        source, "Position", {"pos": {"Square": {"x": 0, "y": 0, "z": 0}}}
+    )
+    world.set_temperature(0.0)
+    world.tick()
+
+
+def test_cell_temperature_falls_back_to_ambient(make_world):
+    world = make_world()
+    assert world.get_cell_temperature(3, 4, 0) == world.get_temperature()
+
+
+def test_cell_temperature_relaxes_heated_pair(make_world):
+    world = make_world()
+    _make_heated_pair(world)
+    assert abs(world.get_cell_temperature(0, 0, 0) - 16.0) < 0.00001
+    assert abs(world.get_cell_temperature(1, 0, 0) - 4.0) < 0.00001
+
+
+def test_cell_temperature_absent_cell_and_default_z(make_world):
+    world = make_world()
+    _make_heated_pair(world)
+    assert world.get_cell_temperature(9, 9, 9) == 0.0
+    assert world.get_cell_temperature(0, 0) == world.get_cell_temperature(0, 0, 0)

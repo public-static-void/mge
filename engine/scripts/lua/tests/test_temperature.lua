@@ -114,6 +114,36 @@ local function test_humidity_pressure_shift_ambient()
 	)
 end
 
+local function test_cell_temperature_falls_back_to_ambient()
+	assert.equals(get_cell_temperature(3, 4, 0), get_temperature())
+end
+
+local function make_heated_pair()
+	add_cell(0, 0, 0)
+	add_cell(1, 0, 0)
+	add_neighbor({ x = 0, y = 0, z = 0 }, { x = 1, y = 0, z = 0 })
+	add_neighbor({ x = 1, y = 0, z = 0 }, { x = 0, y = 0, z = 0 })
+	local source = spawn_entity()
+	set_component(source, "HeatSource", { intensity = 20.0, active = true })
+	set_component(source, "Position", { pos = { Square = { x = 0, y = 0, z = 0 } } })
+	set_temperature(0.0)
+	tick()
+end
+
+local function test_cell_temperature_relaxes_heated_pair()
+	make_heated_pair()
+	local hot = get_cell_temperature(0, 0, 0)
+	local cold = get_cell_temperature(1, 0, 0)
+	assert.is_true(math.abs(hot - 16.0) < 0.00001, "expected ~16.0, got " .. tostring(hot))
+	assert.is_true(math.abs(cold - 4.0) < 0.00001, "expected ~4.0, got " .. tostring(cold))
+end
+
+local function test_cell_temperature_absent_cell_and_optional_z()
+	make_heated_pair()
+	assert.equals(get_cell_temperature(9, 9, 9), 0.0)
+	assert.equals(get_cell_temperature(0, 0), get_cell_temperature(0, 0, 0))
+end
+
 return {
 	test_get_temperature_returns_default = test_get_temperature_returns_default,
 	test_set_temperature_round_trip = test_set_temperature_round_trip,
@@ -126,4 +156,7 @@ return {
 	test_humidity_pressure_round_trip = test_humidity_pressure_round_trip,
 	test_humidity_pressure_clamps = test_humidity_pressure_clamps,
 	test_humidity_pressure_shift_ambient = test_humidity_pressure_shift_ambient,
+	test_cell_temperature_falls_back_to_ambient = test_cell_temperature_falls_back_to_ambient,
+	test_cell_temperature_relaxes_heated_pair = test_cell_temperature_relaxes_heated_pair,
+	test_cell_temperature_absent_cell_and_optional_z = test_cell_temperature_absent_cell_and_optional_z,
 }

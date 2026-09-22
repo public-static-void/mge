@@ -167,3 +167,36 @@ fn test_wasm_tick_applies_humidity_pressure_modifiers() {
     high_pressure.tick();
     assert!(((high_pressure.get_temperature() - neutral.get_temperature()) - 2.0).abs() < 1e-9);
 }
+
+#[test]
+fn test_wasm_cell_temperature_falls_back_to_ambient() {
+    // The guest tick leaves the diffusion map empty, so the host mirror
+    // reports global ambient (same fallback as the core bridge).
+    let mut world = WasmWorld::new();
+    assert!((world.get_cell_temperature(3, 4, 0) - 15.0).abs() < 1e-9);
+
+    world.set_temperature(20.0);
+    assert!((world.get_cell_temperature(3, 4, 0) - 20.0).abs() < 1e-9);
+
+    world.tick();
+    assert!((world.get_cell_temperature(3, 4, 0) - 20.0).abs() < 1e-9);
+}
+
+#[test]
+fn test_wasm_cell_temperature_absent_cells_share_live_ambient() {
+    let mut world = WasmWorld::new();
+    world.set_humidity(1.0);
+    world.set_pressure(1013.0);
+    world.tick();
+    let ambient = world.get_temperature();
+    for (x, y, z) in [(0, 0, 0), (1, 0, 0), (9, 9, 9), (-4, 7, 1)] {
+        assert_eq!(world.get_cell_temperature(x, y, z), ambient);
+    }
+}
+
+#[test]
+fn test_wasm_cell_temperature_map_skipped_in_serialization() {
+    let world = WasmWorld::new();
+    let json: serde_json::Value = serde_json::to_value(&world).expect("WasmWorld serializes");
+    assert!(json.get("temperature_map").is_none());
+}

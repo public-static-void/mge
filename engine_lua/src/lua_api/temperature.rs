@@ -1,4 +1,5 @@
-//! Temperature API: get_temperature, set_temperature, humidity/pressure.
+//! Temperature API: get_temperature, set_temperature, humidity/pressure,
+//! cell temperature.
 
 use engine_core::ecs::world::World;
 use mlua::{Lua, Result as LuaResult, Table};
@@ -56,13 +57,24 @@ pub fn register_temperature_api(
     globals.set("get_pressure", get_pressure)?;
 
     // set_pressure(v) -> nil (clamped to [900.0, 1100.0] by the core method)
-    let w = world;
+    let w = world.clone();
     let set_pressure = lua.create_function_mut(move |_, pressure: f64| {
         let mut world = w.borrow_mut();
         world.set_pressure(pressure);
         Ok(())
     })?;
     globals.set("set_pressure", set_pressure)?;
+
+    // get_cell_temperature(x, y, z?) -> f64 (per-cell temperature from the
+    // transient diffusion map, or global ambient when the map is empty or the
+    // cell is absent; z defaults to 0 when omitted)
+    let w = world;
+    let get_cell_temperature =
+        lua.create_function_mut(move |_, (x, y, z): (i32, i32, Option<i32>)| {
+            let world = w.borrow();
+            Ok(world.get_cell_temperature(x, y, z.unwrap_or(0)))
+        })?;
+    globals.set("get_cell_temperature", get_cell_temperature)?;
 
     Ok(())
 }
