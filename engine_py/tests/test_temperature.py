@@ -74,3 +74,52 @@ def test_body_exchange_drifts_toward_ambient(make_world):
     torso = body["parts"][0]
     assert abs(torso["temperature"] - 35.15) < 0.0001
     assert abs(torso["heat_loss"] - 1.85) < 0.0001
+
+
+def test_humidity_pressure_round_trip(make_world):
+    world = make_world()
+    assert world.get_humidity() == 0.5
+    assert world.get_pressure() == 1013.0
+    world.set_humidity(0.8)
+    assert world.get_humidity() == 0.8
+    world.set_pressure(1000.0)
+    assert world.get_pressure() == 1000.0
+
+
+def test_humidity_pressure_clamps(make_world):
+    world = make_world()
+    world.set_humidity(2.0)
+    assert world.get_humidity() == 1.0
+    world.set_humidity(-1.0)
+    assert world.get_humidity() == 0.0
+    world.set_pressure(2000.0)
+    assert world.get_pressure() == 1100.0
+    world.set_pressure(500.0)
+    assert world.get_pressure() == 900.0
+
+
+def test_humidity_pressure_rejects_non_finite(make_world):
+    world = make_world()
+    world.set_humidity(0.7)
+    world.set_pressure(1000.0)
+    world.set_humidity(float("nan"))
+    world.set_pressure(float("inf"))
+    assert world.get_humidity() == 0.7
+    assert world.get_pressure() == 1000.0
+
+
+def test_humidity_pressure_shift_ambient(make_world):
+    world = make_world()
+    world.set_weather("Clear", 0.0, 100)
+    world.set_humidity(0.5)
+    world.set_pressure(1013.0)
+    world.tick()
+    neutral = world.get_temperature()
+    world.set_humidity(1.0)
+    world.set_pressure(1013.0)
+    world.tick()
+    assert abs((world.get_temperature() - neutral) - 3.0) < 0.5
+    world.set_humidity(0.5)
+    world.set_pressure(973.0)
+    world.tick()
+    assert abs((world.get_temperature() - neutral) + 2.0) < 0.5
