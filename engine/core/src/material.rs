@@ -58,3 +58,36 @@ pub fn get_entity_material(world: &World, entity_id: u32) -> Option<Value> {
 pub fn get_material_names(world: &World) -> Vec<String> {
     world.material_definitions.keys().cloned().collect()
 }
+
+/// Thermal conductivity of a named material, clamped to `[0.0, 1.0]`.
+///
+/// Unknown names resolve through [`default_material()`] (conductivity 0.0),
+/// so missing definitions fail safe toward no insulation penalty.
+pub fn conductivity_of(world: &World, name: &str) -> f64 {
+    get_material_properties(world, name)
+        .get("thermal_conductivity")
+        .and_then(|v| v.as_f64())
+        .unwrap_or(0.0)
+        .clamp(0.0, 1.0)
+}
+
+/// Resolve the thermal conductivity for an equipped item.
+///
+/// Order: (a) the item definition's optional `material` string key,
+/// (b) the owning entity's `Material` component fallback,
+/// (c) [`default_material()`] (conductivity 0.0). `quality` is thermally
+/// unused. Conductivity feeds insulation weighting only, never a second
+/// drift multiplier.
+pub fn resolve_item_conductivity(world: &World, entity_id: u32, item: &Value) -> f64 {
+    if let Some(name) = item.get("material").and_then(|v| v.as_str()) {
+        return conductivity_of(world, name);
+    }
+    if let Some(name) = world
+        .get_component(entity_id, "Material")
+        .and_then(|c| c.get("material"))
+        .and_then(|v| v.as_str())
+    {
+        return conductivity_of(world, name);
+    }
+    conductivity_of(world, "default")
+}
