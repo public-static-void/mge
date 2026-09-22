@@ -252,6 +252,12 @@ pub struct WasmWorld {
     #[serde(skip)]
     pub noise_map: HashMap<CellKey, f64>,
 
+    /// Transient per-cell temperature map (recomputed each tick on the host by
+    /// TemperatureSystem; the guest tick leaves it empty so probes fall back
+    /// to ambient. Not serialized).
+    #[serde(skip)]
+    pub temperature_map: HashMap<CellKey, f64>,
+
     /// Active FOV algorithm name (for display/debugging).
     #[serde(skip, default = "default_fov_algo_name")]
     pub fov_algorithm_name: String,
@@ -346,6 +352,7 @@ impl WasmWorld {
             visible_cells: HashMap::new(),
             explored_cells: HashMap::new(),
             noise_map: HashMap::new(),
+            temperature_map: HashMap::new(),
             widget_registry: HashMap::new(),
             widget_types: HashMap::new(),
             widget_parents: HashMap::new(),
@@ -3702,6 +3709,18 @@ impl WasmWorld {
     /// Replace the entire noise map (called by NoiseSystem after propagation).
     pub fn set_noise_map(&mut self, map: HashMap<CellKey, f64>) {
         self.noise_map = map;
+    }
+
+    // ---- Temperature API ----
+
+    /// Per-cell temperature from the transient diffusion map.
+    /// Falls back to global ambient when the map is empty or the cell is absent.
+    pub fn get_cell_temperature(&self, x: i32, y: i32, z: i32) -> f64 {
+        let cell = CellKey::Square { x, y, z };
+        self.temperature_map
+            .get(&cell)
+            .copied()
+            .unwrap_or(self.temperature.ambient)
     }
 
     // ---- UI Widget API ----
