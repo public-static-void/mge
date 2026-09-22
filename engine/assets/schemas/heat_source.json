@@ -1,0 +1,19 @@
+{
+  "name": "HeatSource",
+  "title": "HeatSource",
+  "description": "Makes an entity add heat to its map cell each tick before the temperature diffusion pass.",
+  "type": "object",
+  "properties": {
+    "intensity": {
+      "type": "number",
+      "default": 1.0,
+      "description": "Additive heat in °C applied to the entity's cell (0 = no heat)"
+    },
+    "active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether this source currently emits heat"
+    }
+  },
+  "modes": ["colony", "roguelike", "simulation"]
+}
