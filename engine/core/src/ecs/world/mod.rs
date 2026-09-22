@@ -96,6 +96,22 @@ pub struct WeatherState {
     pub duration_remaining: u32,
     /// Deterministic RNG seed, persisted across ticks for save/load determinism.
     pub rng_state: [u8; 32],
+    /// Relative humidity 0.0–1.0. Old saves without this field load 0.5.
+    #[serde(default = "default_humidity")]
+    pub humidity: f64,
+    /// Atmospheric pressure in hPa. Old saves without this field load 1013.0.
+    #[serde(default = "default_pressure")]
+    pub pressure: f64,
+}
+
+/// Serde default for `WeatherState::humidity` (old saves predate the field).
+fn default_humidity() -> f64 {
+    crate::systems::temperature::DEFAULT_HUMIDITY
+}
+
+/// Serde default for `WeatherState::pressure` (old saves predate the field).
+fn default_pressure() -> f64 {
+    crate::systems::temperature::DEFAULT_PRESSURE
 }
 
 impl Default for WeatherState {
@@ -105,6 +121,8 @@ impl Default for WeatherState {
             intensity: 0.0,
             duration_remaining: 0,
             rng_state: [0u8; 32],
+            humidity: default_humidity(),
+            pressure: default_pressure(),
         }
     }
 }
