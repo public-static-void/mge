@@ -101,11 +101,27 @@ fn part_heat_loss(world: &World, entity: u32, index: usize) -> f64 {
 #[test]
 fn ambient_formula_matches_reference_values() {
     // Summer noon under clear skies: 25 base + 0 weather + 5 diurnal peak.
-    let noon = compute_ambient_temperature(Season::Summer, WeatherCondition::Clear, 0.0, 14, 0);
+    let noon = compute_ambient_temperature(
+        Season::Summer,
+        WeatherCondition::Clear,
+        0.0,
+        14,
+        0,
+        DEFAULT_HUMIDITY,
+        DEFAULT_PRESSURE,
+    );
     assert!((noon - 30.0).abs() < 1e-9, "expected 30.0, got {noon}");
 
     // Winter night in heavy snow: -10 base - 12 weather - 5 diurnal trough.
-    let night = compute_ambient_temperature(Season::Winter, WeatherCondition::Snow, 1.0, 2, 0);
+    let night = compute_ambient_temperature(
+        Season::Winter,
+        WeatherCondition::Snow,
+        1.0,
+        2,
+        0,
+        DEFAULT_HUMIDITY,
+        DEFAULT_PRESSURE,
+    );
     assert!(
         (night - (-27.0)).abs() < 1e-9,
         "expected -27.0, got {night}"
@@ -123,7 +139,15 @@ fn ambient_formula_encodes_each_season_base() {
         (Season::Autumn, 17.0),
     ];
     for (season, expected) in cases {
-        let ambient = compute_ambient_temperature(season, WeatherCondition::Clear, 0.0, 14, 0);
+        let ambient = compute_ambient_temperature(
+            season,
+            WeatherCondition::Clear,
+            0.0,
+            14,
+            0,
+            DEFAULT_HUMIDITY,
+            DEFAULT_PRESSURE,
+        );
         assert!(
             (ambient - expected).abs() < 1e-9,
             "{season:?}: expected {expected}, got {ambient}"
@@ -140,7 +164,15 @@ fn ambient_weather_deltas_scale_linearly_with_intensity() {
         WeatherCondition::Storm,
         WeatherCondition::Fog,
     ] {
-        let calm = compute_ambient_temperature(Season::Summer, condition, 0.0, 14, 0);
+        let calm = compute_ambient_temperature(
+            Season::Summer,
+            condition,
+            0.0,
+            14,
+            0,
+            DEFAULT_HUMIDITY,
+            DEFAULT_PRESSURE,
+        );
         assert!(
             (calm - 30.0).abs() < 1e-9,
             "{condition:?} at zero intensity should add nothing, got {calm}"
@@ -155,13 +187,29 @@ fn ambient_weather_deltas_scale_linearly_with_intensity() {
         (WeatherCondition::Fog, -3.0),
     ];
     for (condition, delta) in full_and_half {
-        let full = compute_ambient_temperature(Season::Summer, condition, 1.0, 14, 0);
+        let full = compute_ambient_temperature(
+            Season::Summer,
+            condition,
+            1.0,
+            14,
+            0,
+            DEFAULT_HUMIDITY,
+            DEFAULT_PRESSURE,
+        );
         assert!(
             (full - (30.0 + delta)).abs() < 1e-9,
             "{condition:?}: expected {}, got {full}",
             30.0 + delta
         );
-        let half = compute_ambient_temperature(Season::Summer, condition, 0.5, 14, 0);
+        let half = compute_ambient_temperature(
+            Season::Summer,
+            condition,
+            0.5,
+            14,
+            0,
+            DEFAULT_HUMIDITY,
+            DEFAULT_PRESSURE,
+        );
         assert!(
             (half - (30.0 + delta / 2.0)).abs() < 1e-9,
             "{condition:?}: expected {}, got {half}",
@@ -171,8 +219,15 @@ fn ambient_weather_deltas_scale_linearly_with_intensity() {
 
     // Cloudy and Clear ignore intensity entirely.
     for intensity in [0.0, 0.5, 1.0] {
-        let cloudy =
-            compute_ambient_temperature(Season::Summer, WeatherCondition::Cloudy, intensity, 14, 0);
+        let cloudy = compute_ambient_temperature(
+            Season::Summer,
+            WeatherCondition::Cloudy,
+            intensity,
+            14,
+            0,
+            DEFAULT_HUMIDITY,
+            DEFAULT_PRESSURE,
+        );
         assert!(
             (cloudy - 28.0).abs() < 1e-9,
             "cloudy should always sit 2 below clear, got {cloudy}"
@@ -183,13 +238,36 @@ fn ambient_weather_deltas_scale_linearly_with_intensity() {
 #[test]
 fn ambient_diurnal_cycle_peaks_at_mid_afternoon() {
     // Peak +5 at 14:00, trough -5 at 02:00, neutral near 08:00 and 20:00.
-    let peak = compute_ambient_temperature(Season::Spring, WeatherCondition::Clear, 0.0, 14, 0);
+    let peak = compute_ambient_temperature(
+        Season::Spring,
+        WeatherCondition::Clear,
+        0.0,
+        14,
+        0,
+        DEFAULT_HUMIDITY,
+        DEFAULT_PRESSURE,
+    );
     assert!((peak - 15.0).abs() < 1e-9);
-    let trough = compute_ambient_temperature(Season::Spring, WeatherCondition::Clear, 0.0, 2, 0);
+    let trough = compute_ambient_temperature(
+        Season::Spring,
+        WeatherCondition::Clear,
+        0.0,
+        2,
+        0,
+        DEFAULT_HUMIDITY,
+        DEFAULT_PRESSURE,
+    );
     assert!((trough - 5.0).abs() < 1e-9);
     for (hour, minute) in [(8, 0), (20, 0)] {
-        let neutral =
-            compute_ambient_temperature(Season::Spring, WeatherCondition::Clear, 0.0, hour, minute);
+        let neutral = compute_ambient_temperature(
+            Season::Spring,
+            WeatherCondition::Clear,
+            0.0,
+            hour,
+            minute,
+            DEFAULT_HUMIDITY,
+            DEFAULT_PRESSURE,
+        );
         assert!(
             (neutral - 10.0).abs() < 1e-9,
             "{hour:02}:{minute:02} should equal the bare season base, got {neutral}"
@@ -219,8 +297,15 @@ fn ambient_output_stays_within_physical_bounds() {
         for condition in conditions {
             for intensity in [0.0, 0.5, 1.0] {
                 for hour in [0, 2, 8, 14, 20] {
-                    let ambient =
-                        compute_ambient_temperature(season, condition, intensity, hour, 30);
+                    let ambient = compute_ambient_temperature(
+                        season,
+                        condition,
+                        intensity,
+                        hour,
+                        30,
+                        DEFAULT_HUMIDITY,
+                        DEFAULT_PRESSURE,
+                    );
                     assert!(
                         (-60.0..=60.0).contains(&ambient),
                         "{season:?}/{condition:?} i={intensity} at {hour}:30 gave {ambient}"
@@ -912,7 +997,15 @@ fn new_thermal_bands_bind_without_touching_legacy_values() {
     assert_eq!(DEFAULT_PRESSURE, 1013.0);
 
     // Legacy ambient derivation is canonical: summer noon under clear skies.
-    let noon = compute_ambient_temperature(Season::Summer, WeatherCondition::Clear, 0.0, 14, 0);
+    let noon = compute_ambient_temperature(
+        Season::Summer,
+        WeatherCondition::Clear,
+        0.0,
+        14,
+        0,
+        DEFAULT_HUMIDITY,
+        DEFAULT_PRESSURE,
+    );
     assert!((noon - 30.0).abs() < 1e-9);
 }
 
@@ -930,4 +1023,129 @@ fn insulation_producer_runs_before_sync_before_temperature() {
         aggregation < sync && sync < temperature,
         "producer must precede sync precedes temperature"
     );
+}
+
+#[test]
+fn neutral_air_matches_the_still_air_reference() {
+    // Spring noon under clear skies with neutral humidity/pressure carries
+    // zero modifier load: 10 base + 0 weather + 5·cos(−π/6) diurnal.
+    let canonical = compute_ambient_temperature(
+        Season::Spring,
+        WeatherCondition::Clear,
+        0.0,
+        12,
+        0,
+        DEFAULT_HUMIDITY,
+        DEFAULT_PRESSURE,
+    );
+    assert!(
+        (canonical - 14.330127018922193).abs() < 1e-9,
+        "canonical air should reproduce the still-air value, got {canonical}"
+    );
+}
+
+#[test]
+fn humid_air_runs_hotter_and_dry_air_runs_cooler() {
+    let base = |humidity: f64| {
+        compute_ambient_temperature(
+            Season::Spring,
+            WeatherCondition::Clear,
+            0.0,
+            12,
+            0,
+            humidity,
+            DEFAULT_PRESSURE,
+        )
+    };
+    let neutral = base(DEFAULT_HUMIDITY);
+    assert!((base(1.0) - (neutral + 3.0)).abs() < 1e-9);
+    assert!((base(0.0) - (neutral - 3.0)).abs() < 1e-9);
+    assert!((base(0.75) - (neutral + 1.5)).abs() < 1e-9);
+}
+
+#[test]
+fn pressure_extremes_clamp_to_the_bound_band() {
+    let base = |pressure: f64| {
+        compute_ambient_temperature(
+            Season::Spring,
+            WeatherCondition::Clear,
+            0.0,
+            12,
+            0,
+            DEFAULT_HUMIDITY,
+            pressure,
+        )
+    };
+    let neutral = base(DEFAULT_PRESSURE);
+    assert!((base(1033.0) - (neutral + 1.0)).abs() < 1e-9);
+    assert!((base(1053.0) - (neutral + 2.0)).abs() < 1e-9);
+    assert!((base(973.0) - (neutral - 2.0)).abs() < 1e-9);
+    assert!((base(1200.0) - (neutral + 2.0)).abs() < 1e-9);
+    assert!((base(800.0) - (neutral - 2.0)).abs() < 1e-9);
+}
+
+#[test]
+fn stripped_humidity_and_pressure_fields_load_with_neutral_defaults() {
+    let world = temperature_world();
+    assert_eq!(world.get_humidity(), 0.5);
+    assert_eq!(world.get_pressure(), 1013.0);
+
+    let mut json: serde_json::Value = serde_json::to_value(&world).unwrap();
+    // Simulate an old save: strip the new weather fields entirely.
+    let weather = json.get_mut("weather").unwrap().as_object_mut().unwrap();
+    weather.remove("humidity");
+    weather.remove("pressure");
+
+    let loaded: World = serde_json::from_value(json).unwrap();
+    assert_eq!(loaded.get_humidity(), DEFAULT_HUMIDITY);
+    assert_eq!(loaded.get_pressure(), DEFAULT_PRESSURE);
+}
+
+#[test]
+fn humidity_and_pressure_setters_clamp_and_reject_non_finite() {
+    let mut world = temperature_world();
+    world.set_humidity(2.0);
+    assert_eq!(world.get_humidity(), 1.0);
+    world.set_humidity(-1.0);
+    assert_eq!(world.get_humidity(), 0.0);
+    world.set_pressure(2000.0);
+    assert_eq!(world.get_pressure(), 1100.0);
+    world.set_pressure(500.0);
+    assert_eq!(world.get_pressure(), 900.0);
+
+    world.set_humidity(0.7);
+    world.set_pressure(1000.0);
+    for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+        world.set_humidity(bad);
+        world.set_pressure(bad);
+    }
+    assert_eq!(world.get_humidity(), 0.7);
+    assert_eq!(world.get_pressure(), 1000.0);
+}
+
+#[test]
+fn weather_tick_keeps_humidity_and_pressure_within_bands_deterministically() {
+    // Two identically seeded worlds must drift in lockstep (float-equal).
+    let mut first = temperature_world();
+    let mut second = temperature_world();
+
+    for _ in 0..50 {
+        first.turn += 1;
+        second.turn += 1;
+        // Force a transition every tick so both the nudge and the walk run.
+        first.weather.duration_remaining = 0;
+        second.weather.duration_remaining = 0;
+        WeatherSystem.run(&mut first);
+        WeatherSystem.run(&mut second);
+        for world in [&first, &second] {
+            assert!((0.0..=1.0).contains(&world.get_humidity()));
+            assert!((900.0..=1100.0).contains(&world.get_pressure()));
+        }
+        assert_eq!(first.get_humidity(), second.get_humidity());
+        assert_eq!(first.get_pressure(), second.get_pressure());
+    }
+
+    // Humidity must have moved away from its start (walk is never trivially
+    // flat across 50 ticks with forced transitions).
+    assert_ne!(first.get_humidity(), 0.5);
 }
