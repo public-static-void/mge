@@ -96,6 +96,22 @@ pub struct WeatherState {
     pub duration_remaining: u32,
     /// Deterministic RNG seed, persisted across ticks for save/load determinism.
     pub rng_state: [u8; 32],
+    /// Relative humidity 0.0–1.0. Old saves without this field load 0.5.
+    #[serde(default = "default_humidity")]
+    pub humidity: f64,
+    /// Atmospheric pressure in hPa. Old saves without this field load 1013.0.
+    #[serde(default = "default_pressure")]
+    pub pressure: f64,
+}
+
+/// Serde default for `WeatherState::humidity` (old saves predate the field).
+fn default_humidity() -> f64 {
+    crate::systems::temperature::DEFAULT_HUMIDITY
+}
+
+/// Serde default for `WeatherState::pressure` (old saves predate the field).
+fn default_pressure() -> f64 {
+    crate::systems::temperature::DEFAULT_PRESSURE
 }
 
 impl Default for WeatherState {
@@ -105,6 +121,8 @@ impl Default for WeatherState {
             intensity: 0.0,
             duration_remaining: 0,
             rng_state: [0u8; 32],
+            humidity: default_humidity(),
+            pressure: default_pressure(),
         }
     }
 }
@@ -209,6 +227,14 @@ pub struct World {
     /// Noise level per cell (transient, recomputed each tick by NoiseSystem, not serialized)
     #[serde(skip)]
     pub noise_map: HashMap<CellKey, f64>,
+    /// Per-cell temperature (transient, recomputed each tick by TemperatureSystem
+    /// from ambient plus heat sources plus one diffusion pass, not serialized)
+    #[serde(skip)]
+    pub temperature_map: HashMap<CellKey, f64>,
+    /// Scratch buffer for the diffusion relaxation pass (transient, cleared and
+    /// reused across ticks so diffusion allocates nothing per tick, not serialized)
+    #[serde(skip)]
+    pub temperature_scratch: HashMap<CellKey, f64>,
     /// Weather-driven visibility multiplier (0.0–1.0, 1.0 = no reduction).
     /// Recomputed each tick by WeatherSystem, not persisted.
     #[serde(skip)]
@@ -332,6 +358,8 @@ impl World {
             map_stack: Vec::new(),
             visible_cells: HashMap::new(),
             noise_map: HashMap::new(),
+            temperature_map: HashMap::new(),
+            temperature_scratch: HashMap::new(),
             visibility_modifier: 1.0,
             explored_cells: HashMap::new(),
             event_queues: HashMap::new(),

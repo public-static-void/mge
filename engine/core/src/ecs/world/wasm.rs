@@ -252,6 +252,12 @@ pub struct WasmWorld {
     #[serde(skip)]
     pub noise_map: HashMap<CellKey, f64>,
 
+    /// Transient per-cell temperature map (recomputed each tick on the host by
+    /// TemperatureSystem; the guest tick leaves it empty so probes fall back
+    /// to ambient. Not serialized).
+    #[serde(skip)]
+    pub temperature_map: HashMap<CellKey, f64>,
+
     /// Active FOV algorithm name (for display/debugging).
     #[serde(skip, default = "default_fov_algo_name")]
     pub fov_algorithm_name: String,
@@ -346,6 +352,7 @@ impl WasmWorld {
             visible_cells: HashMap::new(),
             explored_cells: HashMap::new(),
             noise_map: HashMap::new(),
+            temperature_map: HashMap::new(),
             widget_registry: HashMap::new(),
             widget_types: HashMap::new(),
             widget_parents: HashMap::new(),
@@ -841,6 +848,8 @@ impl WasmWorld {
                 self.weather.intensity,
                 self.time_of_day.hour,
                 self.time_of_day.minute,
+                self.weather.humidity,
+                self.weather.pressure,
             );
         }
     }
@@ -987,6 +996,32 @@ impl WasmWorld {
             "temperature_changed",
             &serde_json::to_string(&payload).unwrap_or_default(),
         );
+    }
+
+    /// Returns the current relative humidity in `[0.0, 1.0]`.
+    pub fn get_humidity(&self) -> f64 {
+        self.weather.humidity
+    }
+
+    /// Sets relative humidity, clamped to `[0.0, 1.0]`; non-finite input is
+    /// ignored and leaves stored state unchanged.
+    pub fn set_humidity(&mut self, humidity: f64) {
+        if humidity.is_finite() {
+            self.weather.humidity = humidity.clamp(0.0, 1.0);
+        }
+    }
+
+    /// Returns the current atmospheric pressure in hPa.
+    pub fn get_pressure(&self) -> f64 {
+        self.weather.pressure
+    }
+
+    /// Sets atmospheric pressure, clamped to `[900.0, 1100.0]`; non-finite
+    /// input is ignored and leaves stored state unchanged.
+    pub fn set_pressure(&mut self, pressure: f64) {
+        if pressure.is_finite() {
+            self.weather.pressure = pressure.clamp(900.0, 1100.0);
+        }
     }
 
     /// Reads a line of user input from the configured input source.
@@ -3674,6 +3709,18 @@ impl WasmWorld {
     /// Replace the entire noise map (called by NoiseSystem after propagation).
     pub fn set_noise_map(&mut self, map: HashMap<CellKey, f64>) {
         self.noise_map = map;
+    }
+
+    // ---- Temperature API ----
+
+    /// Per-cell temperature from the transient diffusion map.
+    /// Falls back to global ambient when the map is empty or the cell is absent.
+    pub fn get_cell_temperature(&self, x: i32, y: i32, z: i32) -> f64 {
+        let cell = CellKey::Square { x, y, z };
+        self.temperature_map
+            .get(&cell)
+            .copied()
+            .unwrap_or(self.temperature.ambient)
     }
 
     // ---- UI Widget API ----

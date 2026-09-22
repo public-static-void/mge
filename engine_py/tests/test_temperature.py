@@ -74,3 +74,85 @@ def test_body_exchange_drifts_toward_ambient(make_world):
     torso = body["parts"][0]
     assert abs(torso["temperature"] - 35.15) < 0.0001
     assert abs(torso["heat_loss"] - 1.85) < 0.0001
+
+
+def test_humidity_pressure_round_trip(make_world):
+    world = make_world()
+    assert world.get_humidity() == 0.5
+    assert world.get_pressure() == 1013.0
+    world.set_humidity(0.8)
+    assert world.get_humidity() == 0.8
+    world.set_pressure(1000.0)
+    assert world.get_pressure() == 1000.0
+
+
+def test_humidity_pressure_clamps(make_world):
+    world = make_world()
+    world.set_humidity(2.0)
+    assert world.get_humidity() == 1.0
+    world.set_humidity(-1.0)
+    assert world.get_humidity() == 0.0
+    world.set_pressure(2000.0)
+    assert world.get_pressure() == 1100.0
+    world.set_pressure(500.0)
+    assert world.get_pressure() == 900.0
+
+
+def test_humidity_pressure_rejects_non_finite(make_world):
+    world = make_world()
+    world.set_humidity(0.7)
+    world.set_pressure(1000.0)
+    world.set_humidity(float("nan"))
+    world.set_pressure(float("inf"))
+    assert world.get_humidity() == 0.7
+    assert world.get_pressure() == 1000.0
+
+
+def test_humidity_pressure_shift_ambient(make_world):
+    world = make_world()
+    world.set_weather("Clear", 0.0, 100)
+    world.set_humidity(0.5)
+    world.set_pressure(1013.0)
+    world.tick()
+    neutral = world.get_temperature()
+    world.set_humidity(1.0)
+    world.set_pressure(1013.0)
+    world.tick()
+    assert abs((world.get_temperature() - neutral) - 3.0) < 0.5
+    world.set_humidity(0.5)
+    world.set_pressure(973.0)
+    world.tick()
+    assert abs((world.get_temperature() - neutral) + 2.0) < 0.5
+
+
+def _make_heated_pair(world):
+    world.add_cell(0, 0, 0)
+    world.add_cell(1, 0, 0)
+    world.add_neighbor((0, 0, 0), (1, 0, 0))
+    world.add_neighbor((1, 0, 0), (0, 0, 0))
+    source = world.spawn_entity()
+    world.set_component(source, "HeatSource", {"intensity": 20.0, "active": True})
+    world.set_component(
+        source, "Position", {"pos": {"Square": {"x": 0, "y": 0, "z": 0}}}
+    )
+    world.set_temperature(0.0)
+    world.tick()
+
+
+def test_cell_temperature_falls_back_to_ambient(make_world):
+    world = make_world()
+    assert world.get_cell_temperature(3, 4, 0) == world.get_temperature()
+
+
+def test_cell_temperature_relaxes_heated_pair(make_world):
+    world = make_world()
+    _make_heated_pair(world)
+    assert abs(world.get_cell_temperature(0, 0, 0) - 16.0) < 0.00001
+    assert abs(world.get_cell_temperature(1, 0, 0) - 4.0) < 0.00001
+
+
+def test_cell_temperature_absent_cell_and_default_z(make_world):
+    world = make_world()
+    _make_heated_pair(world)
+    assert world.get_cell_temperature(9, 9, 9) == 0.0
+    assert world.get_cell_temperature(0, 0) == world.get_cell_temperature(0, 0, 0)

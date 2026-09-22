@@ -4,6 +4,15 @@ use rand::Rng;
 use rand::SeedableRng;
 use rand::rngs::SmallRng;
 
+/// Per-tick humidity random-walk half-range (relative humidity units).
+const HUMIDITY_DRIFT_STEP: f64 = 0.02;
+/// Per-tick pressure random-walk half-range (hPa).
+const PRESSURE_DRIFT_STEP: f64 = 1.5;
+/// Per-tick pull toward the condition target (fraction of remaining gap).
+const CONDITION_PULL: f64 = 0.01;
+/// Blend toward the new condition target applied on each transition.
+const TRANSITION_NUDGE: f64 = 0.3;
+
 /// System: Advances global weather state each tick.
 ///
 /// Weather is world-level deterministic state. Each tick the system decrements
@@ -49,6 +58,16 @@ impl System for WeatherSystem {
             world.weather.intensity = new_intensity;
             world.weather.duration_remaining = new_duration;
 
+            // Nudge humidity/pressure toward the new condition's plausible
+            // band. Blend only — no RNG draw here, so the persisted transition
+            // stream (and its exact sequences) is undisturbed.
+            world.weather.humidity +=
+                (humidity_target(new_condition) - world.weather.humidity) * TRANSITION_NUDGE;
+            world.weather.humidity = world.weather.humidity.clamp(0.0, 1.0);
+            world.weather.pressure +=
+                (pressure_target(new_condition) - world.weather.pressure) * TRANSITION_NUDGE;
+            world.weather.pressure = world.weather.pressure.clamp(900.0, 1100.0);
+
             // Emit transition event (OQ4: forced transitions also emit).
             let _ = world.send_event(
                 "weather_changed",
@@ -63,6 +82,8 @@ impl System for WeatherSystem {
         // Recompute visibility modifier from current weather state.
         world.visibility_modifier =
             compute_visibility_modifier(world.weather.condition, world.weather.intensity);
+
+        drift_humidity_and_pressure(world);
     }
 }
 
@@ -78,6 +99,85 @@ pub fn compute_visibility_modifier(condition: WeatherCondition, intensity: f64) 
         WeatherCondition::Snow => 0.6 * intensity,
         WeatherCondition::Storm => 0.5 * intensity,
         WeatherCondition::Fog => 0.4 * intensity,
+    }
+}
+
+/// Condition-plausible humidity anchor: damp conditions sit high, clear sits low.
+fn humidity_target(condition: WeatherCondition) -> f64 {
+    match condition {
+        WeatherCondition::Clear => 0.35,
+        WeatherCondition::Cloudy => 0.55,
+        WeatherCondition::Rain => 0.85,
+        WeatherCondition::Snow => 0.80,
+        WeatherCondition::Storm => 0.90,
+        WeatherCondition::Fog => 0.95,
+    }
+}
+
+/// Condition-plausible pressure anchor in hPa: storms sit low, clear sits high.
+fn pressure_target(condition: WeatherCondition) -> f64 {
+    match condition {
+        WeatherCondition::Clear => 1018.0,
+        WeatherCondition::Cloudy => 1013.0,
+        WeatherCondition::Rain => 1005.0,
+        WeatherCondition::Snow => 1008.0,
+        WeatherCondition::Storm => 998.0,
+        WeatherCondition::Fog => 1012.0,
+    }
+}
+
+/// Advance humidity and pressure one deterministic step: a bounded random walk
+/// plus a weak pull toward the current condition's plausible band.
+///
+/// The walk draws from a transient stream seeded off the persisted `rng_state`
+/// mixed with the turn number, so the persisted transition stream is never
+/// advanced and exact weather sequences are preserved across this change.
+fn drift_humidity_and_pressure(world: &mut World) {
+    let mut seed = world.weather.rng_state;
+    for (i, b) in world.turn.to_le_bytes().iter().enumerate() {
+        seed[i] ^= b.wrapping_add(0x9E);
+    }
+    seed[0] ^= 0x48;
+    let mut drift = SmallRng::from_seed(seed);
+    let humidity_step: f64 = drift.random_range(-HUMIDITY_DRIFT_STEP..=HUMIDITY_DRIFT_STEP);
+    let pressure_step: f64 = drift.random_range(-PRESSURE_DRIFT_STEP..=PRESSURE_DRIFT_STEP);
+
+    let condition = world.weather.condition;
+    world.weather.humidity = (world.weather.humidity
+        + humidity_step
+        + (humidity_target(condition) - world.weather.humidity) * CONDITION_PULL)
+        .clamp(0.0, 1.0);
+    world.weather.pressure = (world.weather.pressure
+        + pressure_step
+        + (pressure_target(condition) - world.weather.pressure) * CONDITION_PULL)
+        .clamp(900.0, 1100.0);
+}
+
+impl World {
+    /// Current relative humidity in `[0.0, 1.0]`.
+    pub fn get_humidity(&self) -> f64 {
+        self.weather.humidity
+    }
+
+    /// Set relative humidity, clamped to `[0.0, 1.0]`; non-finite input is
+    /// ignored and leaves the stored value unchanged.
+    pub fn set_humidity(&mut self, humidity: f64) {
+        if humidity.is_finite() {
+            self.weather.humidity = humidity.clamp(0.0, 1.0);
+        }
+    }
+
+    /// Current atmospheric pressure in hPa.
+    pub fn get_pressure(&self) -> f64 {
+        self.weather.pressure
+    }
+
+    /// Set atmospheric pressure, clamped to `[900.0, 1100.0]`; non-finite
+    /// input is ignored and leaves the stored value unchanged.
+    pub fn set_pressure(&mut self, pressure: f64) {
+        if pressure.is_finite() {
+            self.weather.pressure = pressure.clamp(900.0, 1100.0);
+        }
     }
 }
 

@@ -20,10 +20,16 @@ use world_io_helper::save_and_load_roundtrip;
 
 use engine_core::ecs::system::System;
 use engine_core::ecs::world::{Season, WeatherCondition, World};
-use engine_core::map::{Map, SquareGridMap};
+use engine_core::map::{CellKey, Map, SquareGridMap};
+use engine_core::material::{resolve_item_conductivity, set_entity_material};
 use engine_core::systems::SYSTEM_EXECUTION_ORDER;
+use engine_core::systems::body_equipment_sync::BodyEquipmentSyncSystem;
 use engine_core::systems::body_part_damage::BodyPartDamageSystem;
+use engine_core::systems::equipment_effect_aggregation::{
+    EquipmentEffectAggregationSystem, insulation_contribution,
+};
 use engine_core::systems::temperature::{
+    DEFAULT_HUMIDITY, DEFAULT_PRESSURE, DIFFUSION_RATE, HUMIDITY_BAND, PRESSURE_BAND,
     TemperatureState, TemperatureSystem, compute_ambient_temperature,
 };
 use engine_core::systems::weather::WeatherSystem;
@@ -95,11 +101,27 @@ fn part_heat_loss(world: &World, entity: u32, index: usize) -> f64 {
 #[test]
 fn ambient_formula_matches_reference_values() {
     // Summer noon under clear skies: 25 base + 0 weather + 5 diurnal peak.
-    let noon = compute_ambient_temperature(Season::Summer, WeatherCondition::Clear, 0.0, 14, 0);
+    let noon = compute_ambient_temperature(
+        Season::Summer,
+        WeatherCondition::Clear,
+        0.0,
+        14,
+        0,
+        DEFAULT_HUMIDITY,
+        DEFAULT_PRESSURE,
+    );
     assert!((noon - 30.0).abs() < 1e-9, "expected 30.0, got {noon}");
 
     // Winter night in heavy snow: -10 base - 12 weather - 5 diurnal trough.
-    let night = compute_ambient_temperature(Season::Winter, WeatherCondition::Snow, 1.0, 2, 0);
+    let night = compute_ambient_temperature(
+        Season::Winter,
+        WeatherCondition::Snow,
+        1.0,
+        2,
+        0,
+        DEFAULT_HUMIDITY,
+        DEFAULT_PRESSURE,
+    );
     assert!(
         (night - (-27.0)).abs() < 1e-9,
         "expected -27.0, got {night}"
@@ -117,7 +139,15 @@ fn ambient_formula_encodes_each_season_base() {
         (Season::Autumn, 17.0),
     ];
     for (season, expected) in cases {
-        let ambient = compute_ambient_temperature(season, WeatherCondition::Clear, 0.0, 14, 0);
+        let ambient = compute_ambient_temperature(
+            season,
+            WeatherCondition::Clear,
+            0.0,
+            14,
+            0,
+            DEFAULT_HUMIDITY,
+            DEFAULT_PRESSURE,
+        );
         assert!(
             (ambient - expected).abs() < 1e-9,
             "{season:?}: expected {expected}, got {ambient}"
@@ -134,7 +164,15 @@ fn ambient_weather_deltas_scale_linearly_with_intensity() {
         WeatherCondition::Storm,
         WeatherCondition::Fog,
     ] {
-        let calm = compute_ambient_temperature(Season::Summer, condition, 0.0, 14, 0);
+        let calm = compute_ambient_temperature(
+            Season::Summer,
+            condition,
+            0.0,
+            14,
+            0,
+            DEFAULT_HUMIDITY,
+            DEFAULT_PRESSURE,
+        );
         assert!(
             (calm - 30.0).abs() < 1e-9,
             "{condition:?} at zero intensity should add nothing, got {calm}"
@@ -149,13 +187,29 @@ fn ambient_weather_deltas_scale_linearly_with_intensity() {
         (WeatherCondition::Fog, -3.0),
     ];
     for (condition, delta) in full_and_half {
-        let full = compute_ambient_temperature(Season::Summer, condition, 1.0, 14, 0);
+        let full = compute_ambient_temperature(
+            Season::Summer,
+            condition,
+            1.0,
+            14,
+            0,
+            DEFAULT_HUMIDITY,
+            DEFAULT_PRESSURE,
+        );
         assert!(
             (full - (30.0 + delta)).abs() < 1e-9,
             "{condition:?}: expected {}, got {full}",
             30.0 + delta
         );
-        let half = compute_ambient_temperature(Season::Summer, condition, 0.5, 14, 0);
+        let half = compute_ambient_temperature(
+            Season::Summer,
+            condition,
+            0.5,
+            14,
+            0,
+            DEFAULT_HUMIDITY,
+            DEFAULT_PRESSURE,
+        );
         assert!(
             (half - (30.0 + delta / 2.0)).abs() < 1e-9,
             "{condition:?}: expected {}, got {half}",
@@ -165,8 +219,15 @@ fn ambient_weather_deltas_scale_linearly_with_intensity() {
 
     // Cloudy and Clear ignore intensity entirely.
     for intensity in [0.0, 0.5, 1.0] {
-        let cloudy =
-            compute_ambient_temperature(Season::Summer, WeatherCondition::Cloudy, intensity, 14, 0);
+        let cloudy = compute_ambient_temperature(
+            Season::Summer,
+            WeatherCondition::Cloudy,
+            intensity,
+            14,
+            0,
+            DEFAULT_HUMIDITY,
+            DEFAULT_PRESSURE,
+        );
         assert!(
             (cloudy - 28.0).abs() < 1e-9,
             "cloudy should always sit 2 below clear, got {cloudy}"
@@ -177,13 +238,36 @@ fn ambient_weather_deltas_scale_linearly_with_intensity() {
 #[test]
 fn ambient_diurnal_cycle_peaks_at_mid_afternoon() {
     // Peak +5 at 14:00, trough -5 at 02:00, neutral near 08:00 and 20:00.
-    let peak = compute_ambient_temperature(Season::Spring, WeatherCondition::Clear, 0.0, 14, 0);
+    let peak = compute_ambient_temperature(
+        Season::Spring,
+        WeatherCondition::Clear,
+        0.0,
+        14,
+        0,
+        DEFAULT_HUMIDITY,
+        DEFAULT_PRESSURE,
+    );
     assert!((peak - 15.0).abs() < 1e-9);
-    let trough = compute_ambient_temperature(Season::Spring, WeatherCondition::Clear, 0.0, 2, 0);
+    let trough = compute_ambient_temperature(
+        Season::Spring,
+        WeatherCondition::Clear,
+        0.0,
+        2,
+        0,
+        DEFAULT_HUMIDITY,
+        DEFAULT_PRESSURE,
+    );
     assert!((trough - 5.0).abs() < 1e-9);
     for (hour, minute) in [(8, 0), (20, 0)] {
-        let neutral =
-            compute_ambient_temperature(Season::Spring, WeatherCondition::Clear, 0.0, hour, minute);
+        let neutral = compute_ambient_temperature(
+            Season::Spring,
+            WeatherCondition::Clear,
+            0.0,
+            hour,
+            minute,
+            DEFAULT_HUMIDITY,
+            DEFAULT_PRESSURE,
+        );
         assert!(
             (neutral - 10.0).abs() < 1e-9,
             "{hour:02}:{minute:02} should equal the bare season base, got {neutral}"
@@ -213,8 +297,15 @@ fn ambient_output_stays_within_physical_bounds() {
         for condition in conditions {
             for intensity in [0.0, 0.5, 1.0] {
                 for hour in [0, 2, 8, 14, 20] {
-                    let ambient =
-                        compute_ambient_temperature(season, condition, intensity, hour, 30);
+                    let ambient = compute_ambient_temperature(
+                        season,
+                        condition,
+                        intensity,
+                        hour,
+                        30,
+                        DEFAULT_HUMIDITY,
+                        DEFAULT_PRESSURE,
+                    );
                     assert!(
                         (-60.0..=60.0).contains(&ambient),
                         "{season:?}/{condition:?} i={intensity} at {hour}:30 gave {ambient}"
@@ -700,4 +791,658 @@ fn identical_worlds_produce_identical_temperature_sequences() {
             drop(live);
         }
     }
+}
+
+// --- Increment A: insulation aggregation + material coupling + tuning ---
+
+/// World with real material definitions loaded, so conductivity values
+/// come from the shipped assets (cloth 0.05, iron 0.8).
+fn insulation_world() -> World {
+    let mut world = temperature_world();
+    let dir =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../engine/assets/materials");
+    world.material_definitions =
+        engine_core::ecs::assets::load_material_definitions(&dir).expect("load materials");
+    world
+}
+
+/// Register a garment item covering the torso slot.
+fn register_garment(world: &mut World, id: &str, insulation: f64, material: Option<&str>) {
+    let mut definition =
+        json!({"id": id, "name": id, "slot": "torso", "effects": {"insulation": insulation}});
+    if let Some(name) = material {
+        definition["material"] = json!(name);
+    }
+    world.item_registry.register_item(definition).unwrap();
+}
+
+/// Spawn an entity with a single torso part plus an Equipment component.
+fn spawn_clothed(world: &mut World, equipped_slot: JsonValue, equipped_list: Vec<&str>) -> u32 {
+    let entity = world.spawn_entity();
+    let equipped: Vec<JsonValue> = equipped_list.iter().map(|id| json!(id)).collect();
+    let mut torso = part("torso", json!(37.0), json!(37.0), json!(0.0));
+    torso["equipped"] = JsonValue::Array(equipped);
+    world
+        .set_component(entity, "Body", json!({ "parts": [torso] }))
+        .unwrap();
+    world
+        .set_component(
+            entity,
+            "Equipment",
+            json!({ "slots": {"torso": equipped_slot} }),
+        )
+        .unwrap();
+    entity
+}
+
+fn part_insulation(world: &World, entity: u32) -> f64 {
+    world.get_component(entity, "Body").unwrap()["parts"][0]["insulation"]
+        .as_f64()
+        .unwrap()
+}
+
+#[test]
+fn single_cloth_garment_insulates_by_conductivity_weight() {
+    let mut world = insulation_world();
+    register_garment(&mut world, "cloak", 0.5, Some("cloth"));
+    let entity = spawn_clothed(&mut world, json!("cloak"), vec![]);
+
+    BodyEquipmentSyncSystem.run(&mut world);
+    EquipmentEffectAggregationSystem.run(&mut world);
+
+    let insulation = part_insulation(&world, entity);
+    assert!(
+        (insulation - 0.475).abs() < 1e-9,
+        "0.5 * (1 - 0.05) should be 0.475, got {insulation}"
+    );
+}
+
+#[test]
+fn layered_garments_sum_their_contributions() {
+    let mut world = insulation_world();
+    register_garment(&mut world, "cloak_a", 0.5, Some("cloth"));
+    register_garment(&mut world, "cloak_b", 0.5, Some("cloth"));
+    let entity = spawn_clothed(&mut world, JsonValue::Null, vec!["cloak_a", "cloak_b"]);
+
+    EquipmentEffectAggregationSystem.run(&mut world);
+
+    let insulation = part_insulation(&world, entity);
+    assert!(
+        (insulation - 0.95).abs() < 1e-9,
+        "two cloth layers should sum to 0.95, got {insulation}"
+    );
+}
+
+#[test]
+fn excessive_layering_clamps_insulation_at_one() {
+    let mut world = insulation_world();
+    register_garment(&mut world, "cloak_a", 0.5, Some("cloth"));
+    register_garment(&mut world, "cloak_b", 0.5, Some("cloth"));
+    register_garment(&mut world, "cloak_c", 0.5, Some("cloth"));
+    let entity = spawn_clothed(
+        &mut world,
+        JsonValue::Null,
+        vec!["cloak_a", "cloak_b", "cloak_c"],
+    );
+
+    EquipmentEffectAggregationSystem.run(&mut world);
+
+    assert_eq!(
+        world.get_component(entity, "Body").unwrap()["parts"][0]["insulation"],
+        json!(1.0)
+    );
+}
+
+#[test]
+fn iron_garment_conducts_heat_away() {
+    let mut world = insulation_world();
+    register_garment(&mut world, "breastplate", 0.5, Some("iron"));
+    let entity = spawn_clothed(&mut world, json!("breastplate"), vec![]);
+
+    BodyEquipmentSyncSystem.run(&mut world);
+    EquipmentEffectAggregationSystem.run(&mut world);
+
+    let insulation = part_insulation(&world, entity);
+    assert!(
+        (insulation - 0.1).abs() < 1e-9,
+        "0.5 * (1 - 0.8) should be 0.1, got {insulation}"
+    );
+}
+
+#[test]
+fn bare_parts_reset_stale_insulation_to_zero() {
+    let mut world = insulation_world();
+    let entity = world.spawn_entity();
+    world
+        .set_component(
+            entity,
+            "Body",
+            json!({ "parts": [part("torso", json!(37.0), json!(37.0), json!(2.5))] }),
+        )
+        .unwrap();
+
+    EquipmentEffectAggregationSystem.run(&mut world);
+
+    assert_eq!(
+        world.get_component(entity, "Body").unwrap()["parts"][0]["insulation"],
+        json!(0.0)
+    );
+}
+
+#[test]
+fn explicit_item_material_beats_entity_material() {
+    let mut world = insulation_world();
+    let entity = world.spawn_entity();
+    set_entity_material(&mut world, entity, "cloth").unwrap();
+    let item = json!({"id": "helm", "name": "Helm", "slot": "torso", "material": "iron"});
+
+    let conductivity = resolve_item_conductivity(&world, entity, &item);
+
+    assert!(
+        (conductivity - 0.8).abs() < 1e-9,
+        "explicit iron key should win over cloth entity, got {conductivity}"
+    );
+}
+
+#[test]
+fn entity_material_covers_unkeyed_items() {
+    let mut world = insulation_world();
+    let entity = world.spawn_entity();
+    set_entity_material(&mut world, entity, "iron").unwrap();
+    let item = json!({"id": "helm", "name": "Helm", "slot": "torso"});
+
+    let conductivity = resolve_item_conductivity(&world, entity, &item);
+
+    assert!(
+        (conductivity - 0.8).abs() < 1e-9,
+        "entity iron should apply to keyless items, got {conductivity}"
+    );
+}
+
+#[test]
+fn unresolvable_material_falls_back_to_zero_conductivity() {
+    let mut world = insulation_world();
+    let entity = world.spawn_entity();
+    let item = json!({"id": "helm", "name": "Helm", "slot": "torso"});
+
+    let conductivity = resolve_item_conductivity(&world, entity, &item);
+
+    assert_eq!(conductivity, 0.0);
+}
+
+#[test]
+fn unknown_material_names_fall_back_to_zero_conductivity() {
+    let mut world = insulation_world();
+    let entity = world.spawn_entity();
+    let item = json!({"id": "helm", "name": "Helm", "slot": "torso", "material": "mithril"});
+
+    let conductivity = resolve_item_conductivity(&world, entity, &item);
+
+    assert_eq!(conductivity, 0.0);
+}
+
+#[test]
+fn insulation_weight_matches_base_times_one_minus_conductivity() {
+    assert!((insulation_contribution(0.5, 0.05) - 0.475).abs() < 1e-12);
+    assert!((insulation_contribution(0.5, 0.8) - 0.1).abs() < 1e-12);
+    assert_eq!(insulation_contribution(0.0, 0.8), 0.0);
+}
+
+#[test]
+fn new_thermal_bands_bind_without_touching_legacy_values() {
+    assert_eq!(HUMIDITY_BAND, 3.0);
+    assert_eq!(PRESSURE_BAND, 2.0);
+    assert_eq!(DIFFUSION_RATE, 0.2);
+    assert_eq!(DEFAULT_HUMIDITY, 0.5);
+    assert_eq!(DEFAULT_PRESSURE, 1013.0);
+
+    // Legacy ambient derivation is canonical: summer noon under clear skies.
+    let noon = compute_ambient_temperature(
+        Season::Summer,
+        WeatherCondition::Clear,
+        0.0,
+        14,
+        0,
+        DEFAULT_HUMIDITY,
+        DEFAULT_PRESSURE,
+    );
+    assert!((noon - 30.0).abs() < 1e-9);
+}
+
+#[test]
+fn insulation_producer_runs_before_sync_before_temperature() {
+    let positions: std::collections::HashMap<&str, usize> = SYSTEM_EXECUTION_ORDER
+        .iter()
+        .enumerate()
+        .map(|(index, name)| (*name, index))
+        .collect();
+    let aggregation = positions["EquipmentEffectAggregationSystem"];
+    let sync = positions["BodyEquipmentSyncSystem"];
+    let temperature = positions["TemperatureSystem"];
+    assert!(
+        aggregation < sync && sync < temperature,
+        "producer must precede sync precedes temperature"
+    );
+}
+
+#[test]
+fn neutral_air_matches_the_still_air_reference() {
+    // Spring noon under clear skies with neutral humidity/pressure carries
+    // zero modifier load: 10 base + 0 weather + 5·cos(−π/6) diurnal.
+    let canonical = compute_ambient_temperature(
+        Season::Spring,
+        WeatherCondition::Clear,
+        0.0,
+        12,
+        0,
+        DEFAULT_HUMIDITY,
+        DEFAULT_PRESSURE,
+    );
+    assert!(
+        (canonical - 14.330127018922193).abs() < 1e-9,
+        "canonical air should reproduce the still-air value, got {canonical}"
+    );
+}
+
+#[test]
+fn humid_air_runs_hotter_and_dry_air_runs_cooler() {
+    let base = |humidity: f64| {
+        compute_ambient_temperature(
+            Season::Spring,
+            WeatherCondition::Clear,
+            0.0,
+            12,
+            0,
+            humidity,
+            DEFAULT_PRESSURE,
+        )
+    };
+    let neutral = base(DEFAULT_HUMIDITY);
+    assert!((base(1.0) - (neutral + 3.0)).abs() < 1e-9);
+    assert!((base(0.0) - (neutral - 3.0)).abs() < 1e-9);
+    assert!((base(0.75) - (neutral + 1.5)).abs() < 1e-9);
+}
+
+#[test]
+fn pressure_extremes_clamp_to_the_bound_band() {
+    let base = |pressure: f64| {
+        compute_ambient_temperature(
+            Season::Spring,
+            WeatherCondition::Clear,
+            0.0,
+            12,
+            0,
+            DEFAULT_HUMIDITY,
+            pressure,
+        )
+    };
+    let neutral = base(DEFAULT_PRESSURE);
+    assert!((base(1033.0) - (neutral + 1.0)).abs() < 1e-9);
+    assert!((base(1053.0) - (neutral + 2.0)).abs() < 1e-9);
+    assert!((base(973.0) - (neutral - 2.0)).abs() < 1e-9);
+    assert!((base(1200.0) - (neutral + 2.0)).abs() < 1e-9);
+    assert!((base(800.0) - (neutral - 2.0)).abs() < 1e-9);
+}
+
+#[test]
+fn stripped_humidity_and_pressure_fields_load_with_neutral_defaults() {
+    let world = temperature_world();
+    assert_eq!(world.get_humidity(), 0.5);
+    assert_eq!(world.get_pressure(), 1013.0);
+
+    let mut json: serde_json::Value = serde_json::to_value(&world).unwrap();
+    // Simulate an old save: strip the new weather fields entirely.
+    let weather = json.get_mut("weather").unwrap().as_object_mut().unwrap();
+    weather.remove("humidity");
+    weather.remove("pressure");
+
+    let loaded: World = serde_json::from_value(json).unwrap();
+    assert_eq!(loaded.get_humidity(), DEFAULT_HUMIDITY);
+    assert_eq!(loaded.get_pressure(), DEFAULT_PRESSURE);
+}
+
+#[test]
+fn humidity_and_pressure_setters_clamp_and_reject_non_finite() {
+    let mut world = temperature_world();
+    world.set_humidity(2.0);
+    assert_eq!(world.get_humidity(), 1.0);
+    world.set_humidity(-1.0);
+    assert_eq!(world.get_humidity(), 0.0);
+    world.set_pressure(2000.0);
+    assert_eq!(world.get_pressure(), 1100.0);
+    world.set_pressure(500.0);
+    assert_eq!(world.get_pressure(), 900.0);
+
+    world.set_humidity(0.7);
+    world.set_pressure(1000.0);
+    for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+        world.set_humidity(bad);
+        world.set_pressure(bad);
+    }
+    assert_eq!(world.get_humidity(), 0.7);
+    assert_eq!(world.get_pressure(), 1000.0);
+}
+
+#[test]
+fn weather_tick_keeps_humidity_and_pressure_within_bands_deterministically() {
+    // Two identically seeded worlds must drift in lockstep (float-equal).
+    let mut first = temperature_world();
+    let mut second = temperature_world();
+
+    for _ in 0..50 {
+        first.turn += 1;
+        second.turn += 1;
+        // Force a transition every tick so both the nudge and the walk run.
+        first.weather.duration_remaining = 0;
+        second.weather.duration_remaining = 0;
+        WeatherSystem.run(&mut first);
+        WeatherSystem.run(&mut second);
+        for world in [&first, &second] {
+            assert!((0.0..=1.0).contains(&world.get_humidity()));
+            assert!((900.0..=1100.0).contains(&world.get_pressure()));
+        }
+        assert_eq!(first.get_humidity(), second.get_humidity());
+        assert_eq!(first.get_pressure(), second.get_pressure());
+    }
+
+    // Humidity must have moved away from its start (walk is never trivially
+    // flat across 50 ticks with forced transitions).
+    assert_ne!(first.get_humidity(), 0.5);
+}
+
+// --- Increment C: per-cell diffusion + drift source change ---
+
+/// Two adjacent cells with a bidirectional link.
+fn two_cell_world() -> World {
+    let mut world = make_test_world();
+    let mut grid = SquareGridMap::new();
+    grid.add_cell(0, 0, 0);
+    grid.add_cell(1, 0, 0);
+    grid.add_neighbor((0, 0, 0), (1, 0, 0));
+    grid.add_neighbor((1, 0, 0), (0, 0, 0));
+    world.map = Some(Map::new(Box::new(grid)));
+    world
+}
+
+/// Three cells in a row with bidirectional links; the middle cell is opaque.
+fn walled_row_world() -> World {
+    let mut world = make_test_world();
+    let mut grid = SquareGridMap::new();
+    grid.add_cell(0, 0, 0);
+    grid.add_cell(1, 0, 0);
+    grid.add_cell(2, 0, 0);
+    for (from, to) in [
+        ((0, 0, 0), (1, 0, 0)),
+        ((1, 0, 0), (0, 0, 0)),
+        ((1, 0, 0), (2, 0, 0)),
+        ((2, 0, 0), (1, 0, 0)),
+    ] {
+        grid.add_neighbor(from, to);
+    }
+    let mut map = Map::new(Box::new(grid));
+    map.set_cell_metadata(
+        &CellKey::Square { x: 1, y: 0, z: 0 },
+        json!({"transparent": false}),
+    );
+    world.map = Some(map);
+    world
+}
+
+/// Spawn an entity carrying a `HeatSource` at `(x, y, 0)`.
+fn spawn_heat_source(world: &mut World, x: i32, y: i32, intensity: f64) -> u32 {
+    let entity = world.spawn_entity();
+    world
+        .set_component(
+            entity,
+            "HeatSource",
+            json!({"intensity": intensity, "active": true}),
+        )
+        .unwrap();
+    world
+        .set_component(
+            entity,
+            "Position",
+            json!({"pos": {"Square": {"x": x, "y": y, "z": 0}}}),
+        )
+        .unwrap();
+    entity
+}
+
+#[test]
+fn adjacent_cells_relax_toward_each_other_in_one_pass() {
+    let mut world = two_cell_world();
+    hold_ambient(&mut world, 0.0);
+    spawn_heat_source(&mut world, 0, 0, 20.0);
+    TemperatureSystem.run(&mut world);
+    // Seeded 20.0/0.0, then T_new(c) = T(c) + 0.2 * (avg(neighbors) - T(c)).
+    assert!((world.get_cell_temperature(0, 0, 0) - 16.0).abs() < 1e-9);
+    assert!((world.get_cell_temperature(1, 0, 0) - 4.0).abs() < 1e-9);
+}
+
+#[test]
+fn opaque_cells_neither_give_nor_receive_heat() {
+    let mut world = walled_row_world();
+    hold_ambient(&mut world, 0.0);
+    spawn_heat_source(&mut world, 0, 0, 20.0);
+    TemperatureSystem.run(&mut world);
+    assert!((world.get_cell_temperature(0, 0, 0) - 20.0).abs() < 1e-9);
+    assert!((world.get_cell_temperature(1, 0, 0) - 0.0).abs() < 1e-9);
+    assert!((world.get_cell_temperature(2, 0, 0) - 0.0).abs() < 1e-9);
+}
+
+#[test]
+fn cell_temperature_falls_back_to_ambient_without_a_map_entry() {
+    let world = make_test_world();
+    assert!(world.temperature_map.is_empty());
+    assert_eq!(world.get_cell_temperature(3, 4, 0), world.get_temperature());
+
+    let mut mapped = two_cell_world();
+    hold_ambient(&mut mapped, 7.5);
+    TemperatureSystem.run(&mut mapped);
+    assert_eq!(mapped.get_cell_temperature(9, 9, 9), 7.5);
+}
+
+#[test]
+fn body_drift_reads_the_entity_cell_not_ambient() {
+    let mut world = two_cell_world();
+    hold_ambient(&mut world, 0.0);
+    spawn_heat_source(&mut world, 0, 0, 20.0);
+    let entity = world.spawn_entity();
+    world
+        .set_component(
+            entity,
+            "Body",
+            json!({ "parts": [part("torso", json!(0.0), json!(0.0), json!(0.0))] }),
+        )
+        .unwrap();
+    world
+        .set_component(
+            entity,
+            "Position",
+            json!({"pos": {"Square": {"x": 0, "y": 0, "z": 0}}}),
+        )
+        .unwrap();
+    TemperatureSystem.run(&mut world);
+    // Heated cell relaxes 20.0 -> 16.0; part drifts 0.0 -> 0.0 + 16.0 * 0.05.
+    assert!((part_temperature(&world, entity, 0) - 0.8).abs() < 1e-9);
+}
+
+#[test]
+fn inactive_and_unplaced_heat_sources_add_nothing() {
+    let mut world = two_cell_world();
+    hold_ambient(&mut world, 0.0);
+    let idle = world.spawn_entity();
+    world
+        .set_component(idle, "HeatSource", json!({"intensity": 20.0}))
+        .unwrap();
+    world
+        .set_component(
+            idle,
+            "Position",
+            json!({"pos": {"Square": {"x": 0, "y": 0, "z": 0}}}),
+        )
+        .unwrap();
+    // Deactivate after placement (schema default is active).
+    world
+        .set_component(
+            idle,
+            "HeatSource",
+            json!({"intensity": 20.0, "active": false}),
+        )
+        .unwrap();
+    let homeless = world.spawn_entity();
+    world
+        .set_component(homeless, "HeatSource", json!({"intensity": 20.0}))
+        .unwrap();
+    let away = world.spawn_entity();
+    world
+        .set_component(away, "HeatSource", json!({"intensity": 20.0}))
+        .unwrap();
+    world
+        .set_component(
+            away,
+            "Position",
+            json!({"pos": {"Square": {"x": 5, "y": 5, "z": 0}}}),
+        )
+        .unwrap();
+    TemperatureSystem.run(&mut world);
+    assert!((world.get_cell_temperature(0, 0, 0) - 0.0).abs() < 1e-9);
+    assert!((world.get_cell_temperature(1, 0, 0) - 0.0).abs() < 1e-9);
+}
+
+#[test]
+fn diffusion_map_drops_on_save_and_recomputes_identically() {
+    let mut world = two_cell_world();
+    hold_ambient(&mut world, 0.0);
+    spawn_heat_source(&mut world, 0, 0, 20.0);
+    TemperatureSystem.run(&mut world);
+    assert!(!world.temperature_map.is_empty());
+
+    let json: serde_json::Value = serde_json::to_value(&world).unwrap();
+    assert!(json.get("temperature_map").is_none());
+    assert!(json.get("temperature_scratch").is_none());
+
+    let registry = world.registry.clone();
+    let mut loaded = save_and_load_roundtrip(&world, registry);
+    assert!(loaded.temperature_map.is_empty());
+
+    // The map itself is runtime-only, so re-attach the same topology (heat
+    // sources and the ambient override survive as serialized components and
+    // state); the next tick recomputes identical values.
+    let mut grid = SquareGridMap::new();
+    grid.add_cell(0, 0, 0);
+    grid.add_cell(1, 0, 0);
+    grid.add_neighbor((0, 0, 0), (1, 0, 0));
+    grid.add_neighbor((1, 0, 0), (0, 0, 0));
+    loaded.map = Some(Map::new(Box::new(grid)));
+    TemperatureSystem.run(&mut loaded);
+    assert_eq!(
+        loaded.get_cell_temperature(0, 0, 0),
+        world.get_cell_temperature(0, 0, 0)
+    );
+    assert_eq!(
+        loaded.get_cell_temperature(1, 0, 0),
+        world.get_cell_temperature(1, 0, 0)
+    );
+}
+
+#[test]
+fn diffusion_stays_deterministic_across_fifty_ticks() {
+    fn diffusion_world() -> World {
+        let mut world = two_cell_world();
+        hold_ambient(&mut world, 0.0);
+        spawn_heat_source(&mut world, 0, 0, 20.0);
+        let entity = world.spawn_entity();
+        world
+            .set_component(
+                entity,
+                "Body",
+                json!({ "parts": [part("torso", json!(10.0), json!(10.0), json!(0.0))] }),
+            )
+            .unwrap();
+        world
+            .set_component(
+                entity,
+                "Position",
+                json!({"pos": {"Square": {"x": 1, "y": 0, "z": 0}}}),
+            )
+            .unwrap();
+        world
+    }
+
+    let mut first = diffusion_world();
+    let mut second = diffusion_world();
+    for tick in 0..50 {
+        TemperatureSystem.run(&mut first);
+        TemperatureSystem.run(&mut second);
+        assert_eq!(
+            first.temperature_map, second.temperature_map,
+            "diffusion map diverged on tick {tick}"
+        );
+        assert_eq!(
+            first.get_component(2, "Body"),
+            second.get_component(2, "Body"),
+            "body temperatures diverged on tick {tick}"
+        );
+    }
+}
+
+#[test]
+fn diffusion_adds_no_system_order_entry() {
+    assert!(
+        !SYSTEM_EXECUTION_ORDER
+            .iter()
+            .any(|name| name.contains("Diffusion"))
+    );
+    let weather_pos = SYSTEM_EXECUTION_ORDER
+        .iter()
+        .position(|name| *name == "WeatherSystem")
+        .unwrap();
+    let temperature_pos = SYSTEM_EXECUTION_ORDER
+        .iter()
+        .position(|name| *name == "TemperatureSystem")
+        .unwrap();
+    assert_eq!(temperature_pos, weather_pos + 1);
+}
+
+// --- Increment C bridges: get_cell_temperature contract (mirrored in the
+// Lua, Python, and WASM suites with the same exact values) ---
+
+#[test]
+fn isolated_heated_cell_holds_seed_plus_source() {
+    // A cell with no neighbor links has nothing to exchange with, so the
+    // bridge reports the seeded ambient plus the full source intensity.
+    let mut world = temperature_world();
+    hold_ambient(&mut world, 0.0);
+    spawn_heat_source(&mut world, 0, 0, 20.0);
+    TemperatureSystem.run(&mut world);
+    assert!((world.get_cell_temperature(0, 0, 0) - 20.0).abs() < 1e-5);
+}
+
+#[test]
+fn cell_bridge_distinguishes_z_levels() {
+    // Two stacked cells with no neighbor link stay independent: heat on the
+    // ground floor never reaches the floor above.
+    let mut world = make_test_world();
+    let mut grid = SquareGridMap::new();
+    grid.add_cell(0, 0, 0);
+    grid.add_cell(0, 0, 1);
+    world.map = Some(Map::new(Box::new(grid)));
+    hold_ambient(&mut world, 0.0);
+    spawn_heat_source(&mut world, 0, 0, 20.0);
+    TemperatureSystem.run(&mut world);
+    assert!((world.get_cell_temperature(0, 0, 0) - 20.0).abs() < 1e-5);
+    assert!((world.get_cell_temperature(0, 0, 1) - 0.0).abs() < 1e-5);
+}
+
+#[test]
+fn cell_bridge_absent_cell_tracks_live_ambient() {
+    // Off-map reads follow the current ambient, not a stale tick value.
+    let mut world = two_cell_world();
+    hold_ambient(&mut world, 0.0);
+    TemperatureSystem.run(&mut world);
+    assert!((world.get_cell_temperature(9, 9, 9) - 0.0).abs() < 1e-5);
+    hold_ambient(&mut world, -3.25);
+    TemperatureSystem.run(&mut world);
+    assert!((world.get_cell_temperature(9, 9, 9) - -3.25).abs() < 1e-5);
 }

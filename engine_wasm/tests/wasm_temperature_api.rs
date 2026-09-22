@@ -93,6 +93,110 @@ fn test_wasm_temperature_tick_derives_without_override() {
         world.weather.intensity,
         world.time_of_day.hour,
         world.time_of_day.minute,
+        world.weather.humidity,
+        world.weather.pressure,
     );
     assert!((world.get_temperature() - expected).abs() < 0.0001);
+}
+
+#[test]
+fn test_wasm_humidity_pressure_round_trip_and_clamps() {
+    let mut world = WasmWorld::new();
+    assert!((world.get_humidity() - 0.5).abs() < 0.0001);
+    assert!((world.get_pressure() - 1013.0).abs() < 0.0001);
+
+    world.set_humidity(0.8);
+    assert!((world.get_humidity() - 0.8).abs() < 0.0001);
+    world.set_pressure(1000.0);
+    assert!((world.get_pressure() - 1000.0).abs() < 0.0001);
+
+    world.set_humidity(2.0);
+    assert!((world.get_humidity() - 1.0).abs() < 0.0001);
+    world.set_humidity(-1.0);
+    assert!((world.get_humidity() - 0.0).abs() < 0.0001);
+    world.set_pressure(2000.0);
+    assert!((world.get_pressure() - 1100.0).abs() < 0.0001);
+    world.set_pressure(500.0);
+    assert!((world.get_pressure() - 900.0).abs() < 0.0001);
+}
+
+#[test]
+fn test_wasm_humidity_pressure_rejects_non_finite() {
+    let mut world = WasmWorld::new();
+    world.set_humidity(0.7);
+    world.set_pressure(1000.0);
+    world.set_humidity(f64::NAN);
+    world.set_pressure(f64::INFINITY);
+    world.set_humidity(f64::NEG_INFINITY);
+    world.set_pressure(f64::NAN);
+    assert!((world.get_humidity() - 0.7).abs() < 0.0001);
+    assert!((world.get_pressure() - 1000.0).abs() < 0.0001);
+}
+
+#[test]
+fn test_wasm_tick_applies_humidity_pressure_modifiers() {
+    // WASM tick recomputes scalar ambient plus the humidity/pressure
+    // modifiers through the shared pure function. Per-cell diffusion and
+    // per-part drift stay host-side in v2, so parity covers scalar state.
+    let mut neutral = WasmWorld::new();
+    neutral.set_humidity(0.5);
+    neutral.set_pressure(1013.0);
+    neutral.tick();
+
+    let mut humid = WasmWorld::new();
+    humid.set_humidity(1.0);
+    humid.set_pressure(1013.0);
+    humid.tick();
+    assert!(((humid.get_temperature() - neutral.get_temperature()) - 3.0).abs() < 1e-9);
+
+    let mut dry = WasmWorld::new();
+    dry.set_humidity(0.0);
+    dry.set_pressure(1013.0);
+    dry.tick();
+    assert!(((dry.get_temperature() - neutral.get_temperature()) + 3.0).abs() < 1e-9);
+
+    let mut low_pressure = WasmWorld::new();
+    low_pressure.set_humidity(0.5);
+    low_pressure.set_pressure(973.0);
+    low_pressure.tick();
+    assert!(((low_pressure.get_temperature() - neutral.get_temperature()) + 2.0).abs() < 1e-9);
+
+    let mut high_pressure = WasmWorld::new();
+    high_pressure.set_humidity(0.5);
+    high_pressure.set_pressure(1053.0);
+    high_pressure.tick();
+    assert!(((high_pressure.get_temperature() - neutral.get_temperature()) - 2.0).abs() < 1e-9);
+}
+
+#[test]
+fn test_wasm_cell_temperature_falls_back_to_ambient() {
+    // The guest tick leaves the diffusion map empty, so the host mirror
+    // reports global ambient (same fallback as the core bridge).
+    let mut world = WasmWorld::new();
+    assert!((world.get_cell_temperature(3, 4, 0) - 15.0).abs() < 1e-9);
+
+    world.set_temperature(20.0);
+    assert!((world.get_cell_temperature(3, 4, 0) - 20.0).abs() < 1e-9);
+
+    world.tick();
+    assert!((world.get_cell_temperature(3, 4, 0) - 20.0).abs() < 1e-9);
+}
+
+#[test]
+fn test_wasm_cell_temperature_absent_cells_share_live_ambient() {
+    let mut world = WasmWorld::new();
+    world.set_humidity(1.0);
+    world.set_pressure(1013.0);
+    world.tick();
+    let ambient = world.get_temperature();
+    for (x, y, z) in [(0, 0, 0), (1, 0, 0), (9, 9, 9), (-4, 7, 1)] {
+        assert_eq!(world.get_cell_temperature(x, y, z), ambient);
+    }
+}
+
+#[test]
+fn test_wasm_cell_temperature_map_skipped_in_serialization() {
+    let world = WasmWorld::new();
+    let json: serde_json::Value = serde_json::to_value(&world).expect("WasmWorld serializes");
+    assert!(json.get("temperature_map").is_none());
 }
