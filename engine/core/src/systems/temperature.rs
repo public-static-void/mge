@@ -1,5 +1,7 @@
 use crate::ecs::system::System;
 use crate::ecs::world::{Season, WeatherCondition, World};
+use crate::map::Map;
+use crate::map::cell_key::CellKey;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value as JsonValue, json};
 use std::collections::HashSet;
@@ -36,15 +38,19 @@ pub const DEFAULT_HUMIDITY: f64 = 0.5;
 /// Default atmospheric pressure in hPa for saves predating the field.
 pub const DEFAULT_PRESSURE: f64 = 1013.0;
 
-/// System: Derives the global ambient temperature each tick and exchanges heat
-/// with every `Body` part in place.
+/// System: Derives the global ambient temperature each tick, recomputes the
+/// transient per-cell temperature map, and exchanges heat with every `Body`
+/// part in place.
 ///
 /// Ambient comes from [`compute_ambient_temperature`] applied to the same-tick
 /// `Season + WeatherState + TimeOfDay` output (this system runs immediately
-/// after `WeatherSystem`), unless a script override holds it fixed. Each part
-/// drifts toward ambient at a rate scaled by its stored `insulation`, threshold
-/// crossings emit `cold_stress` / `heat_stress` events, and extreme exposure
-/// queues `PendingDamage` for `BodyPartDamageSystem` on the following tick.
+/// after `WeatherSystem`), unless a script override holds it fixed. The
+/// transient map is then seeded from ambient, heated by `HeatSource`
+/// entities, and relaxed in one synchronous diffusion pass. Each part drifts
+/// toward its entity cell temperature at a rate scaled by its stored
+/// `insulation`, threshold crossings emit `cold_stress` / `heat_stress`
+/// events, and extreme exposure queues `PendingDamage` for
+/// `BodyPartDamageSystem` on the following tick.
 ///
 /// `insulation` is read-only input here: [`EquipmentEffectAggregationSystem`]
 /// is its sole writer.
@@ -81,6 +87,10 @@ impl System for TemperatureSystem {
         }
         let ambient = world.temperature.ambient;
 
+        // Recompute the transient per-cell map (seed → heat sources → one
+        // relaxation pass) before per-part drift reads it.
+        recompute_temperature_map(world, ambient);
+
         // Take the stress flags locally so part processing never holds a
         // borrow on `world` while reading/writing components; prune flags for
         // entities that no longer carry a Body.
@@ -105,9 +115,10 @@ impl System for TemperatureSystem {
             let mut events: Vec<(bool, String, f64, f64)> = Vec::new();
             let mut damage_parts: Vec<String> = Vec::new();
             if let Some(parts) = body.get_mut("parts").and_then(|v| v.as_array_mut()) {
+                let target = cell_temperature_for(world, entity, ambient);
                 process_parts(
                     parts,
-                    ambient,
+                    target,
                     entity,
                     &mut stressed,
                     &mut events,
@@ -184,17 +195,136 @@ pub fn compute_ambient_temperature(
     (season_base + weather_delta + diurnal + humidity_delta + pressure_delta).clamp(-60.0, 60.0)
 }
 
-/// Advance every part (including nested `children`) toward ambient.
+/// Deterministic sort key for map cells (canonical JSON form).
+fn cell_sort_key(cell: &CellKey) -> String {
+    serde_json::to_string(cell).unwrap_or_default()
+}
+
+/// Opaque cells (`transparent: false` in metadata) block heat exchange — same
+/// rule as [`BfsFovAlgorithm`](crate::map::fov::BfsFovAlgorithm) and noise
+/// propagation. Cells without metadata default to transparent.
+fn is_opaque_cell(map: &Map, cell: &CellKey) -> bool {
+    map.get_cell_metadata(cell)
+        .and_then(|m| m.get("transparent"))
+        .and_then(|v| v.as_bool())
+        .map(|t| !t)
+        .unwrap_or(false)
+}
+
+/// Recompute the transient per-cell temperature map for this tick: seed every
+/// map cell with ambient, add each active `HeatSource` `{intensity}` at its
+/// entity cell, then run exactly one synchronous relaxation pass `T_new(c) =
+/// T(c) + D * (avg(neighbors) - T(c))` with `D = DIFFUSION_RATE` over
+/// transparent neighbors only. Opaque cells neither give nor receive.
 ///
-/// Null `temperature` initializes to `ideal_temperature` (or ambient when the
-/// ideal is also null) with no event; null `insulation` counts as `0.0`.
-/// `heat_loss` records `temp_before − temp_after`. Stress events fire at most
-/// once per part per crossing and re-arm inside the ±15 band; deviation of ±25
-/// additionally queues `1.0` damage for the named part.
+/// No per-emitter flood-fill (NFR002): sources touch only their own cell, so
+/// the pass is O(cells) with sorted cell order and the reused
+/// `temperature_scratch` buffer for determinism.
+fn recompute_temperature_map(world: &mut World, ambient: f64) {
+    let Some(map) = world.map.as_ref() else {
+        world.temperature_map.clear();
+        return;
+    };
+    let mut cells = map.all_cells();
+    cells.sort_by_key(cell_sort_key);
+
+    let seeded = &mut world.temperature_map;
+    seeded.clear();
+    seeded.reserve(cells.len());
+    for cell in &cells {
+        seeded.insert(cell.clone(), ambient);
+    }
+
+    if let Some(sources) = world.components.get("HeatSource") {
+        let mut emitters: Vec<u32> = sources.keys().copied().collect();
+        emitters.sort_unstable();
+        for entity in emitters {
+            let Some(data) = sources.get(&entity) else {
+                continue;
+            };
+            let active = data.get("active").and_then(|v| v.as_bool()).unwrap_or(true);
+            if !active {
+                continue;
+            }
+            let intensity = data.get("intensity").and_then(|v| v.as_f64()).unwrap_or(0.0);
+            if !intensity.is_finite() || intensity == 0.0 {
+                continue;
+            }
+            let Some(cell) = world
+                .components
+                .get("Position")
+                .and_then(|positions| positions.get(&entity))
+                .and_then(CellKey::from_position)
+            else {
+                continue;
+            };
+            if !map.contains(&cell) {
+                continue;
+            }
+            if let Some(slot) = seeded.get_mut(&cell) {
+                *slot += intensity;
+            }
+        }
+    }
+
+    let scratch = &mut world.temperature_scratch;
+    scratch.clear();
+    scratch.reserve(cells.len());
+    for cell in &cells {
+        let current = seeded.get(cell).copied().unwrap_or(ambient);
+        if is_opaque_cell(map, cell) {
+            scratch.insert(cell.clone(), current);
+            continue;
+        }
+        let mut sum = 0.0;
+        let mut count = 0u32;
+        for neighbor in map.neighbors(cell) {
+            if !map.contains(&neighbor) || is_opaque_cell(map, &neighbor) {
+                continue;
+            }
+            if let Some(&t) = seeded.get(&neighbor) {
+                sum += t;
+                count += 1;
+            }
+        }
+        let next = if count == 0 {
+            current
+        } else {
+            current + DIFFUSION_RATE * (sum / f64::from(count) - current)
+        };
+        scratch.insert(cell.clone(), next);
+    }
+    std::mem::swap(&mut world.temperature_map, &mut world.temperature_scratch);
+}
+
+/// Drift target for one entity: the transient map value at its cell when the
+/// map is populated, else global ambient.
+fn cell_temperature_for(world: &World, entity: u32, ambient: f64) -> f64 {
+    if world.temperature_map.is_empty() {
+        return ambient;
+    }
+    let Some(cell) = world
+        .get_component(entity, "Position")
+        .and_then(CellKey::from_position)
+    else {
+        return ambient;
+    };
+    world.temperature_map.get(&cell).copied().unwrap_or(ambient)
+}
+
+/// Advance every part (including nested `children`) toward the drift target.
+///
+/// The target is the entity cell temperature from the transient diffusion map
+/// (or global ambient when the map is empty). Null `temperature` initializes
+/// to `ideal_temperature` (or the target when the ideal is also null) with no
+/// event; null `insulation` counts as `0.0`. `heat_loss` records
+/// `temp_before − temp_after`. Stress events fire at most once per part per
+/// crossing and re-arm inside the ±15 band; deviation of ±25 additionally
+/// queues `1.0` damage for the named part.
 #[allow(clippy::too_many_arguments)]
 fn process_parts(
     parts: &mut [JsonValue],
-    ambient: f64,
+    target: f64,
     entity: u32,
     stressed: &mut HashSet<(u32, String)>,
     events: &mut Vec<(bool, String, f64, f64)>,
@@ -215,7 +345,7 @@ fn process_parts(
 
         if let Some(current) = part.get("temperature").and_then(|v| v.as_f64()) {
             let k = 0.05 / (1.0 + insulation);
-            let next = current + (ambient - current) * k;
+            let next = current + (target - current) * k;
             part["temperature"] = json!(next);
             part["heat_loss"] = json!(current - next);
 
@@ -241,12 +371,12 @@ fn process_parts(
                 }
             }
         } else {
-            part["temperature"] = json!(ideal.unwrap_or(ambient));
+            part["temperature"] = json!(ideal.unwrap_or(target));
             part["heat_loss"] = json!(0.0);
         }
 
         if let Some(children) = part.get_mut("children").and_then(|v| v.as_array_mut()) {
-            process_parts(children, ambient, entity, stressed, events, damage_parts);
+            process_parts(children, target, entity, stressed, events, damage_parts);
         }
     }
 }
@@ -272,5 +402,15 @@ impl World {
                 "new_ambient": clamped,
             }),
         );
+    }
+
+    /// Per-cell temperature from the transient diffusion map.
+    /// Falls back to global ambient when the map is empty or the cell is absent.
+    pub fn get_cell_temperature(&self, x: i32, y: i32, z: i32) -> f64 {
+        let cell = CellKey::Square { x, y, z };
+        self.temperature_map
+            .get(&cell)
+            .copied()
+            .unwrap_or(self.temperature.ambient)
     }
 }
