@@ -841,6 +841,8 @@ impl WasmWorld {
                 self.weather.intensity,
                 self.time_of_day.hour,
                 self.time_of_day.minute,
+                self.weather.humidity,
+                self.weather.pressure,
             );
         }
     }
