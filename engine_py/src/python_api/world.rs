@@ -613,6 +613,26 @@ impl PyWorld {
         TemperatureApi::set_temperature(self, ambient)
     }
 
+    /// Get the current relative humidity in `[0.0, 1.0]`.
+    fn get_humidity(&self) -> f64 {
+        TemperatureApi::get_humidity(self)
+    }
+
+    /// Set relative humidity (clamped to `[0.0, 1.0]`).
+    fn set_humidity(&self, humidity: f64) {
+        TemperatureApi::set_humidity(self, humidity)
+    }
+
+    /// Get the current atmospheric pressure in hPa.
+    fn get_pressure(&self) -> f64 {
+        TemperatureApi::get_pressure(self)
+    }
+
+    /// Set atmospheric pressure (clamped to `[900.0, 1100.0]`).
+    fn set_pressure(&self, pressure: f64) {
+        TemperatureApi::set_pressure(self, pressure)
+    }
+
     /// Add a cell to the map
     fn add_cell(&self, x: i32, y: i32, z: i32) {
         crate::python_api::map_api::add_cell(self, x, y, z)

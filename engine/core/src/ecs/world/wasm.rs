@@ -991,6 +991,32 @@ impl WasmWorld {
         );
     }
 
+    /// Returns the current relative humidity in `[0.0, 1.0]`.
+    pub fn get_humidity(&self) -> f64 {
+        self.weather.humidity
+    }
+
+    /// Sets relative humidity, clamped to `[0.0, 1.0]`; non-finite input is
+    /// ignored and leaves stored state unchanged.
+    pub fn set_humidity(&mut self, humidity: f64) {
+        if humidity.is_finite() {
+            self.weather.humidity = humidity.clamp(0.0, 1.0);
+        }
+    }
+
+    /// Returns the current atmospheric pressure in hPa.
+    pub fn get_pressure(&self) -> f64 {
+        self.weather.pressure
+    }
+
+    /// Sets atmospheric pressure, clamped to `[900.0, 1100.0]`; non-finite
+    /// input is ignored and leaves stored state unchanged.
+    pub fn set_pressure(&mut self, pressure: f64) {
+        if pressure.is_finite() {
+            self.weather.pressure = pressure.clamp(900.0, 1100.0);
+        }
+    }
+
     /// Reads a line of user input from the configured input source.
     ///
     /// When `input_source` is `Stdin`, blocks on `std::io::stdin().read_line()`.
