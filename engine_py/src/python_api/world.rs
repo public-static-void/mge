@@ -16,6 +16,7 @@ use crate::python_api::movement::MovementApi;
 use crate::python_api::noise::NoiseApi;
 use crate::python_api::region::{RegionApi, ZoneApi};
 use crate::python_api::save_load::SaveLoadApi;
+use crate::python_api::temperature::TemperatureApi;
 use crate::python_api::time_of_day::TimeOfDayApi;
 use crate::python_api::turn::TurnApi;
 use crate::python_api::unit_template::UnitTemplateApi;
@@ -35,6 +36,7 @@ use engine_core::systems::job::job_board::JobBoard;
 use engine_core::systems::job::types::loader::load_job_types_from_dir;
 use engine_core::systems::noise::NoiseSystem;
 use engine_core::systems::research::ResearchSystem;
+use engine_core::systems::temperature::TemperatureSystem;
 use engine_core::systems::weather::WeatherSystem;
 use engine_core::tech_tree;
 use pyo3::Python;
@@ -142,6 +144,7 @@ impl PyWorld {
         world.register_system(FactionReputationSystem);
         world.register_system(FluidSimulationSystem::default());
         world.register_system(WeatherSystem);
+        world.register_system(TemperatureSystem);
         world.register_system(FovUpdateSystem);
         world.register_system(NoiseSystem);
         world.register_system(EnemyBehaviorSystem);
@@ -595,6 +598,19 @@ impl PyWorld {
     /// Get the current visibility modifier (0.0–1.0, 1.0 = no reduction).
     fn get_weather_visibility_modifier(&self) -> f64 {
         WeatherApi::get_weather_visibility_modifier(self)
+    }
+
+    // ---- TEMPERATURE ----
+
+    /// Get the current global ambient temperature in °C.
+    fn get_temperature(&self) -> f64 {
+        TemperatureApi::get_temperature(self)
+    }
+
+    /// Hold ambient at `ambient` °C (clamped to [-60, 60], emits
+    /// `temperature_changed`).
+    fn set_temperature(&self, ambient: f64) {
+        TemperatureApi::set_temperature(self, ambient)
     }
 
     /// Add a cell to the map

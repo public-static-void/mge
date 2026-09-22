@@ -42,6 +42,8 @@ pub mod noise;
 pub mod research;
 /// Stat calculation system
 pub mod stat_calculation;
+/// Temperature system (deterministic global ambient + per-body heat exchange)
+pub mod temperature;
 /// Weather system (deterministic global weather state)
 pub mod weather;
 /// Zone state validation system
@@ -66,6 +68,7 @@ pub const SYSTEM_EXECUTION_ORDER: &[&str] = &[
     "FactionReputationSystem",
     "FluidSimulationSystem",
     "WeatherSystem",
+    "TemperatureSystem",
     "FovUpdateSystem",
     "NoiseSystem",
     "EnemyBehaviorSystem",

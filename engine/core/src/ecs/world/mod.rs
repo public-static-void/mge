@@ -13,6 +13,7 @@ use crate::map::cell_key::CellKey;
 use crate::map::fov::{BfsFovAlgorithm, FovAlgorithm, RecursiveShadowcasting};
 use crate::plugins::dynamic_systems::DynamicSystemRegistry;
 use crate::systems::job::{JobBoard, JobTypeRegistry};
+use crate::systems::temperature::TemperatureState;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -140,6 +141,16 @@ pub struct World {
     /// Global weather state (persistent, serialized for save/load).
     #[serde(default)]
     pub weather: WeatherState,
+    /// Global ambient temperature state (persistent, serialized for save/load).
+    /// Old saves without this field load with `TemperatureState::default()`.
+    #[serde(default)]
+    pub temperature: TemperatureState,
+    /// Per-part cold/heat stress flags keyed by `(entity, part name)`.
+    /// Transient re-arm tracking: a part emits a stress event at most once per
+    /// crossing and re-arms only after returning inside the ±15 band.
+    /// Not serialized; rebuilt from scratch after load.
+    #[serde(skip)]
+    pub temperature_stress: std::collections::HashSet<(u32, String)>,
     /// Component registry
     #[serde(skip)]
     pub registry: Arc<Mutex<ComponentRegistry>>,
@@ -298,6 +309,8 @@ impl World {
             turn: 0,
             time_of_day: TimeOfDay::default(),
             weather: WeatherState::default(),
+            temperature: TemperatureState::default(),
+            temperature_stress: std::collections::HashSet::new(),
             registry,
             systems: SystemRegistry::new(),
             event_buses: crate::ecs::event_bus_registry::EventBusRegistry::new(),
