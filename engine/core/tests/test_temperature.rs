@@ -21,9 +21,15 @@ use world_io_helper::save_and_load_roundtrip;
 use engine_core::ecs::system::System;
 use engine_core::ecs::world::{Season, WeatherCondition, World};
 use engine_core::map::{Map, SquareGridMap};
+use engine_core::material::{resolve_item_conductivity, set_entity_material};
 use engine_core::systems::SYSTEM_EXECUTION_ORDER;
+use engine_core::systems::body_equipment_sync::BodyEquipmentSyncSystem;
 use engine_core::systems::body_part_damage::BodyPartDamageSystem;
+use engine_core::systems::equipment_effect_aggregation::{
+    EquipmentEffectAggregationSystem, insulation_contribution,
+};
 use engine_core::systems::temperature::{
+    DEFAULT_HUMIDITY, DEFAULT_PRESSURE, DIFFUSION_RATE, HUMIDITY_BAND, PRESSURE_BAND,
     TemperatureState, TemperatureSystem, compute_ambient_temperature,
 };
 use engine_core::systems::weather::WeatherSystem;
@@ -700,4 +706,228 @@ fn identical_worlds_produce_identical_temperature_sequences() {
             drop(live);
         }
     }
+}
+
+// --- Increment A: insulation aggregation + material coupling + tuning ---
+
+/// World with real material definitions loaded, so conductivity values
+/// come from the shipped assets (cloth 0.05, iron 0.8).
+fn insulation_world() -> World {
+    let mut world = temperature_world();
+    let dir =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../engine/assets/materials");
+    world.material_definitions =
+        engine_core::ecs::assets::load_material_definitions(&dir).expect("load materials");
+    world
+}
+
+/// Register a garment item covering the torso slot.
+fn register_garment(world: &mut World, id: &str, insulation: f64, material: Option<&str>) {
+    let mut definition =
+        json!({"id": id, "name": id, "slot": "torso", "effects": {"insulation": insulation}});
+    if let Some(name) = material {
+        definition["material"] = json!(name);
+    }
+    world.item_registry.register_item(definition).unwrap();
+}
+
+/// Spawn an entity with a single torso part plus an Equipment component.
+fn spawn_clothed(world: &mut World, equipped_slot: JsonValue, equipped_list: Vec<&str>) -> u32 {
+    let entity = world.spawn_entity();
+    let equipped: Vec<JsonValue> = equipped_list.iter().map(|id| json!(id)).collect();
+    let mut torso = part("torso", json!(37.0), json!(37.0), json!(0.0));
+    torso["equipped"] = JsonValue::Array(equipped);
+    world
+        .set_component(entity, "Body", json!({ "parts": [torso] }))
+        .unwrap();
+    world
+        .set_component(
+            entity,
+            "Equipment",
+            json!({ "slots": {"torso": equipped_slot} }),
+        )
+        .unwrap();
+    entity
+}
+
+fn part_insulation(world: &World, entity: u32) -> f64 {
+    world.get_component(entity, "Body").unwrap()["parts"][0]["insulation"]
+        .as_f64()
+        .unwrap()
+}
+
+#[test]
+fn single_cloth_garment_insulates_by_conductivity_weight() {
+    let mut world = insulation_world();
+    register_garment(&mut world, "cloak", 0.5, Some("cloth"));
+    let entity = spawn_clothed(&mut world, json!("cloak"), vec![]);
+
+    BodyEquipmentSyncSystem.run(&mut world);
+    EquipmentEffectAggregationSystem.run(&mut world);
+
+    let insulation = part_insulation(&world, entity);
+    assert!(
+        (insulation - 0.475).abs() < 1e-9,
+        "0.5 * (1 - 0.05) should be 0.475, got {insulation}"
+    );
+}
+
+#[test]
+fn layered_garments_sum_their_contributions() {
+    let mut world = insulation_world();
+    register_garment(&mut world, "cloak_a", 0.5, Some("cloth"));
+    register_garment(&mut world, "cloak_b", 0.5, Some("cloth"));
+    let entity = spawn_clothed(&mut world, JsonValue::Null, vec!["cloak_a", "cloak_b"]);
+
+    EquipmentEffectAggregationSystem.run(&mut world);
+
+    let insulation = part_insulation(&world, entity);
+    assert!(
+        (insulation - 0.95).abs() < 1e-9,
+        "two cloth layers should sum to 0.95, got {insulation}"
+    );
+}
+
+#[test]
+fn excessive_layering_clamps_insulation_at_one() {
+    let mut world = insulation_world();
+    register_garment(&mut world, "cloak_a", 0.5, Some("cloth"));
+    register_garment(&mut world, "cloak_b", 0.5, Some("cloth"));
+    register_garment(&mut world, "cloak_c", 0.5, Some("cloth"));
+    let entity = spawn_clothed(
+        &mut world,
+        JsonValue::Null,
+        vec!["cloak_a", "cloak_b", "cloak_c"],
+    );
+
+    EquipmentEffectAggregationSystem.run(&mut world);
+
+    assert_eq!(
+        world.get_component(entity, "Body").unwrap()["parts"][0]["insulation"],
+        json!(1.0)
+    );
+}
+
+#[test]
+fn iron_garment_conducts_heat_away() {
+    let mut world = insulation_world();
+    register_garment(&mut world, "breastplate", 0.5, Some("iron"));
+    let entity = spawn_clothed(&mut world, json!("breastplate"), vec![]);
+
+    BodyEquipmentSyncSystem.run(&mut world);
+    EquipmentEffectAggregationSystem.run(&mut world);
+
+    let insulation = part_insulation(&world, entity);
+    assert!(
+        (insulation - 0.1).abs() < 1e-9,
+        "0.5 * (1 - 0.8) should be 0.1, got {insulation}"
+    );
+}
+
+#[test]
+fn bare_parts_reset_stale_insulation_to_zero() {
+    let mut world = insulation_world();
+    let entity = world.spawn_entity();
+    world
+        .set_component(
+            entity,
+            "Body",
+            json!({ "parts": [part("torso", json!(37.0), json!(37.0), json!(2.5))] }),
+        )
+        .unwrap();
+
+    EquipmentEffectAggregationSystem.run(&mut world);
+
+    assert_eq!(
+        world.get_component(entity, "Body").unwrap()["parts"][0]["insulation"],
+        json!(0.0)
+    );
+}
+
+#[test]
+fn explicit_item_material_beats_entity_material() {
+    let mut world = insulation_world();
+    let entity = world.spawn_entity();
+    set_entity_material(&mut world, entity, "cloth").unwrap();
+    let item = json!({"id": "helm", "name": "Helm", "slot": "torso", "material": "iron"});
+
+    let conductivity = resolve_item_conductivity(&world, entity, &item);
+
+    assert!(
+        (conductivity - 0.8).abs() < 1e-9,
+        "explicit iron key should win over cloth entity, got {conductivity}"
+    );
+}
+
+#[test]
+fn entity_material_covers_unkeyed_items() {
+    let mut world = insulation_world();
+    let entity = world.spawn_entity();
+    set_entity_material(&mut world, entity, "iron").unwrap();
+    let item = json!({"id": "helm", "name": "Helm", "slot": "torso"});
+
+    let conductivity = resolve_item_conductivity(&world, entity, &item);
+
+    assert!(
+        (conductivity - 0.8).abs() < 1e-9,
+        "entity iron should apply to keyless items, got {conductivity}"
+    );
+}
+
+#[test]
+fn unresolvable_material_falls_back_to_zero_conductivity() {
+    let mut world = insulation_world();
+    let entity = world.spawn_entity();
+    let item = json!({"id": "helm", "name": "Helm", "slot": "torso"});
+
+    let conductivity = resolve_item_conductivity(&world, entity, &item);
+
+    assert_eq!(conductivity, 0.0);
+}
+
+#[test]
+fn unknown_material_names_fall_back_to_zero_conductivity() {
+    let mut world = insulation_world();
+    let entity = world.spawn_entity();
+    let item = json!({"id": "helm", "name": "Helm", "slot": "torso", "material": "mithril"});
+
+    let conductivity = resolve_item_conductivity(&world, entity, &item);
+
+    assert_eq!(conductivity, 0.0);
+}
+
+#[test]
+fn insulation_weight_matches_base_times_one_minus_conductivity() {
+    assert!((insulation_contribution(0.5, 0.05) - 0.475).abs() < 1e-12);
+    assert!((insulation_contribution(0.5, 0.8) - 0.1).abs() < 1e-12);
+    assert_eq!(insulation_contribution(0.0, 0.8), 0.0);
+}
+
+#[test]
+fn new_thermal_bands_bind_without_touching_legacy_values() {
+    assert_eq!(HUMIDITY_BAND, 3.0);
+    assert_eq!(PRESSURE_BAND, 2.0);
+    assert_eq!(DIFFUSION_RATE, 0.2);
+    assert_eq!(DEFAULT_HUMIDITY, 0.5);
+    assert_eq!(DEFAULT_PRESSURE, 1013.0);
+
+    // Legacy ambient derivation is canonical: summer noon under clear skies.
+    let noon = compute_ambient_temperature(Season::Summer, WeatherCondition::Clear, 0.0, 14, 0);
+    assert!((noon - 30.0).abs() < 1e-9);
+}
+
+#[test]
+fn insulation_producer_runs_before_sync_before_temperature() {
+    let positions: std::collections::HashMap<&str, usize> = SYSTEM_EXECUTION_ORDER
+        .iter()
+        .enumerate()
+        .map(|(index, name)| (*name, index))
+        .collect();
+    let aggregation = positions["EquipmentEffectAggregationSystem"];
+    let sync = positions["BodyEquipmentSyncSystem"];
+    let temperature = positions["TemperatureSystem"];
+    assert!(
+        aggregation < sync && sync < temperature,
+        "producer must precede sync precedes temperature"
+    );
 }
