@@ -227,6 +227,14 @@ pub struct World {
     /// Noise level per cell (transient, recomputed each tick by NoiseSystem, not serialized)
     #[serde(skip)]
     pub noise_map: HashMap<CellKey, f64>,
+    /// Per-cell temperature (transient, recomputed each tick by TemperatureSystem
+    /// from ambient plus heat sources plus one diffusion pass, not serialized)
+    #[serde(skip)]
+    pub temperature_map: HashMap<CellKey, f64>,
+    /// Scratch buffer for the diffusion relaxation pass (transient, cleared and
+    /// reused across ticks so diffusion allocates nothing per tick, not serialized)
+    #[serde(skip)]
+    pub temperature_scratch: HashMap<CellKey, f64>,
     /// Weather-driven visibility multiplier (0.0–1.0, 1.0 = no reduction).
     /// Recomputed each tick by WeatherSystem, not persisted.
     #[serde(skip)]
@@ -350,6 +358,8 @@ impl World {
             map_stack: Vec::new(),
             visible_cells: HashMap::new(),
             noise_map: HashMap::new(),
+            temperature_map: HashMap::new(),
+            temperature_scratch: HashMap::new(),
             visibility_modifier: 1.0,
             explored_cells: HashMap::new(),
             event_queues: HashMap::new(),
