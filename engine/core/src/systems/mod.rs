@@ -16,6 +16,8 @@ pub mod derived_stats;
 pub mod dungeon;
 /// Economic system
 pub mod economic;
+/// Ecosystem simulation system (deterministic wildlife graze/wander FSM)
+pub mod ecosystem;
 /// Enemy AI behavior system (deterministic FSM: idle/patrol/chase/attack/flee)
 pub mod enemy_behavior;
 /// Equipment effect aggregation system
@@ -72,6 +74,7 @@ pub const SYSTEM_EXECUTION_ORDER: &[&str] = &[
     "FovUpdateSystem",
     "NoiseSystem",
     "EnemyBehaviorSystem",
+    "EcosystemSystem",
     "ProcessDeaths",
     "ProcessDecay",
 ];
