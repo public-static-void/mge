@@ -1,0 +1,56 @@
+{
+  "title": "Species",
+  "description": "Static wildlife archetype: diet, nutrition rates, reproduction and sensing parameters.",
+  "type": "object",
+  "properties": {
+    "diet": {
+      "type": ["string", "null"],
+      "enum": ["herbivore", "carnivore", "omnivore"],
+      "default": "herbivore"
+    },
+    "graze_nutrition_rate": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "default": 0.1
+    },
+    "metabolism_rate": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "default": 0.05
+    },
+    "reproduction_threshold": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "maximum": 1,
+      "default": 0.8
+    },
+    "reproduction_cooldown_ticks": {
+      "type": ["integer", "null"],
+      "minimum": 0,
+      "default": 10
+    },
+    "litter_size": {
+      "type": ["integer", "null"],
+      "minimum": 1,
+      "maximum": 3,
+      "default": 1
+    },
+    "detection_range": {
+      "type": ["integer", "null"],
+      "minimum": 1,
+      "default": 6
+    },
+    "noise_flee_threshold": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "maximum": 1,
+      "default": 0.5
+    },
+    "activity": {
+      "type": ["string", "null"],
+      "enum": ["diurnal", "nocturnal"],
+      "default": "diurnal"
+    }
+  },
+  "modes": ["colony", "roguelike", "simulation"]
+}
