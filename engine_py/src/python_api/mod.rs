@@ -75,6 +75,9 @@ pub mod turn;
 pub mod ui;
 /// Unit template API
 pub mod unit_template;
+/// Vehicle API (embark_vehicle, disembark_vehicle, assign_vehicle_path,
+/// get_vehicle_occupants, is_mounted)
+pub mod vehicle;
 /// Weather API
 pub mod weather;
 /// World API

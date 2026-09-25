@@ -1050,6 +1050,35 @@ impl PyWorld {
         MovementApi::is_move_path_empty(self, agent_id)
     }
 
+    /// Embark a rider onto a vehicle. Returns (ok, err) with err None on success.
+    pub fn embark_vehicle(&self, vehicle_id: u32, rider_id: u32) -> (bool, Option<String>) {
+        crate::python_api::vehicle::embark_vehicle(self, vehicle_id, rider_id)
+    }
+
+    /// Disembark a rider from its vehicle. Returns (ok, err) with err None on success.
+    pub fn disembark_vehicle(&self, rider_id: u32) -> (bool, Option<String>) {
+        crate::python_api::vehicle::disembark_vehicle(self, rider_id)
+    }
+
+    /// Assign a terrain-validated path to a vehicle. Returns the stored step count.
+    pub fn assign_vehicle_path(
+        &self,
+        vehicle_id: u32,
+        goal_cell: Bound<'_, PyAny>,
+    ) -> PyResult<usize> {
+        crate::python_api::vehicle::assign_vehicle_path(self, vehicle_id, &goal_cell)
+    }
+
+    /// Occupant entity IDs of a vehicle.
+    pub fn get_vehicle_occupants(&self, vehicle_id: u32) -> Vec<u32> {
+        crate::python_api::vehicle::get_vehicle_occupants(self, vehicle_id)
+    }
+
+    /// True when the rider is mounted on a vehicle.
+    pub fn is_mounted(&self, rider_id: u32) -> bool {
+        crate::python_api::vehicle::is_mounted(self, rider_id)
+    }
+
     /// Assign jobs to an AI agent using the internal job AI logic.
     #[pyo3(signature = (agent_id, _args))]
     pub fn ai_assign_jobs(&self, agent_id: u32, _args: Vec<PyObject>) -> PyResult<()> {

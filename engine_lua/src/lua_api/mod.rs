@@ -84,6 +84,9 @@ pub mod turn;
 pub mod ui;
 /// Unit template API
 pub mod unit_template;
+/// Vehicle API (embark_vehicle, disembark_vehicle, assign_vehicle_path,
+/// get_vehicle_occupants, is_mounted)
+pub mod vehicle;
 /// Weather API (get_weather, set_weather, get_weather_visibility_modifier)
 pub mod weather;
 /// World API
@@ -138,6 +141,7 @@ pub fn register_all_api_functions(
     noise::register_noise_api(lua, globals, world.clone())?;
     ai_behaviors::register_ai_behaviors_api(lua, globals, world.clone())?;
     unit_template::register_unit_template_api(lua, globals, world.clone())?;
+    vehicle::register_vehicle_api(lua, globals, world.clone())?;
     item_definition::register_item_definition_api(lua, globals, world.clone())?;
     equipment_set_designer::register_equipment_set_designer_api(lua, globals, world.clone())?;
     weather::register_weather_api(lua, globals, world.clone())?;
