@@ -13,6 +13,7 @@ use engine_core::systems::construction::ConstructionSystem;
 use engine_core::systems::death_decay::{ProcessDeaths, ProcessDecay};
 use engine_core::systems::derived_stats::DerivedStatsSystem;
 use engine_core::systems::economic::{EconomicSystem, load_recipes_from_dir};
+use engine_core::systems::ecosystem::EcosystemSystem;
 use engine_core::systems::enemy_behavior::EnemyBehaviorSystem;
 use engine_core::systems::equipment_effect_aggregation::EquipmentEffectAggregationSystem;
 use engine_core::systems::equipment_logic::EquipmentLogicSystem;
@@ -187,6 +188,7 @@ fn main() {
         world.register_system(FovUpdateSystem);
         world.register_system(NoiseSystem);
         world.register_system(EnemyBehaviorSystem);
+        world.register_system(EcosystemSystem);
         world.register_system(FogUpdateSystem);
         world.register_system(ProcessDeaths);
         world.register_system(ProcessDecay);
@@ -287,6 +289,7 @@ fn main() {
         world.register_system(FovUpdateSystem);
         world.register_system(NoiseSystem);
         world.register_system(EnemyBehaviorSystem);
+        world.register_system(EcosystemSystem);
         world.register_system(FogUpdateSystem);
         world.register_system(ProcessDeaths);
         world.register_system(ProcessDecay);

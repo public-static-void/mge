@@ -148,6 +148,7 @@ impl PyWorld {
         world.register_system(FovUpdateSystem);
         world.register_system(NoiseSystem);
         world.register_system(EnemyBehaviorSystem);
+        world.register_system(engine_core::systems::ecosystem::EcosystemSystem);
         world.register_system(FogUpdateSystem);
         world.register_system(engine_core::systems::death_decay::ProcessDeaths);
         world.register_system(engine_core::systems::death_decay::ProcessDecay);

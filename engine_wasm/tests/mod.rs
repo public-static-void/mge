@@ -9,6 +9,7 @@ mod wasm_death_decay_api;
 mod wasm_designer_api;
 mod wasm_economic_api;
 mod wasm_economic_reservation;
+mod wasm_ecosystem;
 mod wasm_engine;
 mod wasm_entity_api;
 mod wasm_event_bus_ecs;

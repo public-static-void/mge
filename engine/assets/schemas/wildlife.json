@@ -1,0 +1,34 @@
+{
+  "title": "Wildlife",
+  "description": "Dynamic per-entity wildlife FSM state: graze, wander, flee, rest, reproduce.",
+  "type": "object",
+  "properties": {
+    "state": {
+      "type": ["string", "null"],
+      "enum": ["graze", "wander", "flee", "rest", "reproduce"],
+      "default": "graze"
+    },
+    "satiety": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "maximum": 1,
+      "default": 0.5
+    },
+    "reproduction_cooldown": {
+      "type": ["integer", "null"],
+      "minimum": 0,
+      "default": 0
+    },
+    "flee_ticks": {
+      "type": ["integer", "null"],
+      "minimum": 0,
+      "default": 0
+    },
+    "rest_ticks": {
+      "type": ["integer", "null"],
+      "minimum": 0,
+      "default": 0
+    }
+  },
+  "modes": ["colony", "roguelike", "simulation"]
+}
