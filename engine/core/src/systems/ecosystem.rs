@@ -556,7 +556,7 @@ fn find_threat_cell(
     cell: &CellKey,
     detection_range: u64,
 ) -> Option<CellKey> {
-    let mut best: Option<(CellKey, usize)> = None;
+    let mut best: Option<(CellKey, usize, u32)> = None;
     for other in world.get_entities_with_component("EnemyAI") {
         if other == eid || !world.is_entity_alive(other) {
             continue;
@@ -578,11 +578,15 @@ fn find_threat_cell(
         let Some(steps) = path_steps(world, cell, &other_cell) else {
             continue;
         };
-        if steps <= detection_range as usize && best.as_ref().is_none_or(|(_, d)| steps < *d) {
-            best = Some((other_cell, steps));
+        if steps <= detection_range as usize
+            && best
+                .as_ref()
+                .is_none_or(|(_, d, e)| steps < *d || (steps == *d && other < *e))
+        {
+            best = Some((other_cell, steps, other));
         }
     }
-    best.map(|(cell, _)| cell)
+    best.map(|(cell, _, _)| cell)
 }
 
 /// A* step count between two cells, or `None` when unreachable.
