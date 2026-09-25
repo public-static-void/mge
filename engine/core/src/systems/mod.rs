@@ -77,6 +77,8 @@ pub const SYSTEM_EXECUTION_ORDER: &[&str] = &[
     "NoiseSystem",
     "EnemyBehaviorSystem",
     "EcosystemSystem",
+    "MovementSystem",
+    "VehicleSystem",
     "ProcessDeaths",
     "ProcessDecay",
 ];
