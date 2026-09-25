@@ -46,6 +46,8 @@ pub mod research;
 pub mod stat_calculation;
 /// Temperature system (deterministic global ambient + per-body heat exchange)
 pub mod temperature;
+/// Vehicle carrier system (embark/disembark + mounted co-movement)
+pub mod vehicle;
 /// Weather system (deterministic global weather state)
 pub mod weather;
 /// Zone state validation system
