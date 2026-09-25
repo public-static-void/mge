@@ -1,0 +1,25 @@
+{
+  "title": "Vehicle",
+  "description": "Mountable carrier: capacity, per-tick speed, terrain constraints, occupants, path.",
+  "type": "object",
+  "properties": {
+    "capacity": { "type": ["integer", "null"], "minimum": 1, "default": 2 },
+    "speed": { "type": ["integer", "null"], "minimum": 1, "default": 1 },
+    "blocked_terrains": {
+      "type": ["array", "null"],
+      "items": { "type": "string" },
+      "default": []
+    },
+    "occupants": {
+      "type": ["array", "null"],
+      "items": { "type": "integer" },
+      "default": []
+    },
+    "move_path": {
+      "type": ["array", "null"],
+      "items": { "type": "object" },
+      "default": []
+    }
+  },
+  "modes": ["colony", "roguelike", "simulation"]
+}
