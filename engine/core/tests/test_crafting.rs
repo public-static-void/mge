@@ -21,8 +21,8 @@ use world_io_helper::save_and_load_roundtrip;
 
 use engine_core::ecs::world::World;
 use engine_core::systems::crafting::CraftingSystem;
-use rand::{Rng, SeedableRng};
 use rand::rngs::SmallRng;
+use rand::{Rng, SeedableRng};
 use serde_json::{Value as JsonValue, json};
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -111,8 +111,15 @@ fn ticking_world(world: World) -> Rc<RefCell<World>> {
 }
 
 fn drain(world: &mut World, event_type: &str) -> Vec<JsonValue> {
-    world.update_event_buses::<JsonValue>();
-    world.drain_events::<JsonValue>(event_type)
+    // `drain_events` reads the read buffer then swaps write→read, so a
+    // second call surfaces events sent via direct op calls with no tick
+    // since (tick-flushed events arrive on the first call). No explicit
+    // `update_event_buses` here: `simulation_tick` already swaps at tick
+    // end, and an extra swap would wipe the just-flushed read buffer when
+    // the write side is empty.
+    let mut events = world.drain_events::<JsonValue>(event_type);
+    events.extend(world.drain_events::<JsonValue>(event_type));
+    events
 }
 
 fn stockpile_iron(world: &World, eid: u32) -> i64 {
@@ -184,10 +191,7 @@ fn rejects_craft_without_hammer_and_accepts_with_one() {
     assert!(world.can_craft(crafter, RECIPE_NAME).is_ok());
     assert!(world.start_craft(crafter, RECIPE_NAME).is_ok());
     // Non-consumed tools are never removed.
-    let slots = world
-        .get_component(crafter, "Inventory")
-        .unwrap()["slots"]
-        .clone();
+    let slots = world.get_component(crafter, "Inventory").unwrap()["slots"].clone();
     assert_eq!(slots, json!(["hammer"]));
 }
 
@@ -216,17 +220,11 @@ fn removes_consumed_tool_exactly_once_at_start() {
         )
         .unwrap();
     world.start_craft(crafter, RECIPE_NAME).unwrap();
-    let slots = world
-        .get_component(crafter, "Inventory")
-        .unwrap()["slots"]
-        .clone();
+    let slots = world.get_component(crafter, "Inventory").unwrap()["slots"].clone();
     assert_eq!(slots, json!(["hammer"]));
     // Cancellation refunds stockpile inputs but never consumed tools.
     assert!(world.cancel_craft(crafter).unwrap());
-    let slots = world
-        .get_component(crafter, "Inventory")
-        .unwrap()["slots"]
-        .clone();
+    let slots = world.get_component(crafter, "Inventory").unwrap()["slots"].clone();
     assert_eq!(slots, json!(["hammer"]));
     assert!(world.get_craft_state(crafter).is_none());
 }
@@ -243,7 +241,10 @@ fn deducts_materials_at_start_and_matches_quality_formula() {
 
     World::tick(Rc::clone(&rc));
     World::tick(Rc::clone(&rc));
-    assert_eq!(rc.borrow().get_craft_state(crafter).unwrap()["progress"], json!(2));
+    assert_eq!(
+        rc.borrow().get_craft_state(crafter).unwrap()["progress"],
+        json!(2)
+    );
     World::tick(Rc::clone(&rc));
 
     // Completed on the third tick while turn was 2; fresh world turn is now 3.
@@ -252,7 +253,11 @@ fn deducts_materials_at_start_and_matches_quality_formula() {
     let state = rc.borrow().get_craft_state(crafter).unwrap().clone();
     assert_eq!(state["state"], json!("complete"));
     let output = state["output_entity"].as_u64().unwrap() as u32;
-    let material = rc.borrow().get_component(output, "Material").unwrap().clone();
+    let material = rc
+        .borrow()
+        .get_component(output, "Material")
+        .unwrap()
+        .clone();
     assert_eq!(material["material"], json!("iron"));
     assert_eq!(material["quality"], json!(expected_quality));
 }
@@ -333,10 +338,13 @@ fn spawns_single_item_entity_into_inventory_with_matching_state() {
     let output = *after.iter().find(|id| !before.contains(id)).unwrap();
 
     let item = world.get_component(output, "Item").unwrap().clone();
-    assert_eq!(
-        item,
-        json!({"id": "iron_sword", "name": "Iron Sword", "slot": "hand", "material": "iron"})
-    );
+    // Field-wise: `set_component` merges Item schema defaults
+    // (`two_handed`, `requirements`, `effects`), so whole-object equality
+    // would couple the test to the schema; assert the contractual fields.
+    assert_eq!(item["id"], json!("iron_sword"));
+    assert_eq!(item["name"], json!("Iron Sword"));
+    assert_eq!(item["slot"], json!("hand"));
+    assert_eq!(item["material"], json!("iron"));
     assert!(world.get_component(output, "Material").is_some());
     // Roomy inventory receives the output id through the normal write.
     let slots = world.get_component(crafter, "Inventory").unwrap()["slots"].clone();
@@ -393,7 +401,10 @@ fn emits_completion_event_and_refunds_on_cancel() {
         "quality",
         "xp_gained",
     ] {
-        assert!(payload.get(key).is_some(), "craft_completed must carry {key}");
+        assert!(
+            payload.get(key).is_some(),
+            "craft_completed must carry {key}"
+        );
     }
     assert_eq!(payload["entity"], json!(crafter));
     assert_eq!(payload["recipe"], json!(RECIPE_NAME));
@@ -404,19 +415,12 @@ fn emits_completion_event_and_refunds_on_cancel() {
     );
 
     // Completed orders are terminal: cancelling reports no order.
-    assert_eq!(
-        world.cancel_craft(crafter).unwrap_err(),
-        "no_craft_order"
-    );
+    assert_eq!(world.cancel_craft(crafter).unwrap_err(), "no_craft_order");
 
     // Fresh order cancelled mid-progress refunds stockpile, not tools.
     world.remove_component(crafter, "CraftOrder").unwrap();
     world
-        .set_component(
-            crafter,
-            "Stockpile",
-            json!({"resources": {"iron": 200}}),
-        )
+        .set_component(crafter, "Stockpile", json!({"resources": {"iron": 200}}))
         .unwrap();
     world.start_craft(crafter, RECIPE_NAME).unwrap();
     assert_eq!(stockpile_iron(&world, crafter), 196);
@@ -430,10 +434,7 @@ fn emits_completion_event_and_refunds_on_cancel() {
         json!({"entity": crafter, "recipe": RECIPE_NAME, "refunded": true})
     );
     // Cancelling twice reports no order.
-    assert_eq!(
-        world.cancel_craft(crafter).unwrap_err(),
-        "no_craft_order"
-    );
+    assert_eq!(world.cancel_craft(crafter).unwrap_err(), "no_craft_order");
 }
 
 #[test]
@@ -493,7 +494,11 @@ fn validates_inputs_before_materials_tools_skill_and_ignores_station() {
         "missing_material:iron"
     );
     world
-        .set_component(crafter, "Stockpile", json!({"resources": {"coal": 1, "iron": 2}}))
+        .set_component(
+            crafter,
+            "Stockpile",
+            json!({"resources": {"coal": 1, "iron": 2}}),
+        )
         .unwrap();
     assert_eq!(
         world.can_craft(crafter, RECIPE_NAME).unwrap_err(),
@@ -560,7 +565,10 @@ fn advances_craft_through_simulation_tick() {
     let rc = ticking_world(world);
     rc.borrow_mut().start_craft(crafter, RECIPE_NAME).unwrap();
     World::tick(Rc::clone(&rc));
-    assert_eq!(rc.borrow().get_craft_state(crafter).unwrap()["progress"], json!(1));
+    assert_eq!(
+        rc.borrow().get_craft_state(crafter).unwrap()["progress"],
+        json!(1)
+    );
     assert_eq!(rc.borrow().turn, 1);
 }
 
@@ -591,15 +599,19 @@ fn never_writes_stockpile_outputs_for_item_recipes() {
         .unwrap();
     let rc = ticking_world(world);
     complete_one_craft(&rc, crafter);
-    let world = rc.borrow();
-    if let Some(stockpile) = world.get_component(crafter, "Stockpile") {
-        assert!(
-            stockpile
-                .get("resources")
-                .and_then(|r| r.as_object())
-                .is_none_or(|map| !map.contains_key("scrap")),
-            "item recipes must not write stockpile outputs, got {stockpile}"
-        );
+    // Scoped borrow: the `stockpile` reference keeps the guard alive through
+    // the check, so the mutable drain borrow must come after the scope ends.
+    {
+        let world = rc.borrow();
+        if let Some(stockpile) = world.get_component(crafter, "Stockpile") {
+            assert!(
+                stockpile
+                    .get("resources")
+                    .and_then(|r| r.as_object())
+                    .is_none_or(|map| !map.contains_key("scrap")),
+                "item recipes must not write stockpile outputs, got {stockpile}"
+            );
+        }
     }
     assert_eq!(drain(&mut rc.borrow_mut(), "craft_completed").len(), 1);
 }
@@ -612,7 +624,14 @@ fn snapshot_craft(world: &mut World) -> CraftSnapshot {
     let mut parts: Vec<JsonValue> = Vec::new();
     for eid in ids {
         let mut entry = json!({"entity": eid});
-        for name in ["Stockpile", "CraftOrder", "Item", "Material", "SkillLevels", "Inventory"] {
+        for name in [
+            "Stockpile",
+            "CraftOrder",
+            "Item",
+            "Material",
+            "SkillLevels",
+            "Inventory",
+        ] {
             if let Some(value) = world.get_component(eid, name) {
                 entry[name] = value.clone();
             }
@@ -643,10 +662,12 @@ fn two_worlds_match_over_fifty_ticks() {
         for (rc, crafter) in [(&world_a, crafter_a), (&world_b, crafter_b)] {
             let needs_start = {
                 let world = rc.borrow();
-                world
-                    .get_craft_state(crafter)
-                    .and_then(|order| order.get("state").and_then(|s| s.as_str()).map(str::to_string))
-                    != Some("in_progress".to_string())
+                world.get_craft_state(crafter).and_then(|order| {
+                    order
+                        .get("state")
+                        .and_then(|s| s.as_str())
+                        .map(str::to_string)
+                }) != Some("in_progress".to_string())
             };
             if needs_start {
                 rc.borrow_mut().start_craft(crafter, RECIPE_NAME).unwrap();
@@ -655,8 +676,15 @@ fn two_worlds_match_over_fifty_ticks() {
         }
         let snapshot_a = snapshot_craft(&mut world_a.borrow_mut());
         let snapshot_b = snapshot_craft(&mut world_b.borrow_mut());
-        assert_eq!(snapshot_a, snapshot_b, "craft state diverged on tick {tick}");
-        assert_eq!(world_a.borrow().turn, world_b.borrow().turn, "turn diverged on tick {tick}");
+        assert_eq!(
+            snapshot_a, snapshot_b,
+            "craft state diverged on tick {tick}"
+        );
+        assert_eq!(
+            world_a.borrow().turn,
+            world_b.borrow().turn,
+            "turn diverged on tick {tick}"
+        );
     }
 }
 

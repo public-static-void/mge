@@ -2773,16 +2773,16 @@ impl WasmWorld {
             .and_then(|skills| skills.get("crafting"))
             .map(Self::wasm_craft_num)
             .unwrap_or(0.0);
-        let quality =
-            (input_quality + 0.1 * skill + (rng.random::<f64>() - 0.5)).clamp(0.0, 10.0);
+        let quality = (input_quality + 0.1 * skill + (rng.random::<f64>() - 0.5)).clamp(0.0, 10.0);
         let xp_skill = recipe
             .required_skill
             .as_ref()
             .map(|required| required.skill.clone())
             .unwrap_or_else(|| "crafting".to_string());
-        let base = recipe.xp.map(|xp| xp as f64).unwrap_or_else(|| {
-            crate::systems::job::system::process::base_xp_for_skill(&xp_skill)
-        });
+        let base = recipe
+            .xp
+            .map(|xp| xp as f64)
+            .unwrap_or_else(|| crate::systems::job::system::process::base_xp_for_skill(&xp_skill));
         let xp = ((base + (rng.random::<f64>() - 0.5)).floor().max(1.0)) as i64;
         let material_key = recipe
             .materials
@@ -2856,14 +2856,21 @@ impl WasmWorld {
             .unwrap_or_else(
                 || serde_json::json!({"skills": {}, "total_xp": 0.0, "skill_xp": {}, "skill_levels": {}}),
             );
-        let total = levels.get("total_xp").map(Self::wasm_craft_num).unwrap_or(0.0) + xp as f64;
+        let total = levels
+            .get("total_xp")
+            .map(Self::wasm_craft_num)
+            .unwrap_or(0.0)
+            + xp as f64;
         levels["total_xp"] = serde_json::json!(total);
         let mut skill_xp = levels
             .get("skill_xp")
             .and_then(|value| value.as_object())
             .cloned()
             .unwrap_or_default();
-        let current = skill_xp.get(&xp_skill).map(Self::wasm_craft_num).unwrap_or(0.0);
+        let current = skill_xp
+            .get(&xp_skill)
+            .map(Self::wasm_craft_num)
+            .unwrap_or(0.0);
         skill_xp.insert(xp_skill.clone(), serde_json::json!(current + xp as f64));
         levels["skill_xp"] = JsonValue::Object(skill_xp);
         let mut skills = levels
