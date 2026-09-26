@@ -10,6 +10,7 @@ use engine_core::plugins::types::EngineApi;
 use engine_core::systems::body_equipment_sync::BodyEquipmentSyncSystem;
 use engine_core::systems::body_part_damage::BodyPartDamageSystem;
 use engine_core::systems::construction::ConstructionSystem;
+use engine_core::systems::crafting::CraftingSystem;
 use engine_core::systems::death_decay::{ProcessDeaths, ProcessDecay};
 use engine_core::systems::derived_stats::DerivedStatsSystem;
 use engine_core::systems::economic::{EconomicSystem, load_recipes_from_dir};
@@ -193,6 +194,7 @@ fn main() {
         world.register_system(ProcessDeaths);
         world.register_system(ProcessDecay);
         world.register_system(economic_system);
+        world.register_system(CraftingSystem);
         world.register_system(ConstructionSystem::new());
         world.current_mode = mode.clone();
 
@@ -294,6 +296,7 @@ fn main() {
         world.register_system(ProcessDeaths);
         world.register_system(ProcessDecay);
         world.register_system(economic_system);
+        world.register_system(CraftingSystem);
         world.register_system(ConstructionSystem::new());
         if let Some(mode) = mode_arg {
             world.current_mode = mode;

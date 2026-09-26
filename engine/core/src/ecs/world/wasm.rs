@@ -9,6 +9,8 @@ use crate::map::CellKey;
 use crate::systems::economic::recipe::Recipe;
 use crate::systems::temperature::{TemperatureState, compute_ambient_temperature};
 use crate::systems::weather::compute_visibility_modifier;
+use rand::rngs::SmallRng;
+use rand::{Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use std::collections::{HashMap, HashSet};
@@ -841,6 +843,7 @@ impl WasmWorld {
         self.advance_time_of_day();
         self.simulate_fluid();
         self.tick_construction();
+        self.tick_craft();
         // Recompute the transient visibility modifier from weather state,
         // mirroring WeatherSystem's per-tick recompute (R008/R009).
         self.visibility_modifier =
@@ -2663,6 +2666,239 @@ impl WasmWorld {
             "construction_completed",
             &serde_json::to_string(&event).unwrap_or_default(),
         );
+    }
+
+    /// Advances every in-progress craft order by one tick.
+    ///
+    /// Host mirror of `CraftingSystem`: collect-then-apply in ascending entity
+    /// order, progress +1 per tick, completion at `progress >= recipe.duration`.
+    /// Completion spawns one `Item` + `Material` entity (inventory placement
+    /// when capacity allows, else a world entity), grants deterministic XP,
+    /// marks the order complete, and emits `craft_completed`. Stochastic draws
+    /// come from the same `(crafter_id, turn)` seed layout as the core system,
+    /// so identical setups tick identically. Called from [`tick`](Self::tick),
+    /// mirroring [`tick_construction`](Self::tick_construction).
+    pub fn tick_craft(&mut self) {
+        let mut crafters: Vec<u32> = self
+            .components
+            .get("CraftOrder")
+            .map(|m| m.keys().copied().collect())
+            .unwrap_or_default();
+        crafters.sort_unstable();
+        let turn = self.turn;
+        // Collect phase: pure reads only.
+        let mut pending: Vec<(u32, String, Recipe, i64)> = Vec::new();
+        for crafter in crafters {
+            let Some(order) = self
+                .components
+                .get("CraftOrder")
+                .and_then(|m| m.get(&crafter))
+                .cloned()
+            else {
+                continue;
+            };
+            if order.get("state").and_then(|v| v.as_str()) != Some("in_progress") {
+                continue;
+            }
+            let Some(recipe_name) = order
+                .get("recipe")
+                .and_then(|v| v.as_str())
+                .map(str::to_string)
+            else {
+                continue;
+            };
+            let Some(recipe) = self.craft_recipes.get(&recipe_name).cloned() else {
+                continue;
+            };
+            if recipe.output_item.is_none() {
+                continue;
+            }
+            let progress = order.get("progress").and_then(|v| v.as_i64()).unwrap_or(0) + 1;
+            pending.push((crafter, recipe_name, recipe, progress));
+        }
+        // Apply phase: one writer per order.
+        for (crafter, recipe_name, recipe, progress) in pending {
+            if progress >= recipe.duration {
+                self.complete_wasm_craft(crafter, &recipe_name, &recipe, progress, turn);
+            } else if let Some(stored) = self
+                .components
+                .get_mut("CraftOrder")
+                .and_then(|m| m.get_mut(&crafter))
+            {
+                stored["progress"] = serde_json::json!(progress);
+            }
+        }
+    }
+
+    /// Seeded RNG for one crafting completion; layout matches the core system
+    /// (entity bytes into `seed[0..4]`, turn bytes into `seed[4..8]`).
+    fn wasm_craft_rng(crafter: u32, turn: u32) -> SmallRng {
+        let mut seed = [0u8; 32];
+        seed[0..4].copy_from_slice(&crafter.to_le_bytes());
+        seed[4..8].copy_from_slice(&turn.to_le_bytes());
+        SmallRng::from_seed(seed)
+    }
+
+    /// JSON number tolerant to int/float storage.
+    fn wasm_craft_num(value: &JsonValue) -> f64 {
+        value
+            .as_f64()
+            .unwrap_or_else(|| value.as_i64().unwrap_or(0) as f64)
+    }
+
+    /// Apply-phase completion: deterministic quality + XP from one stream,
+    /// output spawn, XP grant, terminal order state, `craft_completed` event.
+    /// Mirrors the core `complete_craft` value-for-value on identical inputs.
+    fn complete_wasm_craft(
+        &mut self,
+        crafter: u32,
+        recipe_name: &str,
+        recipe: &Recipe,
+        progress: i64,
+        turn: u32,
+    ) {
+        let mut rng = Self::wasm_craft_rng(crafter, turn);
+        let input_quality = self
+            .components
+            .get("Material")
+            .and_then(|m| m.get(&crafter))
+            .and_then(|material| material.get("quality"))
+            .map(Self::wasm_craft_num)
+            .unwrap_or(1.0);
+        let skill = self
+            .components
+            .get("SkillLevels")
+            .and_then(|m| m.get(&crafter))
+            .and_then(|levels| levels.get("skills"))
+            .and_then(|skills| skills.get("crafting"))
+            .map(Self::wasm_craft_num)
+            .unwrap_or(0.0);
+        let quality =
+            (input_quality + 0.1 * skill + (rng.random::<f64>() - 0.5)).clamp(0.0, 10.0);
+        let xp_skill = recipe
+            .required_skill
+            .as_ref()
+            .map(|required| required.skill.clone())
+            .unwrap_or_else(|| "crafting".to_string());
+        let base = recipe.xp.map(|xp| xp as f64).unwrap_or_else(|| {
+            crate::systems::job::system::process::base_xp_for_skill(&xp_skill)
+        });
+        let xp = ((base + (rng.random::<f64>() - 0.5)).floor().max(1.0)) as i64;
+        let material_key = recipe
+            .materials
+            .first()
+            .map(|material| material.material.clone())
+            .unwrap_or_else(|| {
+                recipe
+                    .output_item
+                    .as_ref()
+                    .map(|output| output.id.clone())
+                    .unwrap_or_default()
+            });
+        let output = recipe
+            .output_item
+            .as_ref()
+            .expect("craft output requires output_item")
+            .clone();
+
+        let entity = self.spawn_entity();
+        self.components
+            .entry("Item".to_string())
+            .or_default()
+            .insert(
+                entity,
+                serde_json::json!({"id": output.id, "name": output.name, "slot": output.slot, "material": material_key}),
+            );
+        self.components
+            .entry("Material".to_string())
+            .or_default()
+            .insert(
+                entity,
+                serde_json::json!({"material": material_key, "quality": quality}),
+            );
+        // Inventory placement when capacity allows; otherwise the entity stays
+        // a world entity. Absent or null `max_slots` means unbounded.
+        let (len, capacity) = self
+            .components
+            .get("Inventory")
+            .and_then(|m| m.get(&crafter))
+            .map(|inventory| {
+                let len = inventory
+                    .get("slots")
+                    .and_then(|slots| slots.as_array())
+                    .map(|slots| slots.len())
+                    .unwrap_or(usize::MAX);
+                let capacity = match inventory.get("max_slots") {
+                    None | Some(JsonValue::Null) => usize::MAX,
+                    Some(value) => Self::wasm_craft_num(value).max(0.0) as usize,
+                };
+                (len, capacity)
+            })
+            .unwrap_or((usize::MAX, 0));
+        if len < capacity
+            && let Some(slots) = self
+                .components
+                .get_mut("Inventory")
+                .and_then(|m| m.get_mut(&crafter))
+                .and_then(|inventory| inventory.get_mut("slots"))
+                .and_then(|slots| slots.as_array_mut())
+        {
+            slots.push(serde_json::json!(output.id));
+        }
+
+        // Deterministic XP grant mirroring the core accounting (`total_xp`,
+        // `skill_xp`, `skills`); missing entries start at skill value 0.
+        let mut levels = self
+            .components
+            .get("SkillLevels")
+            .and_then(|m| m.get(&crafter))
+            .cloned()
+            .unwrap_or_else(
+                || serde_json::json!({"skills": {}, "total_xp": 0.0, "skill_xp": {}, "skill_levels": {}}),
+            );
+        let total = levels.get("total_xp").map(Self::wasm_craft_num).unwrap_or(0.0) + xp as f64;
+        levels["total_xp"] = serde_json::json!(total);
+        let mut skill_xp = levels
+            .get("skill_xp")
+            .and_then(|value| value.as_object())
+            .cloned()
+            .unwrap_or_default();
+        let current = skill_xp.get(&xp_skill).map(Self::wasm_craft_num).unwrap_or(0.0);
+        skill_xp.insert(xp_skill.clone(), serde_json::json!(current + xp as f64));
+        levels["skill_xp"] = JsonValue::Object(skill_xp);
+        let mut skills = levels
+            .get("skills")
+            .and_then(|value| value.as_object())
+            .cloned()
+            .unwrap_or_default();
+        if !skills.contains_key(&xp_skill) {
+            skills.insert(xp_skill.clone(), serde_json::json!(0.0));
+        }
+        levels["skills"] = JsonValue::Object(skills);
+        self.components
+            .entry("SkillLevels".to_string())
+            .or_default()
+            .insert(crafter, levels);
+
+        if let Some(stored) = self
+            .components
+            .get_mut("CraftOrder")
+            .and_then(|m| m.get_mut(&crafter))
+        {
+            stored["progress"] = serde_json::json!(progress);
+            stored["state"] = serde_json::json!("complete");
+            stored["output_entity"] = serde_json::json!(entity);
+        }
+        let event = serde_json::json!({
+            "entity": crafter,
+            "recipe": recipe_name,
+            "output_entity": entity,
+            "output_item": {"id": output.id, "name": output.name, "slot": output.slot},
+            "material": material_key,
+            "quality": quality,
+            "xp_gained": xp,
+        });
+        let _ = self.send_event("craft_completed", &event.to_string());
     }
 
     // ---- Body API ----

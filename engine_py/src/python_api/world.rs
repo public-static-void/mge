@@ -26,6 +26,7 @@ use engine_core::ecs::world::World;
 use engine_core::loot::LootEntry;
 use engine_core::systems::body_part_damage::BodyPartDamageSystem;
 use engine_core::systems::construction::ConstructionSystem;
+use engine_core::systems::crafting::CraftingSystem;
 use engine_core::systems::economic::{EconomicSystem, load_recipes_from_dir};
 use engine_core::systems::enemy_behavior::EnemyBehaviorSystem;
 use engine_core::systems::faction_reputation::FactionReputationSystem;
@@ -162,6 +163,7 @@ impl PyWorld {
         let recipes = load_recipes_from_dir(&recipes_dir);
         let economic_system = EconomicSystem::with_recipes(recipes);
         world.register_system(economic_system);
+        world.register_system(CraftingSystem);
         world.register_system(ConstructionSystem::new());
 
         Ok(PyWorld {

@@ -19,7 +19,6 @@ use world_helper::make_test_world;
 mod world_io_helper;
 use world_io_helper::save_and_load_roundtrip;
 
-use engine_core::ecs::system::System;
 use engine_core::ecs::world::World;
 use engine_core::systems::crafting::CraftingSystem;
 use rand::{Rng, SeedableRng};
@@ -127,7 +126,13 @@ fn stockpile_iron(world: &World, eid: u32) -> i64 {
 
 /// Normative quality/XP recomputation from the SPEC formula: first stream
 /// draw feeds quality, second feeds XP, seeded `(crafter_id, turn)`.
-fn expected_quality_and_xp(crafter: u32, turn: u32, q_in: f64, skill: f64, base_xp: f64) -> (f64, i64) {
+fn expected_quality_and_xp(
+    crafter: u32,
+    turn: u32,
+    q_in: f64,
+    skill: f64,
+    base_xp: f64,
+) -> (f64, i64) {
     let mut seed = [0u8; 32];
     seed[0..4].copy_from_slice(&crafter.to_le_bytes());
     seed[4..8].copy_from_slice(&turn.to_le_bytes());
@@ -137,8 +142,8 @@ fn expected_quality_and_xp(crafter: u32, turn: u32, q_in: f64, skill: f64, base_
     (quality, xp)
 }
 
-/// Start a craft and tick `duration` times; completion runs on the last tick
-/// with `world.turn` equal to `complete_turn`.
+/// Start a craft and tick three times (the sword recipe duration); the third
+/// tick completes while `world.turn` is 2 on a fresh world.
 fn complete_one_craft(rc: &Rc<RefCell<World>>, crafter: u32) {
     rc.borrow_mut().start_craft(crafter, RECIPE_NAME).unwrap();
     for _ in 0..3 {
@@ -216,6 +221,14 @@ fn removes_consumed_tool_exactly_once_at_start() {
         .unwrap()["slots"]
         .clone();
     assert_eq!(slots, json!(["hammer"]));
+    // Cancellation refunds stockpile inputs but never consumed tools.
+    assert!(world.cancel_craft(crafter).unwrap());
+    let slots = world
+        .get_component(crafter, "Inventory")
+        .unwrap()["slots"]
+        .clone();
+    assert_eq!(slots, json!(["hammer"]));
+    assert!(world.get_craft_state(crafter).is_none());
 }
 
 #[test]
@@ -371,7 +384,15 @@ fn emits_completion_event_and_refunds_on_cancel() {
     let events = drain(&mut world, "craft_completed");
     assert_eq!(events.len(), 1);
     let payload = &events[0];
-    for key in ["entity", "recipe", "output_entity", "output_item", "material", "quality", "xp_gained"] {
+    for key in [
+        "entity",
+        "recipe",
+        "output_entity",
+        "output_item",
+        "material",
+        "quality",
+        "xp_gained",
+    ] {
         assert!(payload.get(key).is_some(), "craft_completed must carry {key}");
     }
     assert_eq!(payload["entity"], json!(crafter));
@@ -408,7 +429,7 @@ fn emits_completion_event_and_refunds_on_cancel() {
         cancelled[0],
         json!({"entity": crafter, "recipe": RECIPE_NAME, "refunded": true})
     );
-    // Consumed tools stay consumed across the refund.
+    // Cancelling twice reports no order.
     assert_eq!(
         world.cancel_craft(crafter).unwrap_err(),
         "no_craft_order"
@@ -654,7 +675,8 @@ fn save_load_roundtrip_preserves_recipes_orders_entities_xp() {
 
     // Recipes, in-progress order, stockpile, and XP survive the trip.
     assert_eq!(loaded.list_craft_recipes(), vec![RECIPE_NAME.to_string()]);
-    assert_eq!(loaded.get_craft_state(crafter).unwrap(), &live_order);
+    let loaded_order = loaded.get_craft_state(crafter).unwrap();
+    assert_eq!(loaded_order, live_order);
     assert_eq!(stockpile_iron(&loaded, crafter), 196);
     assert_eq!(
         loaded.get_component(crafter, "SkillLevels").unwrap()["total_xp"],
