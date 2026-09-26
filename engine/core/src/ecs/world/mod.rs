@@ -29,6 +29,7 @@ pub mod wasm;
 pub use season::Season;
 
 mod component;
+mod craft_ops;
 mod entity;
 mod events;
 pub mod loadout;
@@ -265,6 +266,10 @@ pub struct World {
     /// Map from recipe name to recipe definition (loaded from assets/recipes).
     #[serde(skip)]
     pub recipes: HashMap<String, JsonValue>,
+    /// Craft-path recipes keyed by registration name. Serialized (with a
+    /// default for old saves) so save/load round-trips preserve them.
+    #[serde(default)]
+    pub craft_recipes: HashMap<String, crate::systems::economic::recipe::Recipe>,
     /// Map from job name to job definition (loaded from assets/jobs).
     #[serde(skip)]
     pub jobs: HashMap<String, JsonValue>,
@@ -371,6 +376,7 @@ impl World {
             resource_definitions: HashMap::new(),
             material_definitions: HashMap::new(),
             recipes: HashMap::new(),
+            craft_recipes: HashMap::new(),
             jobs: HashMap::new(),
             job_board: JobBoard::default(),
             fov_algorithm: Box::new(RecursiveShadowcasting),

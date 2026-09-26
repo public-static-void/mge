@@ -1,7 +1,7 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 /// Represents a resource amount
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ResourceAmount {
     /// The kind of the resource
     pub kind: String,
@@ -10,7 +10,7 @@ pub struct ResourceAmount {
 }
 
 /// Tool requirement: an item that must be present, optionally consumed at start.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ToolReq {
     /// Item id that must be present on the crafter
     pub item: String,
@@ -20,7 +20,7 @@ pub struct ToolReq {
 }
 
 /// Material requirement: quantity consumed from the crafter's stockpile.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct MaterialAmount {
     /// Material key consumed from `Stockpile.resources`
     pub material: String,
@@ -29,7 +29,7 @@ pub struct MaterialAmount {
 }
 
 /// Skill gate for a recipe.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct SkillReq {
     /// Skill name; defaults to "crafting" when omitted
     #[serde(default = "default_craft_skill")]
@@ -43,7 +43,7 @@ fn default_craft_skill() -> String {
 }
 
 /// Item-entity output descriptor. When `None`, the recipe is stockpile-only.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct OutputItem {
     /// Item id carried by the spawned entity's `Item` component
     pub id: String,
@@ -54,7 +54,7 @@ pub struct OutputItem {
 }
 
 /// Represents a recipe
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Recipe {
     /// The name of the recipe
     pub name: String,

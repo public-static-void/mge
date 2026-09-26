@@ -8,6 +8,8 @@ pub mod body_equipment_sync;
 pub mod body_part_damage;
 /// Building construction system
 pub mod construction;
+/// Crafting system (tool-gated, material/quality-aware, skill-gated Item production)
+pub mod crafting;
 /// Death and decay system
 pub mod death_decay;
 /// Derived stats calculation system
