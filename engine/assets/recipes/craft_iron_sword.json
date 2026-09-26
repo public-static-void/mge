@@ -1,0 +1,12 @@
+{
+  "name": "iron_sword",
+  "inputs": [{ "kind": "iron", "amount": 2 }],
+  "outputs": [],
+  "duration": 3,
+  "tools": [{ "item": "hammer", "consumed": false }],
+  "materials": [{ "material": "iron", "amount": 2 }],
+  "required_skill": { "skill": "crafting", "level": 2 },
+  "output_item": { "id": "iron_sword", "name": "Iron Sword", "slot": "hand" },
+  "station": null,
+  "xp": 12
+}
