@@ -6,6 +6,7 @@ use crate::ecs::world::loadout::EquipmentIssue;
 use crate::ecs::world::{Season, WeatherCondition, WeatherState};
 use crate::loot::LootTableRegistry;
 use crate::map::CellKey;
+use crate::systems::economic::recipe::Recipe;
 use crate::systems::temperature::{TemperatureState, compute_ambient_temperature};
 use crate::systems::weather::compute_visibility_modifier;
 use serde::{Deserialize, Serialize};
@@ -281,6 +282,13 @@ pub struct WasmWorld {
     /// Auto-incrementing zone id counter (zone ids are `zone-{n}`).
     #[serde(default)]
     pub next_zone_id: u64,
+
+    /// Craft recipe registry: name → recipe. Only recipes with `output_item`
+    /// are visible to the craft path (`list_craft_recipes` filters the rest),
+    /// mirroring [`World`](super::World) `craft_recipes` semantics with
+    /// identical error strings.
+    #[serde(default)]
+    pub craft_recipes: HashMap<String, Recipe>,
 }
 
 fn default_fov_algo_name() -> String {
@@ -370,6 +378,7 @@ impl WasmWorld {
             item_registry: ItemRegistry::new(),
             equipment_set_registry: EquipmentSetRegistry::new(),
             next_zone_id: 1,
+            craft_recipes: HashMap::new(),
         }
     }
 
@@ -5042,6 +5051,403 @@ impl WasmWorld {
                     None => false,
                 }
             }
+        }
+    }
+}
+
+impl WasmWorld {
+    /// Register a craft recipe under `name` from its JSON definition.
+    ///
+    /// Mirrors [`World`](super::World) `register_craft_recipe`: the JSON is
+    /// validated through the extended `Recipe` loader (all new craft fields
+    /// optional). Stockpile-only recipes (no `output_item`) are stored but
+    /// stay unknown to the craft path.
+    pub fn register_craft_recipe(&mut self, name: &str, recipe_json: &str) -> Result<(), String> {
+        let raw: JsonValue =
+            serde_json::from_str(recipe_json).map_err(|e| format!("Invalid recipe JSON: {e}"))?;
+        let recipe: Recipe =
+            serde_json::from_value(raw).map_err(|e| format!("invalid_recipe: {e}"))?;
+        self.craft_recipes.insert(name.to_string(), recipe);
+        Ok(())
+    }
+
+    /// Names of registered craft-path recipes (those with `output_item`),
+    /// sorted ascending.
+    pub fn list_craft_recipes(&self) -> Vec<String> {
+        let mut names: Vec<String> = self
+            .craft_recipes
+            .iter()
+            .filter(|(_, recipe)| recipe.output_item.is_some())
+            .map(|(name, _)| name.clone())
+            .collect();
+        names.sort();
+        names
+    }
+
+    /// Pure gate check: `Ok(())` when `crafter` may start `recipe`, else the
+    /// exact error string (`unknown_recipe`, `already_crafting`,
+    /// `missing_input:<kind>`, `missing_material:<material>`,
+    /// `missing_tool:<item>`, `insufficient_skill`). Never mutates.
+    pub fn can_craft(&self, crafter: u32, recipe: &str) -> Result<(), String> {
+        self.validate_craft(crafter, recipe).map(|_| ())
+    }
+
+    /// Start crafting: runs the shared gate, replaces any terminal order,
+    /// creates an in-progress `CraftOrder`, then deducts inputs/materials
+    /// from `Stockpile.resources` and removes consumed tools once.
+    pub fn start_craft(&mut self, crafter: u32, recipe: &str) -> Result<(), String> {
+        let recipe = self.validate_craft(crafter, recipe)?;
+        let active = self
+            .craft_component(crafter)
+            .and_then(|order| order.get("state").cloned())
+            .and_then(|state| state.as_str().map(str::to_string))
+            == Some("in_progress".to_string());
+        if !active {
+            let _ = self.remove_component(crafter, "CraftOrder");
+        }
+        let order = serde_json::json!({"recipe": recipe.name, "progress": 0, "state": "in_progress", "output_entity": null});
+        self.set_component(crafter, "CraftOrder", &order.to_string())
+            .map_err(|e| e.to_string())?;
+        self.consume_craft_inputs(crafter, &recipe);
+        Ok(())
+    }
+
+    /// Clone of the crafter's `CraftOrder` as a JSON string, or `None` when
+    /// absent.
+    pub fn get_craft_state(&self, crafter: u32) -> Option<String> {
+        self.get_component(crafter, "CraftOrder")
+    }
+
+    /// Cancel an in-progress order: refunds stockpile inputs/materials
+    /// (consumable tools are not refunded), removes the order, and emits
+    /// `craft_cancelled { entity, recipe, refunded: true }`. Terminal or
+    /// missing orders report `no_craft_order`.
+    pub fn cancel_craft(&mut self, crafter: u32) -> Result<bool, String> {
+        let order = self
+            .craft_component(crafter)
+            .ok_or_else(|| "no_craft_order".to_string())?;
+        if order.get("state").and_then(|state| state.as_str()) != Some("in_progress") {
+            return Err("no_craft_order".to_string());
+        }
+        let recipe_name = order
+            .get("recipe")
+            .and_then(|recipe| recipe.as_str())
+            .unwrap_or("")
+            .to_string();
+        if let Some(recipe) = self.craft_recipes.get(&recipe_name).cloned()
+            && let Some(stockpile) = self.craft_component_raw(crafter, "Stockpile")
+        {
+            let mut updated = stockpile;
+            if let Some(map) = updated
+                .get_mut("resources")
+                .and_then(|resources| resources.as_object_mut())
+            {
+                for input in &recipe.inputs {
+                    let current = map
+                        .get(&input.kind)
+                        .map(|count| {
+                            count
+                                .as_i64()
+                                .unwrap_or_else(|| count.as_f64().unwrap_or(0.0) as i64)
+                        })
+                        .unwrap_or(0);
+                    map.insert(
+                        input.kind.clone(),
+                        serde_json::json!(current + input.amount),
+                    );
+                }
+                for material in &recipe.materials {
+                    let current = map
+                        .get(&material.material)
+                        .map(|count| {
+                            count
+                                .as_i64()
+                                .unwrap_or_else(|| count.as_f64().unwrap_or(0.0) as i64)
+                        })
+                        .unwrap_or(0);
+                    map.insert(
+                        material.material.clone(),
+                        serde_json::json!(current + material.amount),
+                    );
+                }
+            }
+            let _ = self.set_component(crafter, "Stockpile", &updated.to_string());
+        }
+        self.remove_component(crafter, "CraftOrder")
+            .map_err(|_| "no_craft_order".to_string())?;
+        let _ = self.send_event(
+            "craft_cancelled",
+            &serde_json::json!({"entity": crafter, "recipe": recipe_name, "refunded": true})
+                .to_string(),
+        );
+        Ok(true)
+    }
+
+    /// Parsed `CraftOrder` component, or `None` when absent/unparseable.
+    fn craft_component(&self, crafter: u32) -> Option<JsonValue> {
+        self.craft_component_raw(crafter, "CraftOrder")
+    }
+
+    /// Parsed component by name, or `None` when absent/unparseable.
+    fn craft_component_raw(&self, entity: u32, name: &str) -> Option<JsonValue> {
+        self.get_component(entity, name)
+            .and_then(|raw| serde_json::from_str::<JsonValue>(&raw).ok())
+    }
+
+    /// Craft-path recipe lookup: unknown names and stockpile-only recipes (no
+    /// `output_item`) are both unknown to this path.
+    fn craft_recipe(&self, name: &str) -> Option<Recipe> {
+        self.craft_recipes
+            .get(name)
+            .filter(|recipe| recipe.output_item.is_some())
+            .cloned()
+    }
+
+    /// Current level of `skill` on `crafter`; missing components read as 0.
+    fn craft_skill_level(&self, crafter: u32, skill: &str) -> f64 {
+        self.craft_component_raw(crafter, "SkillLevels")
+            .and_then(|levels| levels.get("skills").cloned())
+            .and_then(|skills| skills.get(skill).cloned())
+            .map(|value| {
+                value
+                    .as_f64()
+                    .unwrap_or_else(|| value.as_i64().unwrap_or(0) as f64)
+            })
+            .unwrap_or(0.0)
+    }
+
+    /// True when `item` is present on the crafter in any recognized holding:
+    /// own `Item` component id, `Inventory` slot (string id or object with
+    /// `id`), `Stockpile` metadata key, or a positive
+    /// `Stockpile.resources` count.
+    fn craft_has_tool(&self, crafter: u32, item: &str) -> bool {
+        if self
+            .craft_component_raw(crafter, "Item")
+            .and_then(|component| component.get("id").cloned())
+            .and_then(|id| id.as_str().map(str::to_string))
+            == Some(item.to_string())
+        {
+            return true;
+        }
+        if let Some(slots) = self
+            .craft_component_raw(crafter, "Inventory")
+            .and_then(|inventory| inventory.get("slots").cloned())
+            .and_then(|slots| slots.as_array().cloned())
+            && slots.iter().any(|slot| {
+                slot.as_str() == Some(item)
+                    || slot.get("id").and_then(|id| id.as_str()) == Some(item)
+            })
+        {
+            return true;
+        }
+        if let Some(stockpile) = self.craft_component_raw(crafter, "Stockpile") {
+            if stockpile
+                .as_object()
+                .is_some_and(|object| object.keys().any(|key| key == item && key != "resources"))
+            {
+                return true;
+            }
+            if stockpile
+                .get("resources")
+                .and_then(|resources| resources.as_object())
+                .and_then(|resources| resources.get(item))
+                .is_some_and(|count| {
+                    count
+                        .as_i64()
+                        .unwrap_or_else(|| count.as_f64().unwrap_or(0.0) as i64)
+                        > 0
+                })
+            {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Shared gate for `can_craft`/`start_craft`: fixed validation order
+    /// inputs, materials, tools, skill. Returns the recipe on success.
+    fn validate_craft(&self, crafter: u32, recipe_name: &str) -> Result<Recipe, String> {
+        let recipe = self
+            .craft_recipe(recipe_name)
+            .ok_or_else(|| "unknown_recipe".to_string())?;
+        if self
+            .craft_component(crafter)
+            .and_then(|order| order.get("state").cloned())
+            .and_then(|state| state.as_str().map(str::to_string))
+            == Some("in_progress".to_string())
+        {
+            return Err("already_crafting".to_string());
+        }
+        let resources = self
+            .craft_component_raw(crafter, "Stockpile")
+            .and_then(|stockpile| stockpile.get("resources").cloned())
+            .and_then(|resources| resources.as_object().cloned());
+        for input in &recipe.inputs {
+            let current = resources
+                .as_ref()
+                .and_then(|map| map.get(&input.kind))
+                .map(|count| {
+                    count
+                        .as_i64()
+                        .unwrap_or_else(|| count.as_f64().unwrap_or(0.0) as i64)
+                })
+                .unwrap_or(0);
+            if current < input.amount {
+                return Err(format!("missing_input:{}", input.kind));
+            }
+        }
+        for material in &recipe.materials {
+            let current = resources
+                .as_ref()
+                .and_then(|map| map.get(&material.material))
+                .map(|count| {
+                    count
+                        .as_i64()
+                        .unwrap_or_else(|| count.as_f64().unwrap_or(0.0) as i64)
+                })
+                .unwrap_or(0);
+            if current < material.amount {
+                return Err(format!("missing_material:{}", material.material));
+            }
+        }
+        for tool in &recipe.tools {
+            if !self.craft_has_tool(crafter, &tool.item) {
+                return Err(format!("missing_tool:{}", tool.item));
+            }
+        }
+        if let Some(required) = &recipe.required_skill
+            && self.craft_skill_level(crafter, &required.skill) < required.level as f64
+        {
+            return Err("insufficient_skill".to_string());
+        }
+        Ok(recipe)
+    }
+
+    /// Remove a single instance of `item` from the crafter, preferring
+    /// inventory slots, then the own `Item` component, then stockpile
+    /// holdings.
+    fn craft_remove_one_tool(&mut self, crafter: u32, item: &str) {
+        if let Some(inventory) = self.craft_component_raw(crafter, "Inventory")
+            && let Some(slots) = inventory.get("slots").and_then(|slots| slots.as_array())
+            && let Some(index) = slots.iter().position(|slot| {
+                slot.as_str() == Some(item)
+                    || slot.get("id").and_then(|id| id.as_str()) == Some(item)
+            })
+        {
+            let mut updated = inventory.clone();
+            if let Some(array) = updated
+                .get_mut("slots")
+                .and_then(|slots| slots.as_array_mut())
+            {
+                array.remove(index);
+            }
+            if self
+                .set_component(crafter, "Inventory", &updated.to_string())
+                .is_ok()
+            {
+                return;
+            }
+        }
+        if self
+            .craft_component_raw(crafter, "Item")
+            .and_then(|component| component.get("id").cloned())
+            .and_then(|id| id.as_str().map(str::to_string))
+            == Some(item.to_string())
+            && self.remove_component(crafter, "Item").is_ok()
+        {
+            return;
+        }
+        if let Some(stockpile) = self.craft_component_raw(crafter, "Stockpile") {
+            let mut updated = stockpile.clone();
+            let mut removed = false;
+            if let Some(object) = updated.as_object_mut() {
+                if object.contains_key(item) && item != "resources" {
+                    object.remove(item);
+                    removed = true;
+                }
+                if !removed
+                    && let Some(count) = object
+                        .get_mut("resources")
+                        .and_then(|resources| resources.as_object_mut())
+                        .and_then(|resources| resources.get_mut(item))
+                    && count
+                        .as_i64()
+                        .unwrap_or_else(|| count.as_f64().unwrap_or(0.0) as i64)
+                        > 0
+                {
+                    let next = count
+                        .as_i64()
+                        .unwrap_or_else(|| count.as_f64().unwrap_or(0.0) as i64)
+                        - 1;
+                    *count = serde_json::json!(next);
+                    removed = true;
+                }
+            }
+            if removed {
+                let _ = self.set_component(crafter, "Stockpile", &updated.to_string());
+            }
+        }
+    }
+
+    /// Deduct inputs/materials from `Stockpile.resources` and remove consumed
+    /// tools exactly once. Only touches an existing stockpile, so recipes
+    /// without requirements never create one.
+    fn consume_craft_inputs(&mut self, crafter: u32, recipe: &Recipe) {
+        if self
+            .components
+            .get("Stockpile")
+            .is_some_and(|map| map.contains_key(&crafter))
+            && let Some(stockpile) = self.craft_component_raw(crafter, "Stockpile")
+        {
+            let mut updated = stockpile.clone();
+            let mut touched = false;
+            if let Some(map) = updated
+                .get_mut("resources")
+                .and_then(|resources| resources.as_object_mut())
+            {
+                for input in &recipe.inputs {
+                    let current = map
+                        .get(&input.kind)
+                        .map(|count| {
+                            count
+                                .as_i64()
+                                .unwrap_or_else(|| count.as_f64().unwrap_or(0.0) as i64)
+                        })
+                        .unwrap_or(0);
+                    map.insert(
+                        input.kind.clone(),
+                        serde_json::json!(current - input.amount),
+                    );
+                    touched = true;
+                }
+                for material in &recipe.materials {
+                    let current = map
+                        .get(&material.material)
+                        .map(|count| {
+                            count
+                                .as_i64()
+                                .unwrap_or_else(|| count.as_f64().unwrap_or(0.0) as i64)
+                        })
+                        .unwrap_or(0);
+                    map.insert(
+                        material.material.clone(),
+                        serde_json::json!(current - material.amount),
+                    );
+                    touched = true;
+                }
+            }
+            if touched {
+                let _ = self.set_component(crafter, "Stockpile", &updated.to_string());
+            }
+        }
+        let consumed: Vec<String> = recipe
+            .tools
+            .iter()
+            .filter(|tool| tool.consumed)
+            .map(|tool| tool.item.clone())
+            .collect();
+        for item in consumed {
+            self.craft_remove_one_tool(crafter, &item);
         }
     }
 }

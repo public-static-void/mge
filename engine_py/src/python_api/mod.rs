@@ -11,6 +11,9 @@ pub mod camera_api;
 pub mod component;
 /// Construction API (place_blueprint, get_construction_state, cancel_construction, demolish_building)
 pub mod construction;
+/// Crafting API (register_craft_recipe, list_craft_recipes, can_craft,
+/// start_craft, get_craft_state, cancel_craft)
+pub mod craft;
 /// Death/decay API
 pub mod death_decay;
 /// Designer API (item definitions, equipment sets, loadouts)

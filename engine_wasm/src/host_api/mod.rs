@@ -70,6 +70,10 @@ pub mod body;
 /// Economic module
 pub mod economic;
 
+/// Crafting module (register_craft_recipe, list_craft_recipes, can_craft,
+/// start_craft, get_craft_state, cancel_craft)
+pub mod craft;
+
 /// Map module
 pub mod map;
 
