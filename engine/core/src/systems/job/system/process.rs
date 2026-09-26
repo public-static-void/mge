@@ -80,6 +80,15 @@ fn get_skill_registry() -> &'static SkillRegistryMap {
     })
 }
 
+/// Base XP per action for a skill from the registry, defaulting to 10.0.
+/// Shared with the deterministic crafting path so both read one source.
+pub(crate) fn base_xp_for_skill(skill_name: &str) -> f64 {
+    get_skill_registry()
+        .get(skill_name)
+        .map(|e| e.base_xp_per_action)
+        .unwrap_or(10.0)
+}
+
 /// Grants XP to an agent on job completion and handles level-up.
 /// Returns the updated SkillLevels component if changes were made.
 fn grant_xp_on_job_completion(

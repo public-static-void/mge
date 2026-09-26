@@ -13,6 +13,9 @@ pub mod camera;
 pub mod component;
 /// Construction API
 pub mod construction;
+/// Crafting API (register_craft_recipe, list_craft_recipes, can_craft,
+/// start_craft, get_craft_state, cancel_craft)
+pub mod craft;
 /// Death/Decay API
 pub mod death_decay;
 /// Dungeon Generation API
@@ -130,6 +133,7 @@ pub fn register_all_api_functions(
     multiscale_map::register_multiscale_map_api(lua, globals, world.clone())?;
     economic::register_economic_api(lua, globals, world.clone())?;
     construction::register_construction_api(lua, globals, world.clone())?;
+    craft::register_craft_api(lua, globals, world.clone())?;
     movement_ops::register_movement_ops_api(lua, globals, world.clone())?;
     dungeon::register_dungeon_api(lua, globals)?;
     job_ai::register_job_ai_api(lua, globals, world.clone())?;

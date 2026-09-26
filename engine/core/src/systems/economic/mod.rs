@@ -12,5 +12,5 @@ pub mod resource;
 pub mod system;
 
 pub use loader::load_recipes_from_dir;
-pub use recipe::{Recipe, ResourceAmount};
+pub use recipe::{MaterialAmount, OutputItem, Recipe, ResourceAmount, SkillReq, ToolReq};
 pub use system::EconomicSystem;

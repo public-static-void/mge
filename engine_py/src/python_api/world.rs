@@ -26,6 +26,7 @@ use engine_core::ecs::world::World;
 use engine_core::loot::LootEntry;
 use engine_core::systems::body_part_damage::BodyPartDamageSystem;
 use engine_core::systems::construction::ConstructionSystem;
+use engine_core::systems::crafting::CraftingSystem;
 use engine_core::systems::economic::{EconomicSystem, load_recipes_from_dir};
 use engine_core::systems::enemy_behavior::EnemyBehaviorSystem;
 use engine_core::systems::faction_reputation::FactionReputationSystem;
@@ -162,6 +163,7 @@ impl PyWorld {
         let recipes = load_recipes_from_dir(&recipes_dir);
         let economic_system = EconomicSystem::with_recipes(recipes);
         world.register_system(economic_system);
+        world.register_system(CraftingSystem);
         world.register_system(ConstructionSystem::new());
 
         Ok(PyWorld {
@@ -889,6 +891,52 @@ impl PyWorld {
     /// Demolish a completed building; returns True.
     fn demolish_building(&self, building_id: u32) -> PyResult<bool> {
         crate::python_api::construction::demolish_building(self, building_id)
+    }
+
+    /// Register a craft recipe under `name` from its JSON definition.
+    /// Raises `ValueError` on invalid JSON.
+    ///
+    /// Example: `world.register_craft_recipe("iron_sword", '{"name":"iron_sword",...}')`
+    fn register_craft_recipe(&self, name: String, recipe_json: String) -> PyResult<()> {
+        crate::python_api::craft::register_craft_recipe(self, name, recipe_json)
+    }
+
+    /// Names of registered craft-path recipes, sorted ascending.
+    ///
+    /// Example: `names = world.list_craft_recipes()`
+    fn list_craft_recipes(&self) -> Vec<String> {
+        crate::python_api::craft::list_craft_recipes(self)
+    }
+
+    /// Pure craft gate: `(True, None)` when `crafter` may start `recipe`,
+    /// else `(False, reason)` — error strings byte-identical to Lua/WASM.
+    ///
+    /// Example: `ok, err = world.can_craft(crafter, "iron_sword")`
+    fn can_craft(&self, crafter: u32, recipe: String) -> (bool, Option<String>) {
+        crate::python_api::craft::can_craft(self, crafter, recipe)
+    }
+
+    /// Start crafting: gate + in-progress `CraftOrder` + input deduction.
+    /// Returns `(True, None)` on success, `(False, reason)` on rejection.
+    ///
+    /// Example: `ok, err = world.start_craft(crafter, "iron_sword")`
+    fn start_craft(&self, crafter: u32, recipe: String) -> (bool, Option<String>) {
+        crate::python_api::craft::start_craft(self, crafter, recipe)
+    }
+
+    /// Clone of the crafter's `CraftOrder` as a dict, or `None` when absent.
+    ///
+    /// Example: `state = world.get_craft_state(crafter)`
+    fn get_craft_state(&self, py: Python, crafter: u32) -> PyResult<Option<PyObject>> {
+        crate::python_api::craft::get_craft_state(self, py, crafter)
+    }
+
+    /// Cancel an in-progress craft order with stockpile refund.
+    /// Returns `(True, None)` on success, `(False, "no_craft_order")` otherwise.
+    ///
+    /// Example: `ok, err = world.cancel_craft(crafter)`
+    fn cancel_craft(&self, crafter: u32) -> (bool, Option<String>) {
+        crate::python_api::craft::cancel_craft(self, crafter)
     }
 
     /// Returns a list of all registered job type names.
