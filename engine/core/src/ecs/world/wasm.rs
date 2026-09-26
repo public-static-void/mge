@@ -5046,9 +5046,18 @@ impl WasmWorld {
     }
 }
 
-/// Parse a flat WASM `Position` (`x`/`y`/`z`, `q`/`r`/`z`, or id-only) into a
-/// [`CellKey`], mirroring the `entities_in_cell` coordinate matching.
+/// Parse a WASM `Position` into a [`CellKey`], mirroring the
+/// `entities_in_cell` coordinate matching.
+///
+/// Accepts the flat transport shape (`x`/`y`/`z`, `q`/`r`/`z`, or id-only)
+/// plus the schema-validated wrapped (`{"pos": ...}`) and bare-enum
+/// (`{"Square": ...}`) forms, so vehicle ops keep working in schema-loaded
+/// worlds where validation requires the `pos` wrapper.
 fn flat_pos_to_cell(pos: &JsonValue) -> Option<CellKey> {
+    let inner = pos.get("pos").unwrap_or(pos);
+    if let Ok(cell) = serde_json::from_value::<CellKey>(inner.clone()) {
+        return Some(cell);
+    }
     if let Some(id) = pos.get("id").and_then(|v| v.as_str()) {
         return Some(CellKey::Province { id: id.to_string() });
     }
