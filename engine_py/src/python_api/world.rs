@@ -34,9 +34,11 @@ use engine_core::systems::fog::FogUpdateSystem;
 use engine_core::systems::fov::FovUpdateSystem;
 use engine_core::systems::job::job_board::JobBoard;
 use engine_core::systems::job::types::loader::load_job_types_from_dir;
+use engine_core::systems::movement_system::MovementSystem;
 use engine_core::systems::noise::NoiseSystem;
 use engine_core::systems::research::ResearchSystem;
 use engine_core::systems::temperature::TemperatureSystem;
+use engine_core::systems::vehicle::VehicleSystem;
 use engine_core::systems::weather::WeatherSystem;
 use engine_core::tech_tree;
 use pyo3::Python;
@@ -149,6 +151,8 @@ impl PyWorld {
         world.register_system(NoiseSystem);
         world.register_system(EnemyBehaviorSystem);
         world.register_system(engine_core::systems::ecosystem::EcosystemSystem);
+        world.register_system(MovementSystem);
+        world.register_system(VehicleSystem);
         world.register_system(FogUpdateSystem);
         world.register_system(engine_core::systems::death_decay::ProcessDeaths);
         world.register_system(engine_core::systems::death_decay::ProcessDecay);
@@ -1048,6 +1052,35 @@ impl PyWorld {
     /// Check if an agent's move path is empty.
     pub fn is_move_path_empty(&self, agent_id: u32) -> PyResult<bool> {
         MovementApi::is_move_path_empty(self, agent_id)
+    }
+
+    /// Embark a rider onto a vehicle. Returns (ok, err) with err None on success.
+    pub fn embark_vehicle(&self, vehicle_id: u32, rider_id: u32) -> (bool, Option<String>) {
+        crate::python_api::vehicle::embark_vehicle(self, vehicle_id, rider_id)
+    }
+
+    /// Disembark a rider from its vehicle. Returns (ok, err) with err None on success.
+    pub fn disembark_vehicle(&self, rider_id: u32) -> (bool, Option<String>) {
+        crate::python_api::vehicle::disembark_vehicle(self, rider_id)
+    }
+
+    /// Assign a terrain-validated path to a vehicle. Returns the stored step count.
+    pub fn assign_vehicle_path(
+        &self,
+        vehicle_id: u32,
+        goal_cell: Bound<'_, PyAny>,
+    ) -> PyResult<usize> {
+        crate::python_api::vehicle::assign_vehicle_path(self, vehicle_id, &goal_cell)
+    }
+
+    /// Occupant entity IDs of a vehicle.
+    pub fn get_vehicle_occupants(&self, vehicle_id: u32) -> Vec<u32> {
+        crate::python_api::vehicle::get_vehicle_occupants(self, vehicle_id)
+    }
+
+    /// True when the rider is mounted on a vehicle.
+    pub fn is_mounted(&self, rider_id: u32) -> bool {
+        crate::python_api::vehicle::is_mounted(self, rider_id)
     }
 
     /// Assign jobs to an AI agent using the internal job AI logic.

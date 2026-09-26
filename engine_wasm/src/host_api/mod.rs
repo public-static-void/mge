@@ -131,3 +131,6 @@ pub mod designer;
 
 /// Temperature module (get_temperature, set_temperature)
 pub mod temperature;
+/// Vehicle module (embark_vehicle, disembark_vehicle, assign_vehicle_path,
+/// get_vehicle_occupants, is_mounted)
+pub mod vehicle;

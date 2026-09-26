@@ -53,7 +53,7 @@
 - [x] Temperature and environment simulation
 - [x] Temperature v2 (per-cell diffusion, humidity/pressure modifiers, insulation aggregation)
 - [x] Ecosystem and wildlife simulation
-- [ ] Vehicle support
+- [x] Vehicle support
 - [ ] Crafting system (recipes, tools, materials)
 - [x] Manufacturing and production queue
 - [ ] Diplomacy AI (relationships, treaties, war)

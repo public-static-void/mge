@@ -4819,3 +4819,261 @@ fn wasm_map_from_map_json(map_json: &str) -> Result<WasmMap, String> {
 
     Ok(map)
 }
+
+/// World-level vehicle operations for the WASM bridge.
+///
+/// Mirrors the [`World`](super::World) embark/disembark/path/occupancy
+/// semantics with identical error strings (`no_vehicle`, `no_rider`,
+/// `already_mounted`, `full`, `not_mounted`, `no_path`) and identical event
+/// names. Transport is JSON strings: positions use the flat WASM `Position`
+/// shape (`x`/`y`/`z`, `q`/`r`/`z`, or id-only), while stored path steps keep
+/// the bare enum shape the movement hooks consume.
+impl WasmWorld {
+    /// Embark `rider` onto `vehicle`.
+    ///
+    /// Records membership in the vehicle `occupants` array, clears the
+    /// rider's `Agent.move_path` so it never steps independently while
+    /// mounted, and emits `vehicle_embarked`. A full vehicle is rejected
+    /// with no state change plus `vehicle_embark_rejected{reason:"full"}`.
+    /// Riders already mounted elsewhere must disembark first (no transfers),
+    /// and vehicle entities cannot ride (`no_rider`).
+    pub fn embark(&mut self, vehicle: u32, rider: u32) -> Result<(), String> {
+        use crate::systems::vehicle::{occupants_of, vehicle_params};
+        let vehicle_value: JsonValue = self
+            .get_component(vehicle, "Vehicle")
+            .and_then(|s| serde_json::from_str(&s).ok())
+            .ok_or_else(|| "no_vehicle".to_string())?;
+        if !self.entities.contains(&rider) || self.has_vehicle_component(rider) {
+            return Err("no_rider".to_string());
+        }
+        if self.is_mounted(rider) {
+            return Err("already_mounted".to_string());
+        }
+        let (capacity, _, _) = vehicle_params(&vehicle_value);
+        let mut occupants = occupants_of(&vehicle_value);
+        if occupants.len() as u64 >= capacity {
+            let _ = self.send_event(
+                "vehicle_embark_rejected",
+                &serde_json::json!({"vehicle": vehicle, "rider": rider, "reason": "full"})
+                    .to_string(),
+            );
+            return Err("full".to_string());
+        }
+        occupants.push(rider);
+        let mut updated = vehicle_value;
+        if let Some(obj) = updated.as_object_mut() {
+            obj.insert("occupants".to_string(), serde_json::json!(occupants));
+        }
+        self.set_component(vehicle, "Vehicle", &updated.to_string())?;
+        if let Some(agent_str) = self.get_component(rider, "Agent")
+            && let Ok(mut agent) = serde_json::from_str::<JsonValue>(&agent_str)
+            && let Some(obj) = agent.as_object_mut()
+        {
+            obj.remove("move_path");
+            let _ = self.set_component(rider, "Agent", &agent.to_string());
+        }
+        let _ = self.send_event(
+            "vehicle_embarked",
+            &serde_json::json!({"vehicle": vehicle, "rider": rider}).to_string(),
+        );
+        Ok(())
+    }
+
+    /// Disembark `rider` from its vehicle.
+    ///
+    /// Removes the rider from `occupants`, sets the rider `Position` to the
+    /// vehicle's current cell (flat WASM shape), and emits
+    /// `vehicle_disembarked`.
+    pub fn disembark(&mut self, rider: u32) -> Result<(), String> {
+        use crate::systems::vehicle::occupants_of;
+        let vehicle = self
+            .vehicle_of(rider)
+            .ok_or_else(|| "not_mounted".to_string())?;
+        let vehicle_value: JsonValue = self
+            .get_component(vehicle, "Vehicle")
+            .and_then(|s| serde_json::from_str(&s).ok())
+            .ok_or_else(|| "not_mounted".to_string())?;
+        let occupants: Vec<u32> = occupants_of(&vehicle_value)
+            .into_iter()
+            .filter(|id| *id != rider)
+            .collect();
+        let mut updated = vehicle_value;
+        if let Some(obj) = updated.as_object_mut() {
+            obj.insert("occupants".to_string(), serde_json::json!(occupants));
+        }
+        self.set_component(vehicle, "Vehicle", &updated.to_string())?;
+        if let Some(position) = self.get_component(vehicle, "Position") {
+            let _ = self.set_component(rider, "Position", &position);
+        }
+        let _ = self.send_event(
+            "vehicle_disembarked",
+            &serde_json::json!({"vehicle": vehicle, "rider": rider}).to_string(),
+        );
+        Ok(())
+    }
+
+    /// Compute a path with the existing BFS and store the terrain-valid prefix
+    /// in `Vehicle.move_path`, returning the stored step count.
+    ///
+    /// `goal_json` is one enum-shaped cell (`{"Square": ...}` / `{"Hex": ...}`
+    /// / `{"Province": ...}`). Steps are validated against the terrain guard;
+    /// the stored path truncates at the first violating step and
+    /// `vehicle_move_blocked` is emitted. A fully-blocked path stores an empty
+    /// path. With no map, no vehicle position, or an unreachable goal the
+    /// stored path is left unchanged and `no_path` is returned. The BFS
+    /// itself is untouched.
+    pub fn assign_vehicle_path(&mut self, vehicle: u32, goal_json: &str) -> Result<usize, String> {
+        use crate::systems::vehicle::{cell_to_step_json, step_to_cell, vehicle_params};
+        let vehicle_value: JsonValue = self
+            .get_component(vehicle, "Vehicle")
+            .and_then(|s| serde_json::from_str(&s).ok())
+            .ok_or_else(|| "no_vehicle".to_string())?;
+        let goal: CellKey = serde_json::from_str(goal_json).map_err(|_| "no_path".to_string())?;
+        let start_value: JsonValue = self
+            .get_component(vehicle, "Position")
+            .and_then(|s| serde_json::from_str(&s).ok())
+            .filter(|v| flat_pos_to_cell(v).is_some())
+            .ok_or_else(|| "no_path".to_string())?;
+        let start = flat_pos_to_cell(&start_value).ok_or_else(|| "no_path".to_string())?;
+        let start_json = serde_json::to_string(&start).map_err(|_| "no_path".to_string())?;
+        let goal_json = serde_json::to_string(&goal).map_err(|_| "no_path".to_string())?;
+        let path_json = self.find_path(&start_json, &goal_json).ok_or_else(|| {
+            // Unreachable goal: leave the stored path unchanged.
+            "no_path".to_string()
+        })?;
+        let path_value: JsonValue =
+            serde_json::from_str(&path_json).map_err(|_| "no_path".to_string())?;
+        let path: Vec<CellKey> = path_value
+            .get("path")
+            .and_then(|v| v.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| {
+                        serde_json::from_value::<CellKey>(v.clone())
+                            .ok()
+                            .or_else(|| step_to_cell(v))
+                    })
+                    .collect()
+            })
+            .ok_or_else(|| "no_path".to_string())?;
+        if path.len() <= 1 {
+            let mut updated = vehicle_value;
+            if let Some(obj) = updated.as_object_mut() {
+                obj.remove("move_path");
+            }
+            self.set_component(vehicle, "Vehicle", &updated.to_string())?;
+            return Ok(0);
+        }
+        let (_, _, blocked_terrains) = vehicle_params(&vehicle_value);
+        let mut stored = Vec::new();
+        let mut updated = vehicle_value;
+        for cell in path.iter().skip(1) {
+            if self.wasm_cell_blocked(&blocked_terrains, cell) {
+                if let Some(obj) = updated.as_object_mut() {
+                    obj.remove("move_path");
+                }
+                if !stored.is_empty() {
+                    updated["move_path"] = serde_json::json!(stored);
+                }
+                self.set_component(vehicle, "Vehicle", &updated.to_string())?;
+                let _ = self.send_event(
+                    "vehicle_move_blocked",
+                    &serde_json::json!({"vehicle": vehicle, "cell": cell_to_step_json(cell)})
+                        .to_string(),
+                );
+                return Ok(stored.len());
+            }
+            stored.push(cell_to_step_json(cell));
+        }
+        updated["move_path"] = serde_json::json!(stored);
+        self.set_component(vehicle, "Vehicle", &updated.to_string())?;
+        Ok(stored.len())
+    }
+
+    /// Occupant entity IDs of `vehicle`, or empty when it has no `Vehicle`
+    /// component.
+    pub fn vehicle_occupants(&self, vehicle: u32) -> Vec<u32> {
+        use crate::systems::vehicle::occupants_of;
+        self.get_component(vehicle, "Vehicle")
+            .and_then(|s| serde_json::from_str::<JsonValue>(&s).ok())
+            .map(|v| occupants_of(&v))
+            .unwrap_or_default()
+    }
+
+    /// True when `rider` is listed in any live vehicle's `occupants`.
+    pub fn is_mounted(&self, rider: u32) -> bool {
+        self.vehicle_of(rider).is_some()
+    }
+
+    /// The vehicle carrying `rider`, or `None` when the rider is not mounted.
+    fn vehicle_of(&self, rider: u32) -> Option<u32> {
+        use crate::systems::vehicle::occupants_of;
+        let mut ids = self.get_entities_with_component("Vehicle");
+        ids.sort_unstable();
+        ids.into_iter().find(|vid| {
+            self.get_component(*vid, "Vehicle")
+                .and_then(|s| serde_json::from_str::<JsonValue>(&s).ok())
+                .map(|v| occupants_of(&v))
+                .is_some_and(|occ| occ.contains(&rider))
+        })
+    }
+
+    /// True when the entity carries a `Vehicle` component (vehicles cannot ride).
+    fn has_vehicle_component(&self, entity: u32) -> bool {
+        self.components
+            .get("Vehicle")
+            .is_some_and(|m| m.contains_key(&entity))
+    }
+
+    /// True when the cell is impassable for the vehicle: `walkable:false`
+    /// metadata always blocks; a `terrain` metadata string blocks when listed
+    /// in `blocked_terrains`. Cells without metadata never block on terrain.
+    fn wasm_cell_blocked(&self, blocked_terrains: &[String], cell: &CellKey) -> bool {
+        let key = serde_json::to_string(cell).unwrap_or_default();
+        let meta = self.map.as_ref().and_then(|m| m.cell_metadata.get(&key));
+        match meta {
+            None => false,
+            Some(m) => {
+                if m.get("walkable").and_then(|v| v.as_bool()) == Some(false) {
+                    return true;
+                }
+                match m.get("terrain").and_then(|v| v.as_str()) {
+                    Some(terrain) => blocked_terrains.iter().any(|t| t == terrain),
+                    None => false,
+                }
+            }
+        }
+    }
+}
+
+/// Parse a WASM `Position` into a [`CellKey`], mirroring the
+/// `entities_in_cell` coordinate matching.
+///
+/// Accepts the flat transport shape (`x`/`y`/`z`, `q`/`r`/`z`, or id-only)
+/// plus the schema-validated wrapped (`{"pos": ...}`) and bare-enum
+/// (`{"Square": ...}`) forms, so vehicle ops keep working in schema-loaded
+/// worlds where validation requires the `pos` wrapper.
+fn flat_pos_to_cell(pos: &JsonValue) -> Option<CellKey> {
+    let inner = pos.get("pos").unwrap_or(pos);
+    if let Ok(cell) = serde_json::from_value::<CellKey>(inner.clone()) {
+        return Some(cell);
+    }
+    if let Some(id) = pos.get("id").and_then(|v| v.as_str()) {
+        return Some(CellKey::Province { id: id.to_string() });
+    }
+    if pos.get("x").is_some() {
+        return Some(CellKey::Square {
+            x: pos.get("x").and_then(|v| v.as_f64()).unwrap_or(0.0) as i32,
+            y: pos.get("y").and_then(|v| v.as_f64()).unwrap_or(0.0) as i32,
+            z: pos.get("z").and_then(|v| v.as_f64()).unwrap_or(0.0) as i32,
+        });
+    }
+    if pos.get("q").is_some() {
+        return Some(CellKey::Hex {
+            q: pos.get("q").and_then(|v| v.as_f64()).unwrap_or(0.0) as i32,
+            r: pos.get("r").and_then(|v| v.as_f64()).unwrap_or(0.0) as i32,
+            z: pos.get("z").and_then(|v| v.as_f64()).unwrap_or(0.0) as i32,
+        });
+    }
+    None
+}

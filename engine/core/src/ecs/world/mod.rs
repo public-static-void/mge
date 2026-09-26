@@ -38,6 +38,7 @@ mod resources;
 mod save_load;
 mod systems;
 mod template;
+mod vehicle_ops;
 mod zone;
 
 pub use zone::ZoneShape;
