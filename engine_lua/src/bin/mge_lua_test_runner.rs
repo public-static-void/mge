@@ -25,10 +25,12 @@ use engine_core::systems::inventory::InventoryConstraintSystem;
 use engine_core::systems::job::{
     JobLogicKind, JobSystem, JobTypeRegistry, load_job_types_from_dir,
 };
+use engine_core::systems::movement_system::MovementSystem;
 use engine_core::systems::noise::NoiseSystem;
 use engine_core::systems::research::ResearchSystem;
 use engine_core::systems::stat_calculation::StatCalculationSystem;
 use engine_core::systems::temperature::TemperatureSystem;
+use engine_core::systems::vehicle::VehicleSystem;
 use engine_core::systems::weather::WeatherSystem;
 use engine_lua::ScriptEngine;
 use gag::BufferRedirect;
@@ -312,6 +314,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         world.borrow_mut().register_system(NoiseSystem);
         world.borrow_mut().register_system(EnemyBehaviorSystem);
         world.borrow_mut().register_system(EcosystemSystem);
+        world.borrow_mut().register_system(MovementSystem);
+        world.borrow_mut().register_system(VehicleSystem);
         world.borrow_mut().register_system(FogUpdateSystem);
 
         // --- Economic System registration ---
