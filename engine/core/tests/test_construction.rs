@@ -564,6 +564,10 @@ fn test_ordering_slot_sits_immediately_after_economic() {
         .iter()
         .position(|name| *name == "EconomicSystem")
         .unwrap();
+    let crafting = order
+        .iter()
+        .position(|name| *name == "CraftingSystem")
+        .unwrap();
     let construction = order
         .iter()
         .position(|name| *name == "ConstructionSystem")
@@ -572,7 +576,8 @@ fn test_ordering_slot_sits_immediately_after_economic() {
         .iter()
         .position(|name| *name == "FactionReputationSystem")
         .unwrap();
-    assert_eq!(construction, economic + 1);
+    assert_eq!(crafting, economic + 1);
+    assert_eq!(construction, crafting + 1);
     assert!(construction < reputation);
 }
 

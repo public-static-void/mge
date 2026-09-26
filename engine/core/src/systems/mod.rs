@@ -69,6 +69,7 @@ pub const SYSTEM_EXECUTION_ORDER: &[&str] = &[
     "ResearchSystem",
     "JobSystem",
     "EconomicSystem",
+    "CraftingSystem",
     "ConstructionSystem",
     "ZoneSystem",
     "FactionReputationSystem",
