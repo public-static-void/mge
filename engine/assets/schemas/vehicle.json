@@ -1,4 +1,5 @@
 {
+  "name": "Vehicle",
   "title": "Vehicle",
   "description": "Mountable carrier: capacity, per-tick speed, terrain constraints, occupants, path.",
   "type": "object",
