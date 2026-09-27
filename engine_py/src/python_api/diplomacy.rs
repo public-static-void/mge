@@ -11,7 +11,9 @@ fn parse_kind(kind: &str) -> PyResult<TreatyKind> {
 /// Returns the canonical relation name for a faction pair.
 pub fn get_relation(pyworld: &PyWorld, fa: String, fb: String) -> String {
     let world = pyworld.inner.borrow();
-    diplomacy::get_relation(&world, &fa, &fb).as_str().to_string()
+    diplomacy::get_relation(&world, &fa, &fb)
+        .as_str()
+        .to_string()
 }
 
 /// Returns the standing score for a faction pair.
@@ -21,12 +23,7 @@ pub fn get_standing(pyworld: &PyWorld, fa: String, fb: String) -> i64 {
 }
 
 /// Applies a standing delta; bounds and validation live in core.
-pub fn modify_standing(
-    pyworld: &PyWorld,
-    fa: String,
-    fb: String,
-    delta: i64,
-) -> PyResult<()> {
+pub fn modify_standing(pyworld: &PyWorld, fa: String, fb: String, delta: i64) -> PyResult<()> {
     let mut world = pyworld.inner.borrow_mut();
     diplomacy::modify_standing(&mut world, &fa, &fb, delta).map_err(PyValueError::new_err)
 }

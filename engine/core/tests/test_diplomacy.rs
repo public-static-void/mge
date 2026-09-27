@@ -53,7 +53,7 @@ fn setup_world() -> World {
     world.map = Some(open_plane(10));
     {
         let mut reg = world.registry.lock().unwrap();
-        register_diplomacy_schemas(&mut *reg);
+        register_diplomacy_schemas(&mut reg);
     }
     world
 }

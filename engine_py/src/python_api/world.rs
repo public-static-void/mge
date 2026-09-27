@@ -553,11 +553,7 @@ impl PyWorld {
 
     /// List treaty records as a list of dicts, optionally filtered to one faction.
     #[pyo3(signature = (faction=None))]
-    fn list_treaties(
-        &self,
-        py: Python<'_>,
-        faction: Option<String>,
-    ) -> PyResult<PyObject> {
+    fn list_treaties(&self, py: Python<'_>, faction: Option<String>) -> PyResult<PyObject> {
         crate::python_api::diplomacy::list_treaties(self, py, faction)
     }
 

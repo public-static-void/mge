@@ -40,9 +40,7 @@ fn read_pair(
 /// Registers the diplomacy API (get_relation, get_standing, modify_standing,
 /// declare_war, declare_peace, propose_treaty, accept_treaty, break_treaty,
 /// list_treaties).
-pub fn register_diplomacy_api(
-    linker: &mut Linker<Arc<Mutex<WasmWorld>>>,
-) -> anyhow::Result<()> {
+pub fn register_diplomacy_api(linker: &mut Linker<Arc<Mutex<WasmWorld>>>) -> anyhow::Result<()> {
     linker.func_wrap(
         "diplomacy",
         "get_relation",
@@ -60,7 +58,11 @@ pub fn register_diplomacy_api(
             };
             let relation = {
                 let world = caller.data().lock().unwrap();
-                world.diplomacy.query_relation(&fa, &fb).as_str().to_string()
+                world
+                    .diplomacy
+                    .query_relation(&fa, &fb)
+                    .as_str()
+                    .to_string()
             };
             write_string_to_wasm(&mut caller, out_ptr, out_len, &relation) as i32
         },

@@ -119,8 +119,7 @@ impl DiplomacyState {
     /// Shared proposal validation behind `can_propose`. Emits no event.
     fn check_propose(&self, proposer: &str, other: &str, kind: &TreatyKind) -> Result<(), String> {
         can_modify_standing(proposer, other)?;
-        if self.query_relation(proposer, other) == RelationState::War
-            && *kind != TreatyKind::Peace
+        if self.query_relation(proposer, other) == RelationState::War && *kind != TreatyKind::Peace
         {
             return Err(format!(
                 "cannot propose {kind:?} while '{proposer}' and '{other}' are at war"
@@ -333,7 +332,9 @@ impl DiplomacyState {
         let due: Vec<u64> = self
             .treaties
             .values()
-            .filter(|t| t.status == TreatyStatus::Active && t.expires_tick.is_some_and(|e| e <= turn))
+            .filter(|t| {
+                t.status == TreatyStatus::Active && t.expires_tick.is_some_and(|e| e <= turn)
+            })
             .map(|t| t.id)
             .collect();
         let mut pending = Vec::with_capacity(due.len());
@@ -341,10 +342,7 @@ impl DiplomacyState {
             if let Some(treaty) = self.treaties.get_mut(&id) {
                 treaty.status = TreatyStatus::Expired;
             }
-            pending.push((
-                "treaty_expired".to_string(),
-                json!({ "treaty_id": id }),
-            ));
+            pending.push(("treaty_expired".to_string(), json!({ "treaty_id": id })));
         }
         Ok(pending)
     }
@@ -627,9 +625,10 @@ pub fn propose_treaty(
     duration_ticks: Option<u64>,
 ) -> Result<u64, String> {
     let turn = u64::from(world.turn);
-    let (id, pending) = world
-        .diplomacy
-        .apply_propose_treaty(proposer, other, kind, turn, duration_ticks)?;
+    let (id, pending) =
+        world
+            .diplomacy
+            .apply_propose_treaty(proposer, other, kind, turn, duration_ticks)?;
     forward_pending(world, pending)?;
     Ok(id)
 }
