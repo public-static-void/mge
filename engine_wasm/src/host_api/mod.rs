@@ -133,6 +133,10 @@ pub mod unit_template;
 /// Designer module (item definitions, equipment sets, loadouts, validation)
 pub mod designer;
 
+/// Diplomacy module (get_relation, get_standing, modify_standing, declare_war,
+/// declare_peace, propose_treaty, accept_treaty, break_treaty, list_treaties)
+pub mod diplomacy;
+
 /// Temperature module (get_temperature, set_temperature)
 pub mod temperature;
 /// Vehicle module (embark_vehicle, disembark_vehicle, assign_vehicle_path,

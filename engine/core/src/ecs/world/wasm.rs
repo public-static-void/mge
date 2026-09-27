@@ -1,3 +1,4 @@
+use crate::diplomacy::DiplomacyState;
 use crate::ecs::equipment_set::{EquipmentSet, EquipmentSetRegistry};
 use crate::ecs::item::ItemRegistry;
 use crate::ecs::template::UnitTemplateRegistry;
@@ -285,6 +286,14 @@ pub struct WasmWorld {
     #[serde(default)]
     pub next_zone_id: u64,
 
+    /// World-level diplomacy store (pair relations + treaties).
+    ///
+    /// All transition logic lives in [`DiplomacyState`]; the WASM host bridge
+    /// only forwards calls and events, so every bridge observes identical
+    /// rules. Old saves without this field load with an empty store.
+    #[serde(default)]
+    pub diplomacy: DiplomacyState,
+
     /// Craft recipe registry: name → recipe. Only recipes with `output_item`
     /// are visible to the craft path (`list_craft_recipes` filters the rest),
     /// mirroring [`World`](super::World) `craft_recipes` semantics with
@@ -381,6 +390,7 @@ impl WasmWorld {
             equipment_set_registry: EquipmentSetRegistry::new(),
             next_zone_id: 1,
             craft_recipes: HashMap::new(),
+            diplomacy: DiplomacyState::default(),
         }
     }
 

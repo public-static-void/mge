@@ -501,6 +501,66 @@ impl PyWorld {
         FactionApi::get_reputation(self, entity, &faction_id)
     }
 
+    // ---- DIPLOMACY ----
+
+    /// Canonical relation name for a faction pair ("allied", "neutral", "hostile", "war").
+    fn get_relation(&self, fa: String, fb: String) -> String {
+        crate::python_api::diplomacy::get_relation(self, fa, fb)
+    }
+
+    /// Standing score for a faction pair, or 0 if unknown.
+    fn get_standing(&self, fa: String, fb: String) -> i64 {
+        crate::python_api::diplomacy::get_standing(self, fa, fb)
+    }
+
+    /// Apply a standing delta; bounds and validation live in core.
+    fn modify_standing(&self, fa: String, fb: String, delta: i64) -> PyResult<()> {
+        crate::python_api::diplomacy::modify_standing(self, fa, fb, delta)
+    }
+
+    /// Declare war between two factions.
+    fn declare_war(&self, fa: String, fb: String) -> PyResult<()> {
+        crate::python_api::diplomacy::declare_war(self, fa, fb)
+    }
+
+    /// Declare peace between two warring factions.
+    fn declare_peace(&self, fa: String, fb: String) -> PyResult<()> {
+        crate::python_api::diplomacy::declare_peace(self, fa, fb)
+    }
+
+    /// Propose a treaty; kind is "non_aggression", "alliance", "peace", or "trade".
+    /// duration_ticks=None means the treaty never expires. Returns the treaty id.
+    #[pyo3(signature = (proposer, other, kind, duration_ticks=None))]
+    fn propose_treaty(
+        &self,
+        proposer: String,
+        other: String,
+        kind: String,
+        duration_ticks: Option<u64>,
+    ) -> PyResult<u64> {
+        crate::python_api::diplomacy::propose_treaty(self, proposer, other, kind, duration_ticks)
+    }
+
+    /// Accept a proposed treaty.
+    fn accept_treaty(&self, treaty_id: u64) -> PyResult<()> {
+        crate::python_api::diplomacy::accept_treaty(self, treaty_id)
+    }
+
+    /// Break a proposed or active treaty.
+    fn break_treaty(&self, treaty_id: u64) -> PyResult<()> {
+        crate::python_api::diplomacy::break_treaty(self, treaty_id)
+    }
+
+    /// List treaty records as a list of dicts, optionally filtered to one faction.
+    #[pyo3(signature = (faction=None))]
+    fn list_treaties(
+        &self,
+        py: Python<'_>,
+        faction: Option<String>,
+    ) -> PyResult<PyObject> {
+        crate::python_api::diplomacy::list_treaties(self, py, faction)
+    }
+
     // ---- FOV ----
 
     /// Get visible cells for an entity. Returns a list of dicts with x, y, z keys.
