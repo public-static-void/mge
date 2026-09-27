@@ -18,6 +18,9 @@ pub mod craft;
 pub mod death_decay;
 /// Designer API (item definitions, equipment sets, loadouts)
 pub mod designer;
+/// Diplomacy API (get_relation, get_standing, modify_standing, declare_war,
+/// declare_peace, propose_treaty, accept_treaty, break_treaty, list_treaties)
+pub mod diplomacy;
 /// Dungeon generation API
 pub mod dungeon;
 /// Economic API

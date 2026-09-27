@@ -2,6 +2,7 @@
 //!
 //! Defines the World struct, which holds all entities, components, systems, and loaded assets.
 
+use crate::diplomacy::DiplomacyState;
 use crate::ecs::equipment_set::EquipmentSetRegistry;
 use crate::ecs::item::ItemRegistry;
 use crate::ecs::registry::ComponentRegistry;
@@ -245,6 +246,10 @@ pub struct World {
     /// Old saves without this field deserialize as empty (backward compatible).
     #[serde(default)]
     pub explored_cells: HashMap<u32, HashSet<CellKey>>,
+    /// World-level diplomacy store: faction-pair relations (persistent,
+    /// serialized for save/load). Old saves without this field load empty.
+    #[serde(default)]
+    pub diplomacy: DiplomacyState,
     event_queues: HashMap<String, (VecDeque<JsonValue>, VecDeque<JsonValue>)>, // (write, read)
     /// Map postprocessors
     #[serde(skip)]
@@ -368,6 +373,7 @@ impl World {
             temperature_scratch: HashMap::new(),
             visibility_modifier: 1.0,
             explored_cells: HashMap::new(),
+            diplomacy: DiplomacyState::default(),
             event_queues: HashMap::new(),
             map_postprocessors: Vec::new(),
             map_validators: Vec::new(),

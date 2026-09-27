@@ -18,6 +18,9 @@ pub mod construction;
 pub mod craft;
 /// Death/Decay API
 pub mod death_decay;
+/// Diplomacy API (get_relation, get_standing, modify_standing, declare_war,
+/// declare_peace, propose_treaty, accept_treaty, break_treaty, list_treaties)
+pub mod diplomacy;
 /// Dungeon Generation API
 pub mod dungeon;
 /// Economic API
@@ -136,6 +139,7 @@ pub fn register_all_api_functions(
     craft::register_craft_api(lua, globals, world.clone())?;
     movement_ops::register_movement_ops_api(lua, globals, world.clone())?;
     dungeon::register_dungeon_api(lua, globals)?;
+    diplomacy::register_diplomacy_api(lua, globals, world.clone())?;
     job_ai::register_job_ai_api(lua, globals, world.clone())?;
     loot::register_loot_api(lua, globals, world.clone())?;
     faction::register_faction_api(lua, globals, world.clone())?;

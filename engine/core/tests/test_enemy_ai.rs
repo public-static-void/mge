@@ -657,11 +657,7 @@ fn target_selection_by_faction() {
         )
         .unwrap();
     world
-        .set_component(
-            player,
-            "Reputation",
-            json!({"relations": {"enemies": {"score": -50}}}),
-        )
+        .set_component(player, "Reputation", json!({"values": {"enemies": -50}}))
         .unwrap();
 
     // Set visible cells
@@ -754,11 +750,7 @@ fn patrol_to_chase_when_hostile_detected() {
         )
         .unwrap();
     world
-        .set_component(
-            player,
-            "Reputation",
-            json!({"relations": {"enemies": {"score": -50}}}),
-        )
+        .set_component(player, "Reputation", json!({"values": {"enemies": -50}}))
         .unwrap();
 
     let mut system = EnemyBehaviorSystem;
