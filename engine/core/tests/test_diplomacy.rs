@@ -7,7 +7,11 @@
 mod world_helper;
 use world_helper::make_test_world;
 
-use engine_core::diplomacy::{RelationState, get_relation, get_standing, modify_standing};
+use engine_core::diplomacy::{
+    RelationState, TreatyKind, TreatyStatus, accept_treaty, break_treaty, can_accept, can_break,
+    can_propose, declare_peace, declare_war, expire_due_treaties, get_relation, get_standing,
+    list_treaties, modify_standing, propose_treaty,
+};
 use engine_core::ecs::world::World;
 use engine_core::map::cell_key::CellKey;
 use engine_core::map::{Map, SquareGridMap};
@@ -120,6 +124,244 @@ fn standing_mutation_emits_single_event() {
     assert_eq!(event.get("old_standing").and_then(|v| v.as_i64()), Some(0));
     assert_eq!(event.get("new_standing").and_then(|v| v.as_i64()), Some(30));
     assert_eq!(event.get("state").and_then(|v| v.as_str()), Some("Neutral"));
+}
+
+/// Drain one event bus after flushing the bus registry.
+fn drain_flushed(world: &mut World, name: &str) -> Vec<serde_json::Value> {
+    world.update_event_buses::<serde_json::Value>();
+    world.drain_events(name)
+}
+
+/// Proposing a treaty records it and emits exactly one proposal event.
+#[test]
+fn propose_treaty_records_and_emits_event() {
+    let mut world = setup_world();
+    let id = propose_treaty(&mut world, "a", "b", TreatyKind::NonAggression, Some(10)).unwrap();
+
+    let listed = list_treaties(&world, None);
+    assert_eq!(listed.len(), 1);
+    assert_eq!(listed[0].id, id);
+    assert_eq!(listed[0].status, TreatyStatus::Proposed);
+
+    let events = drain_flushed(&mut world, "treaty_proposed");
+    assert_eq!(events.len(), 1, "expected exactly one proposal event");
+    assert_eq!(
+        events[0].get("treaty_id").and_then(|v| v.as_u64()),
+        Some(id)
+    );
+}
+
+/// A duplicate same-kind treaty on one pair is rejected without an event.
+#[test]
+fn duplicate_propose_same_kind_is_rejected() {
+    let mut world = setup_world();
+    propose_treaty(&mut world, "a", "b", TreatyKind::NonAggression, Some(10)).unwrap();
+    drain_flushed(&mut world, "treaty_proposed");
+
+    assert!(can_propose(&world, "a", "b", &TreatyKind::NonAggression).is_err());
+    assert!(propose_treaty(&mut world, "b", "a", TreatyKind::NonAggression, Some(5)).is_err());
+
+    let events = drain_flushed(&mut world, "treaty_proposed");
+    assert!(events.is_empty(), "rejected proposal must emit no event");
+
+    let other_kind = propose_treaty(&mut world, "a", "b", TreatyKind::Alliance, Some(5));
+    assert!(other_kind.is_ok(), "different kind on same pair is allowed");
+}
+
+/// Non-peace proposals are barred while the pair is at war; peace is allowed.
+#[test]
+fn propose_non_peace_during_war_is_rejected() {
+    let mut world = setup_world();
+    declare_war(&mut world, "a", "b").unwrap();
+    drain_flushed(&mut world, "treaty_proposed");
+
+    assert!(propose_treaty(&mut world, "a", "b", TreatyKind::NonAggression, Some(5)).is_err());
+    assert!(propose_treaty(&mut world, "a", "b", TreatyKind::Alliance, Some(5)).is_err());
+    assert!(propose_treaty(&mut world, "a", "b", TreatyKind::TradeStub, Some(5)).is_err());
+
+    let events = drain_flushed(&mut world, "treaty_proposed");
+    assert!(events.is_empty(), "rejected proposal must emit no event");
+
+    let peace = propose_treaty(&mut world, "a", "b", TreatyKind::Peace, Some(5));
+    assert!(peace.is_ok(), "peace proposal during war is allowed");
+    declare_peace(&mut world, "a", "b").unwrap();
+}
+
+/// Accepting a proposal activates it and emits exactly one signed event.
+#[test]
+fn accept_treaty_activates_and_emits_event() {
+    let mut world = setup_world();
+    let id = propose_treaty(&mut world, "a", "b", TreatyKind::NonAggression, Some(10)).unwrap();
+    accept_treaty(&mut world, id).unwrap();
+
+    let listed = list_treaties(&world, None);
+    assert_eq!(listed[0].status, TreatyStatus::Active);
+
+    let events = drain_flushed(&mut world, "treaty_signed");
+    assert_eq!(events.len(), 1, "expected exactly one signed event");
+    assert_eq!(
+        events[0].get("treaty_id").and_then(|v| v.as_u64()),
+        Some(id)
+    );
+}
+
+/// Alliance acceptance raises the pair to Allied.
+#[test]
+fn accept_alliance_moves_state_to_allied() {
+    let mut world = setup_world();
+    let id = propose_treaty(&mut world, "a", "b", TreatyKind::Alliance, Some(10)).unwrap();
+    accept_treaty(&mut world, id).unwrap();
+    assert_eq!(get_relation(&world, "a", "b"), RelationState::Allied);
+}
+
+/// Peace acceptance on a neutral pair keeps Neutral or better.
+#[test]
+fn accept_peace_on_neutral_keeps_neutral_or_better() {
+    let mut world = setup_world();
+    let id = propose_treaty(&mut world, "a", "b", TreatyKind::Peace, Some(10)).unwrap();
+    accept_treaty(&mut world, id).unwrap();
+    let state = get_relation(&world, "a", "b");
+    assert!(
+        state == RelationState::Neutral || state == RelationState::Allied,
+        "peace must keep Neutral-or-better, got {state:?}"
+    );
+}
+
+/// Non-aggression acceptance lifts a hostile pair to Neutral.
+#[test]
+fn accept_non_aggression_lifts_hostile_to_neutral() {
+    let mut world = setup_world();
+    let id = propose_treaty(&mut world, "a", "b", TreatyKind::NonAggression, Some(10)).unwrap();
+    accept_treaty(&mut world, id).unwrap();
+    assert_eq!(get_relation(&world, "a", "b"), RelationState::Neutral);
+}
+
+/// Double acceptance and acceptance of unknown ids are rejected silently.
+#[test]
+fn double_accept_is_rejected() {
+    let mut world = setup_world();
+    let id = propose_treaty(&mut world, "a", "b", TreatyKind::Alliance, Some(10)).unwrap();
+    accept_treaty(&mut world, id).unwrap();
+    drain_flushed(&mut world, "treaty_signed");
+
+    assert!(can_accept(&world, id).is_err());
+    assert!(accept_treaty(&mut world, id).is_err());
+    assert!(accept_treaty(&mut world, 9999).is_err());
+
+    let events = drain_flushed(&mut world, "treaty_signed");
+    assert!(events.is_empty(), "rejected acceptance must emit no event");
+}
+
+/// Breaking an active treaty marks it broken, applies the penalty, and emits.
+#[test]
+fn break_active_treaty_applies_penalty_and_emits() {
+    let mut world = setup_world();
+    let id = propose_treaty(&mut world, "a", "b", TreatyKind::Alliance, Some(10)).unwrap();
+    accept_treaty(&mut world, id).unwrap();
+    break_treaty(&mut world, id).unwrap();
+
+    let listed = list_treaties(&world, None);
+    assert_eq!(listed[0].status, TreatyStatus::Broken);
+    assert_eq!(get_standing(&world, "a", "b"), -25);
+
+    let events = drain_flushed(&mut world, "treaty_broken");
+    assert_eq!(events.len(), 1, "expected exactly one broken event");
+    assert_eq!(
+        events[0].get("treaty_id").and_then(|v| v.as_u64()),
+        Some(id)
+    );
+    assert_eq!(events[0].get("penalty").and_then(|v| v.as_i64()), Some(-25));
+}
+
+/// Breaking an expired treaty or an unknown id is rejected silently.
+#[test]
+fn break_after_expire_is_rejected() {
+    let mut world = setup_world();
+    let id = propose_treaty(&mut world, "a", "b", TreatyKind::NonAggression, Some(0)).unwrap();
+    accept_treaty(&mut world, id).unwrap();
+    expire_due_treaties(&mut world).unwrap();
+    assert_eq!(list_treaties(&world, None)[0].status, TreatyStatus::Expired);
+    drain_flushed(&mut world, "treaty_broken");
+
+    assert!(can_break(&world, id).is_err());
+    assert!(break_treaty(&mut world, id).is_err());
+    assert!(break_treaty(&mut world, 9999).is_err());
+
+    let events = drain_flushed(&mut world, "treaty_broken");
+    assert!(events.is_empty(), "rejected break must emit no event");
+}
+
+/// Active treaties reaching their expiry tick expire with one event each.
+#[test]
+fn expiry_at_turn_boundary_expires_with_event() {
+    let mut world = setup_world();
+    let id = propose_treaty(&mut world, "a", "b", TreatyKind::NonAggression, Some(5)).unwrap();
+    accept_treaty(&mut world, id).unwrap();
+
+    world.turn = 4;
+    expire_due_treaties(&mut world).unwrap();
+    assert_eq!(list_treaties(&world, None)[0].status, TreatyStatus::Active);
+    assert!(drain_flushed(&mut world, "treaty_expired").is_empty());
+
+    world.turn = 5;
+    expire_due_treaties(&mut world).unwrap();
+    assert_eq!(list_treaties(&world, None)[0].status, TreatyStatus::Expired);
+    let events = drain_flushed(&mut world, "treaty_expired");
+    assert_eq!(events.len(), 1, "expected exactly one expiry event");
+    assert_eq!(
+        events[0].get("treaty_id").and_then(|v| v.as_u64()),
+        Some(id)
+    );
+}
+
+/// Treaties without a duration never expire.
+#[test]
+fn none_duration_treaty_never_expires() {
+    let mut world = setup_world();
+    let id = propose_treaty(&mut world, "a", "b", TreatyKind::Alliance, None).unwrap();
+    accept_treaty(&mut world, id).unwrap();
+
+    world.turn = 100;
+    expire_due_treaties(&mut world).unwrap();
+    assert_eq!(list_treaties(&world, None)[0].status, TreatyStatus::Active);
+    assert!(drain_flushed(&mut world, "treaty_expired").is_empty());
+}
+
+/// Trade treaties run the full lifecycle without touching pair state.
+#[test]
+fn trade_treaty_completes_lifecycle_without_state_change() {
+    let mut world = setup_world();
+    let id = propose_treaty(&mut world, "a", "b", TreatyKind::TradeStub, Some(5)).unwrap();
+    accept_treaty(&mut world, id).unwrap();
+    assert_eq!(get_relation(&world, "a", "b"), RelationState::Neutral);
+    assert_eq!(get_standing(&world, "a", "b"), 0);
+
+    world.turn = 5;
+    expire_due_treaties(&mut world).unwrap();
+    assert_eq!(list_treaties(&world, None)[0].status, TreatyStatus::Expired);
+    assert_eq!(get_relation(&world, "a", "b"), RelationState::Neutral);
+    assert_eq!(get_standing(&world, "a", "b"), 0);
+
+    world.update_event_buses::<serde_json::Value>();
+    let proposed: Vec<serde_json::Value> = world.drain_events("treaty_proposed");
+    let signed: Vec<serde_json::Value> = world.drain_events("treaty_signed");
+    let expired: Vec<serde_json::Value> = world.drain_events("treaty_expired");
+    assert_eq!(proposed.len(), 1);
+    assert_eq!(signed.len(), 1);
+    assert_eq!(expired.len(), 1);
+}
+
+/// Treaty listings filter by faction membership.
+#[test]
+fn list_treaties_filters_by_faction() {
+    let mut world = setup_world();
+    propose_treaty(&mut world, "a", "b", TreatyKind::NonAggression, Some(10)).unwrap();
+    propose_treaty(&mut world, "c", "d", TreatyKind::Alliance, Some(10)).unwrap();
+
+    assert_eq!(list_treaties(&world, None).len(), 2);
+    assert_eq!(list_treaties(&world, Some("a")).len(), 1);
+    assert_eq!(list_treaties(&world, Some("d")).len(), 1);
+    assert!(list_treaties(&world, Some("zzz")).is_empty());
 }
 
 /// Regression test for the F-01 precondition: hostile targeting reads the
