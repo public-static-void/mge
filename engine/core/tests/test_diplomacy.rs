@@ -12,6 +12,8 @@ use engine_core::diplomacy::{
     can_propose, declare_peace, declare_war, expire_due_treaties, get_relation, get_standing,
     list_treaties, modify_standing, propose_treaty,
 };
+use engine_core::ecs::registry::ComponentRegistry;
+use engine_core::ecs::schema::ComponentSchema;
 use engine_core::ecs::world::World;
 use engine_core::map::cell_key::CellKey;
 use engine_core::map::{Map, SquareGridMap};
@@ -49,7 +51,36 @@ fn setup_world() -> World {
     let mut world = make_test_world();
     world.current_mode = "roguelike".to_string();
     world.map = Some(open_plane(10));
+    {
+        let mut reg = world.registry.lock().unwrap();
+        register_diplomacy_schemas(&mut *reg);
+    }
     world
+}
+
+/// Registers the Diplomacy + Treaty component schemas from the on-disk files.
+///
+/// Kept as a helper so schema registration is explicit per test setup rather
+/// than relying solely on the directory auto-load in `make_test_world`.
+fn register_diplomacy_schemas(reg: &mut ComponentRegistry) {
+    reg.register_external_schema(ComponentSchema {
+        name: "Diplomacy".to_string(),
+        schema: serde_json::from_str(include_str!("../../assets/schemas/diplomacy.json")).unwrap(),
+        modes: vec![
+            "colony".to_string(),
+            "roguelike".to_string(),
+            "simulation".to_string(),
+        ],
+    });
+    reg.register_external_schema(ComponentSchema {
+        name: "Treaty".to_string(),
+        schema: serde_json::from_str(include_str!("../../assets/schemas/treaty.json")).unwrap(),
+        modes: vec![
+            "colony".to_string(),
+            "roguelike".to_string(),
+            "simulation".to_string(),
+        ],
+    });
 }
 
 /// Pair lookups behave identically regardless of argument order.
@@ -765,4 +796,79 @@ fn execution_order_places_diplomacy_between_reputation_and_enemy() {
         pos("DiplomacySystem") < pos("EnemyBehaviorSystem"),
         "DiplomacySystem must run before EnemyBehaviorSystem"
     );
+}
+
+/// Diplomacy + Treaty schemas are registered in the test world registry.
+#[test]
+fn diplomacy_schemas_are_registered() {
+    let world = setup_world();
+    let reg = world.registry.lock().unwrap();
+    let names = reg.all_component_names();
+    assert!(
+        names.contains(&"Diplomacy".to_string()),
+        "Diplomacy schema must be registered"
+    );
+    assert!(
+        names.contains(&"Treaty".to_string()),
+        "Treaty schema must be registered"
+    );
+}
+
+/// Whole-world save/load preserves relation state, standing, every treaty
+/// record/status, and the monotonic id counter with no per-system save code.
+#[test]
+fn save_load_roundtrip_preserves_diplomacy_store() {
+    use engine_core::ecs::system::System;
+    use engine_core::systems::diplomacy::DiplomacySystem;
+
+    let mut world = setup_world();
+
+    modify_standing(&mut world, "a", "b", 45).unwrap();
+
+    let active_id = propose_treaty(&mut world, "c", "d", TreatyKind::Alliance, Some(50)).unwrap();
+    accept_treaty(&mut world, active_id).unwrap();
+
+    let proposed_id =
+        propose_treaty(&mut world, "e", "f", TreatyKind::NonAggression, Some(20)).unwrap();
+
+    let broken_id = propose_treaty(&mut world, "g", "h", TreatyKind::TradeStub, Some(30)).unwrap();
+    accept_treaty(&mut world, broken_id).unwrap();
+    break_treaty(&mut world, broken_id).unwrap();
+
+    let expired_id = propose_treaty(&mut world, "i", "j", TreatyKind::Peace, Some(5)).unwrap();
+    accept_treaty(&mut world, expired_id).unwrap();
+    world.turn = 5;
+    let mut system = DiplomacySystem;
+    system.run(&mut world);
+
+    declare_war(&mut world, "k", "l").unwrap();
+
+    let before_treaties = list_treaties(&world, None);
+
+    let file = tempfile::NamedTempFile::new().unwrap();
+    world.save_to_file(file.path()).unwrap();
+    let mut loaded = World::load_from_file(file.path(), world.registry.clone()).unwrap();
+
+    assert_eq!(get_relation(&loaded, "a", "b"), RelationState::Neutral);
+    assert_eq!(get_standing(&loaded, "a", "b"), 45);
+    assert_eq!(get_relation(&loaded, "c", "d"), RelationState::Allied);
+    assert_eq!(get_relation(&loaded, "k", "l"), RelationState::War);
+    assert_eq!(get_standing(&loaded, "g", "h"), -25);
+
+    assert_eq!(list_treaties(&loaded, None), before_treaties);
+    let status_of = |id: u64| {
+        list_treaties(&loaded, None)
+            .into_iter()
+            .find(|t| t.id == id)
+            .unwrap()
+            .status
+    };
+    assert_eq!(status_of(active_id), TreatyStatus::Active);
+    assert_eq!(status_of(proposed_id), TreatyStatus::Proposed);
+    assert_eq!(status_of(broken_id), TreatyStatus::Broken);
+    assert_eq!(status_of(expired_id), TreatyStatus::Expired);
+
+    let next_id = propose_treaty(&mut world, "m", "n", TreatyKind::Peace, None).unwrap();
+    let loaded_next_id = propose_treaty(&mut loaded, "m", "n", TreatyKind::Peace, None).unwrap();
+    assert_eq!(loaded_next_id, next_id);
 }

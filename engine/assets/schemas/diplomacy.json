@@ -1,0 +1,29 @@
+{
+  "title": "Diplomacy",
+  "description": "Bilateral diplomatic relation between two factions: explicit relationship state plus a clamped standing score.",
+  "type": "object",
+  "properties": {
+    "pair": {
+      "type": "array",
+      "description": "Canonical sorted faction-id pair [min, max]",
+      "items": { "type": "string" },
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "state": {
+      "type": "string",
+      "enum": ["Allied", "Neutral", "Hostile", "War"],
+      "default": "Neutral",
+      "description": "Explicit relationship state, set only by war/peace/treaty transitions"
+    },
+    "standing": {
+      "type": "integer",
+      "minimum": -100,
+      "maximum": 100,
+      "default": 0,
+      "description": "Diplomatic standing score, clamped to -100..100"
+    }
+  },
+  "required": ["pair", "state", "standing"],
+  "modes": ["colony", "roguelike", "simulation"]
+}

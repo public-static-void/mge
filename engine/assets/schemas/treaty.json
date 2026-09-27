@@ -1,0 +1,49 @@
+{
+  "title": "Treaty",
+  "description": "One bilateral treaty record with propose/accept/break/expire lifecycle.",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Monotonic treaty id from the store counter"
+    },
+    "a": {
+      "type": "string",
+      "description": "Proposing faction id"
+    },
+    "b": {
+      "type": "string",
+      "description": "Counterparty faction id"
+    },
+    "kind": {
+      "type": "string",
+      "enum": ["NonAggression", "Alliance", "Peace", "TradeStub"],
+      "description": "Treaty kind"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["Proposed", "Active", "Broken", "Expired"],
+      "description": "Current lifecycle status"
+    },
+    "proposed_tick": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Turn the treaty was proposed on"
+    },
+    "active_tick": {
+      "type": ["integer", "null"],
+      "minimum": 0,
+      "default": null,
+      "description": "Turn the treaty was accepted on; null until accepted"
+    },
+    "expires_tick": {
+      "type": ["integer", "null"],
+      "minimum": 0,
+      "default": null,
+      "description": "Turn the treaty expires on; null means it never expires"
+    }
+  },
+  "required": ["id", "a", "b", "kind", "status", "proposed_tick"],
+  "modes": ["colony", "roguelike", "simulation"]
+}
