@@ -6,7 +6,7 @@
 //! accessors, with no per-entity owner required.
 //!
 //! Relationship state is explicit-only: it changes solely through war, peace,
-//! and treaty transitions (M4/M3), never derived from entity `Reputation`
+//! and treaty transitions, never derived from entity `Reputation`
 //! scores or `Faction.role`. Every successful mutation emits exactly one
 //! `relation_changed` event; rejected mutations emit nothing.
 
@@ -218,7 +218,7 @@ impl DiplomacyState {
         let (a, b) = Self::canonical(fa, fb);
         let entry = self.get_or_create(&a, &b);
         let old_standing = entry.standing;
-        let new_standing = (old_standing + delta).clamp(MIN_STANDING, MAX_STANDING);
+        let new_standing = old_standing.saturating_add(delta).clamp(MIN_STANDING, MAX_STANDING);
         entry.standing = new_standing;
         let state = entry.state;
         Ok(vec![(
@@ -256,7 +256,7 @@ impl DiplomacyState {
                 status: TreatyStatus::Proposed,
                 proposed_tick: turn,
                 active_tick: None,
-                expires_tick: duration_ticks.map(|d| turn + d),
+                expires_tick: duration_ticks.map(|d| turn.saturating_add(d)),
             },
         );
         Ok((
