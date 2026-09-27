@@ -14,6 +14,8 @@ pub mod crafting;
 pub mod death_decay;
 /// Derived stats calculation system
 pub mod derived_stats;
+/// Diplomacy treaty-expiry system
+pub mod diplomacy;
 /// Procedural dungeon generation
 pub mod dungeon;
 /// Economic system
@@ -73,6 +75,7 @@ pub const SYSTEM_EXECUTION_ORDER: &[&str] = &[
     "ConstructionSystem",
     "ZoneSystem",
     "FactionReputationSystem",
+    "DiplomacySystem",
     "FluidSimulationSystem",
     "WeatherSystem",
     "TemperatureSystem",

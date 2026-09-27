@@ -180,15 +180,19 @@ fn find_nearest_hostile_in_faction(
         }
 
         if let Some(my_fid) = my_faction {
-            let rep_negative = world
-                .get_component(other, "Reputation")
-                .and_then(|r| r.get("values"))
-                .and_then(|v| v.get(my_fid))
-                .and_then(|s| s.as_i64())
-                .map(|s| s < 0)
-                .unwrap_or(false);
-            if !rep_negative {
-                continue;
+            let at_war = crate::diplomacy::get_relation(world, my_fid, target_faction)
+                == crate::diplomacy::RelationState::War;
+            if !at_war {
+                let rep_negative = world
+                    .get_component(other, "Reputation")
+                    .and_then(|r| r.get("values"))
+                    .and_then(|v| v.get(my_fid))
+                    .and_then(|s| s.as_i64())
+                    .map(|s| s < 0)
+                    .unwrap_or(false);
+                if !rep_negative {
+                    continue;
+                }
             }
         }
 

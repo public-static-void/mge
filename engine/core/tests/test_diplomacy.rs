@@ -132,6 +132,93 @@ fn drain_flushed(world: &mut World, name: &str) -> Vec<serde_json::Value> {
     world.drain_events(name)
 }
 
+/// Spawn an EnemyAI actor of one faction plus a victim entity of another,
+/// with positions two cells apart on the open plane. Returns (enemy, victim).
+fn spawn_war_pair(world: &mut World, my_faction: &str, target_faction: &str) -> (u32, u32) {
+    use serde_json::json;
+
+    let enemy = world.spawn_entity();
+    world
+        .set_component(
+            enemy,
+            "EnemyAI",
+            json!({
+                "state": "idle",
+                "alert_level": 0,
+                "detection_range": 10,
+                "attack_range": 1,
+                "flee_threshold": 0.25,
+                "target_faction": target_faction,
+                "target_entity": null
+            }),
+        )
+        .unwrap();
+    world
+        .set_component(
+            enemy,
+            "Position",
+            json!({"pos": {"Square": {"x": 0, "y": 0, "z": 0}}}),
+        )
+        .unwrap();
+    world
+        .set_component(enemy, "Health", json!({"current": 10.0, "max": 10.0}))
+        .unwrap();
+    world
+        .set_component(enemy, "Sight", json!({"range": 10}))
+        .unwrap();
+    world
+        .set_component(
+            enemy,
+            "Faction",
+            json!({"faction_id": my_faction, "role": "enemy"}),
+        )
+        .unwrap();
+    world
+        .set_component(enemy, "Type", json!({"kind": "enemy"}))
+        .unwrap();
+
+    let victim = world.spawn_entity();
+    world
+        .set_component(
+            victim,
+            "Position",
+            json!({"pos": {"Square": {"x": 3, "y": 0, "z": 0}}}),
+        )
+        .unwrap();
+    world
+        .set_component(victim, "Health", json!({"current": 10.0, "max": 10.0}))
+        .unwrap();
+    world
+        .set_component(victim, "Type", json!({"kind": "villager"}))
+        .unwrap();
+    world
+        .set_component(
+            victim,
+            "Faction",
+            json!({"faction_id": target_faction, "role": "member"}),
+        )
+        .unwrap();
+    (enemy, victim)
+}
+
+/// Make both war-pair cells visible to the observer.
+fn make_pair_visible(world: &mut World, observer: u32) {
+    let mut visible = HashSet::new();
+    visible.insert(CellKey::Square { x: 0, y: 0, z: 0 });
+    visible.insert(CellKey::Square { x: 3, y: 0, z: 0 });
+    world.set_visible_cells(observer, visible);
+}
+
+/// Read the EnemyAI state string for an entity.
+fn ai_state(world: &World, enemy: u32) -> String {
+    world
+        .get_component(enemy, "EnemyAI")
+        .and_then(|ai| ai.get("state"))
+        .and_then(|s| s.as_str())
+        .map(|s| s.to_string())
+        .unwrap()
+}
+
 /// Proposing a treaty records it and emits exactly one proposal event.
 #[test]
 fn propose_treaty_records_and_emits_event() {
@@ -455,5 +542,227 @@ fn reputation_gated_targeting_uses_production_shape() {
     assert_eq!(
         state, "chase",
         "Enemy should detect and chase hostile faction member written via production shape"
+    );
+}
+
+/// Declaring war sets the pair to War and emits exactly one war event.
+#[test]
+fn war_declaration_sets_war_and_emits_event() {
+    let mut world = setup_world();
+    declare_war(&mut world, "a", "b").unwrap();
+    assert_eq!(get_relation(&world, "a", "b"), RelationState::War);
+
+    let events = drain_flushed(&mut world, "war_declared");
+    assert_eq!(events.len(), 1, "expected exactly one war event");
+    assert_eq!(
+        events[0].get("aggressor").and_then(|v| v.as_str()),
+        Some("a")
+    );
+    assert_eq!(
+        events[0].get("defender").and_then(|v| v.as_str()),
+        Some("b")
+    );
+}
+
+/// A second war declaration on a war pair is rejected without a new event.
+#[test]
+fn double_war_declaration_is_rejected() {
+    use engine_core::diplomacy::can_war;
+
+    let mut world = setup_world();
+    declare_war(&mut world, "a", "b").unwrap();
+    drain_flushed(&mut world, "war_declared");
+
+    assert!(can_war(&world, "a", "b").is_err());
+    assert!(declare_war(&mut world, "b", "a").is_err());
+
+    let events = drain_flushed(&mut world, "war_declared");
+    assert!(events.is_empty(), "rejected war must emit no event");
+}
+
+/// War auto-breaks live paper treaties on the pair, each with its own event.
+#[test]
+fn war_breaks_paper_treaties() {
+    let mut world = setup_world();
+    let pact = propose_treaty(&mut world, "a", "b", TreatyKind::NonAggression, Some(10)).unwrap();
+    accept_treaty(&mut world, pact).unwrap();
+    let pact2 = propose_treaty(&mut world, "a", "b", TreatyKind::Alliance, Some(10)).unwrap();
+    accept_treaty(&mut world, pact2).unwrap();
+
+    declare_war(&mut world, "a", "b").unwrap();
+    assert_eq!(get_relation(&world, "a", "b"), RelationState::War);
+
+    let listed = list_treaties(&world, None);
+    let status_of = |id: u64| {
+        listed
+            .iter()
+            .find(|t| t.id == id)
+            .map(|t| t.status)
+            .unwrap()
+    };
+    assert_eq!(status_of(pact), TreatyStatus::Broken);
+    assert_eq!(status_of(pact2), TreatyStatus::Broken);
+
+    let events = drain_flushed(&mut world, "treaty_broken");
+    assert_eq!(events.len(), 2, "one broken event per auto-broken treaty");
+}
+
+/// Trade treaties are not paper: war leaves an active trade treaty in force.
+#[test]
+fn war_leaves_trade_treaty_active() {
+    let mut world = setup_world();
+    let id = propose_treaty(&mut world, "a", "b", TreatyKind::TradeStub, Some(10)).unwrap();
+    accept_treaty(&mut world, id).unwrap();
+
+    declare_war(&mut world, "a", "b").unwrap();
+    assert_eq!(list_treaties(&world, None)[0].status, TreatyStatus::Active);
+}
+
+/// Peace on a war pair resets to Neutral with zero standing and emits.
+#[test]
+fn peace_resets_war_pair_to_neutral_zero() {
+    use engine_core::diplomacy::can_peace;
+
+    let mut world = setup_world();
+    declare_war(&mut world, "a", "b").unwrap();
+    modify_standing(&mut world, "a", "b", 60).unwrap();
+    drain_flushed(&mut world, "war_declared");
+    drain_flushed(&mut world, "relation_changed");
+
+    declare_peace(&mut world, "a", "b").unwrap();
+    assert_eq!(get_relation(&world, "a", "b"), RelationState::Neutral);
+    assert_eq!(get_standing(&world, "a", "b"), 0);
+
+    let events = drain_flushed(&mut world, "peace_declared");
+    assert_eq!(events.len(), 1, "expected exactly one peace event");
+
+    assert!(can_peace(&world, "a", "b").is_err());
+    assert!(declare_peace(&mut world, "a", "b").is_err());
+    let again = drain_flushed(&mut world, "peace_declared");
+    assert!(again.is_empty(), "rejected peace must emit no event");
+}
+
+/// Peace on a non-war pair is rejected without an event.
+#[test]
+fn peace_on_non_war_pair_is_rejected() {
+    let mut world = setup_world();
+    assert!(declare_peace(&mut world, "a", "b").is_err());
+    let events = drain_flushed(&mut world, "peace_declared");
+    assert!(events.is_empty(), "rejected peace must emit no event");
+}
+
+/// The treaty Peace path clears war with the same end state as declare_peace.
+#[test]
+fn treaty_peace_accept_on_war_pair_clears_war() {
+    let mut world = setup_world();
+    declare_war(&mut world, "a", "b").unwrap();
+    modify_standing(&mut world, "a", "b", -40).unwrap();
+
+    let id = propose_treaty(&mut world, "a", "b", TreatyKind::Peace, Some(10)).unwrap();
+    accept_treaty(&mut world, id).unwrap();
+    assert_eq!(get_relation(&world, "a", "b"), RelationState::Neutral);
+    assert_eq!(get_standing(&world, "a", "b"), 0);
+}
+
+/// War-pair targeting ignores entity reputation: zero-rep victims are chased.
+#[test]
+fn war_pair_targeting_ignores_reputation() {
+    use engine_core::ecs::system::System;
+    use engine_core::systems::enemy_behavior::EnemyBehaviorSystem;
+
+    let mut world = setup_world();
+    let (enemy, _victim) = spawn_war_pair(&mut world, "raiders", "players");
+    declare_war(&mut world, "raiders", "players").unwrap();
+    make_pair_visible(&mut world, enemy);
+
+    let mut system = EnemyBehaviorSystem;
+    system.run(&mut world);
+
+    assert_eq!(
+        ai_state(&world, enemy),
+        "chase",
+        "war-pair victim with no negative reputation must still be chased"
+    );
+}
+
+/// War never grants omniscience: a blind attacker finds no target.
+#[test]
+fn blind_attacker_finds_no_target_during_war() {
+    use engine_core::ecs::system::System;
+    use engine_core::systems::enemy_behavior::EnemyBehaviorSystem;
+
+    let mut world = setup_world();
+    let (enemy, _victim) = spawn_war_pair(&mut world, "raiders", "players");
+    declare_war(&mut world, "raiders", "players").unwrap();
+
+    let mut system = EnemyBehaviorSystem;
+    system.run(&mut world);
+
+    assert_eq!(
+        ai_state(&world, enemy),
+        "idle",
+        "blind attacker must stay idle even during war"
+    );
+}
+
+/// DiplomacySystem expires due treaties through the tick path with events.
+#[test]
+fn diplomacy_system_expires_due_treaties() {
+    use engine_core::ecs::system::System;
+    use engine_core::systems::diplomacy::DiplomacySystem;
+
+    let mut world = setup_world();
+    let id = propose_treaty(&mut world, "a", "b", TreatyKind::NonAggression, Some(5)).unwrap();
+    accept_treaty(&mut world, id).unwrap();
+
+    world.turn = 5;
+    let mut system = DiplomacySystem;
+    system.run(&mut world);
+
+    assert_eq!(list_treaties(&world, None)[0].status, TreatyStatus::Expired);
+    let events = drain_flushed(&mut world, "treaty_expired");
+    assert_eq!(events.len(), 1, "expected exactly one expiry event");
+    assert_eq!(
+        events[0].get("treaty_id").and_then(|v| v.as_u64()),
+        Some(id)
+    );
+}
+
+/// DiplomacySystem leaves treaties without duration in force across 100 ticks.
+#[test]
+fn diplomacy_system_keeps_timeless_treaty_for_100_ticks() {
+    use engine_core::ecs::system::System;
+    use engine_core::systems::diplomacy::DiplomacySystem;
+
+    let mut world = setup_world();
+    let id = propose_treaty(&mut world, "a", "b", TreatyKind::Alliance, None).unwrap();
+    accept_treaty(&mut world, id).unwrap();
+
+    world.turn = 100;
+    let mut system = DiplomacySystem;
+    system.run(&mut world);
+
+    assert_eq!(list_treaties(&world, None)[0].status, TreatyStatus::Active);
+    assert!(drain_flushed(&mut world, "treaty_expired").is_empty());
+}
+
+/// DiplomacySystem sits strictly between reputation settlement and targeting.
+#[test]
+fn execution_order_places_diplomacy_between_reputation_and_enemy() {
+    use engine_core::systems::SYSTEM_EXECUTION_ORDER;
+
+    let pos = |name: &str| {
+        SYSTEM_EXECUTION_ORDER
+            .iter()
+            .position(|n| *n == name)
+            .unwrap_or_else(|| panic!("{name} missing from SYSTEM_EXECUTION_ORDER"))
+    };
+    assert!(
+        pos("DiplomacySystem") > pos("FactionReputationSystem"),
+        "DiplomacySystem must run after FactionReputationSystem"
+    );
+    assert!(
+        pos("DiplomacySystem") < pos("EnemyBehaviorSystem"),
+        "DiplomacySystem must run before EnemyBehaviorSystem"
     );
 }

@@ -319,12 +319,22 @@ pub fn accept_treaty(world: &mut World, treaty_id: u64) -> Result<(), String> {
 /// Applies a treaty kind's state floor to its pair on acceptance.
 ///
 /// Floors never demote: `Allied` survives `Peace`/`NonAggression`, and `War`
-/// is left intact (only peace transitions clear it).
+/// is left intact by `NonAggression`/`Alliance` (only peace transitions clear
+/// it). Accepting a `Peace` treaty on a war pair ends the war with the same
+/// end state as [`declare_peace`]: `(Neutral, 0)`.
 fn apply_accept_floor(world: &mut World, kind: TreatyKind, fa: &str, fb: &str) {
     let (a, b) = DiplomacyState::canonical(fa, fb);
     let entry = world.diplomacy.get_or_create(&a, &b);
     match kind {
-        TreatyKind::Peace | TreatyKind::NonAggression => {
+        TreatyKind::Peace => {
+            if entry.state == RelationState::War {
+                entry.state = RelationState::Neutral;
+                entry.standing = 0;
+            } else if entry.state == RelationState::Hostile {
+                entry.state = RelationState::Neutral;
+            }
+        }
+        TreatyKind::NonAggression => {
             if entry.state == RelationState::Hostile {
                 entry.state = RelationState::Neutral;
             }
@@ -425,8 +435,10 @@ pub fn can_war(world: &World, fa: &str, fb: &str) -> Result<(), String> {
 /// Declares war between two factions: sets pair state to `War` and emits
 /// exactly one `war_declared { aggressor, defender, tick }` event.
 ///
-/// Minimal M3 transition: the war-breaks-paper auto-break of live treaties
-/// lands in M4.
+/// War breaks paper: every `Active` `NonAggression`/`Alliance`/`Peace` treaty
+/// on the pair moves to `Broken` with one `treaty_broken { treaty_id, penalty }`
+/// event each (same penalty path as [`break_treaty`]). `TradeStub` treaties
+/// stay in force.
 pub fn declare_war(world: &mut World, aggressor: &str, defender: &str) -> Result<(), String> {
     can_war(world, aggressor, defender)?;
     let (a, b) = DiplomacyState::canonical(aggressor, defender);
@@ -440,6 +452,25 @@ pub fn declare_war(world: &mut World, aggressor: &str, defender: &str) -> Result
             "tick": tick,
         }),
     )?;
+    let paper: Vec<u64> = world
+        .diplomacy
+        .treaties
+        .values()
+        .filter(|t| {
+            let (ta, tb) = DiplomacyState::canonical(&t.a, &t.b);
+            ta == a
+                && tb == b
+                && t.status == TreatyStatus::Active
+                && matches!(
+                    t.kind,
+                    TreatyKind::NonAggression | TreatyKind::Alliance | TreatyKind::Peace
+                )
+        })
+        .map(|t| t.id)
+        .collect();
+    for id in paper {
+        break_treaty(world, id)?;
+    }
     Ok(())
 }
 
