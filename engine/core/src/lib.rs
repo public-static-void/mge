@@ -4,6 +4,8 @@
 
 /// Config module
 pub mod config;
+/// Diplomacy and faction-pair relationship system
+pub mod diplomacy;
 /// ECS module
 pub mod ecs;
 /// Faction and reputation system
