@@ -56,7 +56,7 @@
 - [x] Vehicle support
 - [x] Crafting system (recipes, tools, materials)
 - [x] Manufacturing and production queue
-- [ ] Diplomacy AI (relationships, treaties, war)
+- [x] Diplomacy AI (relationships, treaties, war)
 - [x] Faction and reputation system
 - [ ] Event-driven narrative engine (scenarios, decision events)
 - [ ] Procedural history and lore generation
