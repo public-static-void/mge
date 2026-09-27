@@ -182,11 +182,10 @@ fn find_nearest_hostile_in_faction(
         if let Some(my_fid) = my_faction {
             let rep_negative = world
                 .get_component(other, "Reputation")
-                .and_then(|r| r.get("relations"))
-                .and_then(|r| r.get(my_fid))
-                .and_then(|r| r.get("score"))
-                .and_then(|s| s.as_f64())
-                .map(|s| s < 0.0)
+                .and_then(|r| r.get("values"))
+                .and_then(|v| v.get(my_fid))
+                .and_then(|s| s.as_i64())
+                .map(|s| s < 0)
                 .unwrap_or(false);
             if !rep_negative {
                 continue;
