@@ -52,12 +52,14 @@ make clean                  # cargo clean
 
 ### Build
 
+Run the `make` targets below as single commands — each wraps its full underlying toolchain invocation.
+
 | What | Command |
 |---|---|
 | Full build | `make all` |
 | Rust plugins | `cargo run -p xtask -- build-plugins` |
 | C plugins | `cargo run -p xtask -- build-c-plugins` |
-| WASM tests | `cargo run -p xtask -- build-wasm-tests` |
+| WASM tests | `make build-wasm-tests` (wraps `cargo run -p xtask -- build-wasm-tests`) |
 | Python native ext | `make test-python` (builds via maturin inside venv) |
 | Schema validation | `cargo run --bin schema_validator --release -- engine/assets/schemas` |
 
@@ -201,7 +203,8 @@ xtask builds each Rust plugin crate in release mode, then copies `target/release
 
 ### WASM Tests
 
-- Build via `cargo run -p xtask -- build-wasm-tests`.
+- Build guest modules via `make build-wasm-tests`.
+- Guest binaries (`engine_wasm/wasm_tests/*.wasm`) are gitignored (`.gitignore`) build outputs — rebuild before testing; green means the `.wasm` files are present on disk plus `make test-wasm` passes.
 - Requires `wasmtime` (managed via Cargo, no system dependency).
 - Test modules in `engine_wasm/tests/`.
 - Loaded into the WASM runtime and executed with full state isolation.
