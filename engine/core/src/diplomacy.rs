@@ -218,7 +218,9 @@ impl DiplomacyState {
         let (a, b) = Self::canonical(fa, fb);
         let entry = self.get_or_create(&a, &b);
         let old_standing = entry.standing;
-        let new_standing = old_standing.saturating_add(delta).clamp(MIN_STANDING, MAX_STANDING);
+        let new_standing = old_standing
+            .saturating_add(delta)
+            .clamp(MIN_STANDING, MAX_STANDING);
         entry.standing = new_standing;
         let state = entry.state;
         Ok(vec![(
