@@ -25,5 +25,5 @@
     }
   },
   "required": ["pair", "state", "standing"],
-  "modes": ["colony", "roguelike", "simulation"]
+  "modes": ["colony", "roguelike", "simulation", "grand-strategy", "4x"]
 }

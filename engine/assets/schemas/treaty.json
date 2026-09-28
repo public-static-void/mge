@@ -45,5 +45,5 @@
     }
   },
   "required": ["id", "a", "b", "kind", "status", "proposed_tick"],
-  "modes": ["colony", "roguelike", "simulation"]
+  "modes": ["colony", "roguelike", "simulation", "grand-strategy", "4x"]
 }

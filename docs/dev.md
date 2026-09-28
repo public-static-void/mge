@@ -20,7 +20,7 @@ This mirrors the CI pipeline so all checks can be reproduced locally.
 - **pytest** (`pip install pytest`) for Python tests
 - **WASM** — built via xtask:
   ```sh
-  cargo run -p xtask -- build-wasm-tests
+  make build-wasm-tests
   ```
 
 ---
@@ -35,11 +35,17 @@ All major build, test, and validation tasks are automated via the project `Makef
 | Target                 | Description                                            |
 | ---------------------- | ------------------------------------------------------ |
 | `make all`             | Build everything (validates schemas first)             |
-| `make test`            | Run all tests (Rust, Python, Lua) and validate schemas |
+| `make test`            | Run all tests (schema validation + Rust, Python, Lua, WASM) |
+| `make test-all`        | Run all tests (schema validation + Rust, Python, Lua, WASM) |
 | `make validate-schema` | Validate all component/data schemas                    |
 | `make test-python`     | Set up venv, build Rust extension, run Python tests    |
-| `make test-rust`       | Build and run all Rust tests                           |
+| `make test-rust`       | Build and run all Rust tests (per-crate shards)        |
 | `make test-lua`        | Run all Lua scripting tests                            |
+| `make test-wasm`       | Rebuild guest modules, run all WASM tests              |
+| `make lint`            | Run the lint gate (zero warnings)                      |
+| `make fmt` / `make fmt-check` | Apply / verify formatting                       |
+| `make run-cli`         | Run the game CLI (forward args via `ARGS="..."`)       |
+| `make run-demo`        | Run the viewport demo                                  |
 | `make clean`           | Clean Rust build artifacts                             |
 | `make help`            | Show a summary of available targets                    |
 
@@ -47,7 +53,7 @@ All major build, test, and validation tasks are automated via the project `Makef
 
 - The Makefile will automatically set up Python virtual environments, install dependencies, and build Rust and C Plugins as needed.
 - All Makefile targets are idempotent and can be safely re-run.
-- The Makefile is the **single source of truth** for build and test orchestration; all CI steps use these targets.
+- The Makefile is the agent/user-facing surface for build and test orchestration. CI machines may invoke the raw toolchain directly (see the CI sequence below).
 
 ---
 
@@ -59,10 +65,10 @@ The standard technical iteration cycle for MGE development:
 
 1. **Validate schemas** — `make validate-schema` checks all JSON component schemas.
 2. **Build** — `make all` validates schemas and builds Rust crates, C plugins, and WASM tests.
-3. **Test** — `make test` runs schema validation + Rust + Python + Lua tests. Use individual targets (`make test-rust`, `make test-python`, `make test-lua`) for faster feedback on backend-specific changes.
-4. **Lint** — `cargo fmt --all --check` and `cargo clippy --all-targets --all-features -- -D warnings`.
+3. **Test** — `make test` runs schema validation + Rust + Python + Lua + WASM tests. Use individual targets (`make test-rust`, `make test-python`, `make test-lua`, `make test-wasm`) for faster feedback on backend-specific changes.
+4. **Lint** — `make fmt-check` and `make lint` (apply formatting with `make fmt`).
 
-CI enforces this sequence: `validate-schema → build-c-plugins → build-wasm-tests → build-all → test-rust → test-python → test-lua`.
+CI jobs (see `.github/workflows/ci.yml`): `fmt → clippy` (clippy needs `fmt`); `validate-schema`, `build-c-plugins`, `build-wasm-tests` (no dependencies); `test-rust` (needs `validate-schema`, `build-c-plugins`, `build-wasm-tests`); `test-lua` (needs `build-c-plugins`); `test-python` (needs `build-c-plugins`); `release` (needs `fmt`, `clippy`, `validate-schema`, `build-c-plugins`, `build-wasm-tests`, `test-rust`, `test-lua`, `test-python`). There is no standalone `test-wasm` CI job — WASM guest modules are built by `build-wasm-tests` and consumed as artifacts.
 
 ### Branching
 
@@ -75,8 +81,8 @@ Feature branches branch from `main` and are merged back via pull requests. Follo
 ### Rust Formatting and Linting
 
 ```sh
-cargo fmt --all --check
-cargo clippy --all-targets --all-features -- -D warnings
+make fmt-check
+make lint
 ```
 
 ---
