@@ -209,6 +209,60 @@ else
   fail "AC010 docs/dev.md CI sequence does not match as-built ci.yml jobs"
 fi
 
+# --- M4/AC012: genre traceability notes name store, system, war-gate, bridges, tests ---
+for genre in grand-strategy 4x; do
+  GENRE_FILE="docs/genres/$genre.md"
+  for token in DiplomacyState DiplomacySystem EnemyBehaviorSystem; do
+    if grep -q "$token" "$GENRE_FILE"; then
+      pass "AC012 $genre.md names $token"
+    else
+      fail "AC012 $genre.md missing $token"
+    fi
+  done
+  for bridge in engine_lua/src/lua_api/diplomacy.rs engine_py/src/python_api/diplomacy.rs engine_wasm/src/host_api/diplomacy.rs; do
+    if grep -q "$bridge" "$GENRE_FILE"; then
+      pass "AC012 $genre.md traces bridge $bridge"
+    else
+      fail "AC012 $genre.md missing bridge trace $bridge"
+    fi
+  done
+  if grep -q 'test_diplomacy' "$GENRE_FILE"; then
+    pass "AC012 $genre.md traces diplomacy test artifacts"
+  else
+    fail "AC012 $genre.md missing diplomacy test trace"
+  fi
+done
+
+# --- M4/AC013: strategy modes registered in schemas + game.toml ---
+for schema in engine/assets/schemas/diplomacy.json engine/assets/schemas/treaty.json; do
+  for mode in grand-strategy 4x; do
+    if python3 -c "import json,sys; sys.exit(0 if '$mode' in json.load(open('$schema')).get('modes', []) else 1)"; then
+      pass "AC013 $schema modes contains $mode"
+    else
+      fail "AC013 $schema modes missing $mode"
+    fi
+  done
+done
+for mode in grand-strategy 4x; do
+  if grep -q "\"$mode\"" game.toml; then
+    pass "AC013 game.toml allowed_modes contains $mode"
+  else
+    fail "AC013 game.toml allowed_modes missing $mode"
+  fi
+done
+if make validate-schema >/dev/null 2>&1; then
+  pass "AC013 make validate-schema green with strategy modes"
+else
+  fail "AC013 make validate-schema red with strategy modes"
+fi
+
+# --- M4/R016 scope guard: no diplomacy core diffs in this milestone ---
+if git diff --quiet -- engine/core/src/diplomacy.rs engine/core/src/systems/ engine_lua/src/lua_api/diplomacy.rs engine_py/src/python_api/diplomacy.rs engine_wasm/src/host_api/diplomacy.rs 2>/dev/null; then
+  pass "R016 zero diplomacy core/system/bridge diffs"
+else
+  fail "R016 diplomacy core/system/bridge diff detected"
+fi
+
 if [ "$FAILURES" -ne 0 ]; then
   echo "$FAILURES check(s) FAILED"
   exit 1

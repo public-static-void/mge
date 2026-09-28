@@ -7,6 +7,8 @@ allowed_modes = [
   "simulation",
   "single",
   "multi",
+  "grand-strategy",
+  "4x",
 ]
 
 [plugins]
