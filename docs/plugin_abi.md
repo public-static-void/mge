@@ -23,7 +23,7 @@ Plugins can register systems, participate in world generation, and interact with
 - Place your Rust plugin crate in `plugins/<plugin_name>/`.
 - Ensure `[lib] crate-type = ["cdylib"]` in `Cargo.toml`.
 - Export a `PLUGIN_VTABLE` symbol with the C ABI.
-- Use `cargo run -p xtask -- build-plugins` to build and deploy all plugins.
+- Use `make build-plugins` to build and deploy all plugins.
 
 ## C Plugins
 
@@ -37,18 +37,12 @@ Plugins can register systems, participate in world generation, and interact with
 ### Usage
 
 ```bash
-cargo run -p xtask -- build-plugins
+make build-plugins
 ```
 
 - Builds all plugin crates in `plugins/`
 - Copies the resulting `.so`/`.dll`/`.dylib` to each plugin's directory for loader discovery
-- Handles both C and Rust plugins
-
-You can also build a single plugin:
-
-```bash
-cargo run -p xtask -- build-plugins rust_test_plugin
-```
+- Handles both C and Rust plugins (C plugins via `make build-c-plugins`, everything via `make build-all`)
 
 ---
 

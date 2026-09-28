@@ -11,7 +11,7 @@
 ```sh
 git clone <repo> && cd mge
 make all                                    # validate schemas → build everything
-cargo run --bin mge_cli -- engine/scripts/lua/demos/roguelike_mvp.lua
+make run-cli ARGS="engine/scripts/lua/demos/roguelike_mvp.lua"
 ```
 
 ---
@@ -55,7 +55,7 @@ engine_macros (proc-macro)
 | `rust_test_plugin` | Test plugin (Rust cdylib)                                                            |
 | C plugins          | `simple_square_plugin`, `simple_hex_plugin`, `simple_province_plugin`, `test_plugin` |
 
-**Lua VM sandbox:** The `mge_cli` binary runs Lua scripts in a restricted VM. Standard Lua modules `os`, `io`, `package`, and `debug` are blocked. Functions like `require()`, `dofile()`, `loadfile()` are unavailable. Use Rust-native global functions (exposed via `engine_lua`) to access engine features from scripts. The same restrictions apply to Lua mods loaded via `--mod`.
+**Lua VM sandbox:** The `mge_cli` binary runs Lua scripts in a restricted VM. Standard Lua modules `os`, `io`, `package`, and `debug` are blocked. Functions like `require()`, `dofile()`, `loadfile()` are unavailable. Use Rust-native global functions (exposed via `engine_lua`) to access engine features from scripts. The same restrictions apply to Lua mods loaded via `--mod`. Exception: the Lua test runner (reached via `make test-lua`) provides a `require` shim for helper modules under `engine/scripts/lua/tests/` — `require` in Lua tests is legal.
 
 ---
 
@@ -159,11 +159,15 @@ If `pkg-config` reports that `luajit.pc` can’t be found, locate the `luajit.pc
 | `make all`             | Validate schemas → build everything               |
 | `make test`            | All tests: schema + Rust + Python + Lua + WASM    |
 | `make validate-schema` | Validate JSON schemas in `engine/assets/schemas/` |
-| `make test-rust`       | `cargo test --all`                                |
-| `make test-python`     | Setup venv → `maturin develop` → `pytest`         |
-| `make test-lua`        | Build test runner → run Lua test suite            |
-| `make test-wasm`       | `cargo test -p engine_wasm`                       |
-| `make clean`           | `cargo clean`                                     |
+| `make test-rust`       | Run Rust tests (per-crate shards)                     |
+| `make test-python`     | Setup venv → build extension → run Python tests       |
+| `make test-lua`        | Build test runner → run Lua test suite                |
+| `make test-wasm`       | Rebuild guest modules → run WASM tests                |
+| `make lint`            | Run the lint gate (zero warnings)                     |
+| `make fmt` / `make fmt-check` | Apply / verify formatting                    |
+| `make run-cli`         | Run the game CLI (forward args via `ARGS="..."`)      |
+| `make run-demo`        | Run the viewport demo                                 |
+| `make clean`           | Remove build artifacts                                |
 | `make help`            | Show a summary of available targets               |
 
 ---
@@ -187,7 +191,7 @@ A playable roguelike demonstrating 8+ engine subsystems:
 | Save/load     | 4 save slots with menu-driven save/load           |
 
 ```sh
-cargo run --bin mge_cli -- engine/scripts/lua/demos/roguelike_mvp.lua
+make run-cli ARGS="engine/scripts/lua/demos/roguelike_mvp.lua"
 ```
 
 Controls: `WASD/hjkl` move · `.` wait · `e/g` pickup · `q/u` use · `i` inventory · `d` drop · `S` save · `L` load · `Q` quit
@@ -195,13 +199,13 @@ Controls: `WASD/hjkl` move · `.` wait · `e/g` pickup · `q/u` use · `i` inven
 ### Viewport Demo
 
 ```sh
-cargo run --example viewport_demo -p engine_core
+make run-demo
 ```
 
 ### Mod Runner
 
 ```sh
-cargo run --bin mge_cli -- --mod mvp_roguelike
+make run-cli ARGS="--mod mvp_roguelike"
 ```
 
 Controls: `WASD` move · `e` attack · `.` wait · `q` quit

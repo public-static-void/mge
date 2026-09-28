@@ -22,13 +22,13 @@ Before every commit, run all three gates. Only commit when all three pass.
 
 ```sh
 # 1. Lint — zero warnings
-cargo clippy --all-targets --all-features -- -D warnings
+make lint
 
-# 2. Format — clean output
-cargo fmt --all
+# 2. Format — clean output (apply with `make fmt`)
+make fmt-check
 
 # 3. Test — all suites green
-cargo test --all                                          # Rust
+make test-rust                                             # Rust (per-crate shards)
 make test-python                                          # Python
 make test-lua                                              # Lua (requires C plugin .so)
 make test-wasm                                            # WASM
@@ -43,7 +43,7 @@ When a gate fails, fix the issue and re-run the gates. Only commit code that lin
 ```sh
 make all                    # validate schemas → build everything
 make test                   # validate-schema + test-rust + test-python + test-lua + test-wasm
-make clean                  # cargo clean
+make clean                  # remove build artifacts
 ```
 
 ---
@@ -57,48 +57,55 @@ Run the `make` targets below as single commands — each wraps its full underlyi
 | What | Command |
 |---|---|
 | Full build | `make all` |
-| Rust plugins | `cargo run -p xtask -- build-plugins` |
-| C plugins | `cargo run -p xtask -- build-c-plugins` |
-| WASM tests | `make build-wasm-tests` (wraps `cargo run -p xtask -- build-wasm-tests`) |
+| Rust plugins | `make build-plugins` |
+| C plugins | `make build-c-plugins` |
+| WASM tests | `make build-wasm-tests` |
 | Python native ext | `make test-python` (builds via maturin inside venv) |
-| Schema validation | `cargo run --bin schema_validator --release -- engine/assets/schemas` |
+| Schema validation | `make validate-schema` |
 
 ### Run
 
 | What | Command |
 |---|---|
-| Game CLI (Lua script) | `cargo run --bin mge_cli -- engine/scripts/lua/demos/roguelike_mvp.lua` |
-| Game CLI (mod) | `cargo run --bin mge_cli -- --mod mvp_roguelike` |
-| Viewport demo | `cargo run --example viewport_demo -p engine_core` |
+| Game CLI (Lua script) | `make run-cli ARGS="engine/scripts/lua/demos/roguelike_mvp.lua"` |
+| Game CLI (mod) | `make run-cli ARGS="--mod mvp_roguelike"` |
+| Viewport demo | `make run-demo` |
 
 ### Test
 
 | What | Command |
 |---|---|
 | All tests | `make test` |
-| Rust only | `make test-rust` (alias: `cargo test --all`) |
-| Python tests | `cd engine_py && source .venv/bin/activate && pytest tests/ -k <filter>` |
+| Rust only | `make test-rust` (per-crate shards; see the `test-rust` recipe in `Makefile`) |
+| Python tests | `make test-python` |
 | Lua tests | `make test-lua LUA_FILTER=<module_filter> [<function_filter>]` (exact names: module = `test_*.lua` stem, e.g. `test_loot`, not `loot`; function = exact key; function filter without module filter unsupported) |
-| WASM tests | `make test-wasm` (alias: `cargo test -p engine_wasm`) |
+| WASM tests | `make test-wasm` |
 | Schema validation | `make validate-schema` |
-| Single Rust test | `cargo test -p engine_core --test <test_file> <test_name>` |
+| Single Rust test | narrow to the owning crate's shard via the `test-rust` recipe in `Makefile` |
 
 ### Lint
 
 ```sh
-cargo fmt --all --check
-cargo clippy --all-targets --all-features -- -D warnings
+make fmt-check
+make lint
 ```
 
 ---
 
 ## Required Command Order
 
-CI enforces this sequence:
+CI jobs (see `.github/workflows/ci.yml` — Branch B: no `test-wasm` job exists):
 
 ```
-validate-schema → build-c-plugins → build-wasm-tests → build-all → test-rust → test-python → test-lua → test-wasm
+fmt → clippy (clippy needs fmt)
+validate-schema, build-c-plugins, build-wasm-tests (no dependencies)
+test-rust (needs validate-schema, build-c-plugins, build-wasm-tests)
+test-lua (needs build-c-plugins)
+test-python (needs build-c-plugins)
+release (needs fmt, clippy, validate-schema, build-c-plugins, build-wasm-tests, test-rust, test-lua, test-python)
 ```
+
+WASM guest modules are built by the `build-wasm-tests` job and consumed as artifacts (there is no standalone `test-wasm` CI job). CI machines may invoke the raw toolchain directly; agent/user-facing instructions use only `make` targets.
 
 `make test` runs: `validate-schema → test-rust → test-python → test-lua → test-wasm` (sequential). Python requires `maturin develop` (handled by `build-python` target in `make test-python`). Lua tests require C plugin `.so` at `plugins/simple_square_plugin/libsimple_square_plugin.so`.
 
@@ -158,7 +165,7 @@ mods/mvp_roguelike/
 1. **Nightly Rust required.** Edition "2024" is not stable. Use `rustup toolchain install nightly && rustup default nightly`.
 2. **LuaJIT system dep.** Install `libluajit-5.1-dev` + `pkg-config`. CI sets `PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig`.
 3. **C plugins need gcc + libjansson-dev.** xtask finds single `.c` file per plugin dir, compiles to `.so` with `-shared -fPIC -ljansson`.
-4. **Lua CLI sandbox.** The `mge_cli` VM blocks `os`, `io`, `package`, `debug` stdlibs — `require()`, `dofile()`, `loadfile()` do not exist. Expose Rust functionality via global functions in `engine_lua/src/lua_api/`. Don't design Lua modules that rely on `require()`.
+4. **Lua CLI sandbox.** The `mge_cli` VM blocks `os`, `io`, `package`, `debug` stdlibs — `require()`, `dofile()`, `loadfile()` do not exist there. Expose Rust functionality via global functions in `engine_lua/src/lua_api/`. Don't design Lua modules that rely on `require()`. Exception: the Lua test runner (`mge_lua_test_runner`, reached via `make test-lua`) installs a `require` shim that loads helper modules from `engine/scripts/lua/tests/` — `require` in Lua tests is legal; it stays unavailable in `mge_cli` and mods.
 
 ### Environment Variables
 
@@ -183,7 +190,7 @@ xtask builds each Rust plugin crate in release mode, then copies `target/release
 
 - Integration tests in `engine/core/tests/`.
 - Require pre-built C plugins and WASM test modules to exist.
-- CI workflow: build-all → download artifacts → `cargo run -p xtask -- build-plugins` → `export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(pwd)/plugins` → `cargo test --all`.
+- CI workflow (`test-rust` job): download C-plugin and WASM artifacts → `make build-all` → `make test-rust` with `LD_LIBRARY_PATH` including `$(pwd)/plugins`.
 
 ### Lua Tests
 
@@ -218,7 +225,7 @@ xtask builds each Rust plugin crate in release mode, then copies `target/release
 - **Schema-driven ECS:** All components defined as JSON schemas in `engine/assets/schemas/`. Loaded dynamically into `ComponentRegistry`. Rust-side components use `#[component]` macro for auto-generated versioning/migration/serde/schema.
 - **Game config:** `game.toml` at workspace root defines title, version, allowed game modes, and native plugin paths.
 - **Plugin ABI:** C ABI defined in `engine/engine_plugin_abi.h`. Exports `PluginVTable` with init, shutdown, update, worldgen, system registration, hot-reload.
-- **Presentation layer:** Terminal-based renderer with viewport support (terminal roguelike-style output). Demo: `cargo run --example viewport_demo -p engine_core`.
+- **Presentation layer:** Terminal-based renderer with viewport support (terminal roguelike-style output). Demo: `make run-demo`.
 - **Roadmap tracking:** After implementing any ROADMAP item (in `docs/ROADMAP.md`), mark it as `[x]` completed in that file as part of the commit.
 - **Lint, format, and test before committing:** See [Pre-Commit Gates](#pre-commit-gates) above. Run all three gates (clippy, fmt, test suites) before committing.
 

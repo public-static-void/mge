@@ -160,6 +160,55 @@ else
   fail "R011 lint-docs verdict contradicts docs state (dirty=$DOCS_DIRTY green=$LINTDOCS_GREEN)"
 fi
 
+# --- M3/AC005-AC007: docs use make forms, require-shim note present ---
+if grep -rnE 'cargo (run|build|test)' AGENTS.md README.md docs/dev.md docs/plugin_abi.md >/dev/null 2>&1; then
+  fail "AC005 plain-cargo user instruction remains in AGENTS.md/README.md/docs/dev.md/docs/plugin_abi.md"
+else
+  pass "AC005 zero plain-cargo in user-facing docs"
+fi
+if grep -q 'require.*shim' AGENTS.md && grep -q 'mge_lua_test_runner' AGENTS.md; then
+  pass "AC007/R017 AGENTS.md carries the Lua require-shim note"
+else
+  fail "AC007/R017 AGENTS.md require-shim note missing"
+fi
+if grep -qE 'cargo (clippy|fmt)|pytest tests/' AGENTS.md; then
+  fail "AC006 raw clippy/fmt/pytest instruction remains in AGENTS.md"
+else
+  pass "AC006 no raw clippy/fmt/pytest instruction in AGENTS.md"
+fi
+if grep -q 'make test' docs/dev.md \
+  && grep -q 'test-rust' docs/dev.md \
+  && grep -q 'test-python' docs/dev.md \
+  && grep -q 'test-lua' docs/dev.md \
+  && grep -q 'test-wasm' docs/dev.md; then
+  pass "AC007 docs/dev.md make test row names all four suites"
+else
+  fail "AC007 docs/dev.md make test row missing a suite"
+fi
+
+# --- M3/AC010 Branch B: docs CI sequence matches as-built ci.yml jobs ---
+for job in fmt clippy validate-schema build-c-plugins build-wasm-tests test-rust test-lua test-python; do
+  if ! grep -q "$job" .github/workflows/ci.yml; then
+    fail "AC010 ci.yml job $job missing (unexpected as-built drift)"
+  fi
+done
+if grep -E '^\s+test-wasm:' .github/workflows/ci.yml >/dev/null 2>&1; then
+  fail "AC010 Branch B violated: ci.yml unexpectedly gained a test-wasm job"
+else
+  pass "AC010 Branch B: ci.yml has no test-wasm job"
+fi
+if grep -E 'test-rust → test-python → test-lua → test-wasm$|build-all → test-rust → test-python → test-lua → test-wasm' AGENTS.md >/dev/null 2>&1; then
+  fail "AC010 stale Required Command Order still claims test-wasm as a CI step"
+else
+  pass "AC010 Required Command Order carries no stale test-wasm CI claim"
+fi
+if grep -q 'test-rust.*needs.*validate-schema.*build-c-plugins.*build-wasm-tests' docs/dev.md \
+  && grep -q 'no standalone.*test-wasm.*CI job' docs/dev.md; then
+  pass "AC010 docs/dev.md CI sequence matches as-built ci.yml jobs"
+else
+  fail "AC010 docs/dev.md CI sequence does not match as-built ci.yml jobs"
+fi
+
 if [ "$FAILURES" -ne 0 ]; then
   echo "$FAILURES check(s) FAILED"
   exit 1
