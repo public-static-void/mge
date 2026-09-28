@@ -2,7 +2,7 @@
 .PHONY: all build-plugins build-c-plugins build-wasm-tests build-all \
 	test test-rust test-python test-lua test-wasm test-all \
 	setup-python build-python build-wheel clean validate-schema help \
-	lint fmt fmt-check run-cli run-demo
+	lint fmt fmt-check run-cli run-demo lint-docs
 
 # ====== CONFIGURABLE VARIABLES ======
 SCHEMA_DIR := engine/assets/schemas
@@ -35,6 +35,7 @@ help:
 	@echo "  make fmt-check        - Verify formatting (cargo fmt --check)"
 	@echo '  make run-cli          - Run game CLI (forward args via ARGS="...")'
 	@echo "  make run-demo         - Run viewport demo"
+	@echo "  make lint-docs        - Fail on plain-cargo regressions in user-facing docs"
 
 # ====== LINT / FORMAT TARGETS ======
 lint:
@@ -53,6 +54,13 @@ run-cli:
 run-demo:
 	cargo run --example viewport_demo -p engine_core
 
+# ====== DOCS REGRESSION GUARD ======
+# User-facing docs must use make targets, never plain cargo (M2/R011).
+lint-docs:
+	@if grep -rnE 'cargo (run|build|test)' AGENTS.md README.md docs/dev.md docs/plugin_abi.md; then \
+		echo "plain-cargo found in user-facing docs"; exit 1; \
+	fi
+
 # ====== SCHEMA VALIDATION ======
 validate-schema:
 	cargo run --bin schema_validator --release -- $(SCHEMA_DIR)
@@ -70,9 +78,16 @@ build-wasm-tests:
 build-all:
 	cargo run -p xtask -- build-all
 
-# ====== RUST TEST TARGET ======
-test-rust:
-	cargo test --all
+# ====== RUST TEST TARGET (sharded per crate: one tool-timeout budget per shard) ======
+test-rust: build-c-plugins
+	cargo test -p engine_core
+	cargo test -p engine_macros
+	cargo test -p engine_py
+	cargo test -p engine_lua
+	cargo test -p engine_wasm
+	cargo test -p schema_validator
+	cargo test -p rust_test_plugin
+	cargo test -p xtask
 
 # ====== PYTHON SETUP, BUILD, AND TEST TARGETS ======
 
@@ -103,13 +118,13 @@ test-python: build-python
 	@cd engine_py && . .venv/bin/activate && pytest
 
 # ====== LUA TEST TARGET ======
-test-lua:
+test-lua: build-c-plugins
 	@echo "Running Lua tests..."
 	cargo build --package engine_lua --bin mge_lua_test_runner
 	./run_lua_tests.sh $(LUA_FILTER)
 
 # ====== WASM TEST TARGET ======
-test-wasm:
+test-wasm: build-wasm-tests
 	cargo test -p engine_wasm
 
 # ====== AGGREGATED TEST TARGETS ======

@@ -78,8 +78,90 @@ else
   fail "AC004 tokens missing from make help output:$MISSING"
 fi
 
+# --- M2/AC008: test-rust sharded per crate, no bare `cargo test --all` ---
+RUST_RECIPE=$(sed -n '/^test-rust:/,/^[^[:space:]]/p' Makefile)
+if printf '%s\n' "$RUST_RECIPE" | grep -q 'cargo test --all'; then
+  fail "AC008 test-rust still contains bare cargo test --all"
+else
+  pass "AC008 test-rust contains no bare cargo test --all"
+fi
+MISSING_SHARDS=""
+for member in engine_core engine_macros engine_py engine_lua engine_wasm schema_validator rust_test_plugin xtask; do
+  if ! printf '%s\n' "$RUST_RECIPE" | grep -q "cargo test -p $member"; then
+    MISSING_SHARDS="$MISSING_SHARDS $member"
+  fi
+done
+if [ -z "$MISSING_SHARDS" ]; then
+  pass "AC008 test-rust shards cover all 8 workspace members"
+else
+  fail "AC008 test-rust missing shards:$MISSING_SHARDS"
+fi
+
+# --- M2/AC009: structural artifact ordering ---
+if grep -q '^test-wasm:.*build-wasm-tests' Makefile; then
+  pass "AC009 test-wasm depends on build-wasm-tests"
+else
+  fail "AC009 test-wasm missing build-wasm-tests dependency"
+fi
+if grep -q '^test-rust:.*build-c-plugins' Makefile; then
+  pass "AC009 test-rust depends on build-c-plugins"
+else
+  fail "AC009 test-rust missing build-c-plugins dependency"
+fi
+if grep -q '^test-lua:.*build-c-plugins' Makefile; then
+  pass "AC009 test-lua depends on build-c-plugins"
+else
+  fail "AC009 test-lua missing build-c-plugins dependency"
+fi
+
+# --- M2/AC011(R012): test/test-all/all semantics preserved ---
+if grep -q '^test-all:' Makefile \
+  && sed -n '/^test-all:/p' Makefile | grep -q 'validate-schema' \
+  && sed -n '/^test-all:/p' Makefile | grep -q 'test-rust' \
+  && sed -n '/^test-all:/p' Makefile | grep -q 'test-python' \
+  && sed -n '/^test-all:/p' Makefile | grep -q 'test-lua' \
+  && sed -n '/^test-all:/p' Makefile | grep -q 'test-wasm'; then
+  pass "AC011 test-all still expands to validate-schema plus all four suites"
+else
+  fail "AC011 test-all semantics changed"
+fi
+if grep -q '^test:.*test-all' Makefile \
+  && grep -q '^all:.*validate-schema' Makefile \
+  && grep -q '^all:.*build-all' Makefile; then
+  pass "AC011 test and all aliases preserved"
+else
+  fail "AC011 test/all alias semantics changed"
+fi
+
+# --- M2/R011: lint-docs guard exists and its verdict matches docs state ---
+if grep -q '^lint-docs:' Makefile \
+  && sed -n '/^lint-docs:/,/^[^[:space:]]/p' Makefile | grep -q 'AGENTS.md' \
+  && sed -n '/^lint-docs:/,/^[^[:space:]]/p' Makefile | grep -q 'cargo (run|build|test)'; then
+  pass "R011 lint-docs target greps user-facing docs for plain-cargo"
+else
+  fail "R011 lint-docs target missing or mis-scoped"
+fi
+# Guard-consistency: the guard must fail exactly when plain-cargo is present.
+# Red while the M3 docs rewrite is pending, green after — correct either way.
+if grep -rnE 'cargo (run|build|test)' AGENTS.md README.md docs/dev.md docs/plugin_abi.md >/dev/null 2>&1; then
+  DOCS_DIRTY=1
+else
+  DOCS_DIRTY=0
+fi
+if make lint-docs >/dev/null 2>&1; then
+  LINTDOCS_GREEN=1
+else
+  LINTDOCS_GREEN=0
+fi
+if { [ "$DOCS_DIRTY" -eq 1 ] && [ "$LINTDOCS_GREEN" -eq 0 ]; } \
+  || { [ "$DOCS_DIRTY" -eq 0 ] && [ "$LINTDOCS_GREEN" -eq 1 ]; }; then
+  pass "R011 lint-docs verdict matches docs state (dirty=$DOCS_DIRTY green=$LINTDOCS_GREEN)"
+else
+  fail "R011 lint-docs verdict contradicts docs state (dirty=$DOCS_DIRTY green=$LINTDOCS_GREEN)"
+fi
+
 if [ "$FAILURES" -ne 0 ]; then
   echo "$FAILURES check(s) FAILED"
   exit 1
 fi
-echo "All M1 checks passed"
+echo "All Makefile-diplomacy checks passed"
