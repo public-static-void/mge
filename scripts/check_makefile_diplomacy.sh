@@ -263,6 +263,52 @@ else
   fail "R016 diplomacy core/system/bridge diff detected"
 fi
 
+# --- M5/AC014: strategy-scenario exercising tests at contract paths ---
+for contract in \
+  engine/scripts/lua/tests/test_grand_strategy_diplomacy.lua \
+  engine_py/tests/test_grand_strategy_diplomacy.py \
+  engine_wasm/tests/wasm_grand_strategy_diplomacy.rs \
+  engine_wasm/wasm_tests/test_grand_strategy_diplomacy.rs; do
+  if [ -f "$contract" ]; then
+    pass "AC014 contract path exists: $contract"
+  else
+    fail "AC014 contract path missing: $contract"
+  fi
+done
+# Scenario skeleton tokens: three nations through the public API arc.
+for token in valoria drakmor kesh; do
+  if grep -q "$token" engine/scripts/lua/tests/test_grand_strategy_diplomacy.lua \
+    && grep -q "$token" engine_py/tests/test_grand_strategy_diplomacy.py \
+    && grep -q "$token" engine_wasm/wasm_tests/test_grand_strategy_diplomacy.rs; then
+    pass "AC014 three-nation scenario names $token in all three suites"
+  else
+    fail "AC014 three-nation scenario missing $token in some suite"
+  fi
+done
+for api in propose_treaty accept_treaty declare_war declare_peace list_treaties; do
+  if grep -q "$api" engine/scripts/lua/tests/test_grand_strategy_diplomacy.lua \
+    && grep -q "$api" engine_py/tests/test_grand_strategy_diplomacy.py \
+    && grep -q "$api" engine_wasm/wasm_tests/test_grand_strategy_diplomacy.rs; then
+    pass "AC014 public API $api exercised in all three suites"
+  else
+    fail "AC014 public API $api missing in some suite"
+  fi
+done
+
+# --- M5/AC015(R016): scope guard restated for the final milestone ---
+if git diff --stat -- engine/core/src/diplomacy.rs engine/core/src/systems/ engine_lua/src/lua_api/diplomacy.rs engine_py/src/python_api/diplomacy.rs engine_wasm/src/host_api/diplomacy.rs 2>/dev/null | grep -q .; then
+  fail "AC015 diplomacy core/system/bridge diff detected"
+else
+  pass "AC015 zero diplomacy core/system/bridge diffs"
+fi
+
+# --- M5/NFR004: no compiled WASM guests tracked by git ---
+if git ls-files -- engine_wasm/wasm_tests/*.wasm engine_wasm/tests/*.wasm | grep -q .; then
+  fail "NFR004 compiled .wasm artifact tracked by git"
+else
+  pass "NFR004 no compiled .wasm artifact tracked by git"
+fi
+
 if [ "$FAILURES" -ne 0 ]; then
   echo "$FAILURES check(s) FAILED"
   exit 1

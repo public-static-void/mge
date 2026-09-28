@@ -19,6 +19,7 @@ mod wasm_export_discovery;
 mod wasm_faction_api;
 mod wasm_fluid_api;
 mod wasm_fog_api;
+mod wasm_grand_strategy_diplomacy;
 mod wasm_input_api;
 mod wasm_inventory_api;
 mod wasm_job_ai;
