@@ -703,6 +703,14 @@ pub fn get_scenario(world: &World, id: &str) -> Option<ScenarioDef> {
     world.narrative.scenarios.get(id).cloned()
 }
 
+/// Returns the turn-indexed narrative history in append order.
+///
+/// Records use `world.turn`, never wall-clock timestamps, so follow-on
+/// lore generation can consume them directly.
+pub fn get_narrative_history(world: &World) -> Vec<NarrativeRecord> {
+    world.narrative.history.clone()
+}
+
 /// Candidate content-file locations, mirroring the `tech_tree.rs` idiom:
 /// workspace root, engine subdir, then the core-crate test depth.
 fn scenario_file_paths() -> [&'static str; 3] {

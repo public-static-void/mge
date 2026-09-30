@@ -598,6 +598,7 @@ fn zero_scenario_tick_is_noop() {
 // --- M3: pending-decision lifecycle (resolve/expiry/cooldown/once) and effects ---
 
 use engine_core::diplomacy::get_standing;
+use engine_core::narrative::get_narrative_history;
 use engine_core::narrative::resolve_decision;
 
 /// Builds a scenario definition JSON string with lifecycle tunables.
@@ -1124,4 +1125,291 @@ fn registered_handler_receives_passthrough_effect() {
         marked[0].get("marked").and_then(|v| v.as_bool()),
         Some(true)
     );
+}
+
+// --- M4: turn-indexed history, save/load round-trip, old-save compatibility ---
+
+#[path = "helpers/world_io.rs"]
+mod world_io_helper;
+use world_io_helper::save_and_load_roundtrip;
+
+/// Fire, resolve, and expiry append turn-indexed records in append order.
+#[test]
+fn history_records_transitions_in_append_order_with_turns() {
+    let mut world = narrative_world();
+    register_scenario(
+        &mut world,
+        &lifecycle_def(
+            "aid",
+            json!([{"type": "turn_gte", "turn": 0}]),
+            standing_choice("send_aid", 15),
+            0,
+            None,
+            true,
+        ),
+    )
+    .expect("register");
+    register_scenario(
+        &mut world,
+        &lifecycle_def(
+            "omen",
+            json!([{"type": "turn_gte", "turn": 1}]),
+            single_choice(),
+            0,
+            Some(1),
+            false,
+        ),
+    )
+    .expect("register");
+
+    world.turn = 0;
+    let aid_id = fire_pending_id(&mut world);
+    resolve_decision(&mut world, aid_id, "send_aid").expect("resolve");
+    world.turn = 1;
+    run_narrative_tick(&mut world);
+    let _ = drain_flushed(&mut world, "narrative_fired");
+    let omen_id = world
+        .narrative
+        .pending
+        .values()
+        .next()
+        .expect("omen pending")
+        .id;
+    world.turn = 2;
+    run_narrative_tick(&mut world);
+    let _ = drain_flushed(&mut world, "narrative_expired");
+
+    let history = get_narrative_history(&world);
+    let kinds: Vec<(String, NarrativeRecordKind, u64, Option<String>)> = history
+        .iter()
+        .map(|record| {
+            (
+                record.scenario_id.clone(),
+                record.kind,
+                record.turn,
+                record.choice_id.clone(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        kinds,
+        vec![
+            ("aid".to_string(), NarrativeRecordKind::Fired, 0, None),
+            (
+                "aid".to_string(),
+                NarrativeRecordKind::Resolved,
+                0,
+                Some("send_aid".to_string())
+            ),
+            ("omen".to_string(), NarrativeRecordKind::Fired, 1, None),
+            ("omen".to_string(), NarrativeRecordKind::Expired, 2, None),
+        ],
+        "fire/resolve/expire append turn-indexed records in order"
+    );
+    assert_eq!(history[0].decision_id, aid_id);
+    assert_eq!(history[2].decision_id, omen_id);
+}
+
+/// History records carry no wall-clock fields.
+#[test]
+fn history_records_carry_no_wall_clock_fields() {
+    let mut world = narrative_world();
+    register_scenario(
+        &mut world,
+        &lifecycle_def(
+            "aid",
+            json!([{"type": "turn_gte", "turn": 0}]),
+            standing_choice("send_aid", 15),
+            0,
+            None,
+            false,
+        ),
+    )
+    .expect("register");
+    let id = fire_pending_id(&mut world);
+    resolve_decision(&mut world, id, "send_aid").expect("resolve");
+
+    let json = serde_json::to_value(get_narrative_history(&world)).expect("history serializes");
+    let records = json.as_array().expect("history is a JSON array");
+    assert!(!records.is_empty());
+    for record in records {
+        let obj = record.as_object().expect("record is a JSON object");
+        for forbidden in [
+            "timestamp",
+            "wall_clock",
+            "wallclock",
+            "created_at",
+            "datetime",
+        ] {
+            assert!(
+                !obj.contains_key(forbidden),
+                "history record must not carry wall-clock field '{forbidden}': {record}"
+            );
+        }
+        assert!(
+            obj.get("turn").and_then(|v| v.as_u64()).is_some(),
+            "history record carries its world turn: {record}"
+        );
+    }
+}
+
+/// Save, load, and save again yield identical narrative bytes.
+#[test]
+fn narrative_save_load_roundtrip_preserves_bytes_pending_and_cooldowns() {
+    let mut world = narrative_world();
+    world.narrative.rng_state = [3u8; 32];
+    register_scenario(
+        &mut world,
+        &lifecycle_def(
+            "aid",
+            json!([{"type": "turn_gte", "turn": 0}]),
+            standing_choice("send_aid", 15),
+            5,
+            None,
+            false,
+        ),
+    )
+    .expect("register");
+    world.turn = 0;
+    let id = fire_pending_id(&mut world);
+    world.turn = 1;
+    run_narrative_tick(&mut world);
+    let _ = drain_flushed(&mut world, "narrative_fired");
+
+    let before = serde_json::to_string(&world.narrative).expect("narrative serializes");
+    let registry = world.registry.clone();
+    let mut loaded = save_and_load_roundtrip(&world, registry);
+    loaded.register_system(NarrativeSystem);
+
+    assert_eq!(
+        loaded.narrative.pending.len(),
+        1,
+        "pending decisions survive the round-trip"
+    );
+    assert!(
+        loaded.narrative.pending.contains_key(&id),
+        "pending decision ids stay stable across load"
+    );
+    assert_eq!(loaded.narrative.history, world.narrative.history);
+    assert_eq!(loaded.narrative.cooldowns, world.narrative.cooldowns);
+    assert_eq!(
+        loaded.narrative.next_decision_id,
+        world.narrative.next_decision_id
+    );
+    assert_eq!(loaded.narrative.rng_state, world.narrative.rng_state);
+
+    let registry = loaded.registry.clone();
+    let resaved = save_and_load_roundtrip(&loaded, registry);
+    assert_eq!(
+        serde_json::to_string(&resaved.narrative).expect("narrative serializes"),
+        serde_json::to_string(&loaded.narrative).expect("narrative serializes"),
+        "save/load/save keeps identical narrative bytes"
+    );
+    assert_eq!(
+        serde_json::to_string(&loaded.narrative).expect("narrative serializes"),
+        before,
+        "load keeps identical narrative bytes"
+    );
+
+    resolve_decision(&mut loaded, id, "send_aid").expect("loaded pending stays resolvable");
+    assert_eq!(
+        get_standing(&loaded, "a", "b"),
+        15,
+        "resolved effects apply after load"
+    );
+    for turn in 2..=5 {
+        loaded.turn = turn;
+        run_narrative_tick(&mut loaded);
+        assert!(
+            drain_flushed(&mut loaded, "narrative_fired").is_empty(),
+            "loaded cooldown still enforced (turn {turn})"
+        );
+    }
+    loaded.turn = 6;
+    run_narrative_tick(&mut loaded);
+    assert_eq!(
+        drain_flushed(&mut loaded, "narrative_fired").len(),
+        1,
+        "scenario refires once the loaded cooldown elapses"
+    );
+}
+
+/// A save without narrative data loads empty with diplomacy ticks unchanged.
+#[test]
+fn old_save_without_narrative_loads_empty_with_unchanged_diplomacy_tick() {
+    use engine_core::diplomacy::modify_standing;
+
+    let mut world = narrative_world();
+    modify_standing(&mut world, "a", "b", 20).expect("raise standing");
+
+    let mut json: serde_json::Value = serde_json::to_value(&world).expect("world serializes");
+    json.as_object_mut()
+        .expect("world is a JSON object")
+        .remove("narrative");
+
+    let mut loaded: World = serde_json::from_value(json).expect("old save loads");
+    assert!(loaded.narrative.scenarios.is_empty());
+    assert!(loaded.narrative.pending.is_empty());
+    assert!(loaded.narrative.history.is_empty());
+    assert!(loaded.narrative.cooldowns.is_empty());
+    assert_eq!(loaded.narrative.next_decision_id, 0);
+    assert_eq!(loaded.narrative.rng_state, [0u8; 32]);
+    assert_eq!(
+        get_standing(&loaded, "a", "b"),
+        20,
+        "diplomacy state survives the old-save load"
+    );
+
+    loaded.register_system(NarrativeSystem);
+    run_narrative_tick(&mut loaded);
+    assert!(
+        drain_flushed(&mut loaded, "narrative_fired").is_empty(),
+        "empty narrative state adds no behavior to the tick"
+    );
+    assert_eq!(
+        get_standing(&loaded, "a", "b"),
+        20,
+        "diplomacy-only tick script unchanged by the empty narrative"
+    );
+}
+
+/// Seeded replay stays identical when one world round-trips through save/load.
+#[test]
+fn seeded_replay_after_load_matches_uninterrupted_world() {
+    fn seeded_world() -> World {
+        let mut world = narrative_world();
+        world.narrative.rng_state = [11u8; 32];
+        register_scenario(
+            &mut world,
+            &weighted_def("heavy", json!([{"type": "turn_gte", "turn": 0}]), 3.0),
+        )
+        .expect("register");
+        register_scenario(
+            &mut world,
+            &weighted_def("light", json!([{"type": "turn_gte", "turn": 0}]), 1.0),
+        )
+        .expect("register");
+        world
+    }
+
+    let mut direct = seeded_world();
+    let mut loaded = seeded_world();
+    for turn in 0..4 {
+        direct.turn = turn;
+        loaded.turn = turn;
+        run_narrative_tick(&mut direct);
+        run_narrative_tick(&mut loaded);
+        let _ = drain_flushed(&mut direct, "narrative_fired");
+        let _ = drain_flushed(&mut loaded, "narrative_fired");
+        if turn == 1 {
+            let registry = loaded.registry.clone();
+            loaded = save_and_load_roundtrip(&loaded, registry);
+            loaded.register_system(NarrativeSystem);
+        }
+    }
+    assert_eq!(
+        loaded.narrative.history, direct.narrative.history,
+        "history matches after a mid-run save/load"
+    );
+    assert_eq!(loaded.narrative.rng_state, direct.narrative.rng_state);
 }
