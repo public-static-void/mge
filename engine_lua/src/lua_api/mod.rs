@@ -70,6 +70,10 @@ pub mod movement_ops;
 /// Multi-scale map navigation API (register_map, set_active_map, get_map_names,
 /// get_active_map_name, link_maps, enter_map, exit_map, map_cell, unmap_cell)
 pub mod multiscale_map;
+/// Narrative API (register_scenario, list_scenarios, get_scenario,
+/// poll_pending_decisions, get_pending_decision, resolve_decision,
+/// get_narrative_history)
+pub mod narrative;
 /// Noise and detection API (emit_noise, get_noise_at, set_hearing, get_hearing)
 pub mod noise;
 /// Region API
@@ -134,6 +138,7 @@ pub fn register_all_api_functions(
     time_of_day::register_time_of_day_api(lua, globals, world.clone())?;
     map::register_map_api(lua, globals, world.clone())?;
     multiscale_map::register_multiscale_map_api(lua, globals, world.clone())?;
+    narrative::register_narrative_api(lua, globals, world.clone())?;
     economic::register_economic_api(lua, globals, world.clone())?;
     construction::register_construction_api(lua, globals, world.clone())?;
     craft::register_craft_api(lua, globals, world.clone())?;

@@ -27,6 +27,7 @@ use engine_core::systems::job::{
     JobLogicKind, JobSystem, JobTypeRegistry, load_job_types_from_dir,
 };
 use engine_core::systems::movement_system::MovementSystem;
+use engine_core::systems::narrative::NarrativeSystem;
 use engine_core::systems::noise::NoiseSystem;
 use engine_core::systems::research::ResearchSystem;
 use engine_core::systems::stat_calculation::StatCalculationSystem;
@@ -350,6 +351,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         world.borrow_mut().register_system(StatCalculationSystem);
         world.borrow_mut().register_system(DerivedStatsSystem);
         world.borrow_mut().register_system(ResearchSystem);
+        world.borrow_mut().register_system(NarrativeSystem);
 
         let mut engine = ScriptEngine::new();
 

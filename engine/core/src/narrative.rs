@@ -703,6 +703,21 @@ pub fn get_scenario(world: &World, id: &str) -> Option<ScenarioDef> {
     world.narrative.scenarios.get(id).cloned()
 }
 
+/// Lists live pending decisions in id order.
+///
+/// Bridges poll this after a tick to discover fired scenarios; id order
+/// keeps every surface deterministic.
+pub fn list_pending_decisions(world: &World) -> Vec<PendingDecision> {
+    let mut out: Vec<PendingDecision> = world.narrative.pending.values().cloned().collect();
+    out.sort_by_key(|decision| decision.id);
+    out
+}
+
+/// Returns the live pending decision for an id, if still unresolved.
+pub fn get_pending_decision(world: &World, id: u64) -> Option<PendingDecision> {
+    world.narrative.pending.get(&id).cloned()
+}
+
 /// Returns the turn-indexed narrative history in append order.
 ///
 /// Records use `world.turn`, never wall-clock timestamps, so follow-on

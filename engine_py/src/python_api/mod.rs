@@ -63,6 +63,10 @@ pub mod mode;
 pub mod movement;
 /// Multi-scale map navigation API
 pub mod multiscale_map;
+/// Narrative API (register_scenario, list_scenarios, get_scenario,
+/// poll_pending_decisions, get_pending_decision, resolve_decision,
+/// get_narrative_history)
+pub mod narrative;
 /// Noise and detection API
 pub mod noise;
 /// Region API

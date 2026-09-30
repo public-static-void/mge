@@ -7,6 +7,7 @@ use crate::ecs::world::loadout::EquipmentIssue;
 use crate::ecs::world::{Season, WeatherCondition, WeatherState};
 use crate::loot::LootTableRegistry;
 use crate::map::CellKey;
+use crate::narrative::{NarrativeRecordKind, NarrativeSnapshot, NarrativeState, TriggerPredicate};
 use crate::systems::economic::recipe::Recipe;
 use crate::systems::temperature::{TemperatureState, compute_ambient_temperature};
 use crate::systems::weather::compute_visibility_modifier;
@@ -300,10 +301,28 @@ pub struct WasmWorld {
     /// identical error strings.
     #[serde(default)]
     pub craft_recipes: HashMap<String, Recipe>,
+
+    /// World-level narrative store: registered scenarios and pending decisions.
+    ///
+    /// All transition logic lives in [`NarrativeState::apply_tick`] and
+    /// [`NarrativeState::apply_resolve`]; the WASM host bridge only forwards
+    /// calls and events, so every bridge observes identical rules. Old saves
+    /// without this field load with an empty store.
+    #[serde(default)]
+    pub narrative: NarrativeState,
 }
 
 fn default_fov_algo_name() -> String {
     "recursive_shadowcasting".to_string()
+}
+
+/// Canonical `(min, max)` key for a faction pair (diplomacy precedent).
+fn canonical_pair(a: &str, b: &str) -> (String, String) {
+    if a <= b {
+        (a.to_string(), b.to_string())
+    } else {
+        (b.to_string(), a.to_string())
+    }
 }
 
 /// Load all JSON schema files from a directory.
@@ -391,6 +410,7 @@ impl WasmWorld {
             next_zone_id: 1,
             craft_recipes: HashMap::new(),
             diplomacy: DiplomacyState::default(),
+            narrative: NarrativeState::default(),
         }
     }
 
@@ -850,6 +870,7 @@ impl WasmWorld {
     /// Advance the simulation by one tick.
     pub fn tick(&mut self) {
         self.turn += 1;
+        self.tick_narrative();
         self.advance_time_of_day();
         self.simulate_fluid();
         self.tick_construction();
@@ -879,6 +900,125 @@ impl WasmWorld {
     /// Returns the current turn number.
     pub fn get_turn(&self) -> i32 {
         self.turn as i32
+    }
+
+    /// Builds the narrative trigger snapshot from WASM world state.
+    ///
+    /// Mirrors [`crate::narrative::snapshot_narrative_view`] for the host
+    /// [`World`](super::World): collects exactly the component counts,
+    /// faction pairs, and resolution flags the registered triggers query,
+    /// so the WASM tick applies the same pure `apply_tick` rules.
+    fn snapshot_narrative_view(&self) -> NarrativeSnapshot {
+        use std::collections::HashSet;
+        let mut components: HashSet<String> = HashSet::new();
+        let mut pairs: HashSet<(String, String)> = HashSet::new();
+        for def in self.narrative.scenarios.values() {
+            for trigger in &def.triggers {
+                match trigger {
+                    TriggerPredicate::EntityCountGte { component, .. } => {
+                        components.insert(component.clone());
+                    }
+                    TriggerPredicate::FactionStandingLte { a, b, .. }
+                    | TriggerPredicate::FactionStandingGte { a, b, .. }
+                    | TriggerPredicate::FactionRelationIs { a, b, .. } => {
+                        pairs.insert(canonical_pair(a, b));
+                    }
+                    _ => {}
+                }
+            }
+        }
+        let mut snap = NarrativeSnapshot {
+            turn: u64::from(self.turn),
+            ..Default::default()
+        };
+        for component in components {
+            snap.component_counts.insert(
+                component.clone(),
+                self.get_entities_with_component(&component).len(),
+            );
+        }
+        for (a, b) in pairs {
+            snap.standings.insert(
+                (a.clone(), b.clone()),
+                self.diplomacy.query_standing(&a, &b),
+            );
+            snap.relations.insert(
+                (a.clone(), b.clone()),
+                self.diplomacy.query_relation(&a, &b).as_str().to_string(),
+            );
+        }
+        for record in &self.narrative.history {
+            if record.kind == NarrativeRecordKind::Resolved {
+                snap.resolved.insert(record.scenario_id.clone());
+            }
+        }
+        snap
+    }
+
+    /// Runs one narrative tick: snapshot, pure apply, forward events.
+    ///
+    /// No-op while no scenarios are registered. Event forwarding never runs
+    /// under a state borrow.
+    pub fn tick_narrative(&mut self) {
+        let snapshot = self.snapshot_narrative_view();
+        let (_decisions, pending) = self.narrative.apply_tick(&snapshot);
+        for (name, payload) in pending {
+            let data = payload.to_string();
+            let _ = self.send_event(&name, &data);
+        }
+    }
+
+    /// Resolves a pending narrative decision with one of its choices.
+    ///
+    /// Applies the pure `apply_resolve` transition, dispatches the choice's
+    /// built-in effects (`emit_event` forwards to the named bus,
+    /// `modify_standing` adjusts the diplomacy standing), then forwards the
+    /// `narrative_resolved` event. Other actions have no handler registry on
+    /// the WASM host and are skipped without aborting the remaining effects.
+    /// Failed calls (unknown or settled decision, unknown choice) change no
+    /// state; effect dispatch itself never fails.
+    pub fn resolve_narrative_decision(
+        &mut self,
+        decision_id: u64,
+        choice_id: &str,
+    ) -> Result<(), String> {
+        let turn = u64::from(self.turn);
+        let (effects, pending) = self.narrative.apply_resolve(decision_id, choice_id, turn)?;
+        for effect in &effects {
+            let data = effect.data.clone().unwrap_or_default();
+            match effect.action.as_str() {
+                "emit_event" => {
+                    let Some(bus) = data.get("bus").and_then(|v| v.as_str()) else {
+                        continue;
+                    };
+                    if bus.is_empty() {
+                        continue;
+                    }
+                    let payload = data.get("payload").cloned().unwrap_or_default();
+                    let _ = self.send_event(bus, &payload.to_string());
+                }
+                "modify_standing" => {
+                    let (Some(a), Some(b), Some(delta)) = (
+                        data.get("a").and_then(|v| v.as_str()),
+                        data.get("b").and_then(|v| v.as_str()),
+                        data.get("delta").and_then(|v| v.as_i64()),
+                    ) else {
+                        continue;
+                    };
+                    if let Ok(pending) = self.diplomacy.apply_modify_standing(a, b, delta) {
+                        for (name, payload) in pending {
+                            let _ = self.send_event(&name, &payload.to_string());
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        for (name, payload) in pending {
+            let data = payload.to_string();
+            let _ = self.send_event(&name, &data);
+        }
+        Ok(())
     }
 
     /// Sets the current game mode.
