@@ -42,6 +42,8 @@ pub mod inventory;
 pub mod job;
 /// Movement system
 pub mod movement_system;
+/// Narrative incident-director system (scenario trigger evaluation)
+pub mod narrative;
 /// Noise propagation system
 pub mod noise;
 /// Research system
@@ -76,6 +78,7 @@ pub const SYSTEM_EXECUTION_ORDER: &[&str] = &[
     "ZoneSystem",
     "FactionReputationSystem",
     "DiplomacySystem",
+    "NarrativeSystem",
     "FluidSimulationSystem",
     "WeatherSystem",
     "TemperatureSystem",
