@@ -20,6 +20,8 @@ pub mod material;
 pub mod modes;
 /// Mods module
 pub mod mods;
+/// Event-driven narrative engine (scenarios, decision events)
+pub mod narrative;
 /// Plugins module
 pub mod plugins;
 /// Presentation module
@@ -28,6 +30,8 @@ pub mod presentation;
 pub mod systems;
 /// Tech tree and research system
 pub mod tech_tree;
+/// Atomic inter-stockpile trade primitives and treaty queries
+pub mod trade;
 /// Worldgen module
 pub mod worldgen;
 
