@@ -594,3 +594,534 @@ fn zero_scenario_tick_is_noop() {
         "no scenarios means no events"
     );
 }
+
+// --- M3: pending-decision lifecycle (resolve/expiry/cooldown/once) and effects ---
+
+use engine_core::diplomacy::get_standing;
+use engine_core::narrative::resolve_decision;
+
+/// Builds a scenario definition JSON string with lifecycle tunables.
+fn lifecycle_def(
+    id: &str,
+    triggers: JsonValue,
+    choices: JsonValue,
+    cooldown_turns: u64,
+    expires_in_turns: Option<u64>,
+    once: bool,
+) -> String {
+    let mut def = json!({
+        "id": id,
+        "name": format!("Scenario {id}"),
+        "triggers": triggers,
+        "choices": choices,
+        "cooldown_turns": cooldown_turns,
+        "once": once,
+    });
+    if let Some(span) = expires_in_turns {
+        def["expires_in_turns"] = json!(span);
+    }
+    def.to_string()
+}
+
+/// A single choice carrying a standing-delta effect.
+fn standing_choice(choice_id: &str, delta: i64) -> JsonValue {
+    json!([{
+        "id": choice_id,
+        "label": format!("Choice {choice_id}"),
+        "effects": [{"action": "modify_standing", "data": {"a": "a", "b": "b", "delta": delta}}],
+    }])
+}
+
+/// Runs one narrative tick and returns the new pending decision id.
+fn fire_pending_id(world: &mut World) -> u64 {
+    run_narrative_tick(world);
+    let _ = drain_flushed(world, "narrative_fired");
+    world
+        .narrative
+        .pending
+        .values()
+        .next()
+        .expect("one pending decision")
+        .id
+}
+
+/// Resolution applies the chosen choice's effects and records the transition.
+#[test]
+fn resolve_applies_choice_effects_and_records_resolution() {
+    let mut world = narrative_world();
+    register_scenario(
+        &mut world,
+        &lifecycle_def(
+            "aid",
+            json!([{"type": "turn_gte", "turn": 0}]),
+            standing_choice("send_aid", 15),
+            0,
+            None,
+            false,
+        ),
+    )
+    .expect("register");
+    let id = fire_pending_id(&mut world);
+    resolve_decision(&mut world, id, "send_aid").expect("resolve must succeed");
+    assert_eq!(
+        get_standing(&world, "a", "b"),
+        15,
+        "chosen choice effects apply in order"
+    );
+    assert!(
+        world.narrative.pending.is_empty(),
+        "resolution removes the pending entry"
+    );
+    let resolved: Vec<_> = world
+        .narrative
+        .history
+        .iter()
+        .filter(|record| record.kind == NarrativeRecordKind::Resolved)
+        .collect();
+    assert_eq!(resolved.len(), 1, "resolution appends one record");
+    assert_eq!(resolved[0].decision_id, id);
+    assert_eq!(resolved[0].choice_id.as_deref(), Some("send_aid"));
+    assert_eq!(resolved[0].turn, u64::from(world.turn));
+    let events = drain_flushed(&mut world, "narrative_resolved");
+    assert_eq!(events.len(), 1, "resolution emits one event");
+    assert_eq!(
+        events[0].get("scenario_id").and_then(|v| v.as_str()),
+        Some("aid")
+    );
+    assert_eq!(
+        events[0].get("choice_id").and_then(|v| v.as_str()),
+        Some("send_aid")
+    );
+}
+
+/// An emit_event effect forwards its payload to the named bus.
+#[test]
+fn resolve_forwards_emit_event_effect_to_its_bus() {
+    let mut world = narrative_world();
+    let choices = json!([{
+        "id": "mourn",
+        "label": "Mourn",
+        "effects": [{"action": "emit_event", "data": {"bus": "rumor", "payload": {"text": "harvest fails"}}}],
+    }]);
+    register_scenario(
+        &mut world,
+        &lifecycle_def(
+            "omen",
+            json!([{"type": "turn_gte", "turn": 0}]),
+            choices,
+            0,
+            None,
+            false,
+        ),
+    )
+    .expect("register");
+    let id = fire_pending_id(&mut world);
+    resolve_decision(&mut world, id, "mourn").expect("resolve must succeed");
+    let rumors = drain_flushed(&mut world, "rumor");
+    assert_eq!(rumors.len(), 1, "emit_event produces the bus payload");
+    assert_eq!(
+        rumors[0].get("text").and_then(|v| v.as_str()),
+        Some("harvest fails")
+    );
+}
+
+/// Resolving an unknown decision errors with no state change.
+#[test]
+fn resolve_rejects_unknown_decision_without_state_change() {
+    let mut world = narrative_world();
+    register_scenario(
+        &mut world,
+        &lifecycle_def(
+            "aid",
+            json!([{"type": "turn_gte", "turn": 0}]),
+            standing_choice("send_aid", 15),
+            0,
+            None,
+            false,
+        ),
+    )
+    .expect("register");
+    let id = fire_pending_id(&mut world);
+    let history_len = world.narrative.history.len();
+    let err =
+        resolve_decision(&mut world, id + 99, "send_aid").expect_err("unknown decision must fail");
+    assert!(!err.is_empty(), "error must explain the rejection");
+    assert!(
+        world.narrative.pending.contains_key(&id),
+        "pending entry survives a failed resolve"
+    );
+    assert_eq!(
+        world.narrative.history.len(),
+        history_len,
+        "failed resolve appends no record"
+    );
+    assert_eq!(
+        get_standing(&world, "a", "b"),
+        0,
+        "failed resolve applies no effects"
+    );
+}
+
+/// Resolving with an unknown choice errors with no state change.
+#[test]
+fn resolve_rejects_unknown_choice_without_state_change() {
+    let mut world = narrative_world();
+    register_scenario(
+        &mut world,
+        &lifecycle_def(
+            "aid",
+            json!([{"type": "turn_gte", "turn": 0}]),
+            standing_choice("send_aid", 15),
+            0,
+            None,
+            false,
+        ),
+    )
+    .expect("register");
+    let id = fire_pending_id(&mut world);
+    resolve_decision(&mut world, id, "abandon_all").expect_err("unknown choice must fail");
+    assert!(
+        world.narrative.pending.contains_key(&id),
+        "pending entry survives a bad choice id"
+    );
+    assert!(
+        world
+            .narrative
+            .history
+            .iter()
+            .all(|record| record.kind != NarrativeRecordKind::Resolved),
+        "bad choice appends no resolved record"
+    );
+    assert_eq!(get_standing(&world, "a", "b"), 0);
+}
+
+/// A settled decision cannot resolve twice; the first call wins.
+#[test]
+fn second_resolve_of_settled_decision_fails() {
+    let mut world = narrative_world();
+    register_scenario(
+        &mut world,
+        &lifecycle_def(
+            "aid",
+            json!([{"type": "turn_gte", "turn": 0}]),
+            standing_choice("send_aid", 15),
+            0,
+            None,
+            false,
+        ),
+    )
+    .expect("register");
+    let id = fire_pending_id(&mut world);
+    resolve_decision(&mut world, id, "send_aid").expect("first resolve wins");
+    resolve_decision(&mut world, id, "send_aid").expect_err("second resolve must fail");
+    assert_eq!(
+        world
+            .narrative
+            .history
+            .iter()
+            .filter(|record| record.kind == NarrativeRecordKind::Resolved)
+            .count(),
+        1,
+        "double resolve records a single resolution"
+    );
+}
+
+/// A timed-out pending decision expires with no effects applied.
+#[test]
+fn pending_decision_expires_without_applying_effects() {
+    let mut world = narrative_world();
+    register_scenario(
+        &mut world,
+        &lifecycle_def(
+            "aid",
+            json!([{"type": "turn_gte", "turn": 0}]),
+            standing_choice("send_aid", 15),
+            0,
+            Some(2),
+            false,
+        ),
+    )
+    .expect("register");
+    world.turn = 0;
+    let id = fire_pending_id(&mut world);
+    world.turn = 2;
+    run_narrative_tick(&mut world);
+    let expired = drain_flushed(&mut world, "narrative_expired");
+    assert_eq!(expired.len(), 1, "expiry emits one event");
+    assert_eq!(
+        expired[0].get("decision_id").and_then(|v| v.as_u64()),
+        Some(id)
+    );
+    assert!(
+        world.narrative.pending.is_empty(),
+        "expiry removes the pending entry"
+    );
+    assert_eq!(
+        get_standing(&world, "a", "b"),
+        0,
+        "expired decisions apply no effects"
+    );
+    assert!(
+        world
+            .narrative
+            .history
+            .iter()
+            .any(|record| record.kind == NarrativeRecordKind::Expired
+                && record.decision_id == id
+                && record.turn == 2),
+        "expiry appends a turn-indexed record"
+    );
+}
+
+/// An expired scenario becomes eligible again on later ticks.
+#[test]
+fn expired_scenario_becomes_eligible_again() {
+    let mut world = narrative_world();
+    register_scenario(
+        &mut world,
+        &lifecycle_def(
+            "aid",
+            json!([{"type": "turn_gte", "turn": 0}]),
+            standing_choice("send_aid", 15),
+            0,
+            Some(2),
+            false,
+        ),
+    )
+    .expect("register");
+    world.turn = 0;
+    let first = fire_pending_id(&mut world);
+    world.turn = 2;
+    run_narrative_tick(&mut world);
+    let _ = drain_flushed(&mut world, "narrative_expired");
+    world.turn = 3;
+    run_narrative_tick(&mut world);
+    let refired = drain_flushed(&mut world, "narrative_fired");
+    assert_eq!(refired.len(), 1, "scenario refires after expiry");
+    let second = world
+        .narrative
+        .pending
+        .values()
+        .next()
+        .expect("new pending decision")
+        .id;
+    assert_ne!(second, first, "refire mints a fresh decision id");
+}
+
+/// Cooldown blocks refire until the blackout elapses.
+#[test]
+fn cooldown_blocks_refire_until_elapsed() {
+    let mut world = narrative_world();
+    register_scenario(
+        &mut world,
+        &lifecycle_def(
+            "aid",
+            json!([{"type": "turn_gte", "turn": 0}]),
+            standing_choice("send_aid", 15),
+            5,
+            None,
+            false,
+        ),
+    )
+    .expect("register");
+    world.turn = 0;
+    let id = fire_pending_id(&mut world);
+    resolve_decision(&mut world, id, "send_aid").expect("resolve");
+    for turn in 1..5 {
+        world.turn = turn;
+        run_narrative_tick(&mut world);
+        assert!(
+            drain_flushed(&mut world, "narrative_fired").is_empty(),
+            "no refire before turn 5 (turn {turn})"
+        );
+    }
+    world.turn = 5;
+    run_narrative_tick(&mut world);
+    assert_eq!(
+        drain_flushed(&mut world, "narrative_fired").len(),
+        1,
+        "scenario refires once the cooldown elapses"
+    );
+}
+
+/// A resolved once-scenario never refires across a long soak.
+#[test]
+fn once_scenario_never_refires_after_resolution() {
+    let mut world = narrative_world();
+    register_scenario(
+        &mut world,
+        &lifecycle_def(
+            "eclipse",
+            json!([{"type": "turn_gte", "turn": 0}]),
+            standing_choice("watch", 5),
+            0,
+            None,
+            true,
+        ),
+    )
+    .expect("register");
+    world.turn = 0;
+    let id = fire_pending_id(&mut world);
+    resolve_decision(&mut world, id, "watch").expect("resolve");
+    for turn in 1..=50 {
+        world.turn = turn;
+        run_narrative_tick(&mut world);
+        assert!(
+            drain_flushed(&mut world, "narrative_fired").is_empty(),
+            "resolved once-scenario stays silent (turn {turn})"
+        );
+    }
+    assert!(world.narrative.pending.is_empty());
+}
+
+/// Expiry is not completion: an expired once-scenario may refire.
+#[test]
+fn expired_once_scenario_may_refire() {
+    let mut world = narrative_world();
+    register_scenario(
+        &mut world,
+        &lifecycle_def(
+            "eclipse",
+            json!([{"type": "turn_gte", "turn": 0}]),
+            standing_choice("watch", 5),
+            0,
+            Some(1),
+            true,
+        ),
+    )
+    .expect("register");
+    world.turn = 0;
+    let first = fire_pending_id(&mut world);
+    world.turn = 1;
+    run_narrative_tick(&mut world);
+    assert_eq!(
+        drain_flushed(&mut world, "narrative_expired").len(),
+        1,
+        "pending times out at turn 1"
+    );
+    world.turn = 2;
+    run_narrative_tick(&mut world);
+    assert_eq!(
+        drain_flushed(&mut world, "narrative_fired").len(),
+        1,
+        "expired once-scenario refires"
+    );
+    let second = world
+        .narrative
+        .pending
+        .values()
+        .next()
+        .expect("new pending decision")
+        .id;
+    assert_ne!(second, first);
+}
+
+/// An effect naming a despawned entity skips while siblings still apply.
+#[test]
+fn effect_targeting_despawned_entity_is_skipped() {
+    let mut world = narrative_world();
+    let ghost = world.spawn_entity();
+    world.despawn_entity(ghost);
+    let choices = json!([{
+        "id": "mourn",
+        "label": "Mourn",
+        "effects": [
+            {"action": "emit_event", "data": {"entity": ghost, "bus": "rumor", "payload": {"text": "ghost"}}},
+            {"action": "modify_standing", "data": {"a": "a", "b": "b", "delta": 10}},
+        ],
+    }]);
+    register_scenario(
+        &mut world,
+        &lifecycle_def(
+            "omen",
+            json!([{"type": "turn_gte", "turn": 0}]),
+            choices,
+            0,
+            None,
+            false,
+        ),
+    )
+    .expect("register");
+    let id = fire_pending_id(&mut world);
+    resolve_decision(&mut world, id, "mourn").expect("resolve succeeds despite the dead target");
+    assert_eq!(
+        get_standing(&world, "a", "b"),
+        10,
+        "remaining effects still apply"
+    );
+    assert!(
+        drain_flushed(&mut world, "rumor").is_empty(),
+        "despawned target skips its effect"
+    );
+}
+
+/// An unknown action resolves with the other effects applied.
+#[test]
+fn unknown_effect_action_resolves_without_aborting_remaining_effects() {
+    let mut world = narrative_world();
+    let choices = json!([{
+        "id": "risk",
+        "label": "Risk",
+        "effects": [
+            {"action": "conjure_doom", "data": {}},
+            {"action": "modify_standing", "data": {"a": "a", "b": "b", "delta": 7}},
+        ],
+    }]);
+    register_scenario(
+        &mut world,
+        &lifecycle_def(
+            "gamble",
+            json!([{"type": "turn_gte", "turn": 0}]),
+            choices,
+            0,
+            None,
+            false,
+        ),
+    )
+    .expect("register");
+    let id = fire_pending_id(&mut world);
+    resolve_decision(&mut world, id, "risk").expect("unknown action must not fail the tick");
+    assert_eq!(get_standing(&world, "a", "b"), 7);
+    assert!(world.narrative.pending.is_empty());
+}
+
+/// A registered handler runs for its passthrough action.
+#[test]
+fn registered_handler_receives_passthrough_effect() {
+    let mut world = narrative_world();
+    world.register_effect_handler(
+        "mark_omen",
+        |world: &mut World, _eid: u32, _effect: &JsonValue| {
+            let _ = world.send_event("omen_marked", json!({"marked": true}));
+        },
+    );
+    let choices = json!([{
+        "id": "mark",
+        "label": "Mark",
+        "effects": [{"action": "mark_omen", "data": {}}],
+    }]);
+    register_scenario(
+        &mut world,
+        &lifecycle_def(
+            "omen",
+            json!([{"type": "turn_gte", "turn": 0}]),
+            choices,
+            0,
+            None,
+            false,
+        ),
+    )
+    .expect("register");
+    let id = fire_pending_id(&mut world);
+    resolve_decision(&mut world, id, "mark").expect("resolve must succeed");
+    let marked = drain_flushed(&mut world, "omen_marked");
+    assert_eq!(
+        marked.len(),
+        1,
+        "passthrough reaches the registered handler"
+    );
+    assert_eq!(
+        marked[0].get("marked").and_then(|v| v.as_bool()),
+        Some(true)
+    );
+}
