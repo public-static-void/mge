@@ -8,11 +8,16 @@
 mod world_helper;
 use world_helper::make_test_world;
 
+use engine_core::diplomacy::RelationState;
 use engine_core::diplomacy::{
-    TreatyKind, accept_treaty, break_treaty, expire_due_treaties, propose_treaty,
+    TreatyKind, accept_treaty, break_treaty, declare_war, expire_due_treaties, get_relation,
+    propose_treaty,
 };
 use engine_core::ecs::world::World;
-use engine_core::trade::{TransferError, has_active_trade_treaty, transfer_stockpile_resource};
+use engine_core::trade::{
+    TradeError, TransferError, execute_treaty_trade, has_active_trade_treaty,
+    transfer_stockpile_resource,
+};
 use serde_json::json;
 
 /// Spawn an entity carrying a Stockpile with the given resources map.
@@ -20,6 +25,19 @@ fn spawn_stockpile(world: &mut World, resources: serde_json::Value) -> u32 {
     let eid = world.spawn_entity();
     world
         .set_component(eid, "Stockpile", json!({ "resources": resources }))
+        .unwrap();
+    eid
+}
+
+/// Spawn an entity carrying a Stockpile plus a Faction membership.
+fn spawn_faction_stockpile(
+    world: &mut World,
+    faction_id: &str,
+    resources: serde_json::Value,
+) -> u32 {
+    let eid = spawn_stockpile(world, resources);
+    world
+        .set_component(eid, "Faction", json!({ "faction_id": faction_id }))
         .unwrap();
     eid
 }
@@ -202,4 +220,142 @@ fn matches_treaty_pairs_regardless_of_argument_order() {
     accept_treaty(&mut world, id).unwrap();
     assert!(has_active_trade_treaty(&world, "alpha", "beta"));
     assert!(has_active_trade_treaty(&world, "beta", "alpha"));
+}
+
+/// A live trade treaty in peacetime authorizes gated execution.
+#[test]
+fn executes_gated_trade_when_treaty_is_live_and_pair_is_at_peace() {
+    let mut world = make_test_world();
+    let from = spawn_faction_stockpile(&mut world, "a", json!({ "grain": 100.0 }));
+    let to = spawn_faction_stockpile(&mut world, "b", json!({ "grain": 0.0 }));
+    let id = propose_treaty(&mut world, "a", "b", TreatyKind::TradeStub, None).unwrap();
+    accept_treaty(&mut world, id).unwrap();
+
+    execute_treaty_trade(&mut world, from, to, "grain", 30.0).unwrap();
+
+    assert_eq!(stockpile_amount(&world, from, "grain"), 70.0);
+    assert_eq!(stockpile_amount(&world, to, "grain"), 30.0);
+}
+
+/// War blocks gated execution while the pre-war treaty stays listed, and the
+/// ungated primitive keeps working between the same entities.
+#[test]
+fn blocks_gated_trade_during_war_but_leaves_ungated_transfer_open() {
+    let mut world = make_test_world();
+    let from = spawn_faction_stockpile(&mut world, "a", json!({ "grain": 100.0 }));
+    let to = spawn_faction_stockpile(&mut world, "b", json!({ "grain": 0.0 }));
+    let id = propose_treaty(&mut world, "a", "b", TreatyKind::TradeStub, None).unwrap();
+    accept_treaty(&mut world, id).unwrap();
+    execute_treaty_trade(&mut world, from, to, "grain", 30.0).unwrap();
+
+    declare_war(&mut world, "a", "b").unwrap();
+    assert_eq!(get_relation(&world, "a", "b"), RelationState::War);
+
+    let before_from = stockpile_snapshot(&world, from);
+    let before_to = stockpile_snapshot(&world, to);
+    assert_eq!(
+        execute_treaty_trade(&mut world, from, to, "grain", 10.0).unwrap_err(),
+        TradeError::RelationIsWar
+    );
+    assert_eq!(stockpile_snapshot(&world, from), before_from);
+    assert_eq!(stockpile_snapshot(&world, to), before_to);
+    assert!(
+        has_active_trade_treaty(&world, "a", "b"),
+        "pre-war TradeStub treaties survive declare_war yet must not authorize"
+    );
+
+    transfer_stockpile_resource(&mut world, from, to, "grain", 10.0).unwrap();
+    assert_eq!(stockpile_amount(&world, from, "grain"), 60.0);
+    assert_eq!(stockpile_amount(&world, to, "grain"), 40.0);
+}
+
+/// Gated execution without any live treaty fails and mutates nothing.
+#[test]
+fn rejects_gated_trade_without_a_live_treaty() {
+    let mut world = make_test_world();
+    let from = spawn_faction_stockpile(&mut world, "a", json!({ "grain": 50.0 }));
+    let to = spawn_faction_stockpile(&mut world, "b", json!({ "grain": 5.0 }));
+    let before_from = stockpile_snapshot(&world, from);
+    let before_to = stockpile_snapshot(&world, to);
+
+    assert_eq!(
+        execute_treaty_trade(&mut world, from, to, "grain", 10.0).unwrap_err(),
+        TradeError::NoLiveTreaty
+    );
+    assert_eq!(stockpile_snapshot(&world, from), before_from);
+    assert_eq!(stockpile_snapshot(&world, to), before_to);
+
+    let id = propose_treaty(&mut world, "a", "b", TreatyKind::TradeStub, None).unwrap();
+    accept_treaty(&mut world, id).unwrap();
+    break_treaty(&mut world, id).unwrap();
+    assert_eq!(
+        execute_treaty_trade(&mut world, from, to, "grain", 10.0).unwrap_err(),
+        TradeError::NoLiveTreaty
+    );
+    assert_eq!(stockpile_snapshot(&world, from), before_from);
+    assert_eq!(stockpile_snapshot(&world, to), before_to);
+}
+
+/// Entities without faction membership cannot authorize gated execution.
+#[test]
+fn rejects_gated_trade_when_either_entity_has_no_faction() {
+    let mut world = make_test_world();
+    let factioned = spawn_faction_stockpile(&mut world, "a", json!({ "grain": 50.0 }));
+    let bare = spawn_stockpile(&mut world, json!({ "grain": 50.0 }));
+    let other = spawn_faction_stockpile(&mut world, "b", json!({ "grain": 0.0 }));
+    let id = propose_treaty(&mut world, "a", "b", TreatyKind::TradeStub, None).unwrap();
+    accept_treaty(&mut world, id).unwrap();
+
+    assert_eq!(
+        execute_treaty_trade(&mut world, bare, other, "grain", 10.0).unwrap_err(),
+        TradeError::NoLiveTreaty
+    );
+    assert_eq!(
+        execute_treaty_trade(&mut world, factioned, bare, "grain", 10.0).unwrap_err(),
+        TradeError::NoLiveTreaty
+    );
+    assert_eq!(stockpile_amount(&world, bare, "grain"), 50.0);
+    assert_eq!(stockpile_amount(&world, other, "grain"), 0.0);
+}
+
+/// An expired treaty stops authorizing gated execution; completed transfers stand.
+#[test]
+fn rejects_gated_trade_after_treaty_expiry_while_completed_transfers_stand() {
+    let mut world = make_test_world();
+    let from = spawn_faction_stockpile(&mut world, "c", json!({ "grain": 100.0 }));
+    let to = spawn_faction_stockpile(&mut world, "d", json!({ "grain": 0.0 }));
+    let id = propose_treaty(&mut world, "c", "d", TreatyKind::TradeStub, Some(5)).unwrap();
+    accept_treaty(&mut world, id).unwrap();
+    execute_treaty_trade(&mut world, from, to, "grain", 30.0).unwrap();
+
+    world.turn = 5;
+    expire_due_treaties(&mut world).unwrap();
+    assert!(!has_active_trade_treaty(&world, "c", "d"));
+    assert_eq!(
+        execute_treaty_trade(&mut world, from, to, "grain", 10.0).unwrap_err(),
+        TradeError::NoLiveTreaty
+    );
+    assert_eq!(stockpile_amount(&world, from, "grain"), 70.0);
+    assert_eq!(stockpile_amount(&world, to, "grain"), 30.0);
+}
+
+/// Transfer failures inside gated execution surface as transfer errors.
+#[test]
+fn surfaces_transfer_failures_from_gated_execution() {
+    let mut world = make_test_world();
+    let from = spawn_faction_stockpile(&mut world, "a", json!({ "grain": 5.0 }));
+    let to = spawn_faction_stockpile(&mut world, "b", json!({ "grain": 0.0 }));
+    let id = propose_treaty(&mut world, "a", "b", TreatyKind::TradeStub, None).unwrap();
+    accept_treaty(&mut world, id).unwrap();
+
+    let err = execute_treaty_trade(&mut world, from, to, "grain", 30.0).unwrap_err();
+    assert!(
+        matches!(
+            err,
+            TradeError::Transfer(TransferError::InsufficientFunds { .. })
+        ),
+        "expected a wrapped insufficient-funds error, got {err:?}"
+    );
+    assert_eq!(stockpile_amount(&world, from, "grain"), 5.0);
+    assert_eq!(stockpile_amount(&world, to, "grain"), 0.0);
 }
