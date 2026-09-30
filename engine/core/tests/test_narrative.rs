@@ -1443,7 +1443,11 @@ fn demo_food_shortage_fires_and_resolves_with_consequences() {
     world.turn = 50;
     run_narrative_tick(&mut world);
     let fired = drain_flushed(&mut world, "narrative_fired");
-    assert_eq!(fired.len(), 1, "the incident fires once its turn gate holds");
+    assert_eq!(
+        fired.len(),
+        1,
+        "the incident fires once its turn gate holds"
+    );
     assert_eq!(
         fired[0].get("scenario_id").and_then(|v| v.as_str()),
         Some("food_shortage")
