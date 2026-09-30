@@ -23,7 +23,7 @@ pub struct Prerequisite {
 }
 
 /// An effect that fires when a tech is unlocked.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Effect {
     /// Action identifier
     pub action: String,
