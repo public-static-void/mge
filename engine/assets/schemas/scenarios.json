@@ -1,0 +1,128 @@
+{
+  "title": "Scenarios",
+  "description": "Master registry of event-driven narrative scenario definitions (incident director).",
+  "type": "object",
+  "properties": {
+    "scenarios": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "description": { "type": "string" },
+          "triggers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "turn_gte",
+                    "entity_count_gte",
+                    "faction_standing_lte",
+                    "faction_standing_gte",
+                    "faction_relation_is",
+                    "scenario_resolved",
+                    "chance"
+                  ]
+                },
+                "turn": { "type": "integer" },
+                "component": { "type": "string" },
+                "count": { "type": "integer" },
+                "a": { "type": "string" },
+                "b": { "type": "string" },
+                "value": { "type": "integer" },
+                "relation": {
+                  "type": "string",
+                  "enum": ["allied", "neutral", "hostile", "war"]
+                },
+                "scenario_id": { "type": "string" },
+                "p": { "type": "number", "minimum": 0, "maximum": 1 }
+              },
+              "required": ["type"]
+            },
+            "default": []
+          },
+          "choices": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string" },
+                "label": { "type": "string" },
+                "effects": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "action": { "type": "string" },
+                      "data": { "type": "object" }
+                    },
+                    "required": ["action"]
+                  },
+                  "default": []
+                }
+              },
+              "required": ["id", "label"]
+            }
+          },
+          "cooldown_turns": { "type": "integer", "default": 0 },
+          "expires_in_turns": { "type": "integer" },
+          "once": { "type": "boolean", "default": false },
+          "weight": { "type": "number", "default": 1.0 }
+        },
+        "required": ["id", "name", "choices"]
+      }
+    }
+  },
+  "required": ["scenarios"],
+  "scenarios": [
+    {
+      "id": "food_shortage",
+      "name": "Food Shortage",
+      "description": "The colony granaries run low after a poor harvest. The council must decide how the colony eats this season.",
+      "triggers": [{ "type": "turn_gte", "turn": 5 }],
+      "choices": [
+        {
+          "id": "ration_stores",
+          "label": "Ration the stores",
+          "effects": [
+            {
+              "action": "emit_event",
+              "data": {
+                "bus": "colony_announcement",
+                "payload": { "message": "The council orders strict rationing. Bellies grumble." }
+              }
+            },
+            {
+              "action": "modify_standing",
+              "data": { "a": "colonists", "b": "leadership", "delta": -5 }
+            }
+          ]
+        },
+        {
+          "id": "send_foragers",
+          "label": "Send foragers into the wilds",
+          "effects": [
+            {
+              "action": "emit_event",
+              "data": {
+                "bus": "colony_announcement",
+                "payload": { "message": "Foragers return with wild roots and game. The colony eats." }
+              }
+            },
+            {
+              "action": "modify_standing",
+              "data": { "a": "colonists", "b": "leadership", "delta": 5 }
+            }
+          ]
+        }
+      ],
+      "cooldown_turns": 10,
+      "once": false,
+      "weight": 1.0
+    }
+  ]
+}

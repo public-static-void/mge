@@ -29,6 +29,7 @@ use crate::host_api::material::register_material_api;
 use crate::host_api::mode::register_mode_api;
 use crate::host_api::movement_ops::register_movement_ops_api;
 use crate::host_api::multiscale_map::register_multiscale_map_api;
+use crate::host_api::narrative::register_narrative_api;
 use crate::host_api::noise::register_noise_api;
 use crate::host_api::region::register_region_api;
 use crate::host_api::save_load::register_save_load_api;
@@ -203,6 +204,7 @@ impl WasmScriptEngine {
         register_temperature_api(&mut linker)?;
         register_designer_api(&mut linker)?;
         register_diplomacy_api(&mut linker)?;
+        register_narrative_api(&mut linker)?;
 
         // Load schemas if schema_path is provided
         let schemas = config

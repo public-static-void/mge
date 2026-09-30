@@ -23,6 +23,7 @@ use engine_core::systems::fluid::FluidSimulationSystem;
 use engine_core::systems::fog::FogUpdateSystem;
 use engine_core::systems::fov::FovUpdateSystem;
 use engine_core::systems::job::JobSystem;
+use engine_core::systems::narrative::NarrativeSystem;
 use engine_core::systems::noise::NoiseSystem;
 use engine_core::systems::research::ResearchSystem;
 use engine_core::systems::stat_calculation::StatCalculationSystem;
@@ -196,6 +197,13 @@ fn main() {
         world.register_system(economic_system);
         world.register_system(CraftingSystem);
         world.register_system(ConstructionSystem::new());
+        world.register_system(NarrativeSystem);
+        for def in engine_core::narrative::load_scenario_definitions() {
+            let id = def.id.clone();
+            if let Err(e) = world.narrative.register_scenario(def) {
+                eprintln!("Skipping invalid scenario definition '{id}': {e}");
+            }
+        }
         world.current_mode = mode.clone();
 
         // Load material definitions
@@ -298,6 +306,13 @@ fn main() {
         world.register_system(economic_system);
         world.register_system(CraftingSystem);
         world.register_system(ConstructionSystem::new());
+        world.register_system(NarrativeSystem);
+        for def in engine_core::narrative::load_scenario_definitions() {
+            let id = def.id.clone();
+            if let Err(e) = world.narrative.register_scenario(def) {
+                eprintln!("Skipping invalid scenario definition '{id}': {e}");
+            }
+        }
         if let Some(mode) = mode_arg {
             world.current_mode = mode;
         }

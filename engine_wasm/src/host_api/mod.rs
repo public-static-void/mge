@@ -80,6 +80,11 @@ pub mod map;
 /// Multi-scale map navigation module (register_map, set_active_map, get_map_names, get_active_map_name, link_maps, enter_map, exit_map, map_cell, unmap_cell)
 pub mod multiscale_map;
 
+/// Narrative module (register_scenario, list_scenarios, get_scenario,
+/// poll_pending_decisions, get_pending_decision, resolve_decision,
+/// get_narrative_history)
+pub mod narrative;
+
 /// Worldgen module
 pub mod worldgen;
 

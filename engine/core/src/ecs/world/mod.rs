@@ -12,6 +12,7 @@ use crate::loot::LootTableRegistry;
 use crate::map::Map;
 use crate::map::cell_key::CellKey;
 use crate::map::fov::{BfsFovAlgorithm, FovAlgorithm, RecursiveShadowcasting};
+use crate::narrative::NarrativeState;
 use crate::plugins::dynamic_systems::DynamicSystemRegistry;
 use crate::systems::job::{JobBoard, JobTypeRegistry};
 use crate::systems::temperature::TemperatureState;
@@ -250,6 +251,11 @@ pub struct World {
     /// serialized for save/load). Old saves without this field load empty.
     #[serde(default)]
     pub diplomacy: DiplomacyState,
+    /// World-level narrative store: registered scenarios and pending decisions
+    /// (persistent, serialized for save/load). Old saves without this field
+    /// load with empty narrative state.
+    #[serde(default)]
+    pub narrative: NarrativeState,
     event_queues: HashMap<String, (VecDeque<JsonValue>, VecDeque<JsonValue>)>, // (write, read)
     /// Map postprocessors
     #[serde(skip)]
@@ -374,6 +380,7 @@ impl World {
             visibility_modifier: 1.0,
             explored_cells: HashMap::new(),
             diplomacy: DiplomacyState::default(),
+            narrative: NarrativeState::default(),
             event_queues: HashMap::new(),
             map_postprocessors: Vec::new(),
             map_validators: Vec::new(),

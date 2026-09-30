@@ -145,6 +145,7 @@ impl PyWorld {
         world.register_system(ResearchSystem);
         world.register_system(engine_core::systems::job::JobSystem);
         world.register_system(FactionReputationSystem);
+        world.register_system(engine_core::systems::narrative::NarrativeSystem);
         world.register_system(FluidSimulationSystem::default());
         world.register_system(WeatherSystem);
         world.register_system(TemperatureSystem);
@@ -555,6 +556,45 @@ impl PyWorld {
     #[pyo3(signature = (faction=None))]
     fn list_treaties(&self, py: Python<'_>, faction: Option<String>) -> PyResult<PyObject> {
         crate::python_api::diplomacy::list_treaties(self, py, faction)
+    }
+
+    // ---- NARRATIVE ----
+
+    /// Register a scenario definition from its JSON encoding.
+    /// Raises ValueError on malformed JSON or invalid definitions.
+    fn register_scenario(&self, def_json: String) -> PyResult<()> {
+        crate::python_api::narrative::register_scenario(self, def_json)
+    }
+
+    /// List registered scenario definitions in id order as a list of dicts.
+    fn list_scenarios(&self, py: Python<'_>) -> PyResult<PyObject> {
+        crate::python_api::narrative::list_scenarios(self, py)
+    }
+
+    /// Get the scenario definition for an id as a dict, or None.
+    fn get_scenario(&self, py: Python<'_>, id: String) -> PyResult<Option<PyObject>> {
+        crate::python_api::narrative::get_scenario(self, py, id)
+    }
+
+    /// List live pending decisions in id order as a list of dicts.
+    fn poll_pending_decisions(&self, py: Python<'_>) -> PyResult<PyObject> {
+        crate::python_api::narrative::poll_pending_decisions(self, py)
+    }
+
+    /// Get the live pending decision for an id as a dict, or None.
+    fn get_pending_decision(&self, py: Python<'_>, decision_id: u64) -> PyResult<Option<PyObject>> {
+        crate::python_api::narrative::get_pending_decision(self, py, decision_id)
+    }
+
+    /// Resolve a pending decision with one of its choices.
+    /// Raises ValueError on unknown or settled decisions and unknown choices.
+    fn resolve_decision(&self, decision_id: u64, choice_id: String) -> PyResult<()> {
+        crate::python_api::narrative::resolve_decision(self, decision_id, choice_id)
+    }
+
+    /// Get the turn-indexed narrative history in append order as a list of dicts.
+    fn get_narrative_history(&self, py: Python<'_>) -> PyResult<PyObject> {
+        crate::python_api::narrative::get_narrative_history(self, py)
     }
 
     // ---- FOV ----
