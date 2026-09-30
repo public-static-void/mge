@@ -6,11 +6,10 @@
 //! module-level state on [`World`] plus thin accessors, with no per-entity
 //! owner required.
 //!
-//! This module covers registration, state shape, and per-tick trigger
-//! evaluation with weighted RNG selection. The pending-decision resolve path,
-//! expiry enforcement, and cooldown writes arrive in later milestones; the
-//! state fields they need are reserved here so saves written now stay
-//! load-compatible.
+//! This module covers registration, state shape, per-tick trigger evaluation
+//! with weighted RNG selection, and the pending-decision lifecycle (resolve,
+//! expiry, cooldown) with choice-effect dispatch. History records and
+//! save/load round-trips build on the same state in later milestones.
 
 use crate::diplomacy::{PendingEvents, get_relation, get_standing};
 use crate::ecs::world::World;
@@ -222,25 +221,68 @@ impl NarrativeState {
 
     /// Evaluates one narrative tick against a prebuilt snapshot.
     ///
-    /// Collect-then-apply: every registered scenario is scanned in `id` order
-    /// (`chance` draws consume the seeded stream in that order), at most one
-    /// eligible scenario fires per tick by `weight`-proportional selection,
-    /// and the win is applied (pending entry, fired history record, fired
-    /// event) before returning. A scenario stays ineligible while it holds a
-    /// live pending decision, waits out a cooldown, resolved with `once` set,
-    /// carries a non-positive or non-finite weight, or has any unmet (or
-    /// unknown) predicate. The RNG stream advances every tick so seeded
-    /// replays stay aligned. Never fails: an empty pool returns empty vecs.
+    /// Collect-then-apply: timed-out pending decisions expire first (expired
+    /// record, `narrative_expired` event, cooldown write, no effects), then
+    /// every registered scenario is scanned in `id` order (`chance` draws
+    /// consume the seeded stream in that order), at most one eligible
+    /// scenario fires per tick by `weight`-proportional selection, and the
+    /// win is applied (pending entry, fired history record, fired event)
+    /// before returning. A scenario stays ineligible while it holds a live
+    /// pending decision, waits out a cooldown, resolved with `once` set,
+    /// expired on this same tick, carries a non-positive or non-finite
+    /// weight, or has any unmet (or unknown) predicate. The RNG stream
+    /// advances every tick so seeded replays stay aligned. Never fails: an
+    /// empty pool returns empty vecs.
     pub fn apply_tick(
         &mut self,
         snap: &NarrativeSnapshot,
     ) -> (Vec<PendingDecision>, PendingEvents) {
         let mut rng = SmallRng::from_seed(self.rng_state);
+        let mut events: PendingEvents = Vec::new();
+        let mut just_expired: HashSet<String> = HashSet::new();
+        let timed_out: Vec<u64> = self
+            .pending
+            .iter()
+            .filter(|(_, decision)| decision.expires_tick.is_some_and(|end| end <= snap.turn))
+            .map(|(id, _)| *id)
+            .collect();
+        for id in timed_out {
+            if let Some(decision) = self.pending.remove(&id) {
+                let blackout = self
+                    .scenarios
+                    .get(&decision.scenario_id)
+                    .map(|def| def.cooldown_turns)
+                    .unwrap_or(0);
+                self.cooldowns.insert(
+                    decision.scenario_id.clone(),
+                    snap.turn.saturating_add(blackout),
+                );
+                self.history.push(NarrativeRecord {
+                    scenario_id: decision.scenario_id.clone(),
+                    decision_id: id,
+                    kind: NarrativeRecordKind::Expired,
+                    turn: snap.turn,
+                    choice_id: None,
+                });
+                just_expired.insert(decision.scenario_id.clone());
+                events.push((
+                    "narrative_expired".to_string(),
+                    serde_json::json!({
+                        "decision_id": id,
+                        "scenario_id": decision.scenario_id,
+                        "expired_tick": snap.turn,
+                    }),
+                ));
+            }
+        }
         let mut ordered: Vec<&ScenarioDef> = self.scenarios.values().collect();
         ordered.sort_by(|a, b| a.id.cmp(&b.id));
         let mut eligible: Vec<&ScenarioDef> = Vec::new();
         for def in ordered {
             if self.is_pending(&def.id) {
+                continue;
+            }
+            if just_expired.contains(&def.id) {
                 continue;
             }
             if self.on_cooldown(&def.id, snap.turn) {
@@ -259,7 +301,7 @@ impl NarrativeState {
         let fired = pick_weighted(&eligible, &mut rng).cloned();
         rng.fill(&mut self.rng_state);
         match fired {
-            None => (Vec::new(), Vec::new()),
+            None => (Vec::new(), events),
             Some(def) => {
                 let id = self.next_decision_id;
                 self.next_decision_id += 1;
@@ -278,17 +320,74 @@ impl NarrativeState {
                     turn: snap.turn,
                     choice_id: None,
                 });
-                let events = vec![(
+                events.push((
                     "narrative_fired".to_string(),
                     serde_json::json!({
                         "decision_id": id,
                         "scenario_id": def.id,
                         "fired_tick": snap.turn,
                     }),
-                )];
+                ));
                 (vec![decision], events)
             }
         }
+    }
+
+    /// Resolves a pending decision with one of its choices.
+    ///
+    /// Removes the pending entry, writes the post-resolution cooldown
+    /// (`turn + cooldown_turns`), appends a resolved history record, and
+    /// returns the choice's effects with the `narrative_resolved` event for
+    /// the caller to dispatch and forward. Resolving an unknown or already
+    /// settled decision, or an unknown choice, errors with no state change.
+    pub fn apply_resolve(
+        &mut self,
+        decision_id: u64,
+        choice_id: &str,
+        turn: u64,
+    ) -> Result<(Vec<Effect>, PendingEvents), NarrativeError> {
+        let decision = self
+            .pending
+            .get(&decision_id)
+            .cloned()
+            .ok_or_else(|| format!("Unknown or settled narrative decision {decision_id}"))?;
+        let choice = decision
+            .choices
+            .iter()
+            .find(|candidate| candidate.id == choice_id)
+            .ok_or_else(|| {
+                format!(
+                    "Unknown choice '{choice_id}' for scenario '{}'",
+                    decision.scenario_id
+                )
+            })?;
+        let effects = choice.effects.clone();
+        let scenario_id = decision.scenario_id.clone();
+        self.pending.remove(&decision_id);
+        let blackout = self
+            .scenarios
+            .get(&scenario_id)
+            .map(|def| def.cooldown_turns)
+            .unwrap_or(0);
+        self.cooldowns
+            .insert(scenario_id.clone(), turn.saturating_add(blackout));
+        self.history.push(NarrativeRecord {
+            scenario_id: scenario_id.clone(),
+            decision_id,
+            kind: NarrativeRecordKind::Resolved,
+            turn,
+            choice_id: Some(choice_id.to_string()),
+        });
+        let events = vec![(
+            "narrative_resolved".to_string(),
+            serde_json::json!({
+                "decision_id": decision_id,
+                "scenario_id": scenario_id,
+                "choice_id": choice_id,
+                "resolved_tick": turn,
+            }),
+        )];
+        Ok((effects, events))
     }
 
     /// Returns true while a live pending decision exists for the scenario.
@@ -394,6 +493,93 @@ pub fn tick_narrative(world: &mut World) {
     for (name, payload) in pending {
         let _ = world.send_event(&name, payload);
     }
+}
+
+/// Dispatches narrative choice effects in order.
+///
+/// Two built-in narrative-local actions run here: `emit_event`
+/// (`{ bus, payload }` forwards to [`World::send_event`]) and
+/// `modify_standing` (`{ a, b, delta }` adjusts the diplomacy standing).
+/// Any other action passes through the already-registered
+/// `EffectProcessorRegistry` handlers (collected under the lock, invoked
+/// outside it); the target entity id comes from `data.entity` when present
+/// (world-scoped effects pass `0`). An effect naming a missing or despawned
+/// entity, an unknown action, or a malformed payload is skipped without
+/// aborting the remaining effects, so dispatch never fails the tick.
+pub fn dispatch_narrative_effects(world: &mut World, effects: &[Effect]) {
+    for effect in effects {
+        let data = effect.data.clone().unwrap_or_default();
+        let target = data
+            .get("entity")
+            .and_then(|v| v.as_u64())
+            .map(|id| id as u32);
+        if let Some(entity) = target
+            && !world.entity_exists(entity)
+        {
+            continue;
+        }
+        match effect.action.as_str() {
+            "emit_event" => {
+                let Some(bus) = data.get("bus").and_then(|v| v.as_str()) else {
+                    continue;
+                };
+                if bus.is_empty() {
+                    continue;
+                }
+                let payload = data.get("payload").cloned().unwrap_or_default();
+                let _ = world.send_event(bus, payload);
+            }
+            "modify_standing" => {
+                let (Some(a), Some(b), Some(delta)) = (
+                    data.get("a").and_then(|v| v.as_str()),
+                    data.get("b").and_then(|v| v.as_str()),
+                    data.get("delta").and_then(|v| v.as_i64()),
+                ) else {
+                    continue;
+                };
+                let _ = crate::diplomacy::modify_standing(world, a, b, delta);
+            }
+            action => {
+                let handler = world
+                    .effect_processor_registry
+                    .as_ref()
+                    .and_then(|registry| registry.lock().unwrap().handler_for(action));
+                match handler {
+                    Some(invokable) => {
+                        let value = serde_json::to_value(effect).unwrap_or_default();
+                        invokable(world, target.unwrap_or(0), &value);
+                    }
+                    None => {
+                        log::warn!(
+                            "Narrative effect action '{action}' has no registered handler; skipping"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Resolves a pending decision with one of its choices.
+///
+/// Applies the pure [`NarrativeState::apply_resolve`] transition, dispatches
+/// the choice's effects in order, then forwards the `narrative_resolved`
+/// event. Failed calls (unknown or settled decision, unknown choice) change
+/// no state; effect dispatch itself never fails.
+pub fn resolve_decision(
+    world: &mut World,
+    decision_id: u64,
+    choice_id: &str,
+) -> Result<(), NarrativeError> {
+    let turn = u64::from(world.turn);
+    let (effects, pending) = world
+        .narrative
+        .apply_resolve(decision_id, choice_id, turn)?;
+    dispatch_narrative_effects(world, &effects);
+    for (name, payload) in pending {
+        let _ = world.send_event(&name, payload);
+    }
+    Ok(())
 }
 
 /// Evaluates a predicate list with AND semantics.

@@ -39,6 +39,14 @@ impl EffectProcessorRegistry {
             .insert(action.to_string(), Arc::new(handler));
     }
 
+    /// Returns the handler registered for an action, if any.
+    ///
+    /// Lets world-scoped dispatchers (narrative choices) reuse registered
+    /// handlers under the caller's own collect-then-invoke discipline.
+    pub fn handler_for(&self, action: &str) -> Option<Arc<EffectHandler>> {
+        self.handlers.get(action).map(Arc::clone)
+    }
+
     /// Process effects
     /// Deadlock-free, recursive effect processing for Arc<Mutex<EffectProcessorRegistry>>
     pub fn process_effects_arc(
