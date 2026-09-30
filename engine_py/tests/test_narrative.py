@@ -11,11 +11,13 @@ import pytest
 
 
 def turn_gate_def(scenario_id):
+    # Host ticks evaluate systems before the turn increment, so turn 0 fires
+    # on the first tick on every bridge (WASM ticks increment first and agree).
     return json.dumps(
         {
             "id": scenario_id,
             "name": f"Scenario {scenario_id}",
-            "triggers": [{"type": "turn_gte", "turn": 1}],
+            "triggers": [{"type": "turn_gte", "turn": 0}],
             "choices": [
                 {
                     "id": "take",

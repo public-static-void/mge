@@ -48,7 +48,10 @@ pub extern "C" fn test_narrative_api() -> i32 {
     }
 
     unsafe {
-        let def = "{\"id\":\"wasm_probe\",\"name\":\"WASM Probe\",\"triggers\":[{\"type\":\"turn_gte\",\"turn\":1}],\"choices\":[{\"id\":\"take\",\"label\":\"Take\",\"effects\":[{\"action\":\"emit_event\",\"data\":{\"bus\":\"narr_wasm_bus\",\"payload\":{\"note\":\"picked\"}}}]}]}";
+        // Turn 0 fires on the first tick on every bridge: host ticks evaluate
+        // systems before the turn increment (turn 0), WASM ticks increment
+        // first (turn 1) — both satisfy the gate.
+        let def = "{\"id\":\"wasm_probe\",\"name\":\"WASM Probe\",\"triggers\":[{\"type\":\"turn_gte\",\"turn\":0}],\"choices\":[{\"id\":\"take\",\"label\":\"Take\",\"effects\":[{\"action\":\"emit_event\",\"data\":{\"bus\":\"narr_wasm_bus\",\"payload\":{\"note\":\"picked\"}}}]}]}";
         let mut out = [0u8; 4096];
 
         // Registration succeeds; malformed definitions are rejected.

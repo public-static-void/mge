@@ -11,10 +11,12 @@ local function scenario_def(id, triggers, choices)
     return '{"id":"' .. id .. '","name":"Scenario ' .. id .. '","triggers":' .. triggers .. ',"choices":' .. choices .. '}'
 end
 
+-- Host ticks evaluate systems before the turn increment, so turn 0 fires on
+-- the first tick on every bridge (WASM ticks increment first and agree).
 local function turn_gate_def(id)
     return scenario_def(
         id,
-        '[{"type":"turn_gte","turn":1}]',
+        '[{"type":"turn_gte","turn":0}]',
         '[{"id":"take","label":"Take","effects":[{"action":"emit_event","data":{"bus":"narr_test_bus","payload":{"note":"picked"}}}]}]'
     )
 end
