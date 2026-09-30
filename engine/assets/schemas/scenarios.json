@@ -78,5 +78,51 @@
     }
   },
   "required": ["scenarios"],
-  "scenarios": []
+  "scenarios": [
+    {
+      "id": "food_shortage",
+      "name": "Food Shortage",
+      "description": "The colony granaries run low after a poor harvest. The council must decide how the colony eats this season.",
+      "triggers": [{ "type": "turn_gte", "turn": 5 }],
+      "choices": [
+        {
+          "id": "ration_stores",
+          "label": "Ration the stores",
+          "effects": [
+            {
+              "action": "emit_event",
+              "data": {
+                "bus": "colony_announcement",
+                "payload": { "message": "The council orders strict rationing. Bellies grumble." }
+              }
+            },
+            {
+              "action": "modify_standing",
+              "data": { "a": "colonists", "b": "leadership", "delta": -5 }
+            }
+          ]
+        },
+        {
+          "id": "send_foragers",
+          "label": "Send foragers into the wilds",
+          "effects": [
+            {
+              "action": "emit_event",
+              "data": {
+                "bus": "colony_announcement",
+                "payload": { "message": "Foragers return with wild roots and game. The colony eats." }
+              }
+            },
+            {
+              "action": "modify_standing",
+              "data": { "a": "colonists", "b": "leadership", "delta": 5 }
+            }
+          ]
+        }
+      ],
+      "cooldown_turns": 10,
+      "once": false,
+      "weight": 1.0
+    }
+  ]
 }

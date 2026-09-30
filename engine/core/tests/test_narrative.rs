@@ -1413,3 +1413,68 @@ fn seeded_replay_after_load_matches_uninterrupted_world() {
     );
     assert_eq!(loaded.narrative.rng_state, direct.narrative.rng_state);
 }
+
+// --- M6: demo colony-sim incident content (food shortage) ---
+
+/// The shipped food-shortage incident fires and resolves with distinct consequences.
+#[test]
+fn demo_food_shortage_fires_and_resolves_with_consequences() {
+    use engine_core::narrative::load_scenario_definitions;
+
+    let defs = load_scenario_definitions();
+    let def = defs
+        .iter()
+        .find(|def| def.id == "food_shortage")
+        .expect("shipped content must carry the food-shortage incident");
+    assert!(
+        def.choices.len() >= 2,
+        "the incident must offer at least two consequential choices"
+    );
+    for choice in &def.choices {
+        assert!(
+            !choice.effects.is_empty(),
+            "every demo choice must carry at least one effect"
+        );
+    }
+
+    let mut world = narrative_world();
+    let def_json = serde_json::to_string(def).expect("shipped def must serialize");
+    register_scenario(&mut world, &def_json).expect("shipped def must register");
+    world.turn = 50;
+    run_narrative_tick(&mut world);
+    let fired = drain_flushed(&mut world, "narrative_fired");
+    assert_eq!(fired.len(), 1, "the incident fires once its turn gate holds");
+    assert_eq!(
+        fired[0].get("scenario_id").and_then(|v| v.as_str()),
+        Some("food_shortage")
+    );
+    let id = world
+        .narrative
+        .pending
+        .values()
+        .next()
+        .expect("one pending decision")
+        .id;
+
+    resolve_decision(&mut world, id, "send_foragers").expect("resolve must succeed");
+    assert_eq!(
+        get_standing(&world, "colonists", "leadership"),
+        5,
+        "the foraging choice lifts colony standing"
+    );
+    let announcements = drain_flushed(&mut world, "colony_announcement");
+    assert_eq!(
+        announcements.len(),
+        1,
+        "the choice announces its outcome on the colony bus"
+    );
+    let history = get_narrative_history(&world);
+    assert_eq!(history.len(), 2, "fire plus resolve append two records");
+    assert_eq!(history[0].kind, NarrativeRecordKind::Fired);
+    assert_eq!(history[1].kind, NarrativeRecordKind::Resolved);
+    assert_eq!(
+        history[1].choice_id.as_deref(),
+        Some("send_foragers"),
+        "the resolved record names the chosen path"
+    );
+}
