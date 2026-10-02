@@ -497,3 +497,45 @@ fn founding_backfill_entries_render_with_era_names() {
         assert!(line.ends_with("— founding"));
     }
 }
+
+// --- Read-model performance: 10k-entry filtered query budget ---
+
+/// A filtered query over ten thousand entries completes within 100 ms.
+#[test]
+fn filtered_query_over_ten_thousand_entries_stays_within_budget() {
+    let mut world = make_test_world();
+    for i in 0..10_000 {
+        let scenario = if i % 2 == 0 { "food_shortage" } else { "omen" };
+        let kind = match i % 4 {
+            0 => ChronicleKind::Fired,
+            1 => ChronicleKind::Resolved,
+            2 => ChronicleKind::Expired,
+            _ => ChronicleKind::Founding,
+        };
+        append_chronicle_entry(
+            &mut world,
+            i % 500,
+            scenario,
+            kind,
+            format!("t{} {scenario} {kind:?}", i % 500),
+            None,
+        );
+    }
+    assert_eq!(chronicle_len(&world), 10_000);
+
+    let filter = ChronicleFilter {
+        scenario_id: Some("food_shortage".to_string()),
+        kind: Some(ChronicleKind::Fired),
+        turn_from: Some(0),
+        turn_to: Some(499),
+    };
+    let started = std::time::Instant::now();
+    let hits = list_chronicle(&world, filter);
+    let elapsed = started.elapsed();
+
+    assert_eq!(hits.len(), 2_500);
+    assert!(
+        elapsed.as_millis() < 100,
+        "10k-entry filtered query took {elapsed:?}, over the 100 ms budget"
+    );
+}
