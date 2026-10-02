@@ -4,13 +4,17 @@
 //! following the free-function accessor split of `narrative.rs`: module-level
 //! state on [`World`] plus thin accessors, with no per-entity owner required.
 //!
-//! This milestone covers the store shape, persistence wiring, and the append
-//! path with monotonic ids. The live narrative feed, filtered queries,
-//! deterministic rendering, and seeded founding backfill arrive in later
-//! milestones and build on this state.
+//! Covers the store shape, persistence wiring, the monotonic append path, the
+//! live narrative feed, filtered queries, deterministic text rendering, and
+//! the seeded founding backfill. Bridges (Lua/Python/WASM) arrive in later
+//! milestones and build on this API.
 
 use crate::ecs::world::World;
 use crate::narrative::{NarrativeRecord, NarrativeRecordKind};
+use rand::Rng;
+use rand::RngCore;
+use rand::SeedableRng;
+use rand::rngs::SmallRng;
 use serde::{Deserialize, Serialize};
 
 /// Lore errors are human-readable rejections; failed calls change no state.
@@ -191,6 +195,111 @@ fn render_summary(
     }
 }
 
+/// Fixed code-side pool of founding-era names: slug plus display name.
+/// Kept in code (not `scenarios.json`) so backfill determinism stays
+/// self-contained in the persisted `LoreState` RNG stream. Backfill shuffles
+/// this order per seed, then cycles for counts beyond eight.
+const FOUNDING_ERAS: [(&str, &str); 8] = [
+    ("first_hearth", "Founding of the First Hearth"),
+    ("stone_circle", "Raising of the Stone Circle"),
+    ("river_crossing", "Crossing of the Great River"),
+    ("ashen_hollow", "Settlement of the Ashen Hollow"),
+    ("high_meadow", "Claiming of the High Meadow"),
+    ("deep_well", "Digging of the Deep Well"),
+    ("ember_watch", "Lighting of the Ember Watch"),
+    ("quiet_orchard", "Planting of the Quiet Orchard"),
+];
+
+/// Looks up the display name for a `founding:{slug}` scenario id.
+fn founding_era_name(scenario_id: &str) -> Option<&'static str> {
+    scenario_id
+        .strip_prefix("founding:")
+        .and_then(|slug| FOUNDING_ERAS.iter().find(|(known, _)| *known == slug))
+        .map(|(_, name)| *name)
+}
+
+/// Resolves the display name for any chronicle scenario id: registered
+/// scenario metadata first, then the founding-era table, then the raw id.
+/// Never fails; unknown ids fall back to the id itself.
+fn resolve_scenario_name(world: &World, scenario_id: &str) -> String {
+    if let Some(def) = world.narrative.scenarios.get(scenario_id) {
+        return def.name.clone();
+    }
+    if let Some(era) = founding_era_name(scenario_id) {
+        return era.to_string();
+    }
+    scenario_id.to_string()
+}
+
+/// Renders the chronicle query as human-readable text, one line per entry.
+///
+/// Each line re-derives through the fixed template in
+/// [`list_chronicle`] order, so renaming a scenario (or backfilling a new
+/// era) is reflected on the next render with no stored-state migration.
+pub fn render_chronicle_text(world: &World, filter: ChronicleFilter) -> Vec<String> {
+    list_chronicle(world, filter)
+        .iter()
+        .map(|entry| {
+            render_summary(
+                &resolve_scenario_name(world, &entry.scenario_id),
+                entry.turn,
+                entry.kind,
+                entry.choice_id.as_deref(),
+            )
+        })
+        .collect()
+}
+
+/// Populates founding-era entries dated before live play.
+///
+/// Appends exactly `era_count` founding entries (one per era, turns
+/// `0..era_count` strictly increasing), so they predate live play whenever
+/// the world turn is 0 (founding before play) or exceeds `era_count`.
+/// Callers backfilling a mid-game world with `era_count` at or above the
+/// current turn should advance the turn first. `era_count == 0` returns
+/// `Ok(0)` and mutates nothing.
+///
+/// The `seed` parameter fully determines the era order (shuffled per seed,
+/// cycling past eight), so repeats with the same seed stay byte-identical,
+/// including after [`clear_lore_history`]. The evolved stream persists back
+/// into `lore.rng_state` following the narrative persist-back pattern; no
+/// wall-clock, thread RNG, or map-ordered iteration enters the path.
+pub fn generate_founding_history(
+    world: &mut World,
+    seed: u64,
+    era_count: u32,
+) -> Result<usize, LoreError> {
+    if era_count == 0 {
+        return Ok(0);
+    }
+    let mut stream = [0u8; 32];
+    stream[..8].copy_from_slice(&seed.to_le_bytes());
+    let mut rng = SmallRng::from_seed(stream);
+    let mut order = [0usize, 1, 2, 3, 4, 5, 6, 7];
+    for i in (1..order.len()).rev() {
+        let j = (rng.next_u32() as usize) % (i + 1);
+        order.swap(i, j);
+    }
+    let count = era_count as usize;
+    for i in 0..count {
+        let (slug, name) = FOUNDING_ERAS[order[i % order.len()]];
+        let scenario_id = format!("founding:{slug}");
+        let turn = i as u64;
+        let summary = render_summary(name, turn, ChronicleKind::Founding, None);
+        append_chronicle_entry(
+            world,
+            turn,
+            &scenario_id,
+            ChronicleKind::Founding,
+            summary,
+            None,
+        );
+    }
+    rng.fill(&mut stream);
+    world.lore.rng_state = stream;
+    Ok(count)
+}
+
 /// Mirrors one narrative history record into the chronicle.
 ///
 /// Called from the world-level narrative transitions (`tick_narrative` for
@@ -199,12 +308,7 @@ fn render_summary(
 /// from the same counter as direct appends, keeping one monotonic sequence.
 pub(crate) fn mirror_narrative_record(world: &mut World, record: &NarrativeRecord) {
     let kind = chronicle_kind_of(record.kind);
-    let scenario_name = world
-        .narrative
-        .scenarios
-        .get(&record.scenario_id)
-        .map(|def| def.name.clone())
-        .unwrap_or_else(|| record.scenario_id.clone());
+    let scenario_name = resolve_scenario_name(world, &record.scenario_id);
     let summary = render_summary(
         &scenario_name,
         record.turn,
