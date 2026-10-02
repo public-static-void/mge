@@ -178,7 +178,7 @@ fn lore_snapshot_restores_entries_and_keeps_ids_monotonic() {
 
 #[test]
 fn saves_without_lore_fields_load_with_an_empty_chronicle() {
-    let mut value = serde_json::to_value(&WasmWorld::new()).expect("fresh world serializes");
+    let mut value = serde_json::to_value(WasmWorld::new()).expect("fresh world serializes");
     value
         .as_object_mut()
         .expect("world serializes as an object")

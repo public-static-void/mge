@@ -42,39 +42,39 @@ fn parse_filter(filter: Option<Bound<'_, PyAny>>) -> PyResult<ChronicleFilter> {
     let obj = value
         .as_object()
         .ok_or_else(|| PyValueError::new_err("Chronicle filter must be a dict"))?;
-    if let Some(scenario) = obj.get("scenario_id") {
-        if !scenario.is_null() {
-            out.scenario_id = Some(
-                scenario
-                    .as_str()
-                    .ok_or_else(|| {
-                        PyValueError::new_err("Chronicle filter scenario_id must be a string")
-                    })?
-                    .to_string(),
-            );
-        }
-    }
-    if let Some(kind) = obj.get("kind") {
-        if !kind.is_null() {
-            let raw = kind
+    if let Some(scenario) = obj.get("scenario_id")
+        && !scenario.is_null()
+    {
+        out.scenario_id = Some(
+            scenario
                 .as_str()
-                .ok_or_else(|| PyValueError::new_err("Chronicle filter kind must be a string"))?;
-            out.kind = Some(parse_kind(raw)?);
-        }
+                .ok_or_else(|| {
+                    PyValueError::new_err("Chronicle filter scenario_id must be a string")
+                })?
+                .to_string(),
+        );
     }
-    if let Some(from) = obj.get("turn_from") {
-        if !from.is_null() {
-            out.turn_from = Some(from.as_u64().ok_or_else(|| {
-                PyValueError::new_err("Chronicle filter turn_from must be a non-negative integer")
-            })?);
-        }
+    if let Some(kind) = obj.get("kind")
+        && !kind.is_null()
+    {
+        let raw = kind
+            .as_str()
+            .ok_or_else(|| PyValueError::new_err("Chronicle filter kind must be a string"))?;
+        out.kind = Some(parse_kind(raw)?);
     }
-    if let Some(to) = obj.get("turn_to") {
-        if !to.is_null() {
-            out.turn_to = Some(to.as_u64().ok_or_else(|| {
-                PyValueError::new_err("Chronicle filter turn_to must be a non-negative integer")
-            })?);
-        }
+    if let Some(from) = obj.get("turn_from")
+        && !from.is_null()
+    {
+        out.turn_from = Some(from.as_u64().ok_or_else(|| {
+            PyValueError::new_err("Chronicle filter turn_from must be a non-negative integer")
+        })?);
+    }
+    if let Some(to) = obj.get("turn_to")
+        && !to.is_null()
+    {
+        out.turn_to = Some(to.as_u64().ok_or_else(|| {
+            PyValueError::new_err("Chronicle filter turn_to must be a non-negative integer")
+        })?);
     }
     Ok(out)
 }
