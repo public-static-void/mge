@@ -24,6 +24,7 @@ use crate::host_api::job_mutation::register_job_mutation_api;
 use crate::host_api::job_query::register_job_query_api;
 use crate::host_api::job_system::register_job_system_api;
 use crate::host_api::loot::register_loot_api;
+use crate::host_api::lore::register_lore_api;
 use crate::host_api::map::register_map_api;
 use crate::host_api::material::register_material_api;
 use crate::host_api::mode::register_mode_api;
@@ -205,6 +206,7 @@ impl WasmScriptEngine {
         register_designer_api(&mut linker)?;
         register_diplomacy_api(&mut linker)?;
         register_narrative_api(&mut linker)?;
+        register_lore_api(&mut linker)?;
 
         // Load schemas if schema_path is provided
         let schemas = config

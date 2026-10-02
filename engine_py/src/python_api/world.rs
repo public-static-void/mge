@@ -617,11 +617,7 @@ impl PyWorld {
     }
 
     /// Get the chronicle entry for an id as a dict, or None for unknown ids.
-    fn get_chronicle_entry(
-        &self,
-        py: Python<'_>,
-        entry_id: i64,
-    ) -> PyResult<Option<PyObject>> {
+    fn get_chronicle_entry(&self, py: Python<'_>, entry_id: i64) -> PyResult<Option<PyObject>> {
         crate::python_api::lore::get_chronicle_entry(self, py, entry_id)
     }
 

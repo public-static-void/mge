@@ -38,8 +38,7 @@ fn parse_filter(filter: Option<Bound<'_, PyAny>>) -> PyResult<ChronicleFilter> {
         return Ok(out);
     };
     let value: serde_json::Value =
-        serde_pyobject::from_pyobject(bound)
-            .map_err(|e| PyValueError::new_err(e.to_string()))?;
+        serde_pyobject::from_pyobject(bound).map_err(|e| PyValueError::new_err(e.to_string()))?;
     let obj = value
         .as_object()
         .ok_or_else(|| PyValueError::new_err("Chronicle filter must be a dict"))?;
@@ -84,11 +83,7 @@ fn parse_filter(filter: Option<Bound<'_, PyAny>>) -> PyResult<ChronicleFilter> {
 ///
 /// Raises `ValueError` on negative inputs or core backfill failures,
 /// leaving prior lore state untouched.
-pub fn generate_founding_history(
-    pyworld: &PyWorld,
-    seed: i64,
-    era_count: i64,
-) -> PyResult<usize> {
+pub fn generate_founding_history(pyworld: &PyWorld, seed: i64, era_count: i64) -> PyResult<usize> {
     let seed_value = u64::try_from(seed)
         .map_err(|_| PyValueError::new_err(format!("Invalid lore seed: {seed}")))?;
     let era_value = u32::try_from(era_count)

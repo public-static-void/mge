@@ -115,6 +115,10 @@ pub mod job_ai;
 /// Loot table module (define_table, roll, has_table, table_names, remove_table)
 pub mod loot;
 
+/// Lore module (generate_founding_history, list_chronicle,
+/// get_chronicle_entry, render_chronicle, chronicle_len, clear_lore_history)
+pub mod lore;
+
 /// Faction and reputation module (set_faction, get_faction, modify_reputation, get_reputation)
 pub mod faction;
 

@@ -10,12 +10,13 @@
 //! milestones and build on this API.
 
 use crate::ecs::world::World;
-use crate::narrative::{NarrativeRecord, NarrativeRecordKind};
+use crate::narrative::{NarrativeRecord, NarrativeRecordKind, ScenarioDef};
 use rand::Rng;
 use rand::RngCore;
 use rand::SeedableRng;
 use rand::rngs::SmallRng;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// Lore errors are human-readable rejections; failed calls change no state.
 pub type LoreError = String;
@@ -87,6 +88,48 @@ pub struct LoreState {
     pub next_entry_id: u64,
 }
 
+impl ChronicleKind {
+    /// Parses a lowercase kind token into its chronicle kind.
+    ///
+    /// Rejects anything outside the fixed `fired|resolved|expired|founding`
+    /// set so invalid bridge filters error instead of silently matching
+    /// nothing. Shared by every scripting bridge.
+    pub fn parse(raw: &str) -> Option<ChronicleKind> {
+        match raw {
+            "fired" => Some(ChronicleKind::Fired),
+            "resolved" => Some(ChronicleKind::Resolved),
+            "expired" => Some(ChronicleKind::Expired),
+            "founding" => Some(ChronicleKind::Founding),
+            _ => None,
+        }
+    }
+}
+
+/// Appends one chronicle entry to a lore store, minting its id.
+///
+/// State-level core behind [`append_chronicle_entry`] and the WASM world
+/// mirror: one monotonic id sequence per store, never reused.
+pub(crate) fn append_chronicle_entry_in(
+    state: &mut LoreState,
+    turn: u64,
+    scenario_id: &str,
+    kind: ChronicleKind,
+    summary: String,
+    choice_id: Option<String>,
+) -> u64 {
+    let entry_id = state.next_entry_id;
+    state.next_entry_id += 1;
+    state.entries.push(ChronicleEntry {
+        entry_id,
+        turn,
+        scenario_id: scenario_id.to_string(),
+        kind,
+        summary,
+        choice_id,
+    });
+    entry_id
+}
+
 /// Appends one chronicle entry, minting its id from the world counter.
 ///
 /// Returns the minted entry id. Ids increase monotonically and are never
@@ -99,17 +142,7 @@ pub fn append_chronicle_entry(
     summary: String,
     choice_id: Option<String>,
 ) -> u64 {
-    let entry_id = world.lore.next_entry_id;
-    world.lore.next_entry_id += 1;
-    world.lore.entries.push(ChronicleEntry {
-        entry_id,
-        turn,
-        scenario_id: scenario_id.to_string(),
-        kind,
-        summary,
-        choice_id,
-    });
-    entry_id
+    append_chronicle_entry_in(&mut world.lore, turn, scenario_id, kind, summary, choice_id)
 }
 
 /// Returns the number of chronicle entries on the world.
@@ -117,15 +150,15 @@ pub fn chronicle_len(world: &World) -> usize {
     world.lore.entries.len()
 }
 
-/// Lists chronicle entries matching every set filter field.
+/// Lists chronicle entries in a lore store matching every set filter field.
 ///
+/// State-level core behind [`list_chronicle`] and the WASM world mirror.
 /// Conjunctive over scenario id, kind, and the inclusive turn range; unset
 /// fields are unbounded. Results always sort by turn then entry id, so
 /// backfilled founding entries (older turns, newer ids) slot before live
 /// entries regardless of insertion order.
-pub fn list_chronicle(world: &World, filter: ChronicleFilter) -> Vec<ChronicleEntry> {
-    let mut out: Vec<ChronicleEntry> = world
-        .lore
+pub(crate) fn list_chronicle_in(state: &LoreState, filter: ChronicleFilter) -> Vec<ChronicleEntry> {
+    let mut out: Vec<ChronicleEntry> = state
         .entries
         .iter()
         .filter(|entry| {
@@ -143,16 +176,33 @@ pub fn list_chronicle(world: &World, filter: ChronicleFilter) -> Vec<ChronicleEn
     out
 }
 
-/// Returns the chronicle entry for an id, if present.
+/// Lists chronicle entries matching every set filter field.
 ///
-/// Unknown ids return `None` and never error, matching the bridge contract.
-pub fn get_chronicle_entry(world: &World, entry_id: u64) -> Option<ChronicleEntry> {
-    world
-        .lore
+/// Conjunctive over scenario id, kind, and the inclusive turn range; unset
+/// fields are unbounded. Results always sort by turn then entry id, so
+/// backfilled founding entries (older turns, newer ids) slot before live
+/// entries regardless of insertion order.
+pub fn list_chronicle(world: &World, filter: ChronicleFilter) -> Vec<ChronicleEntry> {
+    list_chronicle_in(&world.lore, filter)
+}
+
+/// Returns the chronicle entry in a lore store for an id, if present.
+///
+/// State-level core behind [`get_chronicle_entry`] and the WASM world
+/// mirror. Unknown ids return `None` and never error.
+pub(crate) fn get_chronicle_entry_in(state: &LoreState, entry_id: u64) -> Option<ChronicleEntry> {
+    state
         .entries
         .iter()
         .find(|entry| entry.entry_id == entry_id)
         .cloned()
+}
+
+/// Returns the chronicle entry for an id, if present.
+///
+/// Unknown ids return `None` and never error, matching the bridge contract.
+pub fn get_chronicle_entry(world: &World, entry_id: u64) -> Option<ChronicleEntry> {
+    get_chronicle_entry_in(&world.lore, entry_id)
 }
 
 /// Maps a narrative lifecycle transition onto its chronicle kind.
@@ -218,11 +268,17 @@ fn founding_era_name(scenario_id: &str) -> Option<&'static str> {
         .map(|(_, name)| *name)
 }
 
-/// Resolves the display name for any chronicle scenario id: registered
-/// scenario metadata first, then the founding-era table, then the raw id.
-/// Never fails; unknown ids fall back to the id itself.
-fn resolve_scenario_name(world: &World, scenario_id: &str) -> String {
-    if let Some(def) = world.narrative.scenarios.get(scenario_id) {
+/// Resolves the display name for any chronicle scenario id against a
+/// scenario table: registered metadata first, then the founding-era table,
+/// then the raw id. Never fails; unknown ids fall back to the id itself.
+///
+/// State-level core behind [`resolve_scenario_name`] and the WASM world
+/// mirror, which holds its own scenario table on `WasmWorld.narrative`.
+pub(crate) fn resolve_scenario_name_in(
+    scenarios: &HashMap<String, ScenarioDef>,
+    scenario_id: &str,
+) -> String {
+    if let Some(def) = scenarios.get(scenario_id) {
         return def.name.clone();
     }
     if let Some(era) = founding_era_name(scenario_id) {
@@ -231,23 +287,80 @@ fn resolve_scenario_name(world: &World, scenario_id: &str) -> String {
     scenario_id.to_string()
 }
 
-/// Renders the chronicle query as human-readable text, one line per entry.
+/// Renders a chronicle query from a lore store as human-readable text.
 ///
-/// Each line re-derives through the fixed template in
-/// [`list_chronicle`] order, so renaming a scenario (or backfilling a new
-/// era) is reflected on the next render with no stored-state migration.
-pub fn render_chronicle_text(world: &World, filter: ChronicleFilter) -> Vec<String> {
-    list_chronicle(world, filter)
+/// State-level core behind [`render_chronicle_text`] and the WASM world
+/// mirror. Each line re-derives through the fixed template in
+/// [`list_chronicle_in`] order.
+pub(crate) fn render_chronicle_text_in(
+    state: &LoreState,
+    scenarios: &HashMap<String, ScenarioDef>,
+    filter: ChronicleFilter,
+) -> Vec<String> {
+    list_chronicle_in(state, filter)
         .iter()
         .map(|entry| {
             render_summary(
-                &resolve_scenario_name(world, &entry.scenario_id),
+                &resolve_scenario_name_in(scenarios, &entry.scenario_id),
                 entry.turn,
                 entry.kind,
                 entry.choice_id.as_deref(),
             )
         })
         .collect()
+}
+
+/// Renders the chronicle query as human-readable text, one line per entry.
+///
+/// Each line re-derives through the fixed template in
+/// [`list_chronicle`] order, so renaming a scenario (or backfilling a new
+/// era) is reflected on the next render with no stored-state migration.
+pub fn render_chronicle_text(world: &World, filter: ChronicleFilter) -> Vec<String> {
+    render_chronicle_text_in(&world.lore, &world.narrative.scenarios, filter)
+}
+
+/// Populates founding-era entries in a lore store.
+///
+/// State-level core behind [`generate_founding_history`] and the WASM world
+/// mirror. Appends exactly `era_count` founding entries (one per era, turns
+/// `0..era_count` strictly increasing). `era_count == 0` returns `Ok(0)` and
+/// mutates nothing. The evolved stream persists back into
+/// `state.rng_state`; no wall-clock, thread RNG, or map-ordered iteration
+/// enters the path.
+pub(crate) fn generate_founding_history_in(
+    state: &mut LoreState,
+    seed: u64,
+    era_count: u32,
+) -> Result<usize, LoreError> {
+    if era_count == 0 {
+        return Ok(0);
+    }
+    let mut stream = [0u8; 32];
+    stream[..8].copy_from_slice(&seed.to_le_bytes());
+    let mut rng = SmallRng::from_seed(stream);
+    let mut order = [0usize, 1, 2, 3, 4, 5, 6, 7];
+    for i in (1..order.len()).rev() {
+        let j = (rng.next_u32() as usize) % (i + 1);
+        order.swap(i, j);
+    }
+    let count = era_count as usize;
+    for i in 0..count {
+        let (slug, name) = FOUNDING_ERAS[order[i % order.len()]];
+        let scenario_id = format!("founding:{slug}");
+        let turn = i as u64;
+        let summary = render_summary(name, turn, ChronicleKind::Founding, None);
+        append_chronicle_entry_in(
+            state,
+            turn,
+            &scenario_id,
+            ChronicleKind::Founding,
+            summary,
+            None,
+        );
+    }
+    rng.fill(&mut stream);
+    state.rng_state = stream;
+    Ok(count)
 }
 
 /// Populates founding-era entries dated before live play.
@@ -269,35 +382,35 @@ pub fn generate_founding_history(
     seed: u64,
     era_count: u32,
 ) -> Result<usize, LoreError> {
-    if era_count == 0 {
-        return Ok(0);
-    }
-    let mut stream = [0u8; 32];
-    stream[..8].copy_from_slice(&seed.to_le_bytes());
-    let mut rng = SmallRng::from_seed(stream);
-    let mut order = [0usize, 1, 2, 3, 4, 5, 6, 7];
-    for i in (1..order.len()).rev() {
-        let j = (rng.next_u32() as usize) % (i + 1);
-        order.swap(i, j);
-    }
-    let count = era_count as usize;
-    for i in 0..count {
-        let (slug, name) = FOUNDING_ERAS[order[i % order.len()]];
-        let scenario_id = format!("founding:{slug}");
-        let turn = i as u64;
-        let summary = render_summary(name, turn, ChronicleKind::Founding, None);
-        append_chronicle_entry(
-            world,
-            turn,
-            &scenario_id,
-            ChronicleKind::Founding,
-            summary,
-            None,
-        );
-    }
-    rng.fill(&mut stream);
-    world.lore.rng_state = stream;
-    Ok(count)
+    generate_founding_history_in(&mut world.lore, seed, era_count)
+}
+
+/// Mirrors one narrative history record into a lore store.
+///
+/// State-level core behind [`mirror_narrative_record`] and the WASM world
+/// mirror. Entry ids mint from the same counter as direct appends, keeping
+/// one monotonic sequence per store.
+pub(crate) fn mirror_record_in(
+    state: &mut LoreState,
+    scenarios: &HashMap<String, ScenarioDef>,
+    record: &NarrativeRecord,
+) {
+    let kind = chronicle_kind_of(record.kind);
+    let scenario_name = resolve_scenario_name_in(scenarios, &record.scenario_id);
+    let summary = render_summary(
+        &scenario_name,
+        record.turn,
+        kind,
+        record.choice_id.as_deref(),
+    );
+    append_chronicle_entry_in(
+        state,
+        record.turn,
+        &record.scenario_id,
+        kind,
+        summary,
+        record.choice_id.clone(),
+    );
 }
 
 /// Mirrors one narrative history record into the chronicle.
@@ -307,22 +420,15 @@ pub fn generate_founding_history(
 /// record is queryable no later than the end of its own tick. Entry ids mint
 /// from the same counter as direct appends, keeping one monotonic sequence.
 pub(crate) fn mirror_narrative_record(world: &mut World, record: &NarrativeRecord) {
-    let kind = chronicle_kind_of(record.kind);
-    let scenario_name = resolve_scenario_name(world, &record.scenario_id);
-    let summary = render_summary(
-        &scenario_name,
-        record.turn,
-        kind,
-        record.choice_id.as_deref(),
-    );
-    append_chronicle_entry(
-        world,
-        record.turn,
-        &record.scenario_id,
-        kind,
-        summary,
-        record.choice_id.clone(),
-    );
+    mirror_record_in(&mut world.lore, &world.narrative.scenarios, record);
+}
+
+/// Clears the entries of a lore store and resets its id counter.
+///
+/// State-level core behind [`clear_lore_history`] and the WASM world mirror.
+pub(crate) fn clear_lore_history_in(state: &mut LoreState) {
+    state.entries.clear();
+    state.next_entry_id = 0;
 }
 
 /// Clears all chronicle entries and resets the id counter.
@@ -330,6 +436,5 @@ pub(crate) fn mirror_narrative_record(world: &mut World, record: &NarrativeRecor
 /// Test and regen support: mods call this before re-running seeded backfill
 /// generation to reproduce byte-identical chronicles.
 pub fn clear_lore_history(world: &mut World) {
-    world.lore.entries.clear();
-    world.lore.next_entry_id = 0;
+    clear_lore_history_in(&mut world.lore);
 }
