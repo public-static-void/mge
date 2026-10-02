@@ -59,6 +59,9 @@ pub mod job_query;
 pub mod job_system;
 /// Loot API
 pub mod loot;
+/// Lore API (generate_founding_history, list_chronicle, get_chronicle_entry,
+/// render_chronicle, chronicle_len, clear_lore_history)
+pub mod lore;
 /// Map API
 pub mod map;
 /// Material API
@@ -139,6 +142,7 @@ pub fn register_all_api_functions(
     map::register_map_api(lua, globals, world.clone())?;
     multiscale_map::register_multiscale_map_api(lua, globals, world.clone())?;
     narrative::register_narrative_api(lua, globals, world.clone())?;
+    lore::register_lore_api(lua, globals, world.clone())?;
     economic::register_economic_api(lua, globals, world.clone())?;
     construction::register_construction_api(lua, globals, world.clone())?;
     craft::register_craft_api(lua, globals, world.clone())?;
