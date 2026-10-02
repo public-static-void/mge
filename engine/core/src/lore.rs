@@ -10,6 +10,7 @@
 //! milestones and build on this state.
 
 use crate::ecs::world::World;
+use crate::narrative::{NarrativeRecord, NarrativeRecordKind};
 use serde::{Deserialize, Serialize};
 
 /// Lore errors are human-readable rejections; failed calls change no state.
@@ -110,6 +111,114 @@ pub fn append_chronicle_entry(
 /// Returns the number of chronicle entries on the world.
 pub fn chronicle_len(world: &World) -> usize {
     world.lore.entries.len()
+}
+
+/// Lists chronicle entries matching every set filter field.
+///
+/// Conjunctive over scenario id, kind, and the inclusive turn range; unset
+/// fields are unbounded. Results always sort by turn then entry id, so
+/// backfilled founding entries (older turns, newer ids) slot before live
+/// entries regardless of insertion order.
+pub fn list_chronicle(world: &World, filter: ChronicleFilter) -> Vec<ChronicleEntry> {
+    let mut out: Vec<ChronicleEntry> = world
+        .lore
+        .entries
+        .iter()
+        .filter(|entry| {
+            filter
+                .scenario_id
+                .as_ref()
+                .is_none_or(|wanted| *wanted == entry.scenario_id)
+                && filter.kind.is_none_or(|wanted| wanted == entry.kind)
+                && filter.turn_from.is_none_or(|from| entry.turn >= from)
+                && filter.turn_to.is_none_or(|to| entry.turn <= to)
+        })
+        .cloned()
+        .collect();
+    out.sort_by_key(|entry| (entry.turn, entry.entry_id));
+    out
+}
+
+/// Returns the chronicle entry for an id, if present.
+///
+/// Unknown ids return `None` and never error, matching the bridge contract.
+pub fn get_chronicle_entry(world: &World, entry_id: u64) -> Option<ChronicleEntry> {
+    world
+        .lore
+        .entries
+        .iter()
+        .find(|entry| entry.entry_id == entry_id)
+        .cloned()
+}
+
+/// Maps a narrative lifecycle transition onto its chronicle kind.
+fn chronicle_kind_of(kind: NarrativeRecordKind) -> ChronicleKind {
+    match kind {
+        NarrativeRecordKind::Fired => ChronicleKind::Fired,
+        NarrativeRecordKind::Resolved => ChronicleKind::Resolved,
+        NarrativeRecordKind::Expired => ChronicleKind::Expired,
+    }
+}
+
+/// Lowercase kind token for the fixed chronicle template.
+fn kind_label(kind: ChronicleKind) -> &'static str {
+    match kind {
+        ChronicleKind::Fired => "fired",
+        ChronicleKind::Resolved => "resolved",
+        ChronicleKind::Expired => "expired",
+        ChronicleKind::Founding => "founding",
+    }
+}
+
+/// Renders one chronicle summary through the fixed template.
+///
+/// `Turn {turn}: {scenario_name} — {kind} [{choice}]`, with the choice
+/// bracket omitted when no choice resolved. The scenario name falls back to
+/// the scenario id when metadata is absent. No wall-clock, randomness, or
+/// locale-dependent formatting enters the output path.
+fn render_summary(
+    scenario_name: &str,
+    turn: u64,
+    kind: ChronicleKind,
+    choice_id: Option<&str>,
+) -> String {
+    match choice_id {
+        Some(choice) => format!(
+            "Turn {turn}: {scenario_name} — {} [{choice}]",
+            kind_label(kind)
+        ),
+        None => format!("Turn {turn}: {scenario_name} — {}", kind_label(kind)),
+    }
+}
+
+/// Mirrors one narrative history record into the chronicle.
+///
+/// Called from the world-level narrative transitions (`tick_narrative` for
+/// fired/expired records, `resolve_decision` for resolved records) so every
+/// record is queryable no later than the end of its own tick. Entry ids mint
+/// from the same counter as direct appends, keeping one monotonic sequence.
+pub(crate) fn mirror_narrative_record(world: &mut World, record: &NarrativeRecord) {
+    let kind = chronicle_kind_of(record.kind);
+    let scenario_name = world
+        .narrative
+        .scenarios
+        .get(&record.scenario_id)
+        .map(|def| def.name.clone())
+        .unwrap_or_else(|| record.scenario_id.clone());
+    let summary = render_summary(
+        &scenario_name,
+        record.turn,
+        kind,
+        record.choice_id.as_deref(),
+    );
+    append_chronicle_entry(
+        world,
+        record.turn,
+        &record.scenario_id,
+        kind,
+        summary,
+        record.choice_id.clone(),
+    );
 }
 
 /// Clears all chronicle entries and resets the id counter.
