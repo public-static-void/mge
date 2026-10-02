@@ -13,8 +13,8 @@ use world_helper::make_test_world;
 use world_io_helper::save_and_load_roundtrip;
 
 use engine_core::lore::{
-    ChronicleFilter, ChronicleKind, append_chronicle_entry, chronicle_len, get_chronicle_entry,
-    list_chronicle,
+    ChronicleFilter, ChronicleKind, append_chronicle_entry, chronicle_len, clear_lore_history,
+    generate_founding_history, get_chronicle_entry, list_chronicle, render_chronicle_text,
 };
 use engine_core::narrative::{register_scenario, resolve_decision};
 use engine_core::systems::narrative::NarrativeSystem;
@@ -329,4 +329,171 @@ fn combined_filters_intersect_across_all_dimensions() {
     };
     assert!(list_chronicle(&world, empty).is_empty());
     assert!(get_chronicle_entry(&world, 99).is_none());
+}
+
+// --- Deterministic rendering: fixed template with metadata fallback ---
+
+/// Registers the food-shortage scenario under its canonical display name.
+fn register_food_shortage(world: &mut engine_core::ecs::world::World, turn: u64) {
+    let def = json!({
+        "id": "food_shortage",
+        "name": "Food Shortage",
+        "description": "grain stores run low",
+        "triggers": [{"type": "turn_gte", "turn": turn}],
+        "choices": [
+            {"id": "ration", "label": "Ration", "effects": []},
+            {"id": "feast", "label": "Feast", "effects": []},
+        ],
+        "cooldown_turns": 0,
+        "once": false,
+        "weight": 1.0,
+    })
+    .to_string();
+    register_scenario(world, &def).expect("scenario registers");
+}
+
+/// A fired entry without a choice renders the fixed template exactly.
+#[test]
+fn rendered_fired_entry_matches_fixed_template() {
+    let mut world = lore_tick_world();
+    register_food_shortage(&mut world, 7);
+    world.turn = 7;
+    run_lore_tick(&mut world);
+
+    assert_eq!(
+        render_chronicle_text(&world, ChronicleFilter::default()),
+        vec!["Turn 7: Food Shortage — fired".to_string()]
+    );
+}
+
+/// A resolved entry appends its choice label in brackets.
+#[test]
+fn rendered_resolved_entry_includes_choice_label() {
+    let mut world = lore_tick_world();
+    register_food_shortage(&mut world, 7);
+    world.turn = 7;
+    run_lore_tick(&mut world);
+    let id = world
+        .narrative
+        .pending
+        .values()
+        .next()
+        .expect("one pending decision")
+        .id;
+    resolve_decision(&mut world, id, "ration").expect("resolve succeeds");
+
+    assert_eq!(
+        render_chronicle_text(&world, ChronicleFilter::default()),
+        vec![
+            "Turn 7: Food Shortage — fired".to_string(),
+            "Turn 7: Food Shortage — resolved [ration]".to_string(),
+        ]
+    );
+}
+
+/// A founding entry with no registered scenario renders its raw id.
+#[test]
+fn rendered_founding_entry_without_metadata_falls_back_to_scenario_id() {
+    let mut world = lore_tick_world();
+    append_chronicle_entry(
+        &mut world,
+        1,
+        "founding:lost_vale",
+        ChronicleKind::Founding,
+        "stale".to_string(),
+        None,
+    );
+
+    assert_eq!(
+        render_chronicle_text(&world, ChronicleFilter::default()),
+        vec!["Turn 1: founding:lost_vale — founding".to_string()]
+    );
+}
+
+// --- Seeded founding backfill: deterministic pre-play history ---
+
+/// Same seed on two fresh worlds yields byte-identical entries.
+#[test]
+fn founding_backfill_is_deterministic_for_same_seed() {
+    let mut first = make_test_world();
+    let mut second = make_test_world();
+    assert_eq!(generate_founding_history(&mut first, 42, 5), Ok(5));
+    assert_eq!(generate_founding_history(&mut second, 42, 5), Ok(5));
+    assert_eq!(first.lore.entries, second.lore.entries);
+    assert_eq!(first.lore.rng_state, second.lore.rng_state);
+}
+
+/// Clearing and regenerating with the same seed reproduces the chronicle.
+#[test]
+fn founding_backfill_repeats_identically_after_clear() {
+    let mut world = make_test_world();
+    generate_founding_history(&mut world, 42, 5).expect("backfill succeeds");
+    let snapshot = world.lore.entries.clone();
+    clear_lore_history(&mut world);
+    assert_eq!(chronicle_len(&world), 0);
+    generate_founding_history(&mut world, 42, 5).expect("backfill succeeds");
+    assert_eq!(world.lore.entries, snapshot);
+}
+
+/// Zero eras is a no-op returning zero.
+#[test]
+fn founding_backfill_with_zero_eras_changes_nothing() {
+    let mut world = make_test_world();
+    let before = world.lore.rng_state;
+    assert_eq!(generate_founding_history(&mut world, 42, 0), Ok(0));
+    assert_eq!(chronicle_len(&world), 0);
+    assert_eq!(world.lore.next_entry_id, 0);
+    assert_eq!(world.lore.rng_state, before);
+}
+
+/// Backfilled turns are strictly increasing and predate live play.
+#[test]
+fn founding_backfill_turns_predate_live_play_in_strict_order() {
+    let mut world = make_test_world();
+    world.turn = 10;
+    generate_founding_history(&mut world, 42, 5).expect("backfill succeeds");
+    let turns: Vec<u64> = world.lore.entries.iter().map(|entry| entry.turn).collect();
+    assert_eq!(turns, vec![0, 1, 2, 3, 4]);
+    assert!(turns.iter().all(|turn| *turn < u64::from(world.turn)));
+
+    let mut fresh = make_test_world();
+    generate_founding_history(&mut fresh, 42, 5).expect("backfill succeeds");
+    let fresh_turns: Vec<u64> = fresh.lore.entries.iter().map(|entry| entry.turn).collect();
+    assert_eq!(fresh_turns, vec![0, 1, 2, 3, 4]);
+}
+
+/// A different seed yields different summaries.
+#[test]
+fn founding_backfill_diverges_across_seeds() {
+    let mut first = make_test_world();
+    let mut second = make_test_world();
+    generate_founding_history(&mut first, 42, 5).expect("backfill succeeds");
+    generate_founding_history(&mut second, 7, 5).expect("backfill succeeds");
+    let first_summaries: Vec<&str> = first
+        .lore
+        .entries
+        .iter()
+        .map(|entry| entry.summary.as_str())
+        .collect();
+    let second_summaries: Vec<&str> = second
+        .lore
+        .entries
+        .iter()
+        .map(|entry| entry.summary.as_str())
+        .collect();
+    assert_ne!(first_summaries, second_summaries);
+}
+
+/// Backfilled entries render through the fixed template with era names.
+#[test]
+fn founding_backfill_entries_render_with_era_names() {
+    let mut world = make_test_world();
+    generate_founding_history(&mut world, 42, 5).expect("backfill succeeds");
+    let lines = render_chronicle_text(&world, ChronicleFilter::default());
+    assert_eq!(lines.len(), 5);
+    for (line, entry) in lines.iter().zip(world.lore.entries.iter()) {
+        assert_eq!(line, &entry.summary);
+        assert!(line.starts_with(&format!("Turn {}: ", entry.turn)));
+        assert!(line.ends_with("— founding"));
+    }
 }
