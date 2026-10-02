@@ -486,10 +486,20 @@ pub fn snapshot_narrative_view(world: &World) -> NarrativeSnapshot {
 ///
 /// Thin wrapper over [`snapshot_narrative_view`] plus
 /// [`NarrativeState::apply_tick`] so the system entry point and tests share
-/// one path. Event forwarding never runs under a state borrow.
+/// one path. History records appended by the tick (fired, expired) mirror
+/// into the lore chronicle before returning, so the live feed needs no extra
+/// tick and no new `System` slot. Event forwarding never runs under a state
+/// borrow.
 pub fn tick_narrative(world: &mut World) {
     let snapshot = snapshot_narrative_view(world);
+    let mirrored_through = world.narrative.history.len();
     let (_decisions, pending) = world.narrative.apply_tick(&snapshot);
+    if world.narrative.history.len() > mirrored_through {
+        let fresh: Vec<NarrativeRecord> = world.narrative.history[mirrored_through..].to_vec();
+        for record in &fresh {
+            crate::lore::mirror_narrative_record(world, record);
+        }
+    }
     for (name, payload) in pending {
         let _ = world.send_event(&name, payload);
     }
@@ -562,10 +572,11 @@ pub fn dispatch_narrative_effects(world: &mut World, effects: &[Effect]) {
 
 /// Resolves a pending decision with one of its choices.
 ///
-/// Applies the pure [`NarrativeState::apply_resolve`] transition, dispatches
-/// the choice's effects in order, then forwards the `narrative_resolved`
-/// event. Failed calls (unknown or settled decision, unknown choice) change
-/// no state; effect dispatch itself never fails.
+/// Applies the pure [`NarrativeState::apply_resolve`] transition, mirrors the
+/// resolved history record into the lore chronicle (same-tick visibility with
+/// no extra tick), dispatches the choice's effects in order, then forwards
+/// the `narrative_resolved` event. Failed calls (unknown or settled decision,
+/// unknown choice) change no state; effect dispatch itself never fails.
 pub fn resolve_decision(
     world: &mut World,
     decision_id: u64,
@@ -575,6 +586,9 @@ pub fn resolve_decision(
     let (effects, pending) = world
         .narrative
         .apply_resolve(decision_id, choice_id, turn)?;
+    if let Some(record) = world.narrative.history.last().cloned() {
+        crate::lore::mirror_narrative_record(world, &record);
+    }
     dispatch_narrative_effects(world, &effects);
     for (name, payload) in pending {
         let _ = world.send_event(&name, payload);
