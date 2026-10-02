@@ -12,6 +12,8 @@ pub mod ecs;
 pub mod faction;
 /// Loot table system
 pub mod loot;
+/// Procedural history and lore (world chronicle read-model)
+pub mod lore;
 /// Map module
 pub mod map;
 /// Material property lookup and entity material management

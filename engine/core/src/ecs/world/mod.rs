@@ -9,6 +9,7 @@ use crate::ecs::registry::ComponentRegistry;
 use crate::ecs::system::SystemRegistry;
 use crate::ecs::template::UnitTemplateRegistry;
 use crate::loot::LootTableRegistry;
+use crate::lore::LoreState;
 use crate::map::Map;
 use crate::map::cell_key::CellKey;
 use crate::map::fov::{BfsFovAlgorithm, FovAlgorithm, RecursiveShadowcasting};
@@ -256,6 +257,11 @@ pub struct World {
     /// load with empty narrative state.
     #[serde(default)]
     pub narrative: NarrativeState,
+    /// World-level lore store: chronicle entries plus backfill RNG stream
+    /// (persistent, serialized for save/load). Old saves without this field
+    /// load with an empty chronicle.
+    #[serde(default)]
+    pub lore: LoreState,
     event_queues: HashMap<String, (VecDeque<JsonValue>, VecDeque<JsonValue>)>, // (write, read)
     /// Map postprocessors
     #[serde(skip)]
@@ -381,6 +387,7 @@ impl World {
             explored_cells: HashMap::new(),
             diplomacy: DiplomacyState::default(),
             narrative: NarrativeState::default(),
+            lore: LoreState::default(),
             event_queues: HashMap::new(),
             map_postprocessors: Vec::new(),
             map_validators: Vec::new(),
