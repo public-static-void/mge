@@ -597,6 +597,55 @@ impl PyWorld {
         crate::python_api::narrative::get_narrative_history(self, py)
     }
 
+    // ---- LORE ----
+
+    /// Append seeded founding-era entries; returns the appended count.
+    /// Raises ValueError on negative inputs or backfill failures.
+    fn generate_founding_history(&self, seed: i64, era_count: i64) -> PyResult<usize> {
+        crate::python_api::lore::generate_founding_history(self, seed, era_count)
+    }
+
+    /// List chronicle entries matching the filter dict in (turn, id) order.
+    /// None or {} returns every entry. Raises ValueError on invalid filters.
+    #[pyo3(signature = (filter=None))]
+    fn list_chronicle(
+        &self,
+        py: Python<'_>,
+        filter: Option<Bound<'_, PyAny>>,
+    ) -> PyResult<PyObject> {
+        crate::python_api::lore::list_chronicle(self, py, filter)
+    }
+
+    /// Get the chronicle entry for an id as a dict, or None for unknown ids.
+    fn get_chronicle_entry(
+        &self,
+        py: Python<'_>,
+        entry_id: i64,
+    ) -> PyResult<Option<PyObject>> {
+        crate::python_api::lore::get_chronicle_entry(self, py, entry_id)
+    }
+
+    /// Render the filtered chronicle as template lines. Raises ValueError
+    /// on invalid filters.
+    #[pyo3(signature = (filter=None))]
+    fn render_chronicle(
+        &self,
+        py: Python<'_>,
+        filter: Option<Bound<'_, PyAny>>,
+    ) -> PyResult<PyObject> {
+        crate::python_api::lore::render_chronicle(self, py, filter)
+    }
+
+    /// Return the number of chronicle entries.
+    fn chronicle_len(&self) -> usize {
+        crate::python_api::lore::chronicle_len(self)
+    }
+
+    /// Clear all chronicle entries and reset the id counter.
+    fn clear_lore_history(&self) {
+        crate::python_api::lore::clear_lore_history(self)
+    }
+
     // ---- FOV ----
 
     /// Get visible cells for an entity. Returns a list of dicts with x, y, z keys.
