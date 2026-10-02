@@ -30,6 +30,7 @@ mod wasm_job_mutation;
 mod wasm_job_query;
 mod wasm_job_system;
 mod wasm_loot_api;
+mod wasm_lore_api;
 mod wasm_map_api;
 mod wasm_mode_api;
 mod wasm_narrative_api;

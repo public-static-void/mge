@@ -53,6 +53,9 @@ pub mod job_production;
 pub mod job_query;
 /// Job reservation API
 pub mod job_reservation;
+/// Lore API (generate_founding_history, list_chronicle, get_chronicle_entry,
+/// render_chronicle, chronicle_len, clear_lore_history)
+pub mod lore;
 /// Map API
 pub mod map_api;
 /// Material API

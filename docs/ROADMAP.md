@@ -59,7 +59,7 @@
 - [x] Diplomacy AI (relationships, treaties, war)
 - [x] Faction and reputation system
 - [x] Event-driven narrative engine (scenarios, decision events)
-- [ ] Procedural history and lore generation
+- [x] Procedural history and lore generation
 - [x] Tech tree and research system
 - [ ] Resource economy (production, trade, consumption)
 - [ ] Supply and logistics network

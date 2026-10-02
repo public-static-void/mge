@@ -6,6 +6,7 @@ use crate::ecs::world::component::enforce_schema_defaults;
 use crate::ecs::world::loadout::EquipmentIssue;
 use crate::ecs::world::{Season, WeatherCondition, WeatherState};
 use crate::loot::LootTableRegistry;
+use crate::lore::{ChronicleEntry, ChronicleFilter, LoreState};
 use crate::map::CellKey;
 use crate::narrative::{NarrativeRecordKind, NarrativeSnapshot, NarrativeState, TriggerPredicate};
 use crate::systems::economic::recipe::Recipe;
@@ -310,6 +311,15 @@ pub struct WasmWorld {
     /// without this field load with an empty store.
     #[serde(default)]
     pub narrative: NarrativeState,
+
+    /// World-level lore store: chronicle entries plus backfill RNG stream.
+    ///
+    /// Mirrors [`World`](super::World) `lore` field for field; every
+    /// transition delegates to the shared state-level cores in [`crate::lore`]
+    /// so the WASM shard cannot drift. Old saves without this field load
+    /// with an empty chronicle.
+    #[serde(default)]
+    pub lore: LoreState,
 }
 
 fn default_fov_algo_name() -> String {
@@ -411,6 +421,7 @@ impl WasmWorld {
             craft_recipes: HashMap::new(),
             diplomacy: DiplomacyState::default(),
             narrative: NarrativeState::default(),
+            lore: LoreState::default(),
         }
     }
 
@@ -957,11 +968,21 @@ impl WasmWorld {
 
     /// Runs one narrative tick: snapshot, pure apply, forward events.
     ///
-    /// No-op while no scenarios are registered. Event forwarding never runs
-    /// under a state borrow.
+    /// No-op while no scenarios are registered. Fresh history records mirror
+    /// into the lore chronicle before returning, so the live feed needs no
+    /// extra tick — the same same-tick guarantee the [`World`](super::World)
+    /// feed provides. Event forwarding never runs under a state borrow.
     pub fn tick_narrative(&mut self) {
         let snapshot = self.snapshot_narrative_view();
+        let mirrored_through = self.narrative.history.len();
         let (_decisions, pending) = self.narrative.apply_tick(&snapshot);
+        if self.narrative.history.len() > mirrored_through {
+            let fresh: Vec<crate::narrative::NarrativeRecord> =
+                self.narrative.history[mirrored_through..].to_vec();
+            for record in &fresh {
+                crate::lore::mirror_record_in(&mut self.lore, &self.narrative.scenarios, record);
+            }
+        }
         for (name, payload) in pending {
             let data = payload.to_string();
             let _ = self.send_event(&name, &data);
@@ -976,7 +997,8 @@ impl WasmWorld {
     /// `narrative_resolved` event. Other actions have no handler registry on
     /// the WASM host and are skipped without aborting the remaining effects.
     /// Failed calls (unknown or settled decision, unknown choice) change no
-    /// state; effect dispatch itself never fails.
+    /// state; effect dispatch itself never fails. The resolved record mirrors
+    /// into the lore chronicle with no extra tick.
     pub fn resolve_narrative_decision(
         &mut self,
         decision_id: u64,
@@ -984,6 +1006,9 @@ impl WasmWorld {
     ) -> Result<(), String> {
         let turn = u64::from(self.turn);
         let (effects, pending) = self.narrative.apply_resolve(decision_id, choice_id, turn)?;
+        if let Some(record) = self.narrative.history.last().cloned() {
+            crate::lore::mirror_record_in(&mut self.lore, &self.narrative.scenarios, &record);
+        }
         for effect in &effects {
             let data = effect.data.clone().unwrap_or_default();
             match effect.action.as_str() {
@@ -1019,6 +1044,51 @@ impl WasmWorld {
             let _ = self.send_event(&name, &data);
         }
         Ok(())
+    }
+
+    /// Appends seeded founding-era entries and returns the appended count.
+    ///
+    /// Delegates to the shared [`crate::lore`] backfill core, so the WASM
+    /// shard observes identical era order, turns, and summaries for a given
+    /// seed. Negative inputs are rejected before touching lore state.
+    pub fn generate_founding_history(
+        &mut self,
+        seed: u64,
+        era_count: u32,
+    ) -> Result<usize, String> {
+        crate::lore::generate_founding_history_in(&mut self.lore, seed, era_count)
+            .map_err(|e| e.to_string())
+    }
+
+    /// Lists chronicle entries matching every set filter field in
+    /// (turn, entry id) order. Delegates to the shared [`crate::lore`] core.
+    pub fn list_chronicle(&self, filter: ChronicleFilter) -> Vec<ChronicleEntry> {
+        crate::lore::list_chronicle_in(&self.lore, filter)
+    }
+
+    /// Returns the chronicle entry for an id, or `None` for unknown ids.
+    /// Unknown ids never error, matching the bridge contract.
+    pub fn get_chronicle_entry(&self, entry_id: u64) -> Option<ChronicleEntry> {
+        crate::lore::get_chronicle_entry_in(&self.lore, entry_id)
+    }
+
+    /// Renders the filtered chronicle as human-readable template lines in
+    /// (turn, entry id) order. Delegates to the shared [`crate::lore`] core.
+    pub fn render_chronicle(&self, filter: ChronicleFilter) -> Vec<String> {
+        crate::lore::render_chronicle_text_in(&self.lore, &self.narrative.scenarios, filter)
+    }
+
+    /// Returns the number of chronicle entries on the world.
+    pub fn chronicle_len(&self) -> usize {
+        self.lore.entries.len()
+    }
+
+    /// Clears all chronicle entries and resets the id counter.
+    ///
+    /// Test and regen support: call before re-running seeded backfill
+    /// generation to reproduce byte-identical chronicles.
+    pub fn clear_lore_history(&mut self) {
+        crate::lore::clear_lore_history_in(&mut self.lore);
     }
 
     /// Sets the current game mode.
