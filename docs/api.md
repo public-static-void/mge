@@ -216,10 +216,40 @@
 
 ## Economic System
 
-| Function                          | Description                                                |
-| --------------------------------- | ---------------------------------------------------------- |
-| `get_production_job(entity)`      | Get the full ProductionJob component as a table/dict       |
+One identical surface in Lua, Python, and WASM:
+
+| Function | Description |
+| -------- | ----------- |
+| `get_production_job(entity)` | Get the full ProductionJob component as a table/dict |
 | `get_stockpile_resources(entity)` | Get the resources subtable/dict from a Stockpile component |
+| `transfer_stockpile_resource(from, to, kind, amount)` | Move `amount` of `kind` from one entity's Stockpile to another's. Errors on missing Stockpile (`NoStockpile`), empty kind (`UnknownKind`), non-positive/non-finite amount (`NonPositiveAmount`), or overdraft (`InsufficientFunds`, message carries kind/required/available). Self-transfer is a validated no-op. |
+| `has_active_trade_treaty(faction_a, faction_b)` | Returns true while a live `trade` treaty binds the two factions (order-insensitive; the record survives war — only execution is gated). |
+| `execute_treaty_trade(from, to, kind, amount)` | Treaty-gated transfer: derives factions from the endpoints, requires a live trade treaty (`NoLiveTreaty` otherwise), blocks execution while the factions are at war (`RelationIsWar`), then runs the same validated transfer as above. |
+
+> **Scripter-trust note:** the ungated `transfer_stockpile_resource` is a scripter-trust primitive like `modify_stockpile_resource` — it moves resources without treaty or permission checks. Gate player-facing trades through `execute_treaty_trade`; use the ungated form for scripted/admin flows only.
+
+### Upkeep and consumption
+
+Per-entity upkeep is declared through the generic `set_component` / `get_component` path (no bespoke shape) against the `Upkeep` schema:
+
+```lua
+-- Lua
+set_component(e, "Upkeep", { drains = { { kind = "grain", amount_per_tick = 2.0 } } })
+```
+
+```python
+# Python
+world.set_component(e, "Upkeep", {"drains": [{"kind": "grain", "amount_per_tick": 2.0}]})
+```
+
+```json
+// WASM guest: set_component(e, "Upkeep", <this JSON string>)
+{"drains": [{"kind": "grain", "amount_per_tick": 2.0}]}
+```
+
+Each `tick()`, `ConsumptionSystem` visits every entity carrying both `Upkeep` and `Stockpile` in ascending entity-id order and drains each listed entry from the entity's own stockpile (f64 arithmetic; a remainder within `1e-9` of zero floors to exactly `0.0`, and a shortfall within `1e-9` counts as paid). `ConsumptionSystem` runs immediately after `EconomicSystem` and before `CraftingSystem`, so same-tick production lands before upkeep is taken.
+
+Shortage is atomic per entity per tick: when any single drain is insufficient, none of that entity's drains apply that tick, its stockpile is left unchanged, and one `consumption_shortage` event is emitted per missing kind — `{type: "consumption_shortage", entity, kind, required, available, turn}`, retrievable via `poll_ecs_event("consumption_shortage")`. A shortage never despawns, damages, or otherwise penalizes the entity; an entity without `Upkeep` is never drained, and an `Upkeep` carrier without `Stockpile` is skipped with shortage events carrying `available: 0.0`.
 
 ---
 
