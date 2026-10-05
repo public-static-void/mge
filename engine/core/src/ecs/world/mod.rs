@@ -42,6 +42,7 @@ mod resources;
 mod save_load;
 mod systems;
 mod template;
+mod trade_ops;
 mod vehicle_ops;
 mod zone;
 

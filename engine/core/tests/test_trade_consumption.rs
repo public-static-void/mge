@@ -14,6 +14,7 @@ use engine_core::diplomacy::{
     propose_treaty,
 };
 use engine_core::ecs::world::World;
+use engine_core::ecs::world::wasm::WasmWorld;
 use engine_core::trade::{
     TradeError, TransferError, execute_treaty_trade, has_active_trade_treaty,
     transfer_stockpile_resource,
@@ -358,4 +359,77 @@ fn surfaces_transfer_failures_from_gated_execution() {
     );
     assert_eq!(stockpile_amount(&world, from, "grain"), 5.0);
     assert_eq!(stockpile_amount(&world, to, "grain"), 0.0);
+}
+
+/// The WASM trade mirror preserves the war gate while leaving the ungated
+/// primitive open on the same world state.
+#[test]
+fn wasm_mirror_preserves_war_gate_while_leaving_ungated_transfer_open() {
+    fn spawn_wasm_stockpile(
+        world: &mut WasmWorld,
+        faction: &str,
+        resources: serde_json::Value,
+    ) -> u32 {
+        let eid = world.spawn_entity();
+        world
+            .set_component(
+                eid,
+                "Stockpile",
+                &json!({ "resources": resources }).to_string(),
+            )
+            .unwrap();
+        world
+            .set_component(
+                eid,
+                "Faction",
+                &json!({ "faction_id": faction }).to_string(),
+            )
+            .unwrap();
+        eid
+    }
+
+    fn wasm_amount(world: &WasmWorld, entity: u32, kind: &str) -> f64 {
+        world
+            .get_component(entity, "Stockpile")
+            .and_then(|raw| serde_json::from_str::<serde_json::Value>(&raw).ok())
+            .and_then(|stock| {
+                stock
+                    .get("resources")
+                    .and_then(|r| r.get(kind))
+                    .and_then(|v| v.as_f64())
+            })
+            .unwrap_or(0.0)
+    }
+
+    let mut world = WasmWorld::new();
+    let from = spawn_wasm_stockpile(&mut world, "a", json!({ "grain": 100.0 }));
+    let to = spawn_wasm_stockpile(&mut world, "b", json!({ "grain": 0.0 }));
+    let (id, _) = world
+        .diplomacy
+        .apply_propose_treaty("a", "b", TreatyKind::TradeStub, 0, None)
+        .unwrap();
+    world.diplomacy.apply_accept_treaty(id, 0).unwrap();
+    assert!(world.has_active_trade_treaty("a", "b"));
+    world.execute_treaty_trade(from, to, "grain", 30.0).unwrap();
+
+    world.diplomacy.apply_declare_war("a", "b", 0).unwrap();
+    let err = world
+        .execute_treaty_trade(from, to, "grain", 10.0)
+        .unwrap_err();
+    assert!(
+        err.contains("RelationIsWar"),
+        "expected the war gate, got {err}"
+    );
+    assert!(
+        world.has_active_trade_treaty("a", "b"),
+        "pre-war TradeStub treaties survive declare_war yet must not authorize"
+    );
+    assert_eq!(wasm_amount(&world, from, "grain"), 70.0);
+    assert_eq!(wasm_amount(&world, to, "grain"), 30.0);
+
+    world
+        .transfer_stockpile_resource(from, to, "grain", 10.0)
+        .unwrap();
+    assert_eq!(wasm_amount(&world, from, "grain"), 60.0);
+    assert_eq!(wasm_amount(&world, to, "grain"), 40.0);
 }
