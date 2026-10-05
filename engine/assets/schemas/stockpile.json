@@ -11,5 +11,5 @@
     }
   },
   "required": ["resources"],
-  "modes": ["colony"]
+  "modes": ["colony", "4x", "grand-strategy"]
 }

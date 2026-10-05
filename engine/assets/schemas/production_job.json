@@ -9,5 +9,5 @@
     "batch_size": { "type": "integer", "default": 1 }
   },
   "required": ["recipe", "progress", "state"],
-  "modes": ["colony"]
+  "modes": ["colony", "4x", "grand-strategy"]
 }
