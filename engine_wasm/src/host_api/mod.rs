@@ -148,6 +148,9 @@ pub mod diplomacy;
 
 /// Temperature module (get_temperature, set_temperature)
 pub mod temperature;
+/// Trade module (transfer_stockpile_resource, has_active_trade_treaty,
+/// execute_treaty_trade)
+pub mod trade;
 /// Vehicle module (embark_vehicle, disembark_vehicle, assign_vehicle_path,
 /// get_vehicle_occupants, is_mounted)
 pub mod vehicle;

@@ -26,6 +26,7 @@ use engine_core::ecs::world::World;
 use engine_core::loot::LootEntry;
 use engine_core::systems::body_part_damage::BodyPartDamageSystem;
 use engine_core::systems::construction::ConstructionSystem;
+use engine_core::systems::consumption::ConsumptionSystem;
 use engine_core::systems::crafting::CraftingSystem;
 use engine_core::systems::economic::{EconomicSystem, load_recipes_from_dir};
 use engine_core::systems::enemy_behavior::EnemyBehaviorSystem;
@@ -164,6 +165,7 @@ impl PyWorld {
         let recipes = load_recipes_from_dir(&recipes_dir);
         let economic_system = EconomicSystem::with_recipes(recipes);
         world.register_system(economic_system);
+        world.register_system(ConsumptionSystem);
         world.register_system(CraftingSystem);
         world.register_system(ConstructionSystem::new());
 
@@ -915,6 +917,36 @@ impl PyWorld {
     // Modify stockpile resource
     fn modify_stockpile_resource(&self, entity_id: u32, kind: String, delta: f64) -> PyResult<()> {
         EconomicApi::modify_stockpile_resource(self, entity_id, kind, delta)
+    }
+
+    // ---- TRADE ----
+
+    /// Move `amount` of `kind` between two entities' stockpiles (scripter-trust,
+    /// ungated — like `modify_stockpile_resource`).
+    fn transfer_stockpile_resource(
+        &self,
+        from_id: u32,
+        to_id: u32,
+        kind: String,
+        amount: f64,
+    ) -> PyResult<()> {
+        crate::python_api::trade::transfer_stockpile_resource(self, from_id, to_id, kind, amount)
+    }
+
+    /// True when an accepted trade treaty binds two factions (either party order).
+    fn has_active_trade_treaty(&self, faction_a: String, faction_b: String) -> bool {
+        crate::python_api::trade::has_active_trade_treaty(self, faction_a, faction_b)
+    }
+
+    /// Treaty- and peace-gated transfer between two entities' stockpiles.
+    fn execute_treaty_trade(
+        &self,
+        from_id: u32,
+        to_id: u32,
+        kind: String,
+        amount: f64,
+    ) -> PyResult<()> {
+        crate::python_api::trade::execute_treaty_trade(self, from_id, to_id, kind, amount)
     }
 
     /// Get a production job by entity ID.

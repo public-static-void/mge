@@ -38,6 +38,7 @@ use crate::host_api::system::register_system_api;
 use crate::host_api::tech_tree::register_tech_tree_api;
 use crate::host_api::temperature::register_temperature_api;
 use crate::host_api::time_of_day::register_time_of_day_api;
+use crate::host_api::trade::register_trade_api;
 use crate::host_api::turn::register_turn_api;
 use crate::host_api::ui::register_ui_api;
 use crate::host_api::ui_events::register_ui_events_api;
@@ -203,6 +204,7 @@ impl WasmScriptEngine {
         register_vehicle_api(&mut linker)?;
         register_weather_api(&mut linker)?;
         register_temperature_api(&mut linker)?;
+        register_trade_api(&mut linker)?;
         register_designer_api(&mut linker)?;
         register_diplomacy_api(&mut linker)?;
         register_narrative_api(&mut linker)?;

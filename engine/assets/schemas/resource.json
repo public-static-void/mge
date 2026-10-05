@@ -8,5 +8,5 @@
     "unit_volume": { "type": "number", "minimum": 0, "default": 1 }
   },
   "required": ["kind", "amount"],
-  "modes": ["colony"]
+  "modes": ["colony", "4x", "grand-strategy"]
 }

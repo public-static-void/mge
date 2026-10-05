@@ -91,6 +91,9 @@ pub mod tech_tree;
 pub mod temperature;
 /// Time of Day API
 pub mod time_of_day;
+/// Trade API (transfer_stockpile_resource, has_active_trade_treaty,
+/// execute_treaty_trade)
+pub mod trade;
 /// Turn API
 pub mod turn;
 /// UI API
@@ -149,6 +152,7 @@ pub fn register_all_api_functions(
     movement_ops::register_movement_ops_api(lua, globals, world.clone())?;
     dungeon::register_dungeon_api(lua, globals)?;
     diplomacy::register_diplomacy_api(lua, globals, world.clone())?;
+    trade::register_trade_api(lua, globals, world.clone())?;
     job_ai::register_job_ai_api(lua, globals, world.clone())?;
     loot::register_loot_api(lua, globals, world.clone())?;
     faction::register_faction_api(lua, globals, world.clone())?;

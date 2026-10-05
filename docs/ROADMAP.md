@@ -61,7 +61,7 @@
 - [x] Event-driven narrative engine (scenarios, decision events)
 - [x] Procedural history and lore generation
 - [x] Tech tree and research system
-- [ ] Resource economy (production, trade, consumption)
+- [x] Resource economy (production, trade, consumption)
 - [ ] Supply and logistics network
 
 ## Presentation Layer

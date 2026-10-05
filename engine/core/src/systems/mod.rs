@@ -8,6 +8,8 @@ pub mod body_equipment_sync;
 pub mod body_part_damage;
 /// Building construction system
 pub mod construction;
+/// Autonomous per-entity upkeep consumption system
+pub mod consumption;
 /// Crafting system (tool-gated, material/quality-aware, skill-gated Item production)
 pub mod crafting;
 /// Death and decay system
@@ -73,6 +75,7 @@ pub const SYSTEM_EXECUTION_ORDER: &[&str] = &[
     "ResearchSystem",
     "JobSystem",
     "EconomicSystem",
+    "ConsumptionSystem",
     "CraftingSystem",
     "ConstructionSystem",
     "ZoneSystem",

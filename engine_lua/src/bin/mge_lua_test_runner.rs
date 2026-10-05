@@ -10,6 +10,7 @@ use engine_core::plugins::types::EngineApi;
 use engine_core::systems::body_equipment_sync::BodyEquipmentSyncSystem;
 use engine_core::systems::body_part_damage::BodyPartDamageSystem;
 use engine_core::systems::construction::ConstructionSystem;
+use engine_core::systems::consumption::ConsumptionSystem;
 use engine_core::systems::crafting::CraftingSystem;
 use engine_core::systems::death_decay::{ProcessDeaths, ProcessDecay};
 use engine_core::systems::derived_stats::DerivedStatsSystem;
@@ -324,6 +325,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let recipes = load_recipes_from_dir(recipes_dir().to_str().unwrap());
         let economic_system = EconomicSystem::with_recipes(recipes);
         world.borrow_mut().register_system(economic_system);
+        world.borrow_mut().register_system(ConsumptionSystem);
         world.borrow_mut().register_system(CraftingSystem);
         world
             .borrow_mut()
