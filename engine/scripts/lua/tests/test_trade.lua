@@ -135,6 +135,75 @@ function test_gated_trade_without_faction_fails()
 	assert.equals(balances(b, "grain"), 0.0, "Destination should be unchanged without factions")
 end
 
+-- Upkeep/consumption parity: generic component path plus per-tick drain.
+
+local function make_upkeep_entity(stock, drains)
+	local e = spawn_entity()
+	set_component(e, "Stockpile", { resources = stock })
+	set_component(e, "Upkeep", { drains = drains })
+	return e
+end
+
+function test_upkeep_roundtrip_and_rejection()
+	local e = spawn_entity()
+	set_component(e, "Upkeep", { drains = { { kind = "grain", amount_per_tick = 2.0 } } })
+	local up = get_component(e, "Upkeep")
+	assert.equals(up.drains[1].kind, "grain", "Upkeep round-trip should keep the drain kind")
+	assert.equals(up.drains[1].amount_per_tick, 2.0, "Upkeep round-trip should keep the drain amount")
+
+	local bad_cases = {
+		{ drains = { { kind = "", amount_per_tick = 2.0 } } },
+		{ drains = { { kind = "grain", amount_per_tick = 0.0 } } },
+		{ drains = { { kind = "grain", amount_per_tick = -1.0 } } },
+		{ drains = { { kind = "grain", amount_per_tick = 0 / 0 } } },
+	}
+	for _, bad in ipairs(bad_cases) do
+		local ok, _ = pcall(set_component, e, "Upkeep", bad)
+		assert.is_false(ok, "Invalid upkeep drain should be rejected")
+	end
+end
+
+function test_upkeep_drains_each_tick()
+	local e = make_upkeep_entity({ grain = 10.0 }, { { kind = "grain", amount_per_tick = 2.0 } })
+	tick()
+	assert.equals(balances(e, "grain"), 8.0, "One tick should drain 2.0 grain")
+	tick()
+	tick()
+	assert.equals(balances(e, "grain"), 4.0, "Three ticks should drain 6.0 grain total")
+end
+
+function test_upkeep_shortage_keeps_balance_and_emits_event()
+	local e = make_upkeep_entity({ grain = 1.0 }, { { kind = "grain", amount_per_tick = 2.0 } })
+	tick()
+	assert.equals(balances(e, "grain"), 1.0, "Shorted entity should keep its balance")
+	local events = poll_ecs_event("consumption_shortage")
+	assert.equals(#events, 1, "Shortage should emit exactly one event")
+	assert.equals(events[1].entity, e, "Shortage event should name the drained entity")
+	assert.equals(events[1].kind, "grain", "Shortage event should name the missing kind")
+	assert.equals(events[1].required, 2.0, "Shortage event should carry the required amount")
+	assert.equals(events[1].available, 1.0, "Shortage event should carry the available amount")
+end
+
+function test_upkeep_multi_drain_is_atomic()
+	local e = make_upkeep_entity(
+		{ grain = 10.0, wood = 1.0 },
+		{ { kind = "grain", amount_per_tick = 2.0 }, { kind = "wood", amount_per_tick = 2.0 } }
+	)
+	tick()
+	assert.equals(balances(e, "grain"), 10.0, "Atomic shortage should leave grain untouched")
+	assert.equals(balances(e, "wood"), 1.0, "Atomic shortage should leave wood untouched")
+	local events = poll_ecs_event("consumption_shortage")
+	assert.equals(#events, 1, "Atomic shortage should emit exactly one event")
+	assert.equals(events[1].kind, "wood", "Shortage event should name the missing kind")
+end
+
+function test_upkeep_absent_entity_is_spared()
+	local e = spawn_entity()
+	set_component(e, "Stockpile", { resources = { grain = 10.0 } })
+	tick()
+	assert.equals(balances(e, "grain"), 10.0, "Entity without Upkeep should never be drained")
+end
+
 return {
 	test_transfer_moves_balance = test_transfer_moves_balance,
 	test_transfer_insufficient_leaves_unchanged = test_transfer_insufficient_leaves_unchanged,
@@ -144,4 +213,9 @@ return {
 	test_treaty_lifecycle_gates_execution = test_treaty_lifecycle_gates_execution,
 	test_gated_trade_without_treaty_fails = test_gated_trade_without_treaty_fails,
 	test_gated_trade_without_faction_fails = test_gated_trade_without_faction_fails,
+	test_upkeep_roundtrip_and_rejection = test_upkeep_roundtrip_and_rejection,
+	test_upkeep_drains_each_tick = test_upkeep_drains_each_tick,
+	test_upkeep_shortage_keeps_balance_and_emits_event = test_upkeep_shortage_keeps_balance_and_emits_event,
+	test_upkeep_multi_drain_is_atomic = test_upkeep_multi_drain_is_atomic,
+	test_upkeep_absent_entity_is_spared = test_upkeep_absent_entity_is_spared,
 }

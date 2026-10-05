@@ -116,3 +116,76 @@ def test_gated_trade_without_faction_fails(make_world):
         world.execute_treaty_trade(a, b, "grain", 1.0)
     assert balance(world, a) == 10.0
     assert balance(world, b) == 0.0
+
+
+def make_upkeep_entity(world, stock, drains):
+    e = world.spawn_entity()
+    world.set_component(e, "Stockpile", {"resources": stock})
+    world.set_component(e, "Upkeep", {"drains": drains})
+    return e
+
+
+def test_upkeep_roundtrip_and_rejection(make_world):
+    world = make_world()
+    e = world.spawn_entity()
+    world.set_component(e, "Upkeep", {"drains": [{"kind": "grain", "amount_per_tick": 2.0}]})
+    upkeep = world.get_component(e, "Upkeep")
+    assert upkeep["drains"][0]["kind"] == "grain"
+    assert upkeep["drains"][0]["amount_per_tick"] == 2.0
+
+    bad_cases = [
+        {"drains": [{"kind": "", "amount_per_tick": 2.0}]},
+        {"drains": [{"kind": "grain", "amount_per_tick": 0.0}]},
+        {"drains": [{"kind": "grain", "amount_per_tick": -1.0}]},
+        {"drains": [{"kind": "grain", "amount_per_tick": math.nan}]},
+        {"drains": [{"kind": "grain", "amount_per_tick": math.inf}]},
+    ]
+    for bad in bad_cases:
+        with pytest.raises(ValueError):
+            world.set_component(e, "Upkeep", bad)
+
+
+def test_upkeep_drains_each_tick(make_world):
+    world = make_world()
+    e = make_upkeep_entity(world, {"grain": 10.0}, [{"kind": "grain", "amount_per_tick": 2.0}])
+    world.tick()
+    assert balance(world, e) == 8.0
+    world.tick()
+    world.tick()
+    assert balance(world, e) == 4.0
+
+
+def test_upkeep_shortage_keeps_balance_and_emits_event(make_world):
+    world = make_world()
+    e = make_upkeep_entity(world, {"grain": 1.0}, [{"kind": "grain", "amount_per_tick": 2.0}])
+    world.tick()
+    assert balance(world, e) == 1.0
+    events = world.poll_ecs_event("consumption_shortage")
+    assert len(events) == 1
+    assert events[0]["entity"] == e
+    assert events[0]["kind"] == "grain"
+    assert events[0]["required"] == 2.0
+    assert events[0]["available"] == 1.0
+
+
+def test_upkeep_multi_drain_is_atomic(make_world):
+    world = make_world()
+    e = make_upkeep_entity(
+        world,
+        {"grain": 10.0, "wood": 1.0},
+        [{"kind": "grain", "amount_per_tick": 2.0}, {"kind": "wood", "amount_per_tick": 2.0}],
+    )
+    world.tick()
+    assert balance(world, e, "grain") == 10.0
+    assert balance(world, e, "wood") == 1.0
+    events = world.poll_ecs_event("consumption_shortage")
+    assert len(events) == 1
+    assert events[0]["kind"] == "wood"
+
+
+def test_upkeep_absent_entity_is_spared(make_world):
+    world = make_world()
+    e = world.spawn_entity()
+    world.set_component(e, "Stockpile", {"resources": {"grain": 10.0}})
+    world.tick()
+    assert balance(world, e) == 10.0

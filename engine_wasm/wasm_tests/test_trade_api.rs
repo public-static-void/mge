@@ -19,6 +19,28 @@ pub extern "C" fn test_trade_api() -> i32 {
             json_ptr: *const u8,
             json_len: i32,
         );
+        fn get_component(
+            entity: u32,
+            name_ptr: *const u8,
+            name_len: i32,
+            out_ptr: *mut u8,
+            out_len: i32,
+        ) -> i32;
+    }
+
+    #[link(wasm_import_module = "turn")]
+    unsafe extern "C" {
+        fn tick();
+    }
+
+    #[link(wasm_import_module = "event_bus")]
+    unsafe extern "C" {
+        fn poll_ecs_event(
+            type_ptr: *const u8,
+            type_len: i32,
+            out_ptr: *mut u8,
+            out_len: i32,
+        ) -> i32;
     }
 
     #[link(wasm_import_module = "economic")]
@@ -354,6 +376,97 @@ pub extern "C" fn test_trade_api() -> i32 {
             return 0;
         }
         if !balance_has(m, "\"grain\":10.0") || !balance_has(n, "\"grain\":0.0") {
+            return 0;
+        }
+
+        // Upkeep parity via the generic component path: round-trip, drain,
+        // shortage event, atomic multi-drain, and no-upkeep sparing.
+        // (Invalid-drain rejection traps on set_component in WASM, so it is
+        // covered by the Lua/Python mirrors and the core Rust suite instead.)
+        let upkeep_name = "Upkeep";
+        let set_upkeep = |entity: u32, json: &str| unsafe {
+            set_component(
+                entity,
+                upkeep_name.as_ptr(),
+                upkeep_name.len() as i32,
+                json.as_ptr(),
+                json.len() as i32,
+            );
+        };
+        let upkeep_has = |entity: u32, needle: &str| unsafe {
+            let mut buf = [0u8; 512];
+            let w = get_component(
+                entity,
+                upkeep_name.as_ptr(),
+                upkeep_name.len() as i32,
+                buf.as_mut_ptr(),
+                buf.len() as i32,
+            );
+            contains(&buf, w, needle)
+        };
+        let shortage_poll = |out: &mut [u8]| unsafe {
+            let et = "consumption_shortage";
+            poll_ecs_event(
+                et.as_ptr(),
+                et.len() as i32,
+                out.as_mut_ptr(),
+                out.len() as i32,
+            )
+        };
+
+        let u = spawn_entity();
+        set_stock(u, "{\"resources\":{\"grain\":10.0}}");
+        set_upkeep(u, "{\"drains\":[{\"kind\":\"grain\",\"amount_per_tick\":2.0}]}");
+        if !upkeep_has(u, "\"amount_per_tick\":2.0") {
+            return 0;
+        }
+        tick();
+        if !balance_has(u, "\"grain\":8.0") {
+            return 0;
+        }
+        tick();
+        tick();
+        if !balance_has(u, "\"grain\":4.0") {
+            return 0;
+        }
+
+        let s = spawn_entity();
+        set_stock(s, "{\"resources\":{\"grain\":1.0}}");
+        set_upkeep(s, "{\"drains\":[{\"kind\":\"grain\",\"amount_per_tick\":2.0}]}");
+        tick();
+        if !balance_has(s, "\"grain\":1.0") {
+            return 0;
+        }
+        let mut sev = [0u8; 2048];
+        let sw = shortage_poll(&mut sev);
+        if sw <= 0
+            || !contains(&sev, sw, "\"kind\":\"grain\"")
+            || !contains(&sev, sw, "\"required\":2.0")
+            || !contains(&sev, sw, "\"available\":1.0")
+        {
+            return 0;
+        }
+
+        let v = spawn_entity();
+        set_stock(v, "{\"resources\":{\"grain\":10.0,\"wood\":1.0}}");
+        set_upkeep(
+            v,
+            "{\"drains\":[{\"kind\":\"grain\",\"amount_per_tick\":2.0},{\"kind\":\"wood\",\"amount_per_tick\":2.0}]}",
+        );
+        tick();
+        if !balance_has(v, "\"grain\":10.0") || !balance_has(v, "\"wood\":1.0") {
+            return 0;
+        }
+        let mut vev = [0u8; 2048];
+        let vw = shortage_poll(&mut vev);
+        if vw <= 0 || !contains(&vev, vw, "\"kind\":\"wood\"") {
+            return 0;
+        }
+
+        let p = spawn_entity();
+        set_stock(p, "{\"resources\":{\"grain\":10.0}}");
+        tick();
+        if !balance_has(p, "\"grain\":10.0") {
             return 0;
         }
 
