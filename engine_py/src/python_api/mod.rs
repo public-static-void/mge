@@ -82,6 +82,9 @@ pub mod tech_tree;
 pub mod temperature;
 /// Time API
 pub mod time_of_day;
+/// Trade API (transfer_stockpile_resource, has_active_trade_treaty,
+/// execute_treaty_trade)
+pub mod trade;
 /// Turn API
 pub mod turn;
 /// UI API

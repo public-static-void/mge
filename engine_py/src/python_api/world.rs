@@ -917,6 +917,36 @@ impl PyWorld {
         EconomicApi::modify_stockpile_resource(self, entity_id, kind, delta)
     }
 
+    // ---- TRADE ----
+
+    /// Move `amount` of `kind` between two entities' stockpiles (scripter-trust,
+    /// ungated — like `modify_stockpile_resource`).
+    fn transfer_stockpile_resource(
+        &self,
+        from_id: u32,
+        to_id: u32,
+        kind: String,
+        amount: f64,
+    ) -> PyResult<()> {
+        crate::python_api::trade::transfer_stockpile_resource(self, from_id, to_id, kind, amount)
+    }
+
+    /// True when an accepted trade treaty binds two factions (either party order).
+    fn has_active_trade_treaty(&self, faction_a: String, faction_b: String) -> bool {
+        crate::python_api::trade::has_active_trade_treaty(self, faction_a, faction_b)
+    }
+
+    /// Treaty- and peace-gated transfer between two entities' stockpiles.
+    fn execute_treaty_trade(
+        &self,
+        from_id: u32,
+        to_id: u32,
+        kind: String,
+        amount: f64,
+    ) -> PyResult<()> {
+        crate::python_api::trade::execute_treaty_trade(self, from_id, to_id, kind, amount)
+    }
+
     /// Get a production job by entity ID.
     fn get_production_job(&self, py: Python, entity_id: u32) -> PyResult<Option<PyObject>> {
         crate::python_api::job_production::get_production_job(self, py, entity_id)
