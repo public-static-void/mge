@@ -885,6 +885,7 @@ impl WasmWorld {
         self.advance_time_of_day();
         self.simulate_fluid();
         self.tick_construction();
+        self.tick_consumption();
         self.tick_craft();
         // Recompute the transient visibility modifier from weather state,
         // mirroring WeatherSystem's per-tick recompute (R008/R009).
@@ -2898,6 +2899,108 @@ impl WasmWorld {
     /// come from the same `(crafter_id, turn)` seed layout as the core system,
     /// so identical setups tick identically. Called from [`tick`](Self::tick),
     /// mirroring [`tick_construction`](Self::tick_construction).
+    /// Runs one consumption tick: per-entity upkeep drain in ascending
+    /// entity-id order with per-tick atomicity and `consumption_shortage`
+    /// events on insufficiency. Mirrors the core `ConsumptionSystem`
+    /// value-for-value on identical inputs (f64 arithmetic, shared
+    /// `TRANSFER_EPSILON` dust discipline).
+    pub fn tick_consumption(&mut self) {
+        let mut carriers: Vec<u32> = self
+            .components
+            .get("Upkeep")
+            .map(|m| m.keys().copied().collect())
+            .unwrap_or_default();
+        carriers.sort_unstable();
+        let turn = self.turn;
+        let epsilon = crate::trade::TRANSFER_EPSILON;
+        for carrier in carriers {
+            let Some(upkeep) = self
+                .components
+                .get("Upkeep")
+                .and_then(|m| m.get(&carrier))
+                .cloned()
+            else {
+                continue;
+            };
+            let drains: Vec<(String, f64)> = upkeep
+                .get("drains")
+                .and_then(|v| v.as_array())
+                .map(|entries| {
+                    entries
+                        .iter()
+                        .filter_map(|entry| {
+                            let kind = entry.get("kind")?.as_str()?;
+                            if kind.is_empty() {
+                                return None;
+                            }
+                            let amount = entry.get("amount_per_tick")?.as_f64()?;
+                            if !amount.is_finite() || amount <= 0.0 {
+                                return None;
+                            }
+                            Some((kind.to_string(), amount))
+                        })
+                        .collect()
+                })
+                .unwrap_or_default();
+            if drains.is_empty() {
+                continue;
+            }
+            let stockpile = self
+                .components
+                .get("Stockpile")
+                .and_then(|m| m.get(&carrier))
+                .cloned();
+            let balances: Vec<(String, f64, f64)> = drains
+                .iter()
+                .map(|(kind, required)| {
+                    let available = stockpile
+                        .as_ref()
+                        .and_then(|s| s.get("resources"))
+                        .and_then(|r| r.get(kind))
+                        .and_then(|v| v.as_f64())
+                        .unwrap_or(0.0);
+                    (kind.clone(), *required, available)
+                })
+                .collect();
+            if balances
+                .iter()
+                .any(|(_, required, available)| *available + epsilon < *required)
+            {
+                for (kind, required, available) in &balances {
+                    if *available + epsilon < *required {
+                        let event = serde_json::json!({
+                            "type": "consumption_shortage",
+                            "entity": carrier,
+                            "kind": kind,
+                            "required": required,
+                            "available": available,
+                            "turn": turn,
+                        });
+                        let _ = self.send_event("consumption_shortage", &event.to_string());
+                    }
+                }
+                continue;
+            }
+            if let Some(map) = self
+                .components
+                .get_mut("Stockpile")
+                .and_then(|m| m.get_mut(&carrier))
+                .and_then(|s| s.get_mut("resources"))
+                .and_then(|r| r.as_object_mut())
+            {
+                for (kind, required, available) in &balances {
+                    let remainder = *available - *required;
+                    let floored = if remainder.abs() <= epsilon {
+                        0.0
+                    } else {
+                        remainder
+                    };
+                    map.insert(kind.clone(), serde_json::json!(floored));
+                }
+            }
+        }
+    }
+
     pub fn tick_craft(&mut self) {
         let mut crafters: Vec<u32> = self
             .components
