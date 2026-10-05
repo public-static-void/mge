@@ -1,14 +1,16 @@
 //! Crafting execution-ordering pin.
 //!
-//! `SYSTEM_EXECUTION_ORDER` places `CraftingSystem` immediately after
-//! `EconomicSystem` (and therefore before `ConstructionSystem`), so craft
-//! progress observes the same-tick production results, and `order_systems`
-//! preserves that relative order.
+//! `SYSTEM_EXECUTION_ORDER` places `ConsumptionSystem` immediately after
+//! `EconomicSystem` and `CraftingSystem` immediately after consumption (and
+//! therefore before `ConstructionSystem`), so upkeep drains observe the
+//! same-tick production results and craft progress observes post-upkeep
+//! stockpiles, and `order_systems` preserves that relative order.
 
 use engine_core::systems::{SYSTEM_EXECUTION_ORDER, order_systems};
 
-// Crafting reads the post-production stockpile state each tick, so it runs
-// back-to-back with the economic loop before construction consumes outputs.
+// Crafting reads the post-upkeep stockpile state each tick, so upkeep drains
+// run back-to-back with the economic loop and crafting follows consumption
+// before construction consumes outputs.
 #[test]
 fn test_crafting_pinned_immediately_after_economic() {
     let order: Vec<&str> = SYSTEM_EXECUTION_ORDER.to_vec();
@@ -16,6 +18,10 @@ fn test_crafting_pinned_immediately_after_economic() {
         .iter()
         .position(|name| *name == "EconomicSystem")
         .expect("EconomicSystem is ordered");
+    let consumption = order
+        .iter()
+        .position(|name| *name == "ConsumptionSystem")
+        .expect("ConsumptionSystem is ordered");
     let crafting = order
         .iter()
         .position(|name| *name == "CraftingSystem")
@@ -24,18 +30,21 @@ fn test_crafting_pinned_immediately_after_economic() {
         .iter()
         .position(|name| *name == "ConstructionSystem")
         .expect("ConstructionSystem is ordered");
-    assert_eq!(crafting, economic + 1);
+    assert_eq!(consumption, economic + 1);
+    assert_eq!(crafting, consumption + 1);
     assert_eq!(construction, crafting + 1);
 
     let names = vec![
         "ConstructionSystem".to_string(),
         "CraftingSystem".to_string(),
+        "ConsumptionSystem".to_string(),
         "EconomicSystem".to_string(),
     ];
     assert_eq!(
         order_systems(&names),
         vec![
             "EconomicSystem".to_string(),
+            "ConsumptionSystem".to_string(),
             "CraftingSystem".to_string(),
             "ConstructionSystem".to_string(),
         ]
