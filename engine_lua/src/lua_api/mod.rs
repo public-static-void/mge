@@ -83,6 +83,9 @@ pub mod noise;
 pub mod region;
 /// Save/Load API
 pub mod save_load;
+/// Supply API (create_supply_link, remove_supply_link, list_supply_links,
+/// set_supply_link_active, get_supply_link)
+pub mod supply;
 /// System API
 pub mod system;
 /// Tech Tree and Research API
@@ -153,6 +156,7 @@ pub fn register_all_api_functions(
     dungeon::register_dungeon_api(lua, globals)?;
     diplomacy::register_diplomacy_api(lua, globals, world.clone())?;
     trade::register_trade_api(lua, globals, world.clone())?;
+    supply::register_supply_api(lua, globals, world.clone())?;
     job_ai::register_job_ai_api(lua, globals, world.clone())?;
     loot::register_loot_api(lua, globals, world.clone())?;
     faction::register_faction_api(lua, globals, world.clone())?;
