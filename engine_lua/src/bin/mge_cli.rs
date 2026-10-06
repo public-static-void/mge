@@ -28,6 +28,7 @@ use engine_core::systems::narrative::NarrativeSystem;
 use engine_core::systems::noise::NoiseSystem;
 use engine_core::systems::research::ResearchSystem;
 use engine_core::systems::stat_calculation::StatCalculationSystem;
+use engine_core::systems::supply::SupplySystem;
 use engine_core::systems::temperature::TemperatureSystem;
 use engine_core::systems::weather::WeatherSystem;
 use engine_core::worldgen::WorldgenRegistry;
@@ -197,6 +198,7 @@ fn main() {
         world.register_system(ProcessDecay);
         world.register_system(economic_system);
         world.register_system(ConsumptionSystem);
+        world.register_system(SupplySystem);
         world.register_system(CraftingSystem);
         world.register_system(ConstructionSystem::new());
         world.register_system(NarrativeSystem);
@@ -307,6 +309,7 @@ fn main() {
         world.register_system(ProcessDecay);
         world.register_system(economic_system);
         world.register_system(ConsumptionSystem);
+        world.register_system(SupplySystem);
         world.register_system(CraftingSystem);
         world.register_system(ConstructionSystem::new());
         world.register_system(NarrativeSystem);

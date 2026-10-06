@@ -886,6 +886,7 @@ impl WasmWorld {
         self.simulate_fluid();
         self.tick_construction();
         self.tick_consumption();
+        self.tick_supply();
         self.tick_craft();
         // Recompute the transient visibility modifier from weather state,
         // mirroring WeatherSystem's per-tick recompute (R008/R009).
@@ -2996,6 +2997,101 @@ impl WasmWorld {
                         remainder
                     };
                     map.insert(kind.clone(), serde_json::json!(floored));
+                }
+            }
+        }
+    }
+
+    /// Advances every active supply link by one tick.
+    ///
+    /// Host mirror of `SupplySystem`: ascending link-entity-id order,
+    /// per-tick request `min(amount_per_tick, capacity_per_tick)` moved via
+    /// [`transfer_stockpile_resource`](Self::transfer_stockpile_resource),
+    /// `supply_delivered` on success, `supply_shortfall` with no mutation on
+    /// shortfall, `supply_blocked {reason: missing_stockpile}` when an
+    /// endpoint lacks `Stockpile`. Inactive links are skipped silently.
+    /// Called from [`tick`](Self::tick), mirroring
+    /// [`tick_consumption`](Self::tick_consumption). No RNG on this path.
+    pub fn tick_supply(&mut self) {
+        let mut links: Vec<u32> = self
+            .components
+            .get("SupplyLink")
+            .map(|m| m.keys().copied().collect())
+            .unwrap_or_default();
+        links.sort_unstable();
+        let turn = self.turn;
+        for link in links {
+            let Some(record) = self
+                .components
+                .get("SupplyLink")
+                .and_then(|m| m.get(&link))
+                .cloned()
+            else {
+                continue;
+            };
+            let Some(route) = crate::supply::parse_supply_link(&record) else {
+                continue;
+            };
+            if !route.active {
+                continue;
+            }
+            let endpoints_stocked = self
+                .components
+                .get("Stockpile")
+                .is_some_and(|m| m.contains_key(&route.source) && m.contains_key(&route.target));
+            if !endpoints_stocked {
+                let event = serde_json::json!({
+                    "type": "supply_blocked",
+                    "link": link,
+                    "reason": "missing_stockpile",
+                    "turn": turn,
+                });
+                let _ = self.send_event("supply_blocked", &event.to_string());
+                continue;
+            }
+            let request = route.amount_per_tick.min(route.capacity_per_tick);
+            match self.transfer_stockpile_resource(route.source, route.target, &route.kind, request)
+            {
+                Ok(()) => {
+                    let event = serde_json::json!({
+                        "type": "supply_delivered",
+                        "link": link,
+                        "kind": route.kind,
+                        "amount": request,
+                        "turn": turn,
+                    });
+                    let _ = self.send_event("supply_delivered", &event.to_string());
+                }
+                Err(err) if err.starts_with("InsufficientFunds") => {
+                    let available = self
+                        .components
+                        .get("Stockpile")
+                        .and_then(|m| m.get(&route.source))
+                        .and_then(|s| s.get("resources"))
+                        .and_then(|r| r.get(&route.kind))
+                        .and_then(|v| v.as_f64())
+                        .unwrap_or(0.0);
+                    let event = serde_json::json!({
+                        "type": "supply_shortfall",
+                        "link": link,
+                        "kind": route.kind,
+                        "requested": request,
+                        "available": available,
+                        "turn": turn,
+                    });
+                    let _ = self.send_event("supply_shortfall", &event.to_string());
+                }
+                Err(err) if err.starts_with("NoStockpile") => {
+                    let event = serde_json::json!({
+                        "type": "supply_blocked",
+                        "link": link,
+                        "reason": "missing_stockpile",
+                        "turn": turn,
+                    });
+                    let _ = self.send_event("supply_blocked", &event.to_string());
+                }
+                Err(_) => {
+                    continue;
                 }
             }
         }

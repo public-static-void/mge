@@ -768,8 +768,13 @@ fn applies_production_before_consumption_within_one_tick() {
         .iter()
         .position(|name| *name == "CraftingSystem")
         .unwrap();
+    let supply_pos = order
+        .iter()
+        .position(|name| *name == "SupplySystem")
+        .unwrap();
     assert_eq!(consumption_pos, economic_pos + 1);
-    assert_eq!(crafting_pos, consumption_pos + 1);
+    assert_eq!(supply_pos, consumption_pos + 1);
+    assert_eq!(crafting_pos, supply_pos + 1);
 }
 
 /// Dust-level shortfalls within epsilon succeed and floor at zero.

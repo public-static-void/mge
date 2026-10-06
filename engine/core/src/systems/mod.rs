@@ -52,6 +52,8 @@ pub mod noise;
 pub mod research;
 /// Stat calculation system
 pub mod stat_calculation;
+/// Per-tick supply push between linked stockpiles
+pub mod supply;
 /// Temperature system (deterministic global ambient + per-body heat exchange)
 pub mod temperature;
 /// Vehicle carrier system (embark/disembark + mounted co-movement)
@@ -76,6 +78,7 @@ pub const SYSTEM_EXECUTION_ORDER: &[&str] = &[
     "JobSystem",
     "EconomicSystem",
     "ConsumptionSystem",
+    "SupplySystem",
     "CraftingSystem",
     "ConstructionSystem",
     "ZoneSystem",

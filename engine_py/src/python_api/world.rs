@@ -39,6 +39,7 @@ use engine_core::systems::job::types::loader::load_job_types_from_dir;
 use engine_core::systems::movement_system::MovementSystem;
 use engine_core::systems::noise::NoiseSystem;
 use engine_core::systems::research::ResearchSystem;
+use engine_core::systems::supply::SupplySystem;
 use engine_core::systems::temperature::TemperatureSystem;
 use engine_core::systems::vehicle::VehicleSystem;
 use engine_core::systems::weather::WeatherSystem;
@@ -166,6 +167,7 @@ impl PyWorld {
         let economic_system = EconomicSystem::with_recipes(recipes);
         world.register_system(economic_system);
         world.register_system(ConsumptionSystem);
+        world.register_system(SupplySystem);
         world.register_system(CraftingSystem);
         world.register_system(ConstructionSystem::new());
 
