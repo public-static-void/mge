@@ -772,3 +772,185 @@ fn wasm_mirror_blocks_cross_faction_legs_while_at_war() {
         serde_json::from_str(&world.take_events("supply_delivered")).unwrap();
     assert!(delivered.is_empty());
 }
+
+/// The WASM host world runs the same validated link lifecycle as core.
+#[test]
+fn wasm_world_runs_the_supply_link_lifecycle() {
+    let mut world = WasmWorld::new();
+    let source = world.spawn_entity();
+    world
+        .set_component(
+            source,
+            "Stockpile",
+            &json!({ "resources": { "grain": 100.0 } }).to_string(),
+        )
+        .unwrap();
+    let target = world.spawn_entity();
+    world
+        .set_component(
+            target,
+            "Stockpile",
+            &json!({ "resources": { "grain": 0.0 } }).to_string(),
+        )
+        .unwrap();
+
+    let link = world
+        .create_supply_link(source, target, "grain", 10.0, 25.0)
+        .unwrap();
+    let record = world.get_supply_link(link).unwrap();
+    assert_eq!(record.source, source);
+    assert_eq!(record.target, target);
+    assert_eq!(record.kind, "grain");
+    assert_eq!(record.amount_per_tick, 10.0);
+    assert_eq!(record.capacity_per_tick, 25.0);
+    assert!(record.active);
+    assert_eq!(world.list_supply_links(), vec![link]);
+
+    let bare = world.spawn_entity();
+    assert!(
+        world
+            .create_supply_link(source, source, "grain", 10.0, 10.0)
+            .unwrap_err()
+            .starts_with("SameEndpoint")
+    );
+    assert!(
+        world
+            .create_supply_link(source, target, "", 10.0, 10.0)
+            .unwrap_err()
+            .starts_with("UnknownKind")
+    );
+    for bad in [0.0, -5.0, f64::NAN, f64::INFINITY] {
+        assert!(
+            world
+                .create_supply_link(source, target, "grain", bad, 10.0)
+                .unwrap_err()
+                .starts_with("NonPositiveAmount")
+        );
+    }
+    assert!(
+        world
+            .create_supply_link(bare, target, "grain", 1.0, 1.0)
+            .unwrap_err()
+            .starts_with("NoStockpile")
+    );
+    assert!(world.get_supply_link(9999).is_none());
+    assert!(
+        world
+            .remove_supply_link(9999)
+            .unwrap_err()
+            .starts_with("UnknownLink")
+    );
+    assert!(
+        world
+            .set_supply_link_active(9999, true)
+            .unwrap_err()
+            .starts_with("UnknownLink")
+    );
+    assert_eq!(world.list_supply_links(), vec![link]);
+
+    let amount = |world: &WasmWorld, entity: u32| {
+        world
+            .get_component(entity, "Stockpile")
+            .and_then(|raw| serde_json::from_str::<serde_json::Value>(&raw).ok())
+            .and_then(|stock| {
+                stock
+                    .get("resources")
+                    .and_then(|r| r.get("grain"))
+                    .and_then(|v| v.as_f64())
+            })
+            .unwrap_or(0.0)
+    };
+    world.set_supply_link_active(link, false).unwrap();
+    world.tick();
+    assert_eq!(amount(&world, source), 100.0);
+    assert_eq!(amount(&world, target), 0.0);
+    world.set_supply_link_active(link, true).unwrap();
+    world.tick();
+    assert_eq!(amount(&world, source), 90.0);
+    assert_eq!(amount(&world, target), 10.0);
+    let delivered: Vec<JsonValue> =
+        serde_json::from_str(&world.take_events("supply_delivered")).unwrap();
+    assert_eq!(delivered.len(), 1);
+    assert_eq!(delivered[0]["link"].as_u64(), Some(link as u64));
+
+    world.remove_supply_link(link).unwrap();
+    assert!(world.list_supply_links().is_empty());
+    assert!(world.get_supply_link(link).is_none());
+}
+
+/// Run one game-loop pass the way `tick()` orders it: consumption, then supply.
+fn run_game_pass(world: &mut World) {
+    ConsumptionSystem.run(world);
+    SupplySystem.run(world);
+}
+
+/// A multi-depot strategy loop: harvest, capped pushes, consumption, war, peace.
+#[test]
+fn runs_a_multi_depot_strategy_loop_from_field_to_table() {
+    let mut world = make_test_world();
+    let farm = spawn_stockpile(&mut world, json!({ "grain": 100.0 }));
+    let granary = spawn_stockpile(&mut world, json!({ "grain": 0.0 }));
+    let town = world.spawn_entity();
+    world
+        .set_component(town, "Stockpile", json!({ "resources": { "grain": 10.0 } }))
+        .unwrap();
+    world
+        .set_component(
+            town,
+            "Upkeep",
+            json!({ "drains": [{ "kind": "grain", "amount_per_tick": 4.0 }] }),
+        )
+        .unwrap();
+    set_faction(&mut world, farm, "valoria", "member").unwrap();
+    set_faction(&mut world, granary, "valoria", "member").unwrap();
+    set_faction(&mut world, town, "drakmor", "member").unwrap();
+    let field_road = create_supply_link(&mut world, farm, granary, "grain", 20.0, 8.0).unwrap();
+    let town_road = create_supply_link(&mut world, granary, town, "grain", 10.0, 5.0).unwrap();
+
+    // Peaceful harvest: the town eats first, then each capped leg pushes.
+    run_game_pass(&mut world);
+    assert_eq!(stockpile_amount(&world, farm, "grain"), 92.0);
+    assert_eq!(stockpile_amount(&world, granary, "grain"), 3.0);
+    assert_eq!(stockpile_amount(&world, town, "grain"), 11.0);
+    sync_events(&mut world);
+    assert!(drain_events(&mut world, "consumption_shortage").is_empty());
+    let delivered = drain_events(&mut world, "supply_delivered");
+    assert_eq!(delivered.len(), 2);
+
+    // A bumper harvest lands at the farm; both caps still bind.
+    let ripe = stockpile_amount(&world, farm, "grain") + 40.0;
+    let mut stock = world.get_component(farm, "Stockpile").cloned().unwrap();
+    stock["resources"]["grain"] = json!(ripe);
+    world.set_component(farm, "Stockpile", stock).unwrap();
+    run_game_pass(&mut world);
+    assert_eq!(stockpile_amount(&world, farm, "grain"), 124.0);
+    assert_eq!(stockpile_amount(&world, granary, "grain"), 6.0);
+    assert_eq!(stockpile_amount(&world, town, "grain"), 12.0);
+    sync_events(&mut world);
+    assert_eq!(drain_events(&mut world, "supply_delivered").len(), 2);
+
+    // War with the town's nation blocks only the cross-border leg.
+    declare_war(&mut world, "valoria", "drakmor").unwrap();
+    run_game_pass(&mut world);
+    assert_eq!(stockpile_amount(&world, farm, "grain"), 116.0);
+    assert_eq!(stockpile_amount(&world, granary, "grain"), 14.0);
+    assert_eq!(stockpile_amount(&world, town, "grain"), 8.0);
+    sync_events(&mut world);
+    let blocked = drain_events(&mut world, "supply_blocked");
+    assert_eq!(blocked.len(), 1);
+    assert_eq!(blocked[0]["link"].as_u64(), Some(town_road as u64));
+    assert_eq!(blocked[0]["reason"].as_str(), Some("war"));
+    let delivered = drain_events(&mut world, "supply_delivered");
+    assert_eq!(delivered.len(), 1);
+    assert_eq!(delivered[0]["link"].as_u64(), Some(field_road as u64));
+
+    // Peace reopens the road; both legs deliver again.
+    declare_peace(&mut world, "valoria", "drakmor").unwrap();
+    run_game_pass(&mut world);
+    assert_eq!(stockpile_amount(&world, farm, "grain"), 108.0);
+    assert_eq!(stockpile_amount(&world, granary, "grain"), 17.0);
+    assert_eq!(stockpile_amount(&world, town, "grain"), 9.0);
+    sync_events(&mut world);
+    assert!(drain_events(&mut world, "supply_blocked").is_empty());
+    assert_eq!(drain_events(&mut world, "supply_delivered").len(), 2);
+}
