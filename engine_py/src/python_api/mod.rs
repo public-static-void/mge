@@ -76,6 +76,9 @@ pub mod noise;
 pub mod region;
 /// Save/Load API
 pub mod save_load;
+/// Supply API (create_supply_link, remove_supply_link, list_supply_links,
+/// set_supply_link_active, get_supply_link)
+pub mod supply;
 /// Tech Tree and Research API
 pub mod tech_tree;
 /// Temperature API

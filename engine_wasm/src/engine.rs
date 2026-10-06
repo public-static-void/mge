@@ -34,6 +34,7 @@ use crate::host_api::narrative::register_narrative_api;
 use crate::host_api::noise::register_noise_api;
 use crate::host_api::region::register_region_api;
 use crate::host_api::save_load::register_save_load_api;
+use crate::host_api::supply::register_supply_api;
 use crate::host_api::system::register_system_api;
 use crate::host_api::tech_tree::register_tech_tree_api;
 use crate::host_api::temperature::register_temperature_api;
@@ -205,6 +206,7 @@ impl WasmScriptEngine {
         register_weather_api(&mut linker)?;
         register_temperature_api(&mut linker)?;
         register_trade_api(&mut linker)?;
+        register_supply_api(&mut linker)?;
         register_designer_api(&mut linker)?;
         register_diplomacy_api(&mut linker)?;
         register_narrative_api(&mut linker)?;

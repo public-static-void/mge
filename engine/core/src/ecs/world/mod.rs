@@ -40,6 +40,7 @@ mod map;
 mod mode;
 mod resources;
 mod save_load;
+mod supply_ops;
 mod systems;
 mod template;
 mod trade_ops;

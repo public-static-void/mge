@@ -886,6 +886,7 @@ impl WasmWorld {
         self.simulate_fluid();
         self.tick_construction();
         self.tick_consumption();
+        self.tick_supply();
         self.tick_craft();
         // Recompute the transient visibility modifier from weather state,
         // mirroring WeatherSystem's per-tick recompute (R008/R009).
@@ -2996,6 +2997,208 @@ impl WasmWorld {
                         remainder
                     };
                     map.insert(kind.clone(), serde_json::json!(floored));
+                }
+            }
+        }
+    }
+
+    /// Resolves an endpoint entity to its map cell for the supply path gate.
+    ///
+    /// Accepts nested core positions (`{"pos": {"Square": ...}}`) and the
+    /// flat WASM convention (`{"x", "y", "z"}` matched against active-map
+    /// cells). Returns `None` for positionless entities, keeping such links
+    /// unblocked like the core `SupplySystem`.
+    fn supply_endpoint_cell(&self, entity: u32) -> Option<CellKey> {
+        let pos = self.components.get("Position")?.get(&entity)?.clone();
+        if let Some(cell) = CellKey::from_position(&pos) {
+            return Some(cell);
+        }
+        let map = self.map.as_ref()?;
+        map.cells
+            .iter()
+            .find(|cell| Self::flat_position_matches(&pos, cell))
+            .cloned()
+    }
+
+    /// True when both cells sit on the active map but no walkable route joins
+    /// them. Mirrors core A* impassability: `walkable:false` cells never carry
+    /// a route, while off-map cells and a shared cell stay unblocked.
+    fn supply_route_blocked(&self, start: &CellKey, goal: &CellKey) -> bool {
+        use std::collections::VecDeque;
+
+        let Some(map) = self.map.as_ref() else {
+            return false;
+        };
+        if !map.cells.contains(start) || !map.cells.contains(goal) {
+            return false;
+        }
+        if start == goal {
+            return false;
+        }
+        let key_of = |cell: &CellKey| serde_json::to_string(cell).unwrap_or_default();
+        let passable = |key: &str| {
+            map.cell_metadata
+                .get(key)
+                .and_then(|meta| meta.get("walkable"))
+                .and_then(serde_json::Value::as_bool)
+                != Some(false)
+        };
+        let start_key = key_of(start);
+        let goal_key = key_of(goal);
+        let mut visited = HashSet::new();
+        let mut queue = VecDeque::new();
+        visited.insert(start_key.clone());
+        queue.push_back(start_key);
+        while let Some(current) = queue.pop_front() {
+            if current == goal_key {
+                return false;
+            }
+            if let Some(neighbors) = map.neighbors.get(&current) {
+                for neighbor in neighbors {
+                    if !visited.contains(neighbor) && passable(neighbor) {
+                        visited.insert(neighbor.clone());
+                        queue.push_back(neighbor.clone());
+                    }
+                }
+            }
+        }
+        true
+    }
+
+    /// Advances every active supply link by one tick.
+    ///
+    /// Host mirror of `SupplySystem`: ascending link-entity-id order,
+    /// per-tick request `min(amount_per_tick, capacity_per_tick)` moved via
+    /// [`transfer_stockpile_resource`](Self::transfer_stockpile_resource),
+    /// `supply_delivered` on success, `supply_shortfall` with no mutation on
+    /// shortfall, `supply_blocked {reason: missing_stockpile}` when an
+    /// endpoint lacks `Stockpile`, `supply_blocked {reason: war}` for
+    /// cross-faction legs at war, and `supply_blocked {reason: no_path}` when
+    /// positioned endpoints share the active map but have no walkable route.
+    /// Inactive links are skipped silently. Called from
+    /// [`tick`](Self::tick), mirroring
+    /// [`tick_consumption`](Self::tick_consumption). No RNG on this path.
+    pub fn tick_supply(&mut self) {
+        let mut links: Vec<u32> = self
+            .components
+            .get("SupplyLink")
+            .map(|m| m.keys().copied().collect())
+            .unwrap_or_default();
+        links.sort_unstable();
+        let turn = self.turn;
+        for link in links {
+            let Some(record) = self
+                .components
+                .get("SupplyLink")
+                .and_then(|m| m.get(&link))
+                .cloned()
+            else {
+                continue;
+            };
+            let Some(route) = crate::supply::parse_supply_link(&record) else {
+                continue;
+            };
+            if !route.active {
+                continue;
+            }
+            let endpoints_stocked = self
+                .components
+                .get("Stockpile")
+                .is_some_and(|m| m.contains_key(&route.source) && m.contains_key(&route.target));
+            if !endpoints_stocked {
+                let event = serde_json::json!({
+                    "type": "supply_blocked",
+                    "link": link,
+                    "reason": "missing_stockpile",
+                    "turn": turn,
+                });
+                let _ = self.send_event("supply_blocked", &event.to_string());
+                continue;
+            }
+            let source_faction = self
+                .components
+                .get("Faction")
+                .and_then(|m| m.get(&route.source))
+                .and_then(|f| f.get("faction_id"))
+                .and_then(|v| v.as_str())
+                .map(str::to_string);
+            let target_faction = self
+                .components
+                .get("Faction")
+                .and_then(|m| m.get(&route.target))
+                .and_then(|f| f.get("faction_id"))
+                .and_then(|v| v.as_str())
+                .map(str::to_string);
+            if let (Some(fa), Some(fb)) = (source_faction, target_faction)
+                && fa != fb
+                && self.diplomacy.query_relation(&fa, &fb) == crate::diplomacy::RelationState::War
+            {
+                let event = serde_json::json!({
+                    "type": "supply_blocked",
+                    "link": link,
+                    "reason": "war",
+                    "turn": turn,
+                });
+                let _ = self.send_event("supply_blocked", &event.to_string());
+                continue;
+            }
+            if let (Some(start), Some(goal)) = (
+                self.supply_endpoint_cell(route.source),
+                self.supply_endpoint_cell(route.target),
+            ) && self.supply_route_blocked(&start, &goal)
+            {
+                let event = serde_json::json!({
+                    "type": "supply_blocked",
+                    "link": link,
+                    "reason": "no_path",
+                    "turn": turn,
+                });
+                let _ = self.send_event("supply_blocked", &event.to_string());
+                continue;
+            }
+            let request = route.amount_per_tick.min(route.capacity_per_tick);
+            match self.transfer_stockpile_resource(route.source, route.target, &route.kind, request)
+            {
+                Ok(()) => {
+                    let event = serde_json::json!({
+                        "type": "supply_delivered",
+                        "link": link,
+                        "kind": route.kind,
+                        "amount": request,
+                        "turn": turn,
+                    });
+                    let _ = self.send_event("supply_delivered", &event.to_string());
+                }
+                Err(err) if err.starts_with("InsufficientFunds") => {
+                    let available = self
+                        .components
+                        .get("Stockpile")
+                        .and_then(|m| m.get(&route.source))
+                        .and_then(|s| s.get("resources"))
+                        .and_then(|r| r.get(&route.kind))
+                        .and_then(|v| v.as_f64())
+                        .unwrap_or(0.0);
+                    let event = serde_json::json!({
+                        "type": "supply_shortfall",
+                        "link": link,
+                        "kind": route.kind,
+                        "requested": request,
+                        "available": available,
+                        "turn": turn,
+                    });
+                    let _ = self.send_event("supply_shortfall", &event.to_string());
+                }
+                Err(err) if err.starts_with("NoStockpile") => {
+                    let event = serde_json::json!({
+                        "type": "supply_blocked",
+                        "link": link,
+                        "reason": "missing_stockpile",
+                        "turn": turn,
+                    });
+                    let _ = self.send_event("supply_blocked", &event.to_string());
+                }
+                Err(_) => {
+                    continue;
                 }
             }
         }

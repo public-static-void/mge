@@ -28,6 +28,8 @@ pub mod narrative;
 pub mod plugins;
 /// Presentation module
 pub mod presentation;
+/// Supply-link lifecycle (validated per-tick pushes between stockpiles)
+pub mod supply;
 /// Systems module
 pub mod systems;
 /// Tech tree and research system

@@ -39,6 +39,7 @@ use engine_core::systems::job::types::loader::load_job_types_from_dir;
 use engine_core::systems::movement_system::MovementSystem;
 use engine_core::systems::noise::NoiseSystem;
 use engine_core::systems::research::ResearchSystem;
+use engine_core::systems::supply::SupplySystem;
 use engine_core::systems::temperature::TemperatureSystem;
 use engine_core::systems::vehicle::VehicleSystem;
 use engine_core::systems::weather::WeatherSystem;
@@ -166,6 +167,7 @@ impl PyWorld {
         let economic_system = EconomicSystem::with_recipes(recipes);
         world.register_system(economic_system);
         world.register_system(ConsumptionSystem);
+        world.register_system(SupplySystem);
         world.register_system(CraftingSystem);
         world.register_system(ConstructionSystem::new());
 
@@ -947,6 +949,48 @@ impl PyWorld {
         amount: f64,
     ) -> PyResult<()> {
         crate::python_api::trade::execute_treaty_trade(self, from_id, to_id, kind, amount)
+    }
+
+    // ---- SUPPLY ----
+
+    /// Create a supply link between two stockpiled entities; returns the link
+    /// entity id. New links start active. Raises ValueError on bad input.
+    fn create_supply_link(
+        &self,
+        source: u32,
+        target: u32,
+        kind: String,
+        amount_per_tick: f64,
+        capacity_per_tick: f64,
+    ) -> PyResult<u32> {
+        crate::python_api::supply::create_supply_link(
+            self,
+            source,
+            target,
+            kind,
+            amount_per_tick,
+            capacity_per_tick,
+        )
+    }
+
+    /// Remove a link's `SupplyLink` component. Raises ValueError on unknown links.
+    fn remove_supply_link(&self, link: u32) -> PyResult<()> {
+        crate::python_api::supply::remove_supply_link(self, link)
+    }
+
+    /// List link entity ids in ascending order.
+    fn list_supply_links(&self) -> Vec<u32> {
+        crate::python_api::supply::list_supply_links(self)
+    }
+
+    /// Toggle a link's `active` flag. Raises ValueError on unknown links.
+    fn set_supply_link_active(&self, link: u32, active: bool) -> PyResult<()> {
+        crate::python_api::supply::set_supply_link_active(self, link, active)
+    }
+
+    /// Read a link record as a dict. Raises ValueError on unknown links.
+    fn get_supply_link(&self, py: Python<'_>, link: u32) -> PyResult<PyObject> {
+        crate::python_api::supply::get_supply_link(self, py, link)
     }
 
     /// Get a production job by entity ID.

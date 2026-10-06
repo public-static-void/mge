@@ -50,3 +50,37 @@ exposed on all three scripting bridges; no grand-strategy-specific core exists.
 - Mode registration: `engine/assets/schemas/diplomacy.json`,
   `engine/assets/schemas/treaty.json`, and `allowed_modes` in `game.toml`
   all list `grand-strategy` (and `4x`).
+
+## Implementation traceability — Supply
+
+The Supply and logistics network requirement above is implemented by
+genre-agnostic core and exposed on all three scripting bridges; no
+grand-strategy-specific core exists.
+
+- Store: `SupplyLink` link entities in `engine/core/src/supply.rs` (validated
+  `{source, target, kind, amount_per_tick, capacity_per_tick, active}` records
+  with component-held state, so save/load round-trips for free).
+- System: `SupplySystem` in `engine/core/src/systems/supply.rs` (per-tick
+  capped push via `transfer_stockpile_resource` with atomic shortfall skips;
+  ordered after `ConsumptionSystem`, before `CraftingSystem` in
+  `engine/core/src/systems/mod.rs`).
+- War-gate: `SupplySystem` transfers nothing between endpoints whose factions
+  are at war (`get_relation(...) == RelationState::War`), emitting
+  `supply_blocked {reason: war}`; unreachable positioned endpoints emit
+  `supply_blocked {reason: no_path}`.
+- Bridges: Lua (`engine_lua/src/lua_api/supply.rs`), Python
+  (`engine_py/src/python_api/supply.rs`), WASM
+  (`engine_wasm/src/host_api/supply.rs` over the `WasmWorld` mirror in
+  `engine/core/src/ecs/world/supply_ops.rs`) — identical five-function surface
+  (link create/remove/list/active-toggle/query).
+- Tests: `engine/core/tests/test_supply.rs`,
+  `engine/scripts/lua/tests/test_supply.lua`,
+  `engine_py/tests/test_supply.py`,
+  `engine_wasm/tests/wasm_supply_api.rs` with guest
+  `engine_wasm/wasm_tests/test_supply_api.rs`.
+- Strategy-scenario coverage:
+  `runs_a_multi_depot_strategy_loop_from_field_to_table` in the core suite
+  drives produce → capped pushes along two links → consume → wartime block →
+  peace resume via the public API only.
+- Mode registration: `engine/assets/schemas/supply_link.json` and
+  `allowed_modes` in `game.toml` list `grand-strategy` (and `4x`).

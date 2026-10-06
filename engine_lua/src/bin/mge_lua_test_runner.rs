@@ -32,6 +32,7 @@ use engine_core::systems::narrative::NarrativeSystem;
 use engine_core::systems::noise::NoiseSystem;
 use engine_core::systems::research::ResearchSystem;
 use engine_core::systems::stat_calculation::StatCalculationSystem;
+use engine_core::systems::supply::SupplySystem;
 use engine_core::systems::temperature::TemperatureSystem;
 use engine_core::systems::vehicle::VehicleSystem;
 use engine_core::systems::weather::WeatherSystem;
@@ -326,6 +327,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let economic_system = EconomicSystem::with_recipes(recipes);
         world.borrow_mut().register_system(economic_system);
         world.borrow_mut().register_system(ConsumptionSystem);
+        world.borrow_mut().register_system(SupplySystem);
         world.borrow_mut().register_system(CraftingSystem);
         world
             .borrow_mut()

@@ -1,0 +1,39 @@
+{
+  "title": "SupplyLink",
+  "description": "One per-tick capped push of a resource kind between two stockpile entities.",
+  "type": "object",
+  "properties": {
+    "source": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Endpoint entity id supplying the resource"
+    },
+    "target": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Endpoint entity id receiving the resource"
+    },
+    "kind": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Resource kind moved each tick"
+    },
+    "amount_per_tick": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "description": "Requested push per tick before the capacity cap"
+    },
+    "capacity_per_tick": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "description": "Per-tick ceiling; delivery is min(amount, capacity)"
+    },
+    "active": {
+      "type": "boolean",
+      "description": "Inactive links are skipped silently"
+    }
+  },
+  "required": ["source", "target", "kind", "amount_per_tick", "capacity_per_tick", "active"],
+  "additionalProperties": false,
+  "modes": ["colony", "roguelike", "simulation", "4x", "grand-strategy"]
+}

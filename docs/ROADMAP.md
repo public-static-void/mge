@@ -62,7 +62,7 @@
 - [x] Procedural history and lore generation
 - [x] Tech tree and research system
 - [x] Resource economy (production, trade, consumption)
-- [ ] Supply and logistics network
+- [x] Supply and logistics network
 
 ## Presentation Layer
 

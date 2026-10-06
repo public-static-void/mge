@@ -146,6 +146,9 @@ pub mod designer;
 /// declare_peace, propose_treaty, accept_treaty, break_treaty, list_treaties)
 pub mod diplomacy;
 
+/// Supply module (create_supply_link, remove_supply_link, list_supply_links,
+/// set_supply_link_active, get_supply_link)
+pub mod supply;
 /// Temperature module (get_temperature, set_temperature)
 pub mod temperature;
 /// Trade module (transfer_stockpile_resource, has_active_trade_treaty,
