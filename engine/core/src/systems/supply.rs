@@ -5,15 +5,21 @@
 //! `min(amount_per_tick, capacity_per_tick)` of `kind` from source to target
 //! through [`crate::trade::transfer_stockpile_resource`]. Inactive links are
 //! skipped silently; endpoints missing `Stockpile` emit one `supply_blocked`
-//! event with reason `missing_stockpile`; source shortfalls emit one
+//! event with reason `missing_stockpile`; cross-faction legs at war emit one
+//! `supply_blocked` event with reason `war`; positioned endpoints with no
+//! route between their cells emit one `supply_blocked` event with reason
+//! `no_path` (endpoints off every known map stay unblocked); source shortfalls emit one
 //! `supply_shortfall` event with no mutation; successful legs emit one
 //! `supply_delivered` event. Link ids are collected up front and each leg is
 //! itself atomic, so legs compose in sorted order with no mid-iteration link
 //! mutation. Runs in O(L): one link-entity iteration, O(1) work per link.
 //! No RNG anywhere on this path.
 
+use crate::diplomacy::{RelationState, get_relation};
 use crate::ecs::system::System;
 use crate::ecs::world::World;
+use crate::faction::get_faction;
+use crate::map::CellKey;
 use crate::supply::parse_supply_link;
 use crate::trade::{TransferError, transfer_stockpile_resource};
 use serde_json::json;
@@ -54,6 +60,46 @@ impl System for SupplySystem {
                         "type": "supply_blocked",
                         "link": link,
                         "reason": "missing_stockpile",
+                        "turn": turn,
+                    }),
+                );
+                continue;
+            }
+            if let (Some(source_faction), Some(target_faction)) = (
+                get_faction(world, route.source),
+                get_faction(world, route.target),
+            ) && source_faction != target_faction
+                && get_relation(world, &source_faction, &target_faction) == RelationState::War
+            {
+                let _ = world.send_event(
+                    "supply_blocked",
+                    json!({
+                        "type": "supply_blocked",
+                        "link": link,
+                        "reason": "war",
+                        "turn": turn,
+                    }),
+                );
+                continue;
+            }
+            let source_cell = world
+                .get_component(route.source, "Position")
+                .and_then(CellKey::from_position);
+            let target_cell = world
+                .get_component(route.target, "Position")
+                .and_then(CellKey::from_position);
+            if let (Some(start), Some(goal)) = (source_cell, target_cell)
+                && let Some(map) = world.get_map()
+                && map.contains(&start)
+                && map.contains(&goal)
+                && map.find_path(&start, &goal).is_none()
+            {
+                let _ = world.send_event(
+                    "supply_blocked",
+                    json!({
+                        "type": "supply_blocked",
+                        "link": link,
+                        "reason": "no_path",
                         "turn": turn,
                     }),
                 );
