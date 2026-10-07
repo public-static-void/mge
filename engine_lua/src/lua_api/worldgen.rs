@@ -85,7 +85,8 @@ pub fn register_worldgen_api(
                     name,
                     backend: "lua".to_string(),
                     opaque: Box::new(plugin),
-                });
+                })
+                .map_err(|e| mlua::Error::external(e.to_string()))?;
             Ok(())
         })?
     };

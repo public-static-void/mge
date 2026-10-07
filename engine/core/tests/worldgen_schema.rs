@@ -45,7 +45,7 @@ fn test_register_and_invoke_rust_worldgen_plugin() {
     };
 
     let mut registry = WorldgenRegistry::new();
-    registry.register(plugin);
+    registry.register(plugin).expect("register fixture");
 
     let result = registry
         .invoke("test_square_worldgen", &params)

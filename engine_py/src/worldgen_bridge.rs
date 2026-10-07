@@ -39,11 +39,13 @@ pub fn register_worldgen_plugin(py: Python, name: String, callback: Py<PyAny>) -
         callback: callback.clone_ref(py),
     };
     let mut registry = GLOBAL_WORLDGEN_REGISTRY.lock().unwrap();
-    registry.register(ThreadSafeWorldgenPlugin::ThreadSafeScripting {
-        name,
-        backend: "python".to_string(),
-        opaque: Box::new(plugin),
-    });
+    registry
+        .register(ThreadSafeWorldgenPlugin::ThreadSafeScripting {
+            name,
+            backend: "python".to_string(),
+            opaque: Box::new(plugin),
+        })
+        .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
     Ok(())
 }
 

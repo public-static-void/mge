@@ -87,15 +87,125 @@ pub enum WorldgenPlugin {
     },
 }
 
+/// Name collision on registration: re-registering an existing name without
+/// opt-in replace is rejected with the colliding name.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DuplicateName(pub String);
+
+impl fmt::Display for DuplicateName {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "duplicate worldgen plugin name: {}", self.0)
+    }
+}
+
+impl std::error::Error for DuplicateName {}
+
 /// Worldgen errors
 #[derive(Debug)]
 pub enum WorldgenError {
-    /// Plugin not found
-    NotFound,
+    /// Plugin not found; carries the requested name plus the registered
+    /// candidates so callers can suggest alternatives.
+    NotFound {
+        name: String,
+        available: Vec<String>,
+    },
     /// Plugin error
     ScriptError(String),
     /// Validation error
     ValidationError(String),
+}
+
+impl ThreadSafeWorldgenPlugin {
+    /// Registered name of this entry.
+    pub fn name(&self) -> &str {
+        match self {
+            ThreadSafeWorldgenPlugin::CAbi { name, .. } => name,
+            ThreadSafeWorldgenPlugin::ThreadSafeScripting { name, .. } => name,
+        }
+    }
+}
+
+impl WorldgenPlugin {
+    /// Registered name of this entry.
+    pub fn name(&self) -> &str {
+        match self {
+            WorldgenPlugin::CAbi { name, .. } => name,
+            WorldgenPlugin::ThreadSafeScripting { name, .. } => name,
+            WorldgenPlugin::Scripting { name, .. } => name,
+        }
+    }
+}
+
+/// Shared view over a registry entry for the single invoke pipeline.
+/// Implemented by both plugin enums so the match → generate → postprocess →
+/// validate → validators pipeline exists once, without merging the
+/// `Send`/`Sync`-split storage (the local registry keeps `!Send` entries).
+trait WorldgenPluginView {
+    /// Registered name of this entry.
+    fn plugin_name(&self) -> &str;
+    /// Run the entry's generator.
+    fn generate(&self, params: &JsonValue) -> Result<JsonValue, WorldgenError>;
+}
+
+impl WorldgenPluginView for ThreadSafeWorldgenPlugin {
+    fn plugin_name(&self) -> &str {
+        self.name()
+    }
+
+    fn generate(&self, params: &JsonValue) -> Result<JsonValue, WorldgenError> {
+        match self {
+            ThreadSafeWorldgenPlugin::CAbi { generate, .. } => Ok(generate(params)),
+            ThreadSafeWorldgenPlugin::ThreadSafeScripting { opaque, .. } => opaque
+                .invoke(params)
+                .map_err(|e| WorldgenError::ScriptError(e.to_string())),
+        }
+    }
+}
+
+impl WorldgenPluginView for WorldgenPlugin {
+    fn plugin_name(&self) -> &str {
+        self.name()
+    }
+
+    fn generate(&self, params: &JsonValue) -> Result<JsonValue, WorldgenError> {
+        match self {
+            WorldgenPlugin::CAbi { generate, .. } => Ok(generate(params)),
+            WorldgenPlugin::ThreadSafeScripting { opaque, .. } => opaque
+                .invoke(params)
+                .map_err(|e| WorldgenError::ScriptError(e.to_string())),
+            WorldgenPlugin::Scripting { opaque, .. } => opaque
+                .invoke(params)
+                .map_err(|e| WorldgenError::ScriptError(e.to_string())),
+        }
+    }
+}
+
+/// Single shared invoke pipeline: first-match-wins name lookup, then
+/// generate → postprocess → `validate_map_schema` → validators.
+/// Both registries delegate here; the per-registry `invoke` bodies stay thin.
+fn invoke_core<P: WorldgenPluginView>(
+    plugins: &[P],
+    name: &str,
+    params: &JsonValue,
+    run_postprocessors: &dyn Fn(&mut JsonValue),
+    run_validators: &dyn Fn(&JsonValue) -> Result<(), String>,
+) -> Result<JsonValue, WorldgenError> {
+    for plugin in plugins {
+        if plugin.plugin_name() == name {
+            let mut map = plugin.generate(params)?;
+            run_postprocessors(&mut map);
+            validate_map_schema(&map).map_err(WorldgenError::ValidationError)?;
+            run_validators(&map).map_err(WorldgenError::ValidationError)?;
+            return Ok(map);
+        }
+    }
+    Err(WorldgenError::NotFound {
+        name: name.to_string(),
+        available: plugins
+            .iter()
+            .map(|p| p.plugin_name().to_string())
+            .collect(),
+    })
 }
 
 impl fmt::Display for WorldgenError {
@@ -123,20 +233,40 @@ impl ThreadSafeWorldgenRegistry {
         }
     }
 
-    /// Register a plugin
-    pub fn register(&mut self, plugin: ThreadSafeWorldgenPlugin) {
+    /// Register a plugin. Re-registering an existing name without opt-in
+    /// replace is rejected so entries are never silently shadowed.
+    pub fn register(&mut self, plugin: ThreadSafeWorldgenPlugin) -> Result<(), DuplicateName> {
+        let name = plugin.name().to_owned();
+        if self.plugins.iter().any(|p| p.name() == name) {
+            return Err(DuplicateName(name));
+        }
         self.plugins.push(plugin);
+        Ok(())
+    }
+
+    /// Register a plugin, replacing any existing entry under the same name.
+    pub fn register_or_replace(&mut self, plugin: ThreadSafeWorldgenPlugin) {
+        let name = plugin.name().to_owned();
+        self.plugins.retain(|p| p.name() != name);
+        self.plugins.push(plugin);
+    }
+
+    /// Remove the entry registered under `name`. Returns true iff an entry
+    /// was removed.
+    pub fn unregister(&mut self, name: &str) -> bool {
+        let before = self.plugins.len();
+        self.plugins.retain(|p| p.name() != name);
+        self.plugins.len() != before
+    }
+
+    /// Names of all registered entries.
+    pub fn names(&self) -> Vec<String> {
+        self.plugins.iter().map(|p| p.name().to_owned()).collect()
     }
 
     /// List plugin names
     pub fn list_names(&self) -> Vec<String> {
-        self.plugins
-            .iter()
-            .map(|p| match p {
-                ThreadSafeWorldgenPlugin::CAbi { name, .. } => name.clone(),
-                ThreadSafeWorldgenPlugin::ThreadSafeScripting { name, .. } => name.clone(),
-            })
-            .collect()
+        self.names()
     }
 
     /// Register a validator
@@ -170,29 +300,15 @@ impl ThreadSafeWorldgenRegistry {
         }
     }
 
-    /// Invoke a plugin
+    /// Invoke a plugin via the shared pipeline.
     pub fn invoke(&self, name: &str, params: &JsonValue) -> Result<JsonValue, WorldgenError> {
-        for plugin in &self.plugins {
-            let plugin_name = match plugin {
-                ThreadSafeWorldgenPlugin::CAbi { name, .. } => name,
-                ThreadSafeWorldgenPlugin::ThreadSafeScripting { name, .. } => name,
-            };
-            if plugin_name == name {
-                let mut map = match plugin {
-                    ThreadSafeWorldgenPlugin::CAbi { generate, .. } => generate(params),
-                    ThreadSafeWorldgenPlugin::ThreadSafeScripting { opaque, .. } => opaque
-                        .invoke(params)
-                        .map_err(|e| WorldgenError::ScriptError(e.to_string()))?,
-                };
-                self.run_postprocessors(&mut map);
-                // Validate map schema here
-                validate_map_schema(&map).map_err(WorldgenError::ValidationError)?;
-                self.run_validators(&map)
-                    .map_err(WorldgenError::ValidationError)?;
-                return Ok(map);
-            }
-        }
-        Err(WorldgenError::NotFound)
+        invoke_core(
+            &self.plugins,
+            name,
+            params,
+            &|map| self.run_postprocessors(map),
+            &|map| self.run_validators(map),
+        )
     }
 }
 
@@ -223,21 +339,40 @@ impl WorldgenRegistry {
         }
     }
 
-    /// Register a plugin
-    pub fn register(&mut self, plugin: WorldgenPlugin) {
+    /// Register a plugin. Re-registering an existing name without opt-in
+    /// replace is rejected so entries are never silently shadowed.
+    pub fn register(&mut self, plugin: WorldgenPlugin) -> Result<(), DuplicateName> {
+        let name = plugin.name().to_owned();
+        if self.plugins.iter().any(|p| p.name() == name) {
+            return Err(DuplicateName(name));
+        }
         self.plugins.push(plugin);
+        Ok(())
+    }
+
+    /// Register a plugin, replacing any existing entry under the same name.
+    pub fn register_or_replace(&mut self, plugin: WorldgenPlugin) {
+        let name = plugin.name().to_owned();
+        self.plugins.retain(|p| p.name() != name);
+        self.plugins.push(plugin);
+    }
+
+    /// Remove the entry registered under `name`. Returns true iff an entry
+    /// was removed.
+    pub fn unregister(&mut self, name: &str) -> bool {
+        let before = self.plugins.len();
+        self.plugins.retain(|p| p.name() != name);
+        self.plugins.len() != before
+    }
+
+    /// Names of all registered entries.
+    pub fn names(&self) -> Vec<String> {
+        self.plugins.iter().map(|p| p.name().to_owned()).collect()
     }
 
     /// List plugin names
     pub fn list_names(&self) -> Vec<String> {
-        self.plugins
-            .iter()
-            .map(|p| match p {
-                WorldgenPlugin::CAbi { name, .. } => name.clone(),
-                WorldgenPlugin::ThreadSafeScripting { name, .. } => name.clone(),
-                WorldgenPlugin::Scripting { name, .. } => name.clone(),
-            })
-            .collect()
+        self.names()
     }
 
     /// Registers a validator
@@ -293,33 +428,15 @@ impl WorldgenRegistry {
         }
     }
 
-    /// Runs a plugin by name
+    /// Runs a plugin by name via the shared pipeline.
     pub fn invoke(&self, name: &str, params: &JsonValue) -> Result<JsonValue, WorldgenError> {
-        for plugin in &self.plugins {
-            let plugin_name = match plugin {
-                WorldgenPlugin::CAbi { name, .. } => name,
-                WorldgenPlugin::ThreadSafeScripting { name, .. } => name,
-                WorldgenPlugin::Scripting { name, .. } => name,
-            };
-            if plugin_name == name {
-                let mut map = match plugin {
-                    WorldgenPlugin::CAbi { generate, .. } => generate(params),
-                    WorldgenPlugin::ThreadSafeScripting { opaque, .. } => opaque
-                        .invoke(params)
-                        .map_err(|e| WorldgenError::ScriptError(e.to_string()))?,
-                    WorldgenPlugin::Scripting { opaque, .. } => opaque
-                        .invoke(params)
-                        .map_err(|e| WorldgenError::ScriptError(e.to_string()))?,
-                };
-                self.run_postprocessors(&mut map);
-                // Validate map schema here
-                validate_map_schema(&map).map_err(WorldgenError::ValidationError)?;
-                self.run_validators(&map)
-                    .map_err(WorldgenError::ValidationError)?;
-                return Ok(map);
-            }
-        }
-        Err(WorldgenError::NotFound)
+        invoke_core(
+            &self.plugins,
+            name,
+            params,
+            &|map| self.run_postprocessors(map),
+            &|map| self.run_validators(map),
+        )
     }
 
     /// Copies all CAbi and ThreadSafeScripting plugins from a ThreadSafeWorldgenRegistry.

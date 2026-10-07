@@ -62,7 +62,7 @@ pub fn register_worldgen_api(
                     let json = serde_json::to_string(&map).unwrap_or_default();
                     return write_string_to_wasm(&mut caller, out_ptr, out_len, &json) as i32;
                 }
-                Err(engine_core::worldgen::WorldgenError::NotFound) => {
+                Err(engine_core::worldgen::WorldgenError::NotFound { .. }) => {
                     // Fall through to check WASM plugins
                 }
                 Err(_) => return -1,
