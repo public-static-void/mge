@@ -79,7 +79,11 @@ build-all:
 	cargo run -p xtask -- build-all
 
 # ====== RUST TEST TARGET (sharded per crate: one tool-timeout budget per shard) ======
-test-rust: build-c-plugins
+# CI guard: CI runners export CI=true (GitHub Actions sets it automatically),
+# which empties the build-c-plugins prerequisite so consumer jobs reuse the
+# downloaded c-plugins artifact instead of recompiling. Fresh-clone local runs
+# (CI unset) still build C plugins from source.
+test-rust: $(if $(CI),,build-c-plugins)
 	cargo test -p engine_core
 	cargo test -p engine_macros
 	cargo test -p engine_py
@@ -118,7 +122,8 @@ test-python: build-python
 	@cd engine_py && . .venv/bin/activate && pytest
 
 # ====== LUA TEST TARGET ======
-test-lua: build-c-plugins
+# Same CI guard as test-rust: artifact reuse under CI=true, source build locally.
+test-lua: $(if $(CI),,build-c-plugins)
 	@echo "Running Lua tests..."
 	cargo build --package engine_lua --bin mge_lua_test_runner
 	./run_lua_tests.sh $(LUA_FILTER)

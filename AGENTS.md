@@ -83,6 +83,8 @@ Run the `make` targets below as single commands — each wraps its full underlyi
 | Schema validation | `make validate-schema` |
 | Single Rust test | narrow to the owning crate's shard via the `test-rust` recipe in `Makefile` |
 
+`make test-rust` runs one shard per crate (each shard fits the agent tool timeout): `engine_core`, `engine_macros`, `engine_py`, `engine_lua`, `engine_wasm`, `schema_validator`, `rust_test_plugin`, `xtask` (authoritative list in the `test-rust` recipe in `Makefile`). CI invokes the same `make test-rust` target instead of a monolithic workspace-wide run.
+
 ### Lint
 
 ```sh
@@ -190,7 +192,7 @@ xtask builds each Rust plugin crate in release mode, then copies `target/release
 
 - Integration tests in `engine/core/tests/`.
 - Require pre-built C plugins and WASM test modules to exist.
-- CI workflow (`test-rust` job): download C-plugin and WASM artifacts → `make build-all` → `make test-rust` with `LD_LIBRARY_PATH` including `$(pwd)/plugins`.
+- CI workflow (`test-rust` job): download C-plugin and WASM artifacts → deploy Rust plugins via xtask `build-plugins` → `make test-rust` with `LD_LIBRARY_PATH` including `$(pwd)/plugins`. The `CI=true` guard in `Makefile` skips the C rebuild so the downloaded artifact is reused; fresh clones (CI unset) build C plugins from source.
 
 ### Lua Tests
 
@@ -198,6 +200,7 @@ xtask builds each Rust plugin crate in release mode, then copies `target/release
 - Test discovery is **source-parsing based** — the Rust test runner (`mge_lua_test_runner`) reads each `.lua` file, strips comments, and parses `return { test_xxx = function() ... end }` patterns statically. Does NOT require the Lua module at parse time.
 - Each test gets a **fresh World instance** — full state isolation.
 - Requires C plugin at `plugins/simple_square_plugin/libsimple_square_plugin.so`.
+- CI workflow (`test-lua` job): downloads the C-plugin artifact and `make test-lua` reuses it — the `CI=true` guard in `Makefile` skips the rebuild, so the consumer log shows no `gcc`.
 - Pre-registered systems: `ProcessDeaths`, `ProcessDecay`, `EconomicSystem`, `JobSystem`, `InventoryConstraintSystem`, `EquipmentLogicSystem`, `BodyEquipmentSyncSystem`.
 - Test helpers: `engine/scripts/lua/tests/helpers/` (`job_helpers.lua`, `ai_job_helpers.lua`).
 

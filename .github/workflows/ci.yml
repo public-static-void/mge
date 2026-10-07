@@ -123,10 +123,10 @@ jobs:
         run: |
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
           df -h
-      - name: Run all tests
+      - name: Run all tests (sharded per crate via Makefile)
         run: |
           export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(pwd)/plugins
-          cargo test --workspace
+          make test-rust
 
   test-lua:
     runs-on: ubuntu-latest
