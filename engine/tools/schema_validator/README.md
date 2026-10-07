@@ -14,50 +14,50 @@ A CLI tool for validating JSON schema files used in the MGE engine.
 
 ## Usage
 
-From the project root:
+From the project root, always via the canonical make target:
 
 ```bash
-cargo run -p schema_validator -- <path-to-schema-or-directory> [OPTIONS]
+make validate-schema
 ```
 
-### Examples
-
-Validate all schemas in a directory:
+Validate a single schema file or pass extra flags by forwarding them with `ARGS`:
 
 ```bash
-cargo run -p schema_validator -- engine/assets/schemas/
-```
-
-Validate a single schema file:
-
-```bash
-cargo run -p schema_validator -- engine/assets/schemas/health.json
+make validate-schema ARGS="engine/assets/schemas/health.json"
 ```
 
 Show only the summary (no per-file output):
 
 ```bash
-cargo run -p schema_validator -- engine/assets/schemas/ --summary-only
+make validate-schema ARGS="engine/assets/schemas/ --summary-only"
 ```
 
 Stop at the first error:
 
 ```bash
-cargo run -p schema_validator -- engine/assets/schemas/ --fail-fast
+make validate-schema ARGS="engine/assets/schemas/ --fail-fast"
+```
+
+Validate against a different game config:
+
+```bash
+make validate-schema ARGS="engine/assets/schemas/ --config game.toml"
 ```
 
 ## Allowed Modes
 
-The following modes are currently allowed in schemas:
+The following modes are currently allowed in schemas (mirrors `allowed_modes` in `game.toml` at the repo root):
 
 - `colony`
 - `roguelike`
-- `single`
-- `multi`
 - `editor`
 - `simulation`
+- `single`
+- `multi`
+- `grand-strategy`
+- `4x`
 
-To add more modes, update the `allowed_modes` list in [`src/lib.rs`](src/lib.rs).
+The allowed list is loaded at runtime from `allowed_modes` in `game.toml` (see `load_allowed_modes` in `src/main.rs`; override with `--config <path>`), so this list follows that file — to allow a new mode, update `game.toml`, not the validator.
 
 ## Validation Rules
 
@@ -70,8 +70,8 @@ To add more modes, update the `allowed_modes` list in [`src/lib.rs`](src/lib.rs)
 
 - To add new validation rules, edit [`src/lib.rs`](src/lib.rs).
 - To add new CLI options, edit [`src/main.rs`](src/main.rs).
-- To add new allowed modes, update the `allowed_modes` list in [`src/lib.rs`](src/lib.rs).
+- To allow a new mode, add it to `allowed_modes` in `game.toml` at the repo root.
 
 ## CI Integration
 
-See the main project’s `.github/workflows/lint-schemas.yml` for how to run this tool automatically on every PR.
+Schemas are validated automatically on every PR by the `validate-schema` job in `.github/workflows/ci.yml`, which runs the same `make validate-schema` target documented above.
