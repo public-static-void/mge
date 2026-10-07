@@ -111,6 +111,8 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: c-plugins
+          # Must land at plugins/*/lib*.so — the exact paths the
+          # build-c-plugins-if-needed guard checks before reusing.
           path: plugins
       - name: Download WASM test artifacts
         uses: actions/download-artifact@v4
@@ -126,7 +128,9 @@ jobs:
       - name: Run all tests (sharded per crate via Makefile)
         run: |
           export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(pwd)/plugins
-          make test-rust
+          # CI=true selects the guard's reuse path; the guard logs the
+          # "reusing c-plugins artifact (CI=true)" line as consumer-log proof.
+          CI=true make test-rust
 
   test-lua:
     runs-on: ubuntu-latest
@@ -144,13 +148,17 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: c-plugins
+          # Must land at plugins/*/lib*.so — the exact paths the
+          # build-c-plugins-if-needed guard checks before reusing.
           path: plugins
       - name: Build and deploy plugins
         run: cargo run -p xtask -- build-plugins
       - name: Run Lua tests
         run: |
           export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(pwd)/plugins
-          make test-lua
+          # CI=true selects the guard's reuse path; the guard logs the
+          # "reusing c-plugins artifact (CI=true)" line as consumer-log proof.
+          CI=true make test-lua
 
   test-python:
     runs-on: ubuntu-latest
