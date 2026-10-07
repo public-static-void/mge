@@ -88,3 +88,23 @@
 - [x] World generation documentation
 - [x] Development guide
 - [x] README
+
+## Planetary World Generation (new)
+
+- [ ] Planet-scale biome and climate assignment (temperature/humidity/pressure-driven biomes on a planet grid) — cost: new core gen module + 3-bridge surface + 4-suite scenario tests (from: `4x.md` bullet "Procedural world generation (planet gen)")
+- [ ] Planet-to-region-to-hex hierarchical link generation (auto-link child maps through the link-maps surface) — cost: core link-gen helper + bridge docs + multiscale test extension (from: `4x.md` bullet "Procedural world generation (planet gen)")
+- [ ] Native planet-gen worldgen plugin backend (Rust/C plugin emitting planet maps through the worldgen hook) — cost: one plugin crate + xtask deploy + plugin load test (from: `4x.md` bullet "Procedural world generation (planet gen)")
+- [ ] Cross-bridge planet-gen scenario coverage (Lua/Python/WASM dungeon-gen-parity tests for planet output) — cost: 3 bridge test modules + 1 guest module (from: `4x.md` bullet "Procedural world generation (planet gen)")
+
+## Strategy-Layer Presentation (new)
+
+- [ ] Strategic overview renderer (province-colored terminal overview of the named strategic map) — cost: core render helper + viewport wiring + demo-script coverage (from: `grand-strategy.md` bullet "Multi-scale map navigation (strategic ↔ tactical)")
+- [ ] Minimap widget in the terminal UI library (viewport-linked, fog-aware) — cost: widget-lib addition + layout integration + widget tests (from: `grand-strategy.md` bullet "Multi-scale map navigation (strategic ↔ tactical)")
+- [ ] Strategic-to-tactical zoom switching in the camera viewport (per-scale rendering through the existing camera surface) — cost: viewport mode + 3-bridge camera extension + viewport tests (from: `grand-strategy.md` bullet "Multi-scale map navigation (strategic ↔ tactical)")
+- [ ] Faction-relation province tinting (diplomacy-driven coloring of the strategic overview) — cost: renderer tint pass + diplomacy query reuse + scenario test (from: `grand-strategy.md` bullet "Multi-scale map navigation (strategic ↔ tactical)")
+
+## Native Plugin Hot-Reload (new)
+
+- [ ] Host-side shared-object reload flow (unload/reload, state migration through the ABI hot-reload pointer, system re-registration) — cost: core plugin-loader flow + loader tests (from: `4x.md` bullet "Procedural world generation (planet gen)")
+- [ ] CLI reload trigger surfacing (reload a native plugin without restarting the simulation) — cost: CLI command + bridge function + integration test (from: `survival.md` bullet "Procedural dungeon generation")
+- [ ] Save-safe reload round-trip tests (state preserved across a reload cycle in core plus Lua suites) — cost: 2 test modules reusing the save/load harness (from: `survival.md` bullet "Procedural dungeon generation")
