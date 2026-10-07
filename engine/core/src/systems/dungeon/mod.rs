@@ -32,6 +32,7 @@ pub struct DungeonConfig {
 }
 
 impl Default for DungeonConfig {
+    /// Non-deterministic (time-seeded). Tests MUST use explicit seeds.
     fn default() -> Self {
         Self {
             width: 40,
@@ -43,6 +44,23 @@ impl Default for DungeonConfig {
             min_room_size: 3,
             max_room_size: 8,
             max_rooms: 10,
+        }
+    }
+}
+
+impl DungeonConfig {
+    /// Build from invocation params; missing fields fall back to the struct
+    /// defaults. An explicit `seed` always wins over the time-seeded default.
+    pub fn from_params(params: &serde_json::Value) -> Self {
+        use crate::worldgen::{param_u32, param_u64};
+        let defaults = Self::default();
+        Self {
+            width: param_u32(params, "width", defaults.width),
+            height: param_u32(params, "height", defaults.height),
+            seed: param_u64(params, "seed", defaults.seed),
+            min_room_size: param_u32(params, "min_room_size", defaults.min_room_size),
+            max_room_size: param_u32(params, "max_room_size", defaults.max_room_size),
+            max_rooms: param_u32(params, "max_rooms", defaults.max_rooms),
         }
     }
 }
@@ -102,9 +120,13 @@ impl Room {
 }
 
 /// Dungeon generator — stateless, pure function.
+#[derive(Debug, Clone, Copy, Default)]
 pub struct DungeonGenerator;
 
 impl DungeonGenerator {
+    /// Registry name this algorithm is invoked by.
+    pub const NAME: &str = "dungeon";
+
     /// Generate a dungeon map from the given config.
     /// Returns Err(String) if config is invalid (zero dimensions, etc.).
     pub fn generate(config: &DungeonConfig) -> Result<DungeonMap, String> {
@@ -278,53 +300,62 @@ fn build_dungeon_map(
         floor_set.insert((x, y));
     }
 
-    // Create all cells
-    let mut cells = Vec::with_capacity((width * height) as usize);
-    for y in 0..height {
-        for x in 0..width {
-            let walkable = floor_set.contains(&(x, y));
-            cells.push(DungeonCell {
-                x,
-                y,
-                z: 0,
-                walkable,
-            });
-        }
-    }
+    DungeonMap::from_floor_set(width, height, &floor_set)
+}
 
-    // Build neighbors for walkable cells (4-directional to adjacent walkable cells)
-    let mut neighbors = Vec::new();
-    for y in 0..height {
-        for x in 0..width {
-            if !floor_set.contains(&(x, y)) {
-                continue;
+impl DungeonMap {
+    /// Build a map from an explicit walkable floor set: every grid cell
+    /// becomes a map cell, floor cells gain 4-directional neighbor links to
+    /// adjacent floor cells, and wall cells carry non-walkable metadata.
+    pub fn from_floor_set(width: u32, height: u32, floor_set: &HashSet<(u32, u32)>) -> Self {
+        // Create all cells
+        let mut cells = Vec::with_capacity((width * height) as usize);
+        for y in 0..height {
+            for x in 0..width {
+                let walkable = floor_set.contains(&(x, y));
+                cells.push(DungeonCell {
+                    x,
+                    y,
+                    z: 0,
+                    walkable,
+                });
             }
+        }
 
-            // Check 4 cardinal directions
-            let dirs: [(i32, i32); 4] = [(1, 0), (-1, 0), (0, 1), (0, -1)];
-            for (dx, dy) in dirs {
-                let nx = x as i32 + dx;
-                let ny = y as i32 + dy;
-                if nx >= 0
-                    && nx < width as i32
-                    && ny >= 0
-                    && ny < height as i32
-                    && floor_set.contains(&(nx as u32, ny as u32))
-                {
-                    neighbors.push(DungeonNeighbor {
-                        from_x: x,
-                        from_y: y,
-                        from_z: 0,
-                        to_x: nx as u32,
-                        to_y: ny as u32,
-                        to_z: 0,
-                    });
+        // Build neighbors for walkable cells (4-directional to adjacent walkable cells)
+        let mut neighbors = Vec::new();
+        for y in 0..height {
+            for x in 0..width {
+                if !floor_set.contains(&(x, y)) {
+                    continue;
+                }
+
+                // Check 4 cardinal directions
+                let dirs: [(i32, i32); 4] = [(1, 0), (-1, 0), (0, 1), (0, -1)];
+                for (dx, dy) in dirs {
+                    let nx = x as i32 + dx;
+                    let ny = y as i32 + dy;
+                    if nx >= 0
+                        && nx < width as i32
+                        && ny >= 0
+                        && ny < height as i32
+                        && floor_set.contains(&(nx as u32, ny as u32))
+                    {
+                        neighbors.push(DungeonNeighbor {
+                            from_x: x,
+                            from_y: y,
+                            from_z: 0,
+                            to_x: nx as u32,
+                            to_y: ny as u32,
+                            to_z: 0,
+                        });
+                    }
                 }
             }
         }
-    }
 
-    DungeonMap { cells, neighbors }
+        DungeonMap { cells, neighbors }
+    }
 }
 
 // ---- Worldgen Format Conversion ---------------------------------------------
@@ -380,5 +411,16 @@ impl DungeonMap {
             "topology": "square",
             "cells": cells_json,
         })
+    }
+}
+
+impl crate::worldgen::MapgenAlgorithm for DungeonGenerator {
+    fn name(&self) -> &str {
+        Self::NAME
+    }
+
+    fn generate(&self, params: &serde_json::Value) -> Result<serde_json::Value, String> {
+        let config = DungeonConfig::from_params(params);
+        Self::generate(&config).map(|map| map.to_worldgen_json())
     }
 }
