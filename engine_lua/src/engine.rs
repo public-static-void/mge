@@ -1,15 +1,5 @@
 use super::input::{InputProvider, StdinInput};
 use super::lua_api::register_all_api_functions;
-use crate::lua_api::event_bus::register_event_bus_api;
-use crate::lua_api::job_board::register_job_board_api;
-use crate::lua_api::job_cancel::register_job_cancel_api;
-use crate::lua_api::job_events::register_job_event_api;
-use crate::lua_api::job_mutation::register_job_mutation_api;
-use crate::lua_api::job_query::register_job_query_api;
-use crate::lua_api::job_system::register_job_system_api;
-use crate::lua_api::system::register_system_functions;
-use crate::lua_api::world::register_world_api;
-use crate::lua_api::worldgen::register_worldgen_api;
 use engine_core::ecs::world::World;
 use engine_core::mods::loader::ModScriptEngine;
 use engine_core::worldgen::{GLOBAL_WORLDGEN_REGISTRY, WorldgenRegistry};
@@ -133,34 +123,16 @@ impl ScriptEngine {
     pub fn register_world(&mut self, world: Rc<RefCell<World>>) -> mlua::Result<()> {
         let globals = self.lua.globals();
 
-        // Expose the ECS world as a Lua userdata with methods
-        register_world_api(&self.lua, &globals, world.clone())?;
-
-        register_worldgen_api(&self.lua, &globals, self.worldgen_registry.clone())?;
-
-        register_event_bus_api(&self.lua, &globals, world.clone())?;
-
-        register_system_functions(
-            Rc::clone(&self.lua),
-            &globals,
-            world.clone(),
-            self.lua_systems.clone(),
-        )?;
-
+        // Every API domain registers through the single ApiModule registry;
+        // adding or removing a domain is one entry in `API_MODULES`.
         register_all_api_functions(
             &self.lua,
             &globals,
             world.clone(),
             Arc::clone(&self.input_provider),
             Rc::clone(&self.worldgen_registry),
+            Rc::clone(&self.lua_systems),
         )?;
-
-        register_job_system_api(&self.lua, &globals, world.clone())?;
-        register_job_board_api(&self.lua, &globals, world.clone())?;
-        register_job_query_api(&self.lua, &globals, world.clone())?;
-        register_job_mutation_api(&self.lua, &globals, world.clone())?;
-        register_job_cancel_api(&self.lua, &globals, world.clone())?;
-        register_job_event_api(&self.lua, &globals, world.clone())?;
 
         Ok(())
     }
