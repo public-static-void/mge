@@ -6,6 +6,8 @@
 pub mod body_equipment_sync;
 /// Body part damage distribution system
 pub mod body_part_damage;
+/// Cellular-caves map generation (second swappable mapgen algorithm)
+pub mod cellular_caves;
 /// Building construction system
 pub mod construction;
 /// Autonomous per-entity upkeep consumption system
