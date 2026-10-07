@@ -223,6 +223,9 @@ impl WasmScriptEngine {
         let worldgen_registry = config
             .worldgen_registry
             .unwrap_or_else(|| Arc::new(Mutex::new(ThreadSafeWorldgenRegistry::default())));
+        engine_core::worldgen::register_builtin_mapgen_algorithms(
+            &mut worldgen_registry.lock().unwrap(),
+        );
         register_worldgen_api(&mut linker, worldgen_registry)?;
 
         if let Some(imports) = config.import_host_functions {
