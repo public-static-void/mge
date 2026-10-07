@@ -1,5 +1,6 @@
 local assert = require("assert")
 local utils = require("utils")
+local tmp_path = require("helpers.tmp_path")
 
 local function test_save_and_load()
 	-- Setup: create some entities and save them
@@ -8,7 +9,8 @@ local function test_save_and_load()
 	local e2 = spawn_entity()
 	set_component(e2, "Health", { current = 10, max = 10 })
 
-	save_to_file("test_save.json")
+	local save_path = tmp_path.tmp_save_path("test_save")
+	save_to_file(save_path)
 	-- Despawn all entities in the world
 	local entities = get_entities()
 	for _, eid in ipairs(entities) do
@@ -19,7 +21,7 @@ local function test_save_and_load()
 	assert.equals(#entities_after_despawn, 0, "Entities should be empty after despawn")
 
 	-- Restore
-	load_from_file("test_save.json")
+	load_from_file(save_path)
 	local entities_after = get_entities()
 	assert.is_true(#entities_after >= 2, "Entities should exist after loading")
 end

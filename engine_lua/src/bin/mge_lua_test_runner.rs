@@ -393,6 +393,27 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             })?,
         )?;
 
+        // --- Per-test isolated temp dir for save/load round-trips ---
+        // Lua tests run without `os`/`io` (restricted stdlib), so the
+        // runner provisions a unique scratch directory per test and
+        // exposes it as MGE_TEST_TMP_DIR. Save tests write through
+        // helpers/tmp_path.lua instead of CWD-relative fixed names.
+        let test_tmp_dir = std::env::temp_dir().join("mge_lua_tests").join(format!(
+            "{}_{}_pid{}_ns{}",
+            modname,
+            fname,
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&test_tmp_dir)?;
+        lua.globals().set(
+            "MGE_TEST_TMP_DIR",
+            test_tmp_dir.to_str().unwrap().to_string(),
+        )?;
+
         // Prepare Lua code: require the module and call only the test function
         let script = format!(
             r#"
@@ -428,6 +449,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         match result {
             Ok(_) => {
                 println!("{} {}", color(COLOR_GREEN, "[OK]    "), testname);
+                // Best-effort cleanup: the dir is kept on failure for debugging.
+                std::fs::remove_dir_all(&test_tmp_dir).ok();
             }
             Err(e) => {
                 println!("{} {}", color(COLOR_RED, "[FAIL]  "), testname);

@@ -1,5 +1,6 @@
 local assert = require("assert")
 local utils = require("utils")
+local tmp_path = require("helpers.tmp_path")
 
 local function contains(arr, value)
 	for _, v in ipairs(arr) do
@@ -406,12 +407,13 @@ local function test_save_load_roundtrip_preserves_mounted_vehicle()
 	tick()
 	tick()
 
-	save_to_file("test_vehicle_save.json")
+	local save_path = tmp_path.tmp_save_path("test_vehicle_save")
+	save_to_file(save_path)
 	local entities = get_entities()
 	for _, eid in ipairs(entities) do
 		despawn_entity(eid)
 	end
-	load_from_file("test_vehicle_save.json")
+	load_from_file(save_path)
 
 	local occupants = get_vehicle_occupants(vehicle)
 	assert.equals(#occupants, 2, "two riders must survive round-trip")

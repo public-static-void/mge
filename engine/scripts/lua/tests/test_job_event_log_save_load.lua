@@ -1,4 +1,5 @@
 local assert = require("assert")
+local tmp_path = require("helpers.tmp_path")
 
 local function test_event_log_save_and_load()
 	init_job_event_logger()
@@ -11,7 +12,7 @@ local function test_event_log_save_and_load()
 	assert.is_true(#events_before > 0, "Should have at least one event before save")
 
 	-- Save the event log to a file
-	local log_path = "test_job_event_log.json"
+	local log_path = tmp_path.tmp_save_path("test_job_event_log")
 	job_events.save(log_path)
 
 	-- Clear the event log (simulate fresh session)
