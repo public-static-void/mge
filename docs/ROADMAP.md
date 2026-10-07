@@ -88,3 +88,23 @@
 - [x] World generation documentation
 - [x] Development guide
 - [x] README
+
+## Planetary World Generation
+
+- [ ] Planet-scale biome and climate assignment (temperature/humidity/pressure-driven biomes on a planet grid)
+- [ ] Planet-to-region-to-hex hierarchical link generation (auto-link child maps through the link-maps surface)
+- [ ] Native planet-gen worldgen plugin backend (Rust/C plugin emitting planet maps through the worldgen hook)
+- [ ] Cross-bridge planet-gen scenario coverage (Lua/Python/WASM dungeon-gen-parity tests for planet output)
+
+## Strategy-Layer Presentation
+
+- [ ] Strategic overview renderer (province-colored terminal overview of the named strategic map, wired into the viewport)
+- [ ] Minimap widget in the terminal UI library (viewport-linked, fog-aware)
+- [ ] Strategic-to-tactical zoom switching in the camera viewport (per-scale rendering through the existing camera surface)
+- [ ] Faction-relation province tinting (diplomacy-driven coloring of the strategic overview)
+
+## Native Plugin Hot-Reload
+
+- [ ] Host-side shared-object reload flow (unload/reload, state migration through the ABI hot-reload pointer, system re-registration)
+- [ ] CLI reload trigger surfacing (reload a native plugin without restarting the simulation)
+- [ ] Save-safe reload round-trip tests (state preserved across a reload cycle in core plus Lua suites, reusing the save/load harness)

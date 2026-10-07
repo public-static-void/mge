@@ -57,13 +57,14 @@ run-demo:
 # ====== DOCS REGRESSION GUARD ======
 # User-facing docs must use make targets, never plain cargo (M2/R011).
 lint-docs:
-	@if grep -rnE 'cargo (run|build|test)' AGENTS.md README.md docs/dev.md docs/plugin_abi.md; then \
+	@if grep -rnE 'cargo (run|build|test)' AGENTS.md README.md docs/dev.md docs/plugin_abi.md engine/tools/schema_validator/README.md; then \
 		echo "plain-cargo found in user-facing docs"; exit 1; \
 	fi
 
 # ====== SCHEMA VALIDATION ======
+# Extra validator args (alternate path, flags) forward via ARGS; defaults to SCHEMA_DIR.
 validate-schema:
-	cargo run --bin schema_validator --release -- $(SCHEMA_DIR)
+	cargo run --bin schema_validator --release -- $(if $(ARGS),$(ARGS),$(SCHEMA_DIR))
 
 # ====== RUST, C & WASM BUILD TARGETS ======
 build-plugins:
@@ -79,7 +80,11 @@ build-all:
 	cargo run -p xtask -- build-all
 
 # ====== RUST TEST TARGET (sharded per crate: one tool-timeout budget per shard) ======
-test-rust: build-c-plugins
+# CI guard: CI runners export CI=true (GitHub Actions sets it automatically),
+# which empties the build-c-plugins prerequisite so consumer jobs reuse the
+# downloaded c-plugins artifact instead of recompiling. Fresh-clone local runs
+# (CI unset) still build C plugins from source.
+test-rust: $(if $(CI),,build-c-plugins)
 	cargo test -p engine_core
 	cargo test -p engine_macros
 	cargo test -p engine_py
@@ -118,7 +123,8 @@ test-python: build-python
 	@cd engine_py && . .venv/bin/activate && pytest
 
 # ====== LUA TEST TARGET ======
-test-lua: build-c-plugins
+# Same CI guard as test-rust: artifact reuse under CI=true, source build locally.
+test-lua: $(if $(CI),,build-c-plugins)
 	@echo "Running Lua tests..."
 	cargo build --package engine_lua --bin mge_lua_test_runner
 	./run_lua_tests.sh $(LUA_FILTER)

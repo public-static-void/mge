@@ -185,7 +185,7 @@ impl ThreadSafeWorldgenRegistry {
                         .map_err(|e| WorldgenError::ScriptError(e.to_string()))?,
                 };
                 self.run_postprocessors(&mut map);
-                // --- NEW: Validate map schema here ---
+                // Validate map schema here
                 validate_map_schema(&map).map_err(WorldgenError::ValidationError)?;
                 self.run_validators(&map)
                     .map_err(WorldgenError::ValidationError)?;
@@ -312,7 +312,7 @@ impl WorldgenRegistry {
                         .map_err(|e| WorldgenError::ScriptError(e.to_string()))?,
                 };
                 self.run_postprocessors(&mut map);
-                // --- NEW: Validate map schema here ---
+                // Validate map schema here
                 validate_map_schema(&map).map_err(WorldgenError::ValidationError)?;
                 self.run_validators(&map)
                     .map_err(WorldgenError::ValidationError)?;
