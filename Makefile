@@ -57,13 +57,14 @@ run-demo:
 # ====== DOCS REGRESSION GUARD ======
 # User-facing docs must use make targets, never plain cargo (M2/R011).
 lint-docs:
-	@if grep -rnE 'cargo (run|build|test)' AGENTS.md README.md docs/dev.md docs/plugin_abi.md; then \
+	@if grep -rnE 'cargo (run|build|test)' AGENTS.md README.md docs/dev.md docs/plugin_abi.md engine/tools/schema_validator/README.md; then \
 		echo "plain-cargo found in user-facing docs"; exit 1; \
 	fi
 
 # ====== SCHEMA VALIDATION ======
+# Extra validator args (alternate path, flags) forward via ARGS; defaults to SCHEMA_DIR.
 validate-schema:
-	cargo run --bin schema_validator --release -- $(SCHEMA_DIR)
+	cargo run --bin schema_validator --release -- $(if $(ARGS),$(ARGS),$(SCHEMA_DIR))
 
 # ====== RUST, C & WASM BUILD TARGETS ======
 build-plugins:
