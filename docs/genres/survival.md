@@ -136,7 +136,7 @@ and exposed on all three scripting bridges; no survival-specific core exists.
 - Tests: `engine/core/tests/test_noise.rs`,
   `engine/scripts/lua/tests/test_noise.lua`,
   `engine_py/tests/test_noise.py` (no dedicated WASM test module — host API is wired via
-  `engine_wasm/src/engine.rs`; gap logged, claim omitted per the authorship rule).
+  `engine_wasm/src/engine.rs`).
 - Survival-scenario coverage: `test_noise_emission_propagation` (with
   `test_hearing_detection_triggers_alert` and the idle → investigate → chase escalation
   case) drives emit → propagate → AI detect via the public API only.
