@@ -148,3 +148,22 @@ fn caves_config_carries_an_explicit_seed() {
     assert_eq!(config.width, 20);
     assert_eq!(config.height, 15);
 }
+
+#[test]
+fn explicit_config_uses_named_generation_defaults() {
+    let config = CellularCavesConfig::explicit(20, 15, 1234);
+    assert_eq!(config.fill_chance, CellularCavesConfig::DEFAULT_FILL_CHANCE);
+    assert_eq!(config.steps, CellularCavesConfig::DEFAULT_STEPS);
+    assert_eq!(config.birth_limit, CellularCavesConfig::DEFAULT_BIRTH_LIMIT);
+    assert_eq!(config.death_limit, CellularCavesConfig::DEFAULT_DEATH_LIMIT);
+}
+
+#[test]
+fn params_fallback_uses_named_map_defaults() {
+    let config = CellularCavesConfig::from_params(&json!({"seed": 7}));
+    assert_eq!(config.width, CellularCavesConfig::DEFAULT_WIDTH);
+    assert_eq!(config.height, CellularCavesConfig::DEFAULT_HEIGHT);
+    assert_eq!(config.seed, 7);
+    assert_eq!(config.fill_chance, CellularCavesConfig::DEFAULT_FILL_CHANCE);
+    assert_eq!(config.steps, CellularCavesConfig::DEFAULT_STEPS);
+}

@@ -321,6 +321,16 @@ impl std::error::Error for WorldgenError {}
 /// world config names one. Keeps the pre-registry behavior (dungeon output).
 pub const FALLBACK_MAPGEN_ALGORITHM: &str = "dungeon";
 
+/// Wall-clock seed for game (non-test) generation.
+/// Non-deterministic: tests MUST pass explicit seeds instead of calling this.
+pub fn time_seed() -> u64 {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
+}
+
 /// Minimal contract for a swappable mapgen algorithm.
 ///
 /// A new algorithm ships by implementing this trait and registering an entry

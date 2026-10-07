@@ -7,7 +7,8 @@ use rand::rngs::StdRng;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::{HashMap, HashSet};
-use std::time::{SystemTime, UNIX_EPOCH};
+
+use crate::worldgen::time_seed;
 
 /// Map from cell coordinates to neighbor cell coordinate list.
 type NeighborMap = HashMap<(u32, u32, u32), Vec<(u32, u32, u32)>>;
@@ -35,20 +36,28 @@ impl Default for DungeonConfig {
     /// Non-deterministic (time-seeded). Tests MUST use explicit seeds.
     fn default() -> Self {
         Self {
-            width: 40,
-            height: 25,
-            seed: SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_secs(),
-            min_room_size: 3,
-            max_room_size: 8,
-            max_rooms: 10,
+            width: Self::DEFAULT_WIDTH,
+            height: Self::DEFAULT_HEIGHT,
+            seed: time_seed(),
+            min_room_size: Self::DEFAULT_MIN_ROOM_SIZE,
+            max_room_size: Self::DEFAULT_MAX_ROOM_SIZE,
+            max_rooms: Self::DEFAULT_MAX_ROOMS,
         }
     }
 }
 
 impl DungeonConfig {
+    /// Default map width in cells.
+    pub const DEFAULT_WIDTH: u32 = 40;
+    /// Default map height in cells.
+    pub const DEFAULT_HEIGHT: u32 = 25;
+    /// Default minimum room width/height (inclusive).
+    pub const DEFAULT_MIN_ROOM_SIZE: u32 = 3;
+    /// Default maximum room width/height (inclusive).
+    pub const DEFAULT_MAX_ROOM_SIZE: u32 = 8;
+    /// Default maximum number of rooms to place.
+    pub const DEFAULT_MAX_ROOMS: u32 = 10;
+
     /// Build from invocation params; missing fields fall back to the struct
     /// defaults. An explicit `seed` always wins over the time-seeded default.
     pub fn from_params(params: &serde_json::Value) -> Self {

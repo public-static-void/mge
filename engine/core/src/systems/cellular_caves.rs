@@ -10,7 +10,8 @@ use rand::SeedableRng;
 use rand::rngs::StdRng;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
-use std::time::{SystemTime, UNIX_EPOCH};
+
+use crate::worldgen::time_seed;
 
 /// Configuration for cellular-caves generation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -32,6 +33,19 @@ pub struct CellularCavesConfig {
 }
 
 impl CellularCavesConfig {
+    /// Default map width in cells.
+    pub const DEFAULT_WIDTH: u32 = 40;
+    /// Default map height in cells.
+    pub const DEFAULT_HEIGHT: u32 = 25;
+    /// Default initial wall probability per interior cell.
+    pub const DEFAULT_FILL_CHANCE: f64 = 0.45;
+    /// Default smoothing passes applied after the initial fill.
+    pub const DEFAULT_STEPS: u32 = 4;
+    /// Default floor-becomes-wall threshold (wall neighbors above this).
+    pub const DEFAULT_BIRTH_LIMIT: u32 = 5;
+    /// Default wall-survives threshold (wall neighbors at or above this).
+    pub const DEFAULT_DEATH_LIMIT: u32 = 4;
+
     /// Explicit-seed constructor for tests and scripted generation.
     /// Deterministic: the same inputs always produce the same map.
     pub fn explicit(width: u32, height: u32, seed: u64) -> Self {
@@ -39,10 +53,10 @@ impl CellularCavesConfig {
             width,
             height,
             seed,
-            fill_chance: 0.45,
-            steps: 4,
-            birth_limit: 5,
-            death_limit: 4,
+            fill_chance: Self::DEFAULT_FILL_CHANCE,
+            steps: Self::DEFAULT_STEPS,
+            birth_limit: Self::DEFAULT_BIRTH_LIMIT,
+            death_limit: Self::DEFAULT_DEATH_LIMIT,
         }
     }
 
@@ -51,15 +65,12 @@ impl CellularCavesConfig {
     /// time-seeded default.
     pub fn from_params(params: &serde_json::Value) -> Self {
         use crate::worldgen::{param_f64, param_u32, param_u64};
-        let time_seed = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs();
-        let defaults = Self::explicit(40, 25, time_seed);
+        let seed_fallback = time_seed();
+        let defaults = Self::explicit(Self::DEFAULT_WIDTH, Self::DEFAULT_HEIGHT, seed_fallback);
         Self {
             width: param_u32(params, "width", defaults.width),
             height: param_u32(params, "height", defaults.height),
-            seed: param_u64(params, "seed", time_seed),
+            seed: param_u64(params, "seed", seed_fallback),
             fill_chance: param_f64(params, "fill_chance", defaults.fill_chance),
             steps: param_u32(params, "steps", defaults.steps),
             birth_limit: param_u32(params, "birth_limit", defaults.birth_limit),
