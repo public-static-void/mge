@@ -904,6 +904,145 @@ impl WasmWorld {
                 self.weather.pressure,
             );
         }
+        // Recompute propagated noise, mirroring NoiseSystem's per-tick run.
+        self.tick_noise();
+    }
+
+    /// Host mirror of core `NoiseSystem::run` for the WASM bridge world.
+    ///
+    /// Recomputes the transient `noise_map` from `NoiseEmitter` components
+    /// each tick. Propagation is BFS with the same linear falloff as core
+    /// (`intensity * (radius - depth) / radius`, origin keeps full intensity,
+    /// max-aggregation across emitters, `Stealth` scaling, inactive emitters
+    /// skipped), but traverses the world's explicit adjacency
+    /// (`WasmMap.neighbors`) instead of a grid `MapTopology`.
+    fn tick_noise(&mut self) {
+        use std::collections::VecDeque;
+
+        let mut noise_map: HashMap<CellKey, f64> = HashMap::new();
+        if let (Some(map), Some(emitters)) =
+            (self.map.as_ref(), self.components.get("NoiseEmitter"))
+        {
+            for (&entity, data) in emitters.iter() {
+                let active = data.get("active").and_then(|v| v.as_bool()).unwrap_or(true);
+                if !active {
+                    continue;
+                }
+                let intensity = data
+                    .get("intensity")
+                    .and_then(|v| v.as_f64())
+                    .unwrap_or(1.0);
+                let radius = data.get("radius").and_then(|v| v.as_u64()).unwrap_or(5) as i32;
+
+                let effective = if let Some(stealth) =
+                    self.components.get("Stealth").and_then(|m| m.get(&entity))
+                {
+                    intensity
+                        * stealth
+                            .get("noise_modifier")
+                            .and_then(|v| v.as_f64())
+                            .unwrap_or(1.0)
+                } else {
+                    intensity
+                };
+                if effective <= 0.0 {
+                    continue;
+                }
+
+                let origin = match self
+                    .components
+                    .get("Position")
+                    .and_then(|m| m.get(&entity))
+                    .and_then(Self::noise_origin_cell)
+                {
+                    Some(cell) => cell,
+                    None => continue,
+                };
+                if !map.cells.contains(&origin) {
+                    continue;
+                }
+
+                let origin_key = serde_json::to_string(&origin).unwrap_or_default();
+                let mut visited: HashSet<String> = HashSet::new();
+                let mut queue: VecDeque<(String, i32)> = VecDeque::new();
+                noise_map.insert(origin.clone(), effective);
+                visited.insert(origin_key.clone());
+                queue.push_back((origin_key, 0));
+
+                while let Some((current_key, depth)) = queue.pop_front() {
+                    if depth >= radius {
+                        continue;
+                    }
+                    let neighbors = match map.neighbors.get(&current_key) {
+                        Some(n) => n,
+                        None => continue,
+                    };
+                    for neighbor_key in neighbors {
+                        let cell: CellKey = match serde_json::from_str(neighbor_key) {
+                            Ok(c) => c,
+                            Err(_) => continue,
+                        };
+                        if !map.cells.contains(&cell) || !visited.insert(neighbor_key.clone()) {
+                            continue;
+                        }
+                        let distance = depth + 1;
+                        let noise = effective * (radius - distance) as f64 / radius as f64;
+                        noise_map
+                            .entry(cell)
+                            .and_modify(|v| {
+                                if noise > *v {
+                                    *v = noise;
+                                }
+                            })
+                            .or_insert(noise);
+                        let opaque = map
+                            .cell_metadata
+                            .get(neighbor_key)
+                            .and_then(|m| m.get("transparent"))
+                            .and_then(|v| v.as_bool())
+                            .is_some_and(|t| !t);
+                        if !opaque {
+                            queue.push_back((neighbor_key.clone(), distance));
+                        }
+                    }
+                }
+            }
+        }
+        self.noise_map = noise_map;
+    }
+
+    /// Resolve an emitter's map cell from its `Position` component value.
+    ///
+    /// Accepts the canonical nested shapes via [`CellKey::from_position`]
+    /// plus the bridge's flat `x`/`y`/`z` (square) and `q`/`r`/`z` (hex)
+    /// shapes used by the WASM position read path.
+    fn noise_origin_cell(pos: &JsonValue) -> Option<CellKey> {
+        if let Some(cell) = CellKey::from_position(pos) {
+            return Some(cell);
+        }
+        if let (Some(x), Some(y), Some(z)) = (
+            pos.get("x").and_then(|v| v.as_f64()),
+            pos.get("y").and_then(|v| v.as_f64()),
+            pos.get("z").and_then(|v| v.as_f64()),
+        ) {
+            return Some(CellKey::Square {
+                x: x as i32,
+                y: y as i32,
+                z: z as i32,
+            });
+        }
+        if let (Some(q), Some(r), Some(z)) = (
+            pos.get("q").and_then(|v| v.as_f64()),
+            pos.get("r").and_then(|v| v.as_f64()),
+            pos.get("z").and_then(|v| v.as_f64()),
+        ) {
+            return Some(CellKey::Hex {
+                q: q as i32,
+                r: r as i32,
+                z: z as i32,
+            });
+        }
+        None
     }
 
     /// Returns the current turn number.
