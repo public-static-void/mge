@@ -48,6 +48,8 @@ target/
 *.bak
 # Scratch verification files (e.g. tmp_* bridge checks)
 **/tmp_*
+# ...except the Lua save-test path helper, which is a committed source file
+!engine/scripts/lua/tests/helpers/tmp_path.lua
 
 # IDE/Project settings
 .vscode/

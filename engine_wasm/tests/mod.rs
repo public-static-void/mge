@@ -34,6 +34,7 @@ mod wasm_lore_api;
 mod wasm_map_api;
 mod wasm_mode_api;
 mod wasm_narrative_api;
+mod wasm_noise_api;
 mod wasm_region_api;
 mod wasm_save_load_api;
 mod wasm_skill_stat_api;

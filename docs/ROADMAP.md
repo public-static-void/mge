@@ -39,11 +39,13 @@
 - [x] Z-level / multi-layer map support
 - [x] Multi-scale map navigation
 - [x] Procedural dungeon generation
+- [x] Swappable mapgen algorithm registry (shared invoke core, MapgenAlgorithm trait, config-driven selection)
 - [x] Fluid simulation (water, magma)
 - [x] Field-of-view and lighting simulation
 - [x] Fog of war and visibility system
 - [x] AI behaviors (enemy tactics, patrol routes)
 - [x] Noise and detection mechanics
+- [x] WASM noise transport parity (emit → tick → get round-trip + hearing at Lua/Python parity)
 - [x] Item generation and loot tables
 - [x] Material and property system
 - [x] Time-of-day and season cycle

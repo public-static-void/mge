@@ -2,6 +2,8 @@
 //!
 //! Exposes ECS and mode management modules.
 
+/// Shared bridge-domain contract for the scripting API-module registries
+pub mod api_registry;
 /// Config module
 pub mod config;
 /// Diplomacy and faction-pair relationship system

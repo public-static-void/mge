@@ -1,4 +1,5 @@
 local assert = require("assert")
+local tmp_path = require("helpers.tmp_path")
 
 local RECIPE = "iron_sword"
 
@@ -219,12 +220,13 @@ local function test_save_load_roundtrip_preserves_order()
 	start_craft(crafter, RECIPE)
 	tick()
 
-	save_to_file("test_crafting_save.json")
+	local save_path = tmp_path.tmp_save_path("test_crafting_save")
+	save_to_file(save_path)
 	local entities = get_entities()
 	for _, eid in ipairs(entities) do
 		despawn_entity(eid)
 	end
-	load_from_file("test_crafting_save.json")
+	load_from_file(save_path)
 
 	local state = get_craft_state(crafter)
 	assert.not_nil(state, "in-progress order must survive round-trip")

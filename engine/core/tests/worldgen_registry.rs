@@ -31,21 +31,25 @@ fn test_register_and_list_worldgen_plugins() {
     let mut registry = WorldgenRegistry::new();
 
     // Simulate registering plugins from different sources
-    registry.register(WorldgenPlugin::CAbi {
-        name: "simple_square".to_string(),
-        generate: Arc::new(|_| {
-            json!({
-                "topology": "square",
-                "cells": []
-            })
-        }),
-        _lib: None,
-    });
-    registry.register(WorldgenPlugin::Scripting {
-        name: "cave_gen".to_string(),
-        backend: "python".to_string(),
-        opaque: Box::new(DummyWorldgenPlugin),
-    });
+    registry
+        .register(WorldgenPlugin::CAbi {
+            name: "simple_square".to_string(),
+            generate: Arc::new(|_| {
+                json!({
+                    "topology": "square",
+                    "cells": []
+                })
+            }),
+            _lib: None,
+        })
+        .expect("register fixture");
+    registry
+        .register(WorldgenPlugin::Scripting {
+            name: "cave_gen".to_string(),
+            backend: "python".to_string(),
+            opaque: Box::new(DummyWorldgenPlugin),
+        })
+        .expect("register fixture");
 
     let names = registry.list_names();
     assert!(names.contains(&"simple_square".to_string()));
@@ -57,19 +61,21 @@ fn test_register_and_list_worldgen_plugins() {
 fn test_invoke_worldgen_plugin_returns_map() {
     let mut registry = WorldgenRegistry::new();
 
-    registry.register(WorldgenPlugin::CAbi {
-        name: "simple_square".to_string(),
-        generate: Arc::new(|params: &serde_json::Value| {
-            assert_eq!(params["width"], 10);
-            json!({
-                "topology": "square",
-                "cells": [
-                    { "x": 0, "y": 0, "z": 0, "neighbors": [] }
-                ]
-            })
-        }),
-        _lib: None,
-    });
+    registry
+        .register(WorldgenPlugin::CAbi {
+            name: "simple_square".to_string(),
+            generate: Arc::new(|params: &serde_json::Value| {
+                assert_eq!(params["width"], 10);
+                json!({
+                    "topology": "square",
+                    "cells": [
+                        { "x": 0, "y": 0, "z": 0, "neighbors": [] }
+                    ]
+                })
+            }),
+            _lib: None,
+        })
+        .expect("register fixture");
 
     let params = json!({ "width": 10, "height": 10, "seed": 42 });
     let map = registry
@@ -88,11 +94,13 @@ fn test_register_and_list_lua_worldgen_plugin() {
     let mut registry = WorldgenRegistry::new();
 
     // Register a Lua function (mocked as a dummy plugin for core test)
-    registry.register(WorldgenPlugin::Scripting {
-        name: "hex_map".to_string(),
-        backend: "lua".to_string(),
-        opaque: Box::new(DummyWorldgenPlugin),
-    });
+    registry
+        .register(WorldgenPlugin::Scripting {
+            name: "hex_map".to_string(),
+            backend: "lua".to_string(),
+            opaque: Box::new(DummyWorldgenPlugin),
+        })
+        .expect("register fixture");
 
     let names = registry.list_names();
     assert!(names.contains(&"hex_map".to_string()));
@@ -102,7 +110,7 @@ fn test_register_and_list_lua_worldgen_plugin() {
 fn test_invoke_nonexistent_plugin_returns_error() {
     let registry = WorldgenRegistry::new();
     let result = registry.invoke("nonexistent", &json!({}));
-    assert!(matches!(result, Err(WorldgenError::NotFound)));
+    assert!(matches!(result, Err(WorldgenError::NotFound { .. })));
 }
 
 #[test]
@@ -254,18 +262,22 @@ fn test_worldgen_plugin_schema_validation() {
     let mut registry = WorldgenRegistry::new();
 
     // Plugin that returns valid map
-    registry.register(WorldgenPlugin::CAbi {
-        name: "valid_plugin".to_string(),
-        generate: Arc::new(move |_| valid_map.clone()),
-        _lib: None,
-    });
+    registry
+        .register(WorldgenPlugin::CAbi {
+            name: "valid_plugin".to_string(),
+            generate: Arc::new(move |_| valid_map.clone()),
+            _lib: None,
+        })
+        .expect("register fixture");
 
     // Plugin that returns invalid map
-    registry.register(WorldgenPlugin::CAbi {
-        name: "invalid_plugin".to_string(),
-        generate: Arc::new(move |_| invalid_map.clone()),
-        _lib: None,
-    });
+    registry
+        .register(WorldgenPlugin::CAbi {
+            name: "invalid_plugin".to_string(),
+            generate: Arc::new(move |_| invalid_map.clone()),
+            _lib: None,
+        })
+        .expect("register fixture");
 
     // Should succeed
     let result = registry.invoke("valid_plugin", &serde_json::json!({}));
@@ -296,18 +308,20 @@ fn test_worldgen_custom_validator_and_postprocessor() {
     let mut registry = WorldgenRegistry::new();
 
     // Register a plugin that just returns a simple map
-    registry.register(WorldgenPlugin::CAbi {
-        name: "simple".to_string(),
-        generate: Arc::new(|_| {
-            json!({
-                "topology": "square",
-                "cells": [
-                    { "x": 0, "y": 0, "z": 0, "neighbors": [] }
-                ]
-            })
-        }),
-        _lib: None,
-    });
+    registry
+        .register(WorldgenPlugin::CAbi {
+            name: "simple".to_string(),
+            generate: Arc::new(|_| {
+                json!({
+                    "topology": "square",
+                    "cells": [
+                        { "x": 0, "y": 0, "z": 0, "neighbors": [] }
+                    ]
+                })
+            }),
+            _lib: None,
+        })
+        .expect("register fixture");
 
     // Register a validator that rejects maps with no cells
     registry.register_validator(|map| {
@@ -339,18 +353,20 @@ fn test_worldgen_scripting_validator_and_postprocessor() {
 
     let mut registry = WorldgenRegistry::new();
 
-    registry.register(WorldgenPlugin::CAbi {
-        name: "simple2".to_string(),
-        generate: Arc::new(|_| {
-            json!({
-                "topology": "square",
-                "cells": [
-                    { "x": 0, "y": 0, "z": 0, "neighbors": [] }
-                ]
-            })
-        }),
-        _lib: None,
-    });
+    registry
+        .register(WorldgenPlugin::CAbi {
+            name: "simple2".to_string(),
+            generate: Arc::new(|_| {
+                json!({
+                    "topology": "square",
+                    "cells": [
+                        { "x": 0, "y": 0, "z": 0, "neighbors": [] }
+                    ]
+                })
+            }),
+            _lib: None,
+        })
+        .expect("register fixture");
 
     // Register scripting validator
     registry.register_scripting_validator(|map| {
@@ -380,53 +396,55 @@ fn test_register_and_invoke_hex_worldgen_plugin() {
 
     let mut registry = WorldgenRegistry::new();
 
-    registry.register(WorldgenPlugin::CAbi {
-        name: "simple_hex".to_string(),
-        generate: std::sync::Arc::new(|params: &serde_json::Value| {
-            let width = params.get("width").and_then(|v| v.as_u64()).unwrap_or(1) as i32;
-            let height = params.get("height").and_then(|v| v.as_u64()).unwrap_or(1) as i32;
-            let z_levels = params.get("z_levels").and_then(|v| v.as_u64()).unwrap_or(1) as i32;
+    registry
+        .register(WorldgenPlugin::CAbi {
+            name: "simple_hex".to_string(),
+            generate: std::sync::Arc::new(|params: &serde_json::Value| {
+                let width = params.get("width").and_then(|v| v.as_u64()).unwrap_or(1) as i32;
+                let height = params.get("height").and_then(|v| v.as_u64()).unwrap_or(1) as i32;
+                let z_levels = params.get("z_levels").and_then(|v| v.as_u64()).unwrap_or(1) as i32;
 
-            let mut cells = Vec::new();
+                let mut cells = Vec::new();
 
-            // Axial neighbor offsets
-            let neighbors_offset = [(1, 0), (1, -1), (0, -1), (-1, 0), (-1, 1), (0, 1)];
+                // Axial neighbor offsets
+                let neighbors_offset = [(1, 0), (1, -1), (0, -1), (-1, 0), (-1, 1), (0, 1)];
 
-            for z in 0..z_levels {
-                for q in 0..width {
-                    for r in 0..height {
-                        let mut neighbors = Vec::new();
-                        for (dq, dr) in neighbors_offset.iter() {
-                            let nq = q + dq;
-                            let nr = r + dr;
-                            if nq >= 0 && nq < width && nr >= 0 && nr < height {
-                                neighbors.push(json!({
-                                    "q": nq,
-                                    "r": nr,
-                                    "z": z,
-                                }));
+                for z in 0..z_levels {
+                    for q in 0..width {
+                        for r in 0..height {
+                            let mut neighbors = Vec::new();
+                            for (dq, dr) in neighbors_offset.iter() {
+                                let nq = q + dq;
+                                let nr = r + dr;
+                                if nq >= 0 && nq < width && nr >= 0 && nr < height {
+                                    neighbors.push(json!({
+                                        "q": nq,
+                                        "r": nr,
+                                        "z": z,
+                                    }));
+                                }
                             }
-                        }
 
-                        cells.push(json!({
-                            "q": q,
-                            "r": r,
-                            "z": z,
-                            "neighbors": neighbors,
-                            "biome": "TestBiome",
-                            "terrain": "TestTerrain",
-                        }));
+                            cells.push(json!({
+                                "q": q,
+                                "r": r,
+                                "z": z,
+                                "neighbors": neighbors,
+                                "biome": "TestBiome",
+                                "terrain": "TestTerrain",
+                            }));
+                        }
                     }
                 }
-            }
 
-            json!({
-                "topology": "hex",
-                "cells": cells,
-            })
-        }),
-        _lib: None,
-    });
+                json!({
+                    "topology": "hex",
+                    "cells": cells,
+                })
+            }),
+            _lib: None,
+        })
+        .expect("register fixture");
 
     let params = json!({
         "width": 3,
@@ -465,22 +483,24 @@ fn test_register_and_invoke_province_worldgen_plugin() {
 
     let mut registry = WorldgenRegistry::new();
 
-    registry.register(WorldgenPlugin::CAbi {
-        name: "simple_province".to_string(),
-        generate: std::sync::Arc::new(|_params: &serde_json::Value| {
-            let cells = vec![
-                json!({"id": "A", "neighbors": ["B", "C"]}),
-                json!({"id": "B", "neighbors": ["A"]}),
-                json!({"id": "C", "neighbors": ["A"]}),
-            ];
+    registry
+        .register(WorldgenPlugin::CAbi {
+            name: "simple_province".to_string(),
+            generate: std::sync::Arc::new(|_params: &serde_json::Value| {
+                let cells = vec![
+                    json!({"id": "A", "neighbors": ["B", "C"]}),
+                    json!({"id": "B", "neighbors": ["A"]}),
+                    json!({"id": "C", "neighbors": ["A"]}),
+                ];
 
-            json!({
-                "topology": "province",
-                "cells": cells,
-            })
-        }),
-        _lib: None,
-    });
+                json!({
+                    "topology": "province",
+                    "cells": cells,
+                })
+            }),
+            _lib: None,
+        })
+        .expect("register fixture");
 
     let params = json!({});
 

@@ -10,6 +10,16 @@ pub struct PluginConfig {
     // Optionally: pub scripting: Vec<String>,
 }
 
+/// Worldgen selection config: names the active mapgen algorithm.
+/// Switching algorithms is a config change — no source edit.
+#[derive(Debug, Clone, Deserialize, Default)]
+pub struct WorldgenConfig {
+    /// Registry name of the default mapgen algorithm (e.g. `"dungeon"`).
+    /// Absent → the built-in fallback. A per-invocation `algorithm`
+    /// params field overrides this default.
+    pub default_algorithm: Option<String>,
+}
+
 /// The game config file
 #[derive(Debug, Clone, Deserialize)]
 pub struct GameConfig {
@@ -21,6 +31,8 @@ pub struct GameConfig {
     pub allowed_modes: Vec<String>,
     /// Game plugins
     pub plugins: Option<PluginConfig>,
+    /// Worldgen selection (optional; fallback = prior default)
+    pub worldgen: Option<WorldgenConfig>,
     // Add more fields as needed
 }
 

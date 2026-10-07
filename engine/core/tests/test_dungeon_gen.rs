@@ -260,6 +260,26 @@ fn test_single_room() {
     );
 }
 
+#[test]
+fn test_default_uses_named_defaults() {
+    let config = DungeonConfig::default();
+    assert_eq!(config.width, DungeonConfig::DEFAULT_WIDTH);
+    assert_eq!(config.height, DungeonConfig::DEFAULT_HEIGHT);
+    assert_eq!(config.min_room_size, DungeonConfig::DEFAULT_MIN_ROOM_SIZE);
+    assert_eq!(config.max_room_size, DungeonConfig::DEFAULT_MAX_ROOM_SIZE);
+    assert_eq!(config.max_rooms, DungeonConfig::DEFAULT_MAX_ROOMS);
+}
+
+#[test]
+fn test_from_params_falls_back_to_named_defaults() {
+    let config = DungeonConfig::from_params(&serde_json::json!({}));
+    assert_eq!(config.width, DungeonConfig::DEFAULT_WIDTH);
+    assert_eq!(config.height, DungeonConfig::DEFAULT_HEIGHT);
+    assert_eq!(config.min_room_size, DungeonConfig::DEFAULT_MIN_ROOM_SIZE);
+    assert_eq!(config.max_room_size, DungeonConfig::DEFAULT_MAX_ROOM_SIZE);
+    assert_eq!(config.max_rooms, DungeonConfig::DEFAULT_MAX_ROOMS);
+}
+
 // ---- Helpers ------------------------------------------------------------
 
 /// Find contiguous rectangles of floor cells (simple heuristic).

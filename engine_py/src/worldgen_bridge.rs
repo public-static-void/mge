@@ -1,6 +1,7 @@
 use crate::PyObject;
 use engine_core::worldgen::{
     GLOBAL_WORLDGEN_REGISTRY, ThreadSafeScriptingWorldgenPlugin, ThreadSafeWorldgenPlugin,
+    register_builtin_mapgen_algorithms,
 };
 use pyo3::prelude::*;
 use pyo3::types::PyAny;
@@ -33,22 +34,34 @@ impl ThreadSafeScriptingWorldgenPlugin for PythonWorldgenPlugin {
     }
 }
 
+/// Ensure the in-core mapgen algorithms are registered on the global
+/// registry. Idempotent (replace semantics), so every bridge entry point
+/// can call it without coordinating init order.
+fn ensure_builtin_mapgen_algorithms() {
+    let mut registry = GLOBAL_WORLDGEN_REGISTRY.lock().unwrap();
+    register_builtin_mapgen_algorithms(&mut registry);
+}
+
 #[pyfunction]
 pub fn register_worldgen_plugin(py: Python, name: String, callback: Py<PyAny>) -> PyResult<()> {
+    ensure_builtin_mapgen_algorithms();
     let plugin = PythonWorldgenPlugin {
         callback: callback.clone_ref(py),
     };
     let mut registry = GLOBAL_WORLDGEN_REGISTRY.lock().unwrap();
-    registry.register(ThreadSafeWorldgenPlugin::ThreadSafeScripting {
-        name,
-        backend: "python".to_string(),
-        opaque: Box::new(plugin),
-    });
+    registry
+        .register(ThreadSafeWorldgenPlugin::ThreadSafeScripting {
+            name,
+            backend: "python".to_string(),
+            opaque: Box::new(plugin),
+        })
+        .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?;
     Ok(())
 }
 
 #[pyfunction]
 pub fn list_worldgen_plugins() -> Vec<String> {
+    ensure_builtin_mapgen_algorithms();
     let registry = GLOBAL_WORLDGEN_REGISTRY.lock().unwrap();
     registry.list_names()
 }
@@ -59,6 +72,7 @@ pub fn invoke_worldgen_plugin<'py>(
     name: String,
     params: Bound<'py, PyAny>,
 ) -> PyResult<PyObject> {
+    ensure_builtin_mapgen_algorithms();
     let params: Value = serde_pyobject::from_pyobject(params)?;
     let registry = GLOBAL_WORLDGEN_REGISTRY.lock().unwrap();
     let result = registry

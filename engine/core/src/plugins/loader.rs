@@ -129,11 +129,13 @@ pub unsafe fn load_plugin_and_register_worldgen_threadsafe<P: AsRef<Path>>(
                 }
             });
 
-        worldgen_registry.register(ThreadSafeWorldgenPlugin::CAbi {
-            name,
-            generate,
-            _lib: Some(lib), // Dynamic plugin: keep the library alive
-        });
+        worldgen_registry
+            .register(ThreadSafeWorldgenPlugin::CAbi {
+                name,
+                generate,
+                _lib: Some(lib), // Dynamic plugin: keep the library alive
+            })
+            .map_err(|e| e.to_string())?;
     }
 
     Ok(())
@@ -213,11 +215,13 @@ pub unsafe fn load_plugin_and_register_worldgen<P: AsRef<Path>>(
                 }
             });
 
-        worldgen_registry.register(WorldgenPlugin::CAbi {
-            name,
-            generate,
-            _lib: Some(lib), // Dynamic plugin: keep the library alive
-        });
+        worldgen_registry
+            .register(WorldgenPlugin::CAbi {
+                name,
+                generate,
+                _lib: Some(lib), // Dynamic plugin: keep the library alive
+            })
+            .map_err(|e| e.to_string())?;
     }
 
     Ok(())

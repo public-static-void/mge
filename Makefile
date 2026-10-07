@@ -1,5 +1,5 @@
 # ====== PHONY TARGETS ======
-.PHONY: all build-plugins build-c-plugins build-wasm-tests build-all \
+.PHONY: all build-plugins build-c-plugins build-c-plugins-if-needed build-wasm-tests build-all \
 	test test-rust test-python test-lua test-wasm test-all \
 	setup-python build-python build-wheel clean validate-schema help \
 	lint fmt fmt-check run-cli run-demo lint-docs
@@ -16,6 +16,7 @@ help:
 	@echo "  make all              - Build everything (validates schemas first)"
 	@echo "  make build-plugins    - Build Rust plugins via xtask"
 	@echo "  make build-c-plugins  - Build C plugins via xtask"
+	@echo "  make build-c-plugins-if-needed - Reuse C artifact if fresh, else rebuild"
 	@echo "  make build-wasm-tests - Build WASM guest test modules via xtask"
 	@echo "  make build-all        - Build all plugins via xtask"
 	@echo "  make test             - Run all tests and validate schemas"
@@ -73,6 +74,29 @@ build-plugins:
 build-c-plugins:
 	cargo run -p xtask -- build-c-plugins
 
+# Content-aware logged guard (project/4): reuses the downloaded c-plugins
+# artifact when every expected .so exists and is newer than its .c source,
+# otherwise delegates to build-c-plugins. test-rust/test-lua depend on this
+# target instead of a silent conditional prerequisite, so consumer logs
+# always carry an explicit "reusing ..." or "rebuilding ..." line (CI=$CI).
+# A path mismatch degrades to a logged rebuild, never a silent one.
+C_PLUGIN_SRCS := $(wildcard plugins/*/*.c)
+
+build-c-plugins-if-needed:
+	@status=0; \
+	for src in $(C_PLUGIN_SRCS); do \
+		out=$$(dirname "$$src")/lib$$(basename "$$src" .c).so; \
+		if [ ! -f "$$out" ]; then echo "c-plugins artifact missing: $$out"; status=1; \
+		elif [ "$$src" -nt "$$out" ]; then echo "c-plugins source newer than artifact: $$src"; status=1; \
+		fi; \
+	done; \
+	if [ "$$status" -eq 0 ]; then \
+		echo "reusing c-plugins artifact (CI=$${CI:-unset})"; \
+	else \
+		echo "rebuilding c-plugins (CI=$${CI:-unset}) ..."; \
+		$(MAKE) build-c-plugins; \
+	fi
+
 build-wasm-tests:
 	cargo run -p xtask -- build-wasm-tests
 
@@ -80,11 +104,11 @@ build-all:
 	cargo run -p xtask -- build-all
 
 # ====== RUST TEST TARGET (sharded per crate: one tool-timeout budget per shard) ======
-# CI guard: CI runners export CI=true (GitHub Actions sets it automatically),
-# which empties the build-c-plugins prerequisite so consumer jobs reuse the
-# downloaded c-plugins artifact instead of recompiling. Fresh-clone local runs
-# (CI unset) still build C plugins from source.
-test-rust: $(if $(CI),,build-c-plugins)
+# CI guard: consumer jobs reuse the downloaded c-plugins artifact through the
+# logged build-c-plugins-if-needed target below (explicit reuse/rebuild line
+# in the consumer log). Fresh-clone local runs (artifacts absent or stale)
+# rebuild C plugins from source via the same target.
+test-rust: build-c-plugins-if-needed
 	cargo test -p engine_core
 	cargo test -p engine_macros
 	cargo test -p engine_py
@@ -123,8 +147,8 @@ test-python: build-python
 	@cd engine_py && . .venv/bin/activate && pytest
 
 # ====== LUA TEST TARGET ======
-# Same CI guard as test-rust: artifact reuse under CI=true, source build locally.
-test-lua: $(if $(CI),,build-c-plugins)
+# Same logged guard as test-rust: artifact reuse or rebuild is explicit in the log.
+test-lua: build-c-plugins-if-needed
 	@echo "Running Lua tests..."
 	cargo build --package engine_lua --bin mge_lua_test_runner
 	./run_lua_tests.sh $(LUA_FILTER)
