@@ -13,3 +13,6 @@ allowed_modes = [
 
 [plugins]
 native = ["plugins/simple_square_plugin/libsimple_square_plugin.so"]
+
+[worldgen]
+default_algorithm = "dungeon"
