@@ -89,22 +89,22 @@
 - [x] Development guide
 - [x] README
 
-## Planetary World Generation (new)
+## Planetary World Generation
 
-- [ ] Planet-scale biome and climate assignment (temperature/humidity/pressure-driven biomes on a planet grid) — cost: new core gen module + 3-bridge surface + 4-suite scenario tests (from: `4x.md` bullet "Procedural world generation (planet gen)")
-- [ ] Planet-to-region-to-hex hierarchical link generation (auto-link child maps through the link-maps surface) — cost: core link-gen helper + bridge docs + multiscale test extension (from: `4x.md` bullet "Procedural world generation (planet gen)")
-- [ ] Native planet-gen worldgen plugin backend (Rust/C plugin emitting planet maps through the worldgen hook) — cost: one plugin crate + xtask deploy + plugin load test (from: `4x.md` bullet "Procedural world generation (planet gen)")
-- [ ] Cross-bridge planet-gen scenario coverage (Lua/Python/WASM dungeon-gen-parity tests for planet output) — cost: 3 bridge test modules + 1 guest module (from: `4x.md` bullet "Procedural world generation (planet gen)")
+- [ ] Planet-scale biome and climate assignment (temperature/humidity/pressure-driven biomes on a planet grid)
+- [ ] Planet-to-region-to-hex hierarchical link generation (auto-link child maps through the link-maps surface)
+- [ ] Native planet-gen worldgen plugin backend (Rust/C plugin emitting planet maps through the worldgen hook)
+- [ ] Cross-bridge planet-gen scenario coverage (Lua/Python/WASM dungeon-gen-parity tests for planet output)
 
-## Strategy-Layer Presentation (new)
+## Strategy-Layer Presentation
 
-- [ ] Strategic overview renderer (province-colored terminal overview of the named strategic map) — cost: core render helper + viewport wiring + demo-script coverage (from: `grand-strategy.md` bullet "Multi-scale map navigation (strategic ↔ tactical)")
-- [ ] Minimap widget in the terminal UI library (viewport-linked, fog-aware) — cost: widget-lib addition + layout integration + widget tests (from: `grand-strategy.md` bullet "Multi-scale map navigation (strategic ↔ tactical)")
-- [ ] Strategic-to-tactical zoom switching in the camera viewport (per-scale rendering through the existing camera surface) — cost: viewport mode + 3-bridge camera extension + viewport tests (from: `grand-strategy.md` bullet "Multi-scale map navigation (strategic ↔ tactical)")
-- [ ] Faction-relation province tinting (diplomacy-driven coloring of the strategic overview) — cost: renderer tint pass + diplomacy query reuse + scenario test (from: `grand-strategy.md` bullet "Multi-scale map navigation (strategic ↔ tactical)")
+- [ ] Strategic overview renderer (province-colored terminal overview of the named strategic map, wired into the viewport)
+- [ ] Minimap widget in the terminal UI library (viewport-linked, fog-aware)
+- [ ] Strategic-to-tactical zoom switching in the camera viewport (per-scale rendering through the existing camera surface)
+- [ ] Faction-relation province tinting (diplomacy-driven coloring of the strategic overview)
 
-## Native Plugin Hot-Reload (new)
+## Native Plugin Hot-Reload
 
-- [ ] Host-side shared-object reload flow (unload/reload, state migration through the ABI hot-reload pointer, system re-registration) — cost: core plugin-loader flow + loader tests (from: `4x.md` bullet "Procedural world generation (planet gen)")
-- [ ] CLI reload trigger surfacing (reload a native plugin without restarting the simulation) — cost: CLI command + bridge function + integration test (from: `survival.md` bullet "Procedural dungeon generation")
-- [ ] Save-safe reload round-trip tests (state preserved across a reload cycle in core plus Lua suites) — cost: 2 test modules reusing the save/load harness (from: `survival.md` bullet "Procedural dungeon generation")
+- [ ] Host-side shared-object reload flow (unload/reload, state migration through the ABI hot-reload pointer, system re-registration)
+- [ ] CLI reload trigger surfacing (reload a native plugin without restarting the simulation)
+- [ ] Save-safe reload round-trip tests (state preserved across a reload cycle in core plus Lua suites, reusing the save/load harness)
