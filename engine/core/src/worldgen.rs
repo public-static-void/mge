@@ -317,6 +317,160 @@ impl fmt::Display for WorldgenError {
 
 impl std::error::Error for WorldgenError {}
 
+/// Fallback algorithm selected when neither the invocation params nor the
+/// world config names one. Keeps the pre-registry behavior (dungeon output).
+pub const FALLBACK_MAPGEN_ALGORITHM: &str = "dungeon";
+
+/// Minimal contract for a swappable mapgen algorithm.
+///
+/// A new algorithm ships by implementing this trait and registering an entry
+/// — no core `match` on algorithm names is edited. Both plugin enums accept
+/// entries via the [`MapgenAlgoEntry`] blanket adapters below.
+pub trait MapgenAlgorithm {
+    /// Registry name this algorithm is invoked by.
+    fn name(&self) -> &str;
+    /// Generate a map from invocation params.
+    ///
+    /// Params schema: `{ seed, width?, height?, ...algo-specific }`.
+    /// An explicit `seed` always wins over any time-seeded default.
+    fn generate(&self, params: &JsonValue) -> Result<JsonValue, String>;
+}
+
+/// Blanket adapter wrapping a [`MapgenAlgorithm`] impl as a registry entry.
+/// Implements both scripting plugin contracts so one entry type registers on
+/// the thread-safe (global/WASM/Python) and the local (Lua) registries.
+#[derive(Clone)]
+pub struct MapgenAlgoEntry<A>(pub A);
+
+impl<A> MapgenAlgoEntry<A> {
+    /// Wrap an algorithm impl as a registry entry.
+    pub fn new(algo: A) -> Self {
+        Self(algo)
+    }
+}
+
+impl<A: MapgenAlgorithm + Clone + Send + Sync> ThreadSafeScriptingWorldgenPlugin
+    for MapgenAlgoEntry<A>
+{
+    fn invoke(&self, params: &JsonValue) -> Result<JsonValue, Box<dyn std::error::Error>> {
+        self.0
+            .generate(params)
+            .map_err(|e| Box::new(WorldgenError::ScriptError(e)) as _)
+    }
+    fn backend(&self) -> &str {
+        "core"
+    }
+}
+
+impl<A: MapgenAlgorithm + Clone> ScriptingWorldgenPlugin for MapgenAlgoEntry<A> {
+    fn invoke(&self, params: &JsonValue) -> Result<JsonValue, Box<dyn std::error::Error>> {
+        self.0
+            .generate(params)
+            .map_err(|e| Box::new(WorldgenError::ScriptError(e)) as _)
+    }
+    fn backend(&self) -> &str {
+        "core"
+    }
+}
+
+impl<A: MapgenAlgorithm + Clone + Send + Sync + 'static> From<MapgenAlgoEntry<A>>
+    for ThreadSafeWorldgenPlugin
+{
+    fn from(entry: MapgenAlgoEntry<A>) -> Self {
+        ThreadSafeWorldgenPlugin::ThreadSafeScripting {
+            name: entry.0.name().to_owned(),
+            backend: "core".to_owned(),
+            opaque: Box::new(entry),
+        }
+    }
+}
+
+impl<A: MapgenAlgorithm + Clone + 'static> From<MapgenAlgoEntry<A>> for WorldgenPlugin {
+    fn from(entry: MapgenAlgoEntry<A>) -> Self {
+        WorldgenPlugin::Scripting {
+            name: entry.0.name().to_owned(),
+            backend: "core".to_owned(),
+            opaque: Box::new(entry),
+        }
+    }
+}
+
+/// Read an optional numeric params field, falling back to `default` when
+/// absent or non-numeric. Accepts u64/i64/f64 JSON numbers.
+pub fn param_u64(params: &JsonValue, key: &str, default: u64) -> u64 {
+    params
+        .get(key)
+        .and_then(|v| {
+            v.as_u64()
+                .or_else(|| v.as_i64().and_then(|n| u64::try_from(n).ok()))
+                .or_else(|| v.as_f64().map(|f| f as u64))
+        })
+        .unwrap_or(default)
+}
+
+/// Read an optional numeric params field as `u32`, saturating on overflow.
+pub fn param_u32(params: &JsonValue, key: &str, default: u32) -> u32 {
+    params
+        .get(key)
+        .and_then(|v| {
+            v.as_u64()
+                .and_then(|n| u32::try_from(n).ok())
+                .or_else(|| v.as_i64().and_then(|n| u32::try_from(n).ok()))
+                .or_else(|| v.as_f64().map(|f| f as u32))
+        })
+        .unwrap_or(default)
+}
+
+/// Read an optional numeric params field as `f64`.
+pub fn param_f64(params: &JsonValue, key: &str, default: f64) -> f64 {
+    params
+        .get(key)
+        .and_then(|v| {
+            v.as_f64().or_else(|| {
+                v.as_i64()
+                    .map(|n| n as f64)
+                    .or_else(|| v.as_u64().map(|n| n as f64))
+            })
+        })
+        .unwrap_or(default)
+}
+
+/// Resolve the active algorithm name: the `algorithm` params field wins over
+/// the world-config default, which wins over the built-in fallback.
+/// Switching algorithms is a config/name-string change — no source edit.
+pub fn resolve_algorithm_name(config_default: Option<&str>, params: &JsonValue) -> String {
+    params
+        .get("algorithm")
+        .and_then(|v| v.as_str())
+        .map(str::to_owned)
+        .or_else(|| config_default.map(str::to_owned))
+        .unwrap_or_else(|| FALLBACK_MAPGEN_ALGORITHM.to_owned())
+}
+
+/// Register every in-core [`MapgenAlgorithm`] impl on a thread-safe registry.
+/// Idempotent: re-registration replaces, so engine inits can call it freely.
+pub fn register_builtin_mapgen_algorithms(registry: &mut ThreadSafeWorldgenRegistry) {
+    use crate::systems::cellular_caves::CellularCavesGenerator;
+    use crate::systems::dungeon::DungeonGenerator;
+    registry.register_or_replace(ThreadSafeWorldgenPlugin::from(MapgenAlgoEntry::new(
+        DungeonGenerator,
+    )));
+    registry.register_or_replace(ThreadSafeWorldgenPlugin::from(MapgenAlgoEntry::new(
+        CellularCavesGenerator,
+    )));
+}
+
+/// Register every in-core [`MapgenAlgorithm`] impl on a local (Lua) registry.
+/// Idempotent: re-registration replaces, so engine inits can call it freely.
+pub fn register_builtin_mapgen_algorithms_local(registry: &mut WorldgenRegistry) {
+    use crate::systems::cellular_caves::CellularCavesGenerator;
+    use crate::systems::dungeon::DungeonGenerator;
+    registry.register_or_replace(WorldgenPlugin::from(MapgenAlgoEntry::new(DungeonGenerator)));
+    registry.register_or_replace(WorldgenPlugin::from(MapgenAlgoEntry::new(
+        CellularCavesGenerator,
+    )));
+}
+
 /// Thread-safe global registry: only thread-safe plugins and hooks!
 pub struct ThreadSafeWorldgenRegistry {
     pub(crate) plugins: Vec<ThreadSafeWorldgenPlugin>,
