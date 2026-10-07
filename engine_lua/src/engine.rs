@@ -110,6 +110,7 @@ impl ScriptEngine {
                 let global = GLOBAL_WORLDGEN_REGISTRY.lock().unwrap();
                 local.import_threadsafe_plugins(&global);
             }
+            engine_core::worldgen::register_builtin_mapgen_algorithms_local(&mut local);
             std::rc::Rc::new(std::cell::RefCell::new(local))
         };
 
