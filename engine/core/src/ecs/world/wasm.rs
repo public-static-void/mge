@@ -171,9 +171,6 @@ pub struct WasmWorld {
     /// Export names registered as map postprocessors
     #[serde(default)]
     pub map_postprocessor_names: Vec<String>,
-    /// WASM worldgen plugin names registered by the guest module
-    #[serde(default)]
-    pub wasm_worldgen_plugins: Vec<String>,
     /// WASM worldgen validator export names
     #[serde(default)]
     pub wasm_worldgen_validators: Vec<String>,
@@ -389,7 +386,6 @@ impl WasmWorld {
             discovered_export_names: Vec::new(),
             map_validator_names: Vec::new(),
             map_postprocessor_names: Vec::new(),
-            wasm_worldgen_plugins: Vec::new(),
             wasm_worldgen_validators: Vec::new(),
             wasm_worldgen_postprocessors: Vec::new(),
             job_type_data: HashMap::new(),
