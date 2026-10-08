@@ -8,6 +8,17 @@ use std::sync::{Arc, LazyLock, Mutex};
 pub static AI_EVENT_INTENT_BUFFER: LazyLock<Arc<Mutex<VecDeque<JsonValue>>>> =
     LazyLock::new(|| Arc::new(Mutex::new(VecDeque::new())));
 
+/// Clear the AI event intent buffer for test isolation.
+///
+/// Follows the job event log `reset_for_tests` exemplar: production subscribe
+/// paths are unchanged, and each test starts from an empty buffer regardless
+/// of execution order.
+pub fn reset_for_tests() {
+    if let Ok(mut queue) = AI_EVENT_INTENT_BUFFER.lock() {
+        queue.clear();
+    }
+}
+
 /// Computes the utility score of a job for a given agent.
 /// Takes into account skills, preferences, specializations, and resource bonuses.
 fn compute_job_utility(agent: &JsonValue, job: &JsonValue, world: &World) -> f64 {
