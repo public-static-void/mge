@@ -57,3 +57,14 @@ pub static UI_FACTORY: LazyLock<Arc<ReentrantMutex<RefCell<UiFactory>>>> =
 /// Global widget registry
 pub static WIDGET_REGISTRY: LazyLock<Arc<ReentrantMutex<RefCell<WidgetRegistry>>>> =
     LazyLock::new(|| Arc::new(ReentrantMutex::new(RefCell::new(WidgetRegistry::new()))));
+
+/// Reset the global UI factory and widget registry to empty for test
+/// isolation.
+///
+/// Follows the job event log `reset_for_tests` exemplar: production register
+/// paths are unchanged, and each test starts without leaked widget types.
+/// One hook covers the pair because both live in this module.
+pub fn reset_for_tests() {
+    UI_FACTORY.lock().replace(UiFactory::new());
+    WIDGET_REGISTRY.lock().borrow_mut().clear();
+}
