@@ -98,6 +98,81 @@ fn materials_dir() -> PathBuf {
     workspace_root().join("engine/assets/materials")
 }
 
+/// Extracts the exported test table from Lua source with a balanced-brace scan.
+///
+/// Collects every `return {` candidate outside string literals, then returns
+/// the content of the last balanced table (module convention: the exported
+/// table is the final return), so nested braces inside closures or nested
+/// tables cannot truncate the capture. Returns `None` when no balanced
+/// candidate exists; callers log that case instead of skipping silently.
+fn extract_return_table(source: &str) -> Option<String> {
+    let bytes = source.as_bytes();
+    let mut candidates = Vec::new();
+    let mut i = 0;
+    let mut in_str: Option<u8> = None;
+    while i < bytes.len() {
+        let b = bytes[i];
+        if let Some(q) = in_str {
+            if b == b'\\' {
+                i += 1;
+            } else if b == q {
+                in_str = None;
+            }
+        } else if b == b'"' || b == b'\'' {
+            in_str = Some(b);
+        } else if bytes[i..].starts_with(b"return")
+            && (i == 0 || !is_lua_ident(bytes[i - 1]))
+            && bytes[i + 6..].first().is_none_or(|c| !is_lua_ident(*c))
+        {
+            let mut j = i + 6;
+            while j < bytes.len() && bytes[j].is_ascii_whitespace() {
+                j += 1;
+            }
+            if bytes.get(j) == Some(&b'{') {
+                candidates.push(j);
+            }
+        }
+        i += 1;
+    }
+    candidates
+        .iter()
+        .rev()
+        .find_map(|&open| balanced_table_content(bytes, open))
+}
+
+fn is_lua_ident(b: u8) -> bool {
+    b.is_ascii_alphanumeric() || b == b'_'
+}
+
+/// Returns the source between the brace at `open` and its matching close,
+/// skipping over string literals so braces in strings do not affect depth.
+fn balanced_table_content(bytes: &[u8], open: usize) -> Option<String> {
+    let mut depth = 0;
+    let mut in_str: Option<u8> = None;
+    let mut i = open;
+    while i < bytes.len() {
+        let b = bytes[i];
+        if let Some(q) = in_str {
+            if b == b'\\' {
+                i += 1;
+            } else if b == q {
+                in_str = None;
+            }
+        } else if b == b'"' || b == b'\'' {
+            in_str = Some(b);
+        } else if b == b'{' {
+            depth += 1;
+        } else if b == b'}' {
+            depth -= 1;
+            if depth == 0 {
+                return String::from_utf8(bytes[open + 1..i].to_vec()).ok();
+            }
+        }
+        i += 1;
+    }
+    None
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = env::args().skip(1).collect();
     let filter_module = args.first().map(|s| s.as_str());
@@ -111,7 +186,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut test_functions_set = HashSet::new();
 
     // Compile regexes once, outside of the loop
-    let return_table_re = Regex::new(r"return\s*\{(?s)(.*?)\}").unwrap();
     let test_key_re = Regex::new(r"\b(test_[a-zA-Z0-9_]+)\b").unwrap();
 
     for entry in fs::read_dir(&test_dir)? {
@@ -154,16 +228,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                 let uncommented_content = uncommented_lines.join("\n");
 
-                // Extract the content inside the return table {...}
-                let return_table_content =
-                    if let Some(caps) = return_table_re.captures(&uncommented_content) {
-                        caps.get(1).map_or("", |m| m.as_str())
-                    } else {
-                        ""
-                    };
+                // Extract the exported test table with a balanced-brace scan so
+                // early inline `return {` literals cannot truncate the capture
+                let Some(return_table_content) = extract_return_table(&uncommented_content) else {
+                    eprintln!("warning: {modname}: no exported return table found; skipping file");
+                    continue;
+                };
 
                 // Collect test functions from keys in return table with filtering
-                for cap in test_key_re.captures_iter(return_table_content) {
+                for cap in test_key_re.captures_iter(&return_table_content) {
                     let key = cap.get(1).unwrap().as_str();
                     if let (Some(fmod), Some(ffunc)) = (filter_module, filter_func) {
                         if modname == fmod && key == ffunc {
@@ -479,5 +552,73 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     } else {
         println!("{}", color(COLOR_GREEN, "All tests passed!"));
         std::process::exit(0);
+    }
+}
+
+#[cfg(test)]
+mod discovery_tests {
+    use super::extract_return_table;
+
+    #[test]
+    fn finds_export_table_past_early_inline_literal() {
+        let source = r#"
+local function helper()
+	return {
+		topology = "square",
+		cells = {
+			{ x = 1, y = 2, z = 0 },
+		},
+	}
+end
+
+return {
+	test_alpha = test_alpha,
+	test_beta = test_beta,
+}
+"#;
+        let table = extract_return_table(source).expect("export table should be found");
+        assert!(
+            table.contains("test_alpha"),
+            "early literal must not truncate capture"
+        );
+        assert!(
+            table.contains("test_beta"),
+            "early literal must not truncate capture"
+        );
+    }
+
+    #[test]
+    fn keeps_nested_closure_braces_inside_capture() {
+        let source = r#"return {
+	test_nested = function()
+		local t = { inner = { deep = 1 } }
+		return t
+	end,
+}
+"#;
+        let table = extract_return_table(source).expect("table should be found");
+        assert!(table.contains("test_nested"));
+        assert!(
+            table.contains("deep = 1"),
+            "nested braces must not truncate capture"
+        );
+    }
+
+    #[test]
+    fn ignores_braces_inside_string_literals() {
+        let source = "return {\n\ttest_str = \"not a } brace\",\n}\n";
+        let table = extract_return_table(source).expect("table should be found");
+        assert!(table.contains("test_str"));
+    }
+
+    #[test]
+    fn returns_none_when_no_candidate_exists() {
+        assert!(extract_return_table("local x = 1\n").is_none());
+    }
+
+    #[test]
+    fn handles_single_line_export_table() {
+        let table = extract_return_table("return { test_single = test_single }\n").expect("found");
+        assert!(table.contains("test_single"));
     }
 }
