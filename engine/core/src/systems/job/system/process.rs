@@ -1,10 +1,11 @@
 //! Core job processing logic for the job system.
 
+use crate::asset_paths::{resolve_asset_paths, schema_dir_override};
 use crate::ecs::world::World;
 use rand::Rng;
 use serde_json::{Map, Value as JsonValue};
 use std::collections::HashMap;
-use std::path::Path;
+use std::path::PathBuf;
 use std::sync::OnceLock;
 
 /// Fallback base XP granted per action when a skill is missing from the
@@ -20,75 +21,90 @@ pub const DEFAULT_STAMINA: f64 = 100.0;
 pub const DEFAULT_SKILL_LEVEL: f64 = 1.0;
 
 /// Loaded skill registry data: skill name → (max_level, base_xp, stat_bonuses)
-type SkillRegistryMap = HashMap<String, SkillEntry>;
+pub type SkillRegistryMap = HashMap<String, SkillEntry>;
 
-struct SkillEntry {
-    max_level: f64,
-    base_xp_per_action: f64,
-    derived_stat_bonus: HashMap<String, f64>,
+/// A single skill registry entry.
+pub struct SkillEntry {
+    /// Skill cap read by level-up.
+    pub max_level: f64,
+    /// Base XP granted per action.
+    pub base_xp_per_action: f64,
+    /// Per-level derived stat bonuses.
+    pub derived_stat_bonus: HashMap<String, f64>,
+}
+
+/// Load the skill registry from explicit candidate paths (first hit wins).
+/// Pure over its inputs so tests can point it at relocated fixtures; the
+/// cached [`get_skill_registry`] wrapper keeps production behavior.
+pub fn load_skill_registry_from_paths(paths: &[PathBuf]) -> SkillRegistryMap {
+    let mut registry = SkillRegistryMap::new();
+    for path in paths {
+        if path.exists() {
+            match std::fs::read_to_string(path) {
+                Ok(content) => {
+                    if let Ok(json) = serde_json::from_str::<JsonValue>(&content)
+                        && let Some(skills) = json.get("skills").and_then(|v| v.as_array())
+                    {
+                        for skill in skills {
+                            let name = skill
+                                .get("name")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("")
+                                .to_string();
+                            if name.is_empty() {
+                                continue;
+                            }
+                            let max_level = skill
+                                .get("max_level")
+                                .and_then(|v| v.as_f64())
+                                .unwrap_or(DEFAULT_MAX_SKILL_LEVEL);
+                            let base_xp = skill
+                                .get("base_xp_per_action")
+                                .and_then(|v| v.as_f64())
+                                .unwrap_or(DEFAULT_BASE_XP_PER_ACTION);
+                            let mut stat_bonus = HashMap::new();
+                            if let Some(bonus_obj) =
+                                skill.get("derived_stat_bonus").and_then(|v| v.as_object())
+                            {
+                                for (k, v) in bonus_obj {
+                                    if let Some(val) = v.as_f64() {
+                                        stat_bonus.insert(k.clone(), val);
+                                    }
+                                }
+                            }
+                            registry.insert(
+                                name,
+                                SkillEntry {
+                                    max_level,
+                                    base_xp_per_action: base_xp,
+                                    derived_stat_bonus: stat_bonus,
+                                },
+                            );
+                        }
+                    }
+                }
+                Err(_) => continue,
+            }
+            break;
+        }
+    }
+    registry
 }
 
 /// Loads the skill registry from skill_registry.json on first access.
+/// Immutable after init, so no reset hook is needed: tests cover relocated
+/// fixtures through [`load_skill_registry_from_paths`].
 fn get_skill_registry() -> &'static SkillRegistryMap {
     static REGISTRY: OnceLock<SkillRegistryMap> = OnceLock::new();
     REGISTRY.get_or_init(|| {
-        let mut registry = SkillRegistryMap::new();
-        let paths = [
-            "engine/assets/schemas/skill_registry.json",
-            "../engine/assets/schemas/skill_registry.json",
-        ];
-        for path_str in &paths {
-            let path = Path::new(path_str);
-            if path.exists() {
-                match std::fs::read_to_string(path) {
-                    Ok(content) => {
-                        if let Ok(json) = serde_json::from_str::<JsonValue>(&content)
-                            && let Some(skills) = json.get("skills").and_then(|v| v.as_array())
-                        {
-                            for skill in skills {
-                                let name = skill
-                                    .get("name")
-                                    .and_then(|v| v.as_str())
-                                    .unwrap_or("")
-                                    .to_string();
-                                if name.is_empty() {
-                                    continue;
-                                }
-                                let max_level = skill
-                                    .get("max_level")
-                                    .and_then(|v| v.as_f64())
-                                    .unwrap_or(DEFAULT_MAX_SKILL_LEVEL);
-                                let base_xp = skill
-                                    .get("base_xp_per_action")
-                                    .and_then(|v| v.as_f64())
-                                    .unwrap_or(DEFAULT_BASE_XP_PER_ACTION);
-                                let mut stat_bonus = HashMap::new();
-                                if let Some(bonus_obj) =
-                                    skill.get("derived_stat_bonus").and_then(|v| v.as_object())
-                                {
-                                    for (k, v) in bonus_obj {
-                                        if let Some(val) = v.as_f64() {
-                                            stat_bonus.insert(k.clone(), val);
-                                        }
-                                    }
-                                }
-                                registry.insert(
-                                    name,
-                                    SkillEntry {
-                                        max_level,
-                                        base_xp_per_action: base_xp,
-                                        derived_stat_bonus: stat_bonus,
-                                    },
-                                );
-                            }
-                        }
-                    }
-                    Err(_) => continue,
-                }
-                break;
-            }
-        }
-        registry
+        load_skill_registry_from_paths(&resolve_asset_paths(
+            "skill_registry.json",
+            schema_dir_override(),
+            &[
+                "engine/assets/schemas/skill_registry.json",
+                "../engine/assets/schemas/skill_registry.json",
+            ],
+        ))
     })
 }
 
