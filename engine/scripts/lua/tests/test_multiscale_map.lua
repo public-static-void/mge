@@ -14,9 +14,10 @@ local function contains(arr, value)
 	return false
 end
 
--- Build map JSON tables without a literal `return {` so the test runner's
--- source-parsing discovery (first `return {` in the file) still finds the
--- final test table.
+-- Build map JSON tables field-by-field. (Historical note: these helpers once
+-- avoided an inline `return {` literal because discovery used a non-greedy
+-- regex anchored at the first `return {`; the runner now uses a balanced-brace
+-- scan, so early literals are safe — the field-by-field style is kept as-is.)
 local function square_map_json()
 	local map = {}
 	map.topology = "square"
