@@ -72,6 +72,48 @@ fn find_config_file() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../game.toml")
 }
 
+/// Registers the default core system pack on a fresh world: all systems in
+/// deterministic execution order, scenario definitions, and material
+/// definitions. Shared by mod-loading and script/demo modes, which differ
+/// only in how they source the world mode.
+fn register_default_systems(world: &mut World, economic_system: EconomicSystem) {
+    world.register_system(BodyPartDamageSystem);
+    world.register_system(EquipmentLogicSystem);
+    world.register_system(EquipmentEffectAggregationSystem);
+    world.register_system(BodyEquipmentSyncSystem);
+    world.register_system(StatCalculationSystem);
+    world.register_system(DerivedStatsSystem);
+    world.register_system(ResearchSystem);
+    world.register_system(JobSystem);
+    world.register_system(FactionReputationSystem);
+    world.register_system(FluidSimulationSystem::default());
+    world.register_system(WeatherSystem);
+    world.register_system(TemperatureSystem);
+    world.register_system(FovUpdateSystem);
+    world.register_system(NoiseSystem);
+    world.register_system(EnemyBehaviorSystem);
+    world.register_system(EcosystemSystem);
+    world.register_system(FogUpdateSystem);
+    world.register_system(ProcessDeaths);
+    world.register_system(ProcessDecay);
+    world.register_system(economic_system);
+    world.register_system(ConsumptionSystem);
+    world.register_system(SupplySystem);
+    world.register_system(CraftingSystem);
+    world.register_system(ConstructionSystem::new());
+    world.register_system(NarrativeSystem);
+    for def in engine_core::narrative::load_scenario_definitions() {
+        let id = def.id.clone();
+        if let Err(e) = world.narrative.register_scenario(def) {
+            eprintln!("Skipping invalid scenario definition '{id}': {e}");
+        }
+    }
+    let materials_dir = find_materials_dir();
+    if let Ok(mats) = load_material_definitions(&materials_dir) {
+        world.material_definitions = mats;
+    }
+}
+
 fn main() {
     let args: Vec<String> = env::args().collect();
 
@@ -176,45 +218,8 @@ fn main() {
         let recipes = load_recipes_from_dir(&recipes_dir);
         let economic_system = EconomicSystem::with_recipes(recipes);
         let mut world = World::new(registry.clone());
-        // Register all core systems in deterministic execution order
-        world.register_system(BodyPartDamageSystem);
-        world.register_system(EquipmentLogicSystem);
-        world.register_system(EquipmentEffectAggregationSystem);
-        world.register_system(BodyEquipmentSyncSystem);
-        world.register_system(StatCalculationSystem);
-        world.register_system(DerivedStatsSystem);
-        world.register_system(ResearchSystem);
-        world.register_system(JobSystem);
-        world.register_system(FactionReputationSystem);
-        world.register_system(FluidSimulationSystem::default());
-        world.register_system(WeatherSystem);
-        world.register_system(TemperatureSystem);
-        world.register_system(FovUpdateSystem);
-        world.register_system(NoiseSystem);
-        world.register_system(EnemyBehaviorSystem);
-        world.register_system(EcosystemSystem);
-        world.register_system(FogUpdateSystem);
-        world.register_system(ProcessDeaths);
-        world.register_system(ProcessDecay);
-        world.register_system(economic_system);
-        world.register_system(ConsumptionSystem);
-        world.register_system(SupplySystem);
-        world.register_system(CraftingSystem);
-        world.register_system(ConstructionSystem::new());
-        world.register_system(NarrativeSystem);
-        for def in engine_core::narrative::load_scenario_definitions() {
-            let id = def.id.clone();
-            if let Err(e) = world.narrative.register_scenario(def) {
-                eprintln!("Skipping invalid scenario definition '{id}': {e}");
-            }
-        }
+        register_default_systems(&mut world, economic_system);
         world.current_mode = mode.clone();
-
-        // Load material definitions
-        let materials_dir = find_materials_dir();
-        if let Ok(mats) = load_material_definitions(&materials_dir) {
-            world.material_definitions = mats;
-        }
 
         let world_rc = Rc::new(RefCell::new(world));
         let mut engine = ScriptEngine::new();
@@ -287,46 +292,9 @@ fn main() {
         let recipes = load_recipes_from_dir(&recipes_dir);
         let economic_system = EconomicSystem::with_recipes(recipes);
         let mut world = World::new(registry.clone());
-        // Register all core systems in deterministic execution order
-        world.register_system(BodyPartDamageSystem);
-        world.register_system(EquipmentLogicSystem);
-        world.register_system(EquipmentEffectAggregationSystem);
-        world.register_system(BodyEquipmentSyncSystem);
-        world.register_system(StatCalculationSystem);
-        world.register_system(DerivedStatsSystem);
-        world.register_system(ResearchSystem);
-        world.register_system(JobSystem);
-        world.register_system(FactionReputationSystem);
-        world.register_system(FluidSimulationSystem::default());
-        world.register_system(WeatherSystem);
-        world.register_system(TemperatureSystem);
-        world.register_system(FovUpdateSystem);
-        world.register_system(NoiseSystem);
-        world.register_system(EnemyBehaviorSystem);
-        world.register_system(EcosystemSystem);
-        world.register_system(FogUpdateSystem);
-        world.register_system(ProcessDeaths);
-        world.register_system(ProcessDecay);
-        world.register_system(economic_system);
-        world.register_system(ConsumptionSystem);
-        world.register_system(SupplySystem);
-        world.register_system(CraftingSystem);
-        world.register_system(ConstructionSystem::new());
-        world.register_system(NarrativeSystem);
-        for def in engine_core::narrative::load_scenario_definitions() {
-            let id = def.id.clone();
-            if let Err(e) = world.narrative.register_scenario(def) {
-                eprintln!("Skipping invalid scenario definition '{id}': {e}");
-            }
-        }
+        register_default_systems(&mut world, economic_system);
         if let Some(mode) = mode_arg {
             world.current_mode = mode;
-        }
-
-        // Load material definitions
-        let materials_dir = find_materials_dir();
-        if let Ok(mats) = load_material_definitions(&materials_dir) {
-            world.material_definitions = mats;
         }
 
         let world_rc = Rc::new(RefCell::new(world));
@@ -345,4 +313,54 @@ fn main() {
 
     eprintln!("Usage: mge-cli --mod <mod_name> [--mode <mode>] | <script.lua> [args...]");
     std::process::exit(1);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn empty_world() -> World {
+        let registry = Arc::new(Mutex::new(ComponentRegistry::new()));
+        World::new(registry)
+    }
+
+    #[test]
+    fn test_register_default_systems_registers_full_core_pack() {
+        let mut world = empty_world();
+        register_default_systems(&mut world, EconomicSystem::with_recipes(Vec::new()));
+        let expected = [
+            "BodyPartDamageSystem",
+            "EquipmentLogicSystem",
+            "EquipmentEffectAggregationSystem",
+            "BodyEquipmentSyncSystem",
+            "StatCalculationSystem",
+            "DerivedStatsSystem",
+            "ResearchSystem",
+            "JobSystem",
+            "FactionReputationSystem",
+            "FluidSimulationSystem",
+            "WeatherSystem",
+            "TemperatureSystem",
+            "FovUpdateSystem",
+            "NoiseSystem",
+            "EnemyBehaviorSystem",
+            "EcosystemSystem",
+            "FogUpdateSystem",
+            "ProcessDeaths",
+            "ProcessDecay",
+            "EconomicSystem",
+            "ConsumptionSystem",
+            "SupplySystem",
+            "CraftingSystem",
+            "ConstructionSystem",
+            "NarrativeSystem",
+        ];
+        for name in expected {
+            assert!(
+                world.has_system(name),
+                "default pack is missing system '{name}'"
+            );
+        }
+        assert_eq!(world.list_systems().len(), expected.len());
+    }
 }
