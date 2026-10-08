@@ -1,41 +1,53 @@
+use crate::asset_paths::{resolve_asset_paths, schema_dir_override};
 use crate::ecs::system::System;
 use crate::ecs::world::World;
 use serde_json::Value as JsonValue;
 use std::collections::HashSet;
-use std::path::Path;
+use std::path::PathBuf;
 use std::sync::OnceLock;
 
-/// Global cache for valid equipment slot names, loaded from equipment_slots.json.
-fn get_valid_slots() -> &'static HashSet<String> {
-    static SLOTS: OnceLock<HashSet<String>> = OnceLock::new();
-    SLOTS.get_or_init(|| {
-        let mut slots = HashSet::new();
-        // Try loading from default schema path
-        let paths = [
-            "engine/assets/schemas/equipment_slots.json",
-            "../engine/assets/schemas/equipment_slots.json",
-        ];
-        for path_str in &paths {
-            let path = Path::new(path_str);
-            if path.exists() {
-                match std::fs::read_to_string(path) {
-                    Ok(content) => {
-                        if let Ok(json) = serde_json::from_str::<JsonValue>(&content)
-                            && let Some(slot_list) = json.get("slots").and_then(|v| v.as_array())
-                        {
-                            for slot_val in slot_list {
-                                if let Some(s) = slot_val.as_str() {
-                                    slots.insert(s.to_string());
-                                }
+/// Load valid equipment slot names from explicit candidate paths (first hit
+/// wins). Pure over its inputs so tests can point it at relocated fixtures;
+/// the cached [`get_valid_slots`] wrapper keeps production behavior.
+pub fn load_equipment_slots_from_paths(paths: &[PathBuf]) -> HashSet<String> {
+    let mut slots = HashSet::new();
+    // Try loading from default schema path
+    for path in paths {
+        if path.exists() {
+            match std::fs::read_to_string(path) {
+                Ok(content) => {
+                    if let Ok(json) = serde_json::from_str::<JsonValue>(&content)
+                        && let Some(slot_list) = json.get("slots").and_then(|v| v.as_array())
+                    {
+                        for slot_val in slot_list {
+                            if let Some(s) = slot_val.as_str() {
+                                slots.insert(s.to_string());
                             }
                         }
                     }
-                    Err(_) => continue,
                 }
-                break;
+                Err(_) => continue,
             }
+            break;
         }
-        slots
+    }
+    slots
+}
+
+/// Global cache for valid equipment slot names, loaded from equipment_slots.json.
+/// Immutable after init, so no reset hook is needed: tests cover relocated
+/// fixtures through [`load_equipment_slots_from_paths`].
+fn get_valid_slots() -> &'static HashSet<String> {
+    static SLOTS: OnceLock<HashSet<String>> = OnceLock::new();
+    SLOTS.get_or_init(|| {
+        load_equipment_slots_from_paths(&resolve_asset_paths(
+            "equipment_slots.json",
+            schema_dir_override(),
+            &[
+                "engine/assets/schemas/equipment_slots.json",
+                "../engine/assets/schemas/equipment_slots.json",
+            ],
+        ))
     })
 }
 
