@@ -756,3 +756,16 @@ impl Default for WorldgenRegistry {
 /// Only the thread-safe registry is global
 pub static GLOBAL_WORLDGEN_REGISTRY: LazyLock<Mutex<ThreadSafeWorldgenRegistry>> =
     LazyLock::new(|| Mutex::new(ThreadSafeWorldgenRegistry::new()));
+
+/// Reset the global worldgen registry to the builtin algorithms for test
+/// isolation.
+///
+/// Follows the job event log `reset_for_tests` exemplar: builtin registration
+/// is idempotent, so restoring (rather than emptying) keeps production init
+/// paths unchanged while dropping test-registered entries.
+pub fn reset_for_tests() {
+    if let Ok(mut registry) = GLOBAL_WORLDGEN_REGISTRY.lock() {
+        *registry = ThreadSafeWorldgenRegistry::new();
+        register_builtin_mapgen_algorithms(&mut registry);
+    }
+}
