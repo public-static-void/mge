@@ -105,20 +105,79 @@ pub const SYSTEM_EXECUTION_ORDER: &[&str] = &[
 /// Systems in [`SYSTEM_EXECUTION_ORDER`] are placed at their specified positions.
 /// Systems not in the ordering list are appended after in their original relative order.
 pub fn order_systems(system_names: &[String]) -> Vec<String> {
-    let mut remaining: std::collections::HashSet<&str> =
-        system_names.iter().map(|s| s.as_str()).collect();
+    order_systems_with_dependencies(system_names, &std::collections::HashMap::new())
+}
+
+/// Orders system names with dependency awareness for unlisted systems.
+///
+/// Systems in [`SYSTEM_EXECUTION_ORDER`] keep their pack positions first.
+/// Remaining systems follow topological order over `dependencies`, so a new
+/// system with a declared dependency slots after it without editing the
+/// closed list. Only edges between remaining systems constrain the tie-break:
+/// dependencies on listed systems are already satisfied (the pack runs
+/// first) and unknown names are ignored. Registration order — the input
+/// slice order — breaks remaining ties. Cyclic leftovers keep input order
+/// instead of erroring: this is a tie-break, not a scheduler.
+pub fn order_systems_with_dependencies(
+    system_names: &[String],
+    dependencies: &std::collections::HashMap<String, Vec<String>>,
+) -> Vec<String> {
+    use std::collections::{BTreeSet, HashMap, HashSet};
+
+    let listed: HashSet<&str> = SYSTEM_EXECUTION_ORDER.iter().copied().collect();
+    let mut seen: HashSet<&str> = HashSet::new();
     let mut ordered: Vec<String> = Vec::with_capacity(system_names.len());
 
     for &name in SYSTEM_EXECUTION_ORDER {
-        if remaining.remove(name) {
+        if system_names.iter().any(|n| n == name) && seen.insert(name) {
             ordered.push(name.to_string());
         }
     }
 
-    // Append remaining systems in their original registration order for extensibility
-    for name in system_names {
-        if remaining.contains(name.as_str()) {
-            ordered.push(name.clone());
+    // Unlisted systems, deduplicated, in registration (input) order.
+    let unlisted: Vec<&str> = system_names
+        .iter()
+        .map(|s| s.as_str())
+        .filter(|n| !listed.contains(n) && seen.insert(*n))
+        .collect();
+    let position: HashMap<&str, usize> =
+        unlisted.iter().enumerate().map(|(i, n)| (*n, i)).collect();
+
+    // Kahn's algorithm over the unlisted subgraph, input order as tie-break.
+    let mut indegree = vec![0usize; unlisted.len()];
+    let mut dependents: Vec<Vec<usize>> = vec![Vec::new(); unlisted.len()];
+    for (i, name) in unlisted.iter().enumerate() {
+        if let Some(deps) = dependencies.get(*name) {
+            for dep in deps {
+                if let Some(&j) = position.get(dep.as_str()) {
+                    dependents[j].push(i);
+                    indegree[i] += 1;
+                }
+            }
+        }
+    }
+    let mut ready: BTreeSet<usize> = indegree
+        .iter()
+        .enumerate()
+        .filter(|(_, d)| **d == 0)
+        .map(|(i, _)| i)
+        .collect();
+    let mut emitted = vec![false; unlisted.len()];
+    while let Some(&i) = ready.iter().next() {
+        ready.remove(&i);
+        emitted[i] = true;
+        ordered.push(unlisted[i].to_string());
+        for &k in &dependents[i] {
+            indegree[k] -= 1;
+            if indegree[k] == 0 {
+                ready.insert(k);
+            }
+        }
+    }
+    // Cyclic leftovers keep registration order instead of erroring.
+    for (i, name) in unlisted.iter().enumerate() {
+        if !emitted[i] {
+            ordered.push((*name).to_string());
         }
     }
 

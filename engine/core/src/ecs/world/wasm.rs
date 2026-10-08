@@ -8,6 +8,9 @@ use crate::ecs::world::{Season, WeatherCondition, WeatherState};
 use crate::loot::LootTableRegistry;
 use crate::lore::{ChronicleEntry, ChronicleFilter, LoreState};
 use crate::map::CellKey;
+use crate::map::topology_registry::{
+    cell_key_from_json, default_cell, infer_neighbor_candidates, topology_matches_cell,
+};
 use crate::narrative::{NarrativeRecordKind, NarrativeSnapshot, NarrativeState, TriggerPredicate};
 use crate::systems::construction::system::construction_defaults;
 use crate::systems::crafting::crafting_defaults;
@@ -2655,12 +2658,10 @@ impl WasmWorld {
     }
 
     /// True when the cell variant matches the WASM map topology type.
+    /// Single dispatch point: the core topology registry owns the
+    /// variant-to-name pairing, so no call site repeats the closed match.
     fn construction_topology_matches(cell: &CellKey, topology_type: &str) -> bool {
-        match cell {
-            CellKey::Square { .. } => topology_type == "square",
-            CellKey::Hex { .. } => topology_type == "hex",
-            CellKey::Province { .. } => topology_type == "province",
-        }
+        topology_matches_cell(topology_type, cell)
     }
 
     /// Places a validated blueprint; returns the site entity id.
@@ -3683,7 +3684,8 @@ impl WasmWorld {
 
     /// Adds a cell at (x, y, z). Sets topology type to "square" if unset.
     ///
-    /// Topology dispatch (R003): `"hex"` → `CellKey::Hex { q: x, r: y, z }`;
+    /// Cell construction dispatches through the topology registry
+    /// ([`default_cell`]): `"hex"` → `CellKey::Hex { q: x, r: y, z }`;
     /// `"square"`/`"none"`/empty → `CellKey::Square` (topology defaults to
     /// `"square"` when unset, byte-identical to the pre-parity behavior);
     /// `"province"` → no cell appended (province is intentionally z-less —
@@ -3693,13 +3695,8 @@ impl WasmWorld {
         if map.topology_type.is_empty() || map.topology_type == "none" {
             map.topology_type = "square".to_string();
         }
-        if map.topology_type == "province" {
+        let Some(cell) = default_cell(&map.topology_type, x, y, z) else {
             return;
-        }
-        let cell = if map.topology_type == "hex" {
-            CellKey::Hex { q: x, r: y, z }
-        } else {
-            CellKey::Square { x, y, z }
         };
         if !map.cells.contains(&cell) {
             map.cells.push(cell);
@@ -5635,28 +5632,8 @@ fn wasm_map_from_map_json(map_json: &str) -> Result<WasmMap, String> {
         ..WasmMap::default()
     };
 
-    let cell_from_json = |cell: &JsonValue| -> Result<CellKey, String> {
-        match topology {
-            "square" => Ok(CellKey::Square {
-                x: cell.get("x").and_then(|v| v.as_i64()).unwrap_or(0) as i32,
-                y: cell.get("y").and_then(|v| v.as_i64()).unwrap_or(0) as i32,
-                z: cell.get("z").and_then(|v| v.as_i64()).unwrap_or(0) as i32,
-            }),
-            "hex" => Ok(CellKey::Hex {
-                q: cell.get("q").and_then(|v| v.as_i64()).unwrap_or(0) as i32,
-                r: cell.get("r").and_then(|v| v.as_i64()).unwrap_or(0) as i32,
-                z: cell.get("z").and_then(|v| v.as_i64()).unwrap_or(0) as i32,
-            }),
-            "province" => Ok(CellKey::Province {
-                id: cell
-                    .get("id")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| "Province cell missing 'id'".to_string())?
-                    .to_string(),
-            }),
-            other => Err(format!("Unknown topology '{other}'")),
-        }
-    };
+    let cell_from_json =
+        |cell: &JsonValue| -> Result<CellKey, String> { cell_key_from_json(topology, cell) };
 
     // First pass: add all cells so neighbor inference can reference the set.
     for cell in cells {
@@ -5682,40 +5659,11 @@ fn wasm_map_from_map_json(map_json: &str) -> Result<WasmMap, String> {
             }
             map.neighbors.insert(key_str.clone(), neighbor_keys);
         } else {
-            let candidates: Vec<CellKey> = match topology {
-                "square" => match key {
-                    CellKey::Square { x, y, z } => [
-                        CellKey::Square { x: x + 1, y, z },
-                        CellKey::Square { x: x - 1, y, z },
-                        CellKey::Square { x, y: y + 1, z },
-                        CellKey::Square { x, y: y - 1, z },
-                    ]
-                    .to_vec(),
-                    _ => Vec::new(),
-                },
-                "hex" => match key {
-                    CellKey::Hex { q, r, z } => [
-                        CellKey::Hex { q: q + 1, r, z },
-                        CellKey::Hex { q: q - 1, r, z },
-                        CellKey::Hex { q, r: r + 1, z },
-                        CellKey::Hex { q, r: r - 1, z },
-                        CellKey::Hex {
-                            q: q + 1,
-                            r: r - 1,
-                            z,
-                        },
-                        CellKey::Hex {
-                            q: q - 1,
-                            r: r + 1,
-                            z,
-                        },
-                    ]
-                    .to_vec(),
-                    _ => Vec::new(),
-                },
-                // Province adjacency must be explicit.
-                _ => Vec::new(),
-            };
+            // Neighbor inference dispatches through the registry: grid
+            // topologies contribute adjacency candidates, explicit-only
+            // topologies (provinces) contribute none. The JSON-transport
+            // adapter stays here; only the candidate kernel is shared.
+            let candidates: Vec<CellKey> = infer_neighbor_candidates(topology, &key);
             let mut neighbor_keys = Vec::new();
             for candidate in candidates {
                 if map.cells.contains(&candidate) {

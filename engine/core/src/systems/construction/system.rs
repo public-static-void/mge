@@ -39,12 +39,10 @@ pub fn cell_position_json(cell: &CellKey) -> JsonValue {
 }
 
 /// Returns true when the cell variant matches the active map topology.
+/// Single dispatch point lives in the topology registry; this stays a thin
+/// alias so construction reads keep their domain-local name.
 fn topology_matches(cell: &CellKey, topology_type: &str) -> bool {
-    match cell {
-        CellKey::Square { .. } => topology_type == "square",
-        CellKey::Hex { .. } => topology_type == "hex",
-        CellKey::Province { .. } => topology_type == "province",
-    }
+    crate::map::topology_matches_cell(topology_type, cell)
 }
 
 /// Validates a blueprint and spawns the construction ghost plus linked job.

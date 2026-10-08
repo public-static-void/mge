@@ -387,8 +387,8 @@ impl ScanContext<'_> {
 
 /// Compute visible cells from an origin within a given range.
 ///
-/// This convenience wrapper auto-selects the appropriate FOV algorithm based
-/// on the map's topology type:
+/// This convenience wrapper selects the FOV algorithm from the topology
+/// registry's preferred entry:
 /// - `"square"` → [`RecursiveShadowcasting`]
 /// - `"hex"` / `"province"` → [`BfsFovAlgorithm`]
 /// - other → empty set
@@ -399,10 +399,16 @@ pub fn compute_fov(map: &super::Map, origin: &CellKey, range: u32) -> HashSet<Ce
         return HashSet::new();
     }
 
-    let visible: Vec<CellKey> = match map.topology_type() {
-        "square" => RecursiveShadowcasting.compute_fov(origin, range, map.topology.as_ref()),
-        "hex" | "province" => BfsFovAlgorithm.compute_fov(origin, range, map.topology.as_ref()),
-        _ => return HashSet::new(),
+    let preferred = super::topology_registry::resolve_topology(map.topology_type())
+        .map(|entry| entry.preferred_fov);
+    let visible: Vec<CellKey> = match preferred {
+        Some(super::topology_registry::FovKind::RecursiveShadowcasting) => {
+            RecursiveShadowcasting.compute_fov(origin, range, map.topology.as_ref())
+        }
+        Some(super::topology_registry::FovKind::BfsFloodFill) => {
+            BfsFovAlgorithm.compute_fov(origin, range, map.topology.as_ref())
+        }
+        None => return HashSet::new(),
     };
 
     let mut result: HashSet<CellKey> = visible.into_iter().collect();
