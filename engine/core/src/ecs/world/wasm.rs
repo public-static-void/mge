@@ -14,7 +14,7 @@ use crate::systems::crafting::crafting_defaults;
 use crate::systems::death_decay::health_defaults;
 use crate::systems::economic::recipe::Recipe;
 use crate::systems::economic::system::economic_defaults;
-use crate::systems::noise::noise_defaults;
+use crate::systems::noise::{noise_defaults, propagate_noise_kernel};
 use crate::systems::temperature::{TemperatureState, compute_ambient_temperature};
 use crate::systems::weather::compute_visibility_modifier;
 use rand::rngs::SmallRng;
@@ -922,8 +922,6 @@ impl WasmWorld {
     /// skipped), but traverses the world's explicit adjacency
     /// (`WasmMap.neighbors`) instead of a grid `MapTopology`.
     fn tick_noise(&mut self) {
-        use std::collections::VecDeque;
-
         let mut noise_map: HashMap<CellKey, f64> = HashMap::new();
         if let (Some(map), Some(emitters)) =
             (self.map.as_ref(), self.components.get("NoiseEmitter"))
@@ -973,49 +971,42 @@ impl WasmWorld {
                     continue;
                 }
 
-                let origin_key = serde_json::to_string(&origin).unwrap_or_default();
-                let mut visited: HashSet<String> = HashSet::new();
-                let mut queue: VecDeque<(String, i32)> = VecDeque::new();
-                noise_map.insert(origin.clone(), effective);
-                visited.insert(origin_key.clone());
-                queue.push_back((origin_key, 0));
+                // BFS flood-fill with linear falloff through the explicit
+                // adjacency map. The JSON-string transport stays on this side:
+                // the adapters translate keys at the boundary and the shared
+                // kernel owns the propagation shape.
+                let neighbors_of = |cell: &CellKey| -> Vec<CellKey> {
+                    let key = serde_json::to_string(cell).unwrap_or_default();
+                    match map.neighbors.get(&key) {
+                        Some(keys) => keys
+                            .iter()
+                            .filter_map(|neighbor_key| serde_json::from_str(neighbor_key).ok())
+                            .filter(|cell: &CellKey| map.cells.contains(cell))
+                            .collect(),
+                        None => Vec::new(),
+                    }
+                };
+                let is_opaque = |cell: &CellKey| -> bool {
+                    let key = serde_json::to_string(cell).unwrap_or_default();
+                    map.cell_metadata
+                        .get(&key)
+                        .and_then(|m| m.get("transparent"))
+                        .and_then(|v| v.as_bool())
+                        .is_some_and(|t| !t)
+                };
+                let propagated =
+                    propagate_noise_kernel(&origin, effective, radius, neighbors_of, is_opaque);
 
-                while let Some((current_key, depth)) = queue.pop_front() {
-                    if depth >= radius {
-                        continue;
-                    }
-                    let neighbors = match map.neighbors.get(&current_key) {
-                        Some(n) => n,
-                        None => continue,
-                    };
-                    for neighbor_key in neighbors {
-                        let cell: CellKey = match serde_json::from_str(neighbor_key) {
-                            Ok(c) => c,
-                            Err(_) => continue,
-                        };
-                        if !map.cells.contains(&cell) || !visited.insert(neighbor_key.clone()) {
-                            continue;
-                        }
-                        let distance = depth + 1;
-                        let noise = effective * (radius - distance) as f64 / radius as f64;
-                        noise_map
-                            .entry(cell)
-                            .and_modify(|v| {
-                                if noise > *v {
-                                    *v = noise;
-                                }
-                            })
-                            .or_insert(noise);
-                        let opaque = map
-                            .cell_metadata
-                            .get(neighbor_key)
-                            .and_then(|m| m.get("transparent"))
-                            .and_then(|v| v.as_bool())
-                            .is_some_and(|t| !t);
-                        if !opaque {
-                            queue.push_back((neighbor_key.clone(), distance));
-                        }
-                    }
+                // Max-aggregation: take the max at each cell.
+                for (cell, noise) in propagated {
+                    noise_map
+                        .entry(cell)
+                        .and_modify(|v| {
+                            if noise > *v {
+                                *v = noise;
+                            }
+                        })
+                        .or_insert(noise);
                 }
             }
         }

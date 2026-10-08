@@ -120,22 +120,29 @@ impl System for NoiseSystem {
     }
 }
 
-/// BFS noise propagation from an origin cell with linear falloff.
+/// Shared noise propagation kernel used by both the core [`NoiseSystem`] and
+/// the WASM bridge `tick_noise` mirror.
 ///
-/// Returns a map of cells to their noise level.  Opaque cells block
-/// propagation — the cell itself receives noise but neighbors beyond it
-/// are not reached.  The origin cell always receives full intensity.
-fn bfs_noise_propagation(
+/// The kernel owns the propagation shape — BFS flood-fill with linear
+/// falloff (`intensity * (radius - distance) / radius`), origin keeping full
+/// intensity, opaque cells receiving noise without relaying it further — and
+/// is parameterized over neighbor-lookup and opacity closures so each side
+/// keeps its own transport: the core side passes [`MapTopology`] accessors,
+/// the WASM side passes JSON-adjacency adapters without forcing the typed
+/// topology trait across the serialization boundary.
+///
+/// [`MapTopology`]: crate::map::topology::MapTopology
+pub fn propagate_noise_kernel(
     origin: &CellKey,
     intensity: f64,
     radius: i32,
-    topology: &dyn crate::map::topology::MapTopology,
+    neighbors_of: impl Fn(&CellKey) -> Vec<CellKey>,
+    is_opaque: impl Fn(&CellKey) -> bool,
 ) -> HashMap<CellKey, f64> {
     let mut result: HashMap<CellKey, f64> = HashMap::new();
     let mut queue: VecDeque<(CellKey, i32)> = VecDeque::new();
     let mut visited: std::collections::HashSet<CellKey> = std::collections::HashSet::new();
 
-    // Origin cell receives full intensity (R006)
     result.insert(origin.clone(), intensity);
     visited.insert(origin.clone());
     queue.push_back((origin.clone(), 0));
@@ -145,31 +152,59 @@ fn bfs_noise_propagation(
             continue;
         }
 
-        for neighbor in topology.neighbors(&current) {
-            if !topology.contains(&neighbor) || visited.contains(&neighbor) {
+        for neighbor in neighbors_of(&current) {
+            if visited.contains(&neighbor) {
                 continue;
             }
 
             visited.insert(neighbor.clone());
             let distance = depth + 1;
 
-            // Linear falloff: intensity * (radius - distance) / radius (R006)
+            // Linear falloff: intensity * (radius - distance) / radius
             let noise = intensity * (radius - distance) as f64 / radius as f64;
             result.insert(neighbor.clone(), noise);
 
-            // Opaque cells block further propagation but receive noise (R007)
-            let opaque = topology
-                .get_cell_metadata(&neighbor)
-                .and_then(|m| m.get("transparent"))
-                .and_then(|v| v.as_bool())
-                .map(|t| !t)
-                .unwrap_or(false);
-
-            if !opaque {
+            // Opaque cells receive noise but block further propagation.
+            if !is_opaque(&neighbor) {
                 queue.push_back((neighbor, distance));
             }
         }
     }
 
     result
+}
+
+/// BFS noise propagation from an origin cell with linear falloff.
+///
+/// Returns a map of cells to their noise level.  Opaque cells block
+/// propagation — the cell itself receives noise but neighbors beyond it
+/// are not reached.  The origin cell always receives full intensity.
+///
+/// Thin typed-topology adapter over [`propagate_noise_kernel`].
+fn bfs_noise_propagation(
+    origin: &CellKey,
+    intensity: f64,
+    radius: i32,
+    topology: &dyn crate::map::topology::MapTopology,
+) -> HashMap<CellKey, f64> {
+    propagate_noise_kernel(
+        origin,
+        intensity,
+        radius,
+        |cell| {
+            topology
+                .neighbors(cell)
+                .into_iter()
+                .filter(|neighbor| topology.contains(neighbor))
+                .collect()
+        },
+        |cell| {
+            topology
+                .get_cell_metadata(cell)
+                .and_then(|m| m.get("transparent"))
+                .and_then(|v| v.as_bool())
+                .map(|t| !t)
+                .unwrap_or(false)
+        },
+    )
 }
