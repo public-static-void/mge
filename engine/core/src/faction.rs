@@ -1,6 +1,13 @@
 use crate::ecs::world::World;
 use serde_json::{Value as JsonValue, json};
 
+/// Fallback defaults for faction reputation reads, following the
+/// `DungeonConfig::DEFAULT_*` precedent. Read by both [`modify_reputation`]/
+/// [`get_reputation`] and the reputation decay system.
+pub const DEFAULT_REPUTATION: i64 = 0;
+/// Fallback `Reputation.decay_rate` when the field is absent: no decay.
+pub const DEFAULT_DECAY_RATE: f64 = 0.0;
+
 pub fn set_faction(
     world: &mut World,
     entity: u32,
@@ -37,7 +44,7 @@ pub fn modify_reputation(
         .and_then(|c| c.get("values"))
         .and_then(|v| v.get(faction_id))
         .and_then(|v| v.as_i64())
-        .unwrap_or(0);
+        .unwrap_or(DEFAULT_REPUTATION);
 
     let new_value = (old_value + delta).clamp(-100, 100);
 
@@ -66,7 +73,7 @@ pub fn modify_reputation(
                 .get_component(target_entity, "Reputation")
                 .and_then(|c| c.get("decay_rate"))
                 .cloned()
-                .unwrap_or(json!(0.0)),
+                .unwrap_or(json!(DEFAULT_DECAY_RATE)),
         }),
     )?;
 
@@ -91,5 +98,5 @@ pub fn get_reputation(world: &World, target_entity: u32, faction_id: &str) -> i6
         .and_then(|c| c.get("values"))
         .and_then(|v| v.get(faction_id))
         .and_then(|v| v.as_i64())
-        .unwrap_or(0)
+        .unwrap_or(DEFAULT_REPUTATION)
 }

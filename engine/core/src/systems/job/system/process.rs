@@ -7,6 +7,18 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::sync::OnceLock;
 
+/// Fallback base XP granted per action when a skill is missing from the
+/// registry, following the `DungeonConfig::DEFAULT_*` precedent.
+pub const DEFAULT_BASE_XP_PER_ACTION: f64 = 10.0;
+/// Fallback skill cap when a skill is missing from the registry.
+pub const DEFAULT_MAX_SKILL_LEVEL: f64 = 100.0;
+/// Fallback agent `stamina` for the job-progress scaling factor when the
+/// field is absent: a fresh agent works at full rate.
+pub const DEFAULT_STAMINA: f64 = 100.0;
+/// Fallback skill level when an agent has no recorded value for a skill:
+/// an unranked skill performs at level one.
+pub const DEFAULT_SKILL_LEVEL: f64 = 1.0;
+
 /// Loaded skill registry data: skill name → (max_level, base_xp, stat_bonuses)
 type SkillRegistryMap = HashMap<String, SkillEntry>;
 
@@ -45,11 +57,11 @@ fn get_skill_registry() -> &'static SkillRegistryMap {
                                 let max_level = skill
                                     .get("max_level")
                                     .and_then(|v| v.as_f64())
-                                    .unwrap_or(100.0);
+                                    .unwrap_or(DEFAULT_MAX_SKILL_LEVEL);
                                 let base_xp = skill
                                     .get("base_xp_per_action")
                                     .and_then(|v| v.as_f64())
-                                    .unwrap_or(10.0);
+                                    .unwrap_or(DEFAULT_BASE_XP_PER_ACTION);
                                 let mut stat_bonus = HashMap::new();
                                 if let Some(bonus_obj) =
                                     skill.get("derived_stat_bonus").and_then(|v| v.as_object())
@@ -80,13 +92,14 @@ fn get_skill_registry() -> &'static SkillRegistryMap {
     })
 }
 
-/// Base XP per action for a skill from the registry, defaulting to 10.0.
+/// Base XP per action for a skill from the registry, defaulting to
+/// [`DEFAULT_BASE_XP_PER_ACTION`].
 /// Shared with the deterministic crafting path so both read one source.
 pub(crate) fn base_xp_for_skill(skill_name: &str) -> f64 {
     get_skill_registry()
         .get(skill_name)
         .map(|e| e.base_xp_per_action)
-        .unwrap_or(10.0)
+        .unwrap_or(DEFAULT_BASE_XP_PER_ACTION)
 }
 
 /// Grants XP to an agent on job completion and handles level-up.
@@ -100,8 +113,12 @@ fn grant_xp_on_job_completion(
     let entry = registry.get(skill_name);
 
     // If skill registry is empty or skill not found, use defaults
-    let base_xp = entry.map(|e| e.base_xp_per_action).unwrap_or(10.0);
-    let max_level = entry.map(|e| e.max_level).unwrap_or(100.0);
+    let base_xp = entry
+        .map(|e| e.base_xp_per_action)
+        .unwrap_or(DEFAULT_BASE_XP_PER_ACTION);
+    let max_level = entry
+        .map(|e| e.max_level)
+        .unwrap_or(DEFAULT_MAX_SKILL_LEVEL);
 
     // xp_gained = max(1, floor(base_xp * (1.0 + random_0_to_1)))
     let random_factor: f64 = rand::rng().random::<f64>();
@@ -152,7 +169,7 @@ fn grant_xp_on_job_completion(
     let current_skill = skills
         .get(skill_name)
         .and_then(|v| v.as_f64())
-        .unwrap_or(1.0);
+        .unwrap_or(DEFAULT_SKILL_LEVEL);
     skills.insert(skill_name.to_string(), JsonValue::from(current_skill));
     skill_levels["skills"] = JsonValue::Object(skills.clone());
 
@@ -324,18 +341,18 @@ fn default_job_progress(
                     .and_then(|v| v.as_object())
                     .and_then(|map| map.get(&job_type))
                     .and_then(|v| v.as_f64())
-                    .unwrap_or(1.0)
+                    .unwrap_or(DEFAULT_SKILL_LEVEL)
             } else {
                 let skills = agent.get("skills").and_then(|v| v.as_object());
                 skills
                     .and_then(|map| map.get(&job_type))
                     .and_then(|v| v.as_f64())
-                    .unwrap_or(1.0)
+                    .unwrap_or(DEFAULT_SKILL_LEVEL)
             };
         let stamina = agent
             .get("stamina")
             .and_then(|v| v.as_f64())
-            .unwrap_or(100.0);
+            .unwrap_or(DEFAULT_STAMINA);
         progress_increment = 1.0 * skill_value * (stamina / 100.0);
         if progress_increment < 0.1 {
             progress_increment = 0.1;

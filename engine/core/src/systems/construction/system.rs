@@ -3,6 +3,28 @@ use crate::ecs::system::System;
 use crate::map::CellKey;
 use serde_json::{Value as JsonValue, json};
 
+/// Fallback defaults for construction reads, following the
+/// `DungeonConfig::DEFAULT_*` precedent. One domain-owned block, no central
+/// `Defaults` object.
+pub mod construction_defaults {
+    /// Fallback `ConstructionSite`/`ProductionJob` state when the field is absent.
+    pub const PENDING_STATE: &str = "pending";
+    /// Fallback state read when a job/site carries no state yet.
+    pub const MISSING_STATE: &str = "";
+    /// Fallback `building_type` when the field is absent.
+    pub const DEFAULT_BUILDING_TYPE: &str = "";
+    /// Fallback material `kind` when the field is absent.
+    pub const DEFAULT_KIND: &str = "";
+    /// Fallback work `progress` when the field is absent.
+    pub const NO_PROGRESS: i64 = 0;
+    /// Fallback material `amount`/`available` when the field is absent.
+    pub const NO_AMOUNT: i64 = 0;
+    /// Fallback `required_work` when the field is absent (minimum viable work).
+    pub const UNIT_WORK: i64 = 1;
+    /// Fallback `Building.integrity` when the field is absent.
+    pub const DEFAULT_INTEGRITY: i64 = 0;
+}
+
 /// Serialize a [`CellKey`] as a `Position`-shaped component value.
 ///
 /// Produces `{ "pos": { "Square": ... } }` (or `Hex` / `Province`), the same
@@ -102,9 +124,9 @@ pub fn place_blueprint(
                     "building_type": building_type,
                     "target_position": pos_json,
                     "required_materials": materials_json.clone(),
-                    "progress": 0,
+                    "progress": construction_defaults::NO_PROGRESS,
                     "required_work": required_work,
-                    "state": "pending",
+                    "state": construction_defaults::PENDING_STATE,
                     "reserved_stockpile": null,
                     "assigned_job": null,
                 }),
@@ -125,7 +147,7 @@ pub fn place_blueprint(
             "id": job_id,
             "job_type": "construct",
             "category": "construction",
-            "state": "pending",
+            "state": construction_defaults::PENDING_STATE,
             "target": site_id,
             "target_position": cell_position_json(cell),
             "resource_requirements": materials_json,
@@ -172,17 +194,20 @@ pub fn get_construction_state(world: &World, site_id: u32) -> Result<JsonValue, 
         let state = site
             .get("state")
             .and_then(|v| v.as_str())
-            .unwrap_or("pending")
+            .unwrap_or(construction_defaults::PENDING_STATE)
             .to_string();
-        let progress = site.get("progress").and_then(|v| v.as_i64()).unwrap_or(0);
+        let progress = site
+            .get("progress")
+            .and_then(|v| v.as_i64())
+            .unwrap_or(construction_defaults::NO_PROGRESS);
         let required_work = site
             .get("required_work")
             .and_then(|v| v.as_i64())
-            .unwrap_or(1);
+            .unwrap_or(construction_defaults::UNIT_WORK);
         let building_type = site
             .get("building_type")
             .and_then(|v| v.as_str())
-            .unwrap_or("")
+            .unwrap_or(construction_defaults::DEFAULT_BUILDING_TYPE)
             .to_string();
         return Ok(json!({
             "state": state,
@@ -195,12 +220,12 @@ pub fn get_construction_state(world: &World, site_id: u32) -> Result<JsonValue, 
         let building_type = building
             .get("building_type")
             .and_then(|v| v.as_str())
-            .unwrap_or("")
+            .unwrap_or(construction_defaults::DEFAULT_BUILDING_TYPE)
             .to_string();
         let integrity = building
             .get("integrity")
             .and_then(|v| v.as_i64())
-            .unwrap_or(0);
+            .unwrap_or(construction_defaults::DEFAULT_INTEGRITY);
         return Ok(json!({
             "state": "complete",
             "progress": integrity,
@@ -238,7 +263,10 @@ pub fn cancel_construction(world: &mut World, site_id: u32) -> Result<bool, Stri
             ));
         }
     };
-    let state = site.get("state").and_then(|v| v.as_str()).unwrap_or("");
+    let state = site
+        .get("state")
+        .and_then(|v| v.as_str())
+        .unwrap_or(construction_defaults::MISSING_STATE);
     if matches!(state, "complete" | "cancelled") {
         return Err(format!(
             "cancel_construction: site {site_id} is already '{state}'; use demolish_building for completed buildings"
@@ -295,15 +323,24 @@ fn refund_delivered(world: &mut World, site: &JsonValue, job: &JsonValue) {
         return;
     };
     for item in &delivered {
-        let kind = item.get("kind").and_then(|v| v.as_str()).unwrap_or("");
+        let kind = item
+            .get("kind")
+            .and_then(|v| v.as_str())
+            .unwrap_or(construction_defaults::DEFAULT_KIND);
         if kind.is_empty() {
             continue;
         }
-        let amount = item.get("amount").map(amount_as_i64).unwrap_or(0);
+        let amount = item
+            .get("amount")
+            .map(amount_as_i64)
+            .unwrap_or(construction_defaults::NO_AMOUNT);
         if amount <= 0 {
             continue;
         }
-        let available = resources.get(kind).map(amount_as_i64).unwrap_or(0);
+        let available = resources
+            .get(kind)
+            .map(amount_as_i64)
+            .unwrap_or(construction_defaults::NO_AMOUNT);
         resources.insert(kind.to_string(), json!(available + amount));
     }
     let _ = world.set_component(stockpile_id, "Stockpile", stockpile);
@@ -334,7 +371,7 @@ fn amount_as_i64(value: &JsonValue) -> i64 {
     value
         .as_i64()
         .or_else(|| value.as_u64().and_then(|u| i64::try_from(u).ok()))
-        .unwrap_or(0)
+        .unwrap_or(construction_defaults::NO_AMOUNT)
         .max(0)
 }
 
@@ -387,7 +424,10 @@ impl ConstructionSystem {
         let Some(mut site) = world.get_component(site_id, "ConstructionSite").cloned() else {
             return;
         };
-        let state = site.get("state").and_then(|v| v.as_str()).unwrap_or("");
+        let state = site
+            .get("state")
+            .and_then(|v| v.as_str())
+            .unwrap_or(construction_defaults::MISSING_STATE);
         if matches!(state, "complete" | "cancelled") {
             return;
         }
@@ -398,7 +438,10 @@ impl ConstructionSystem {
         let Some(job) = world.get_component(job_id, "Job").cloned() else {
             return;
         };
-        let job_state = job.get("state").and_then(|v| v.as_str()).unwrap_or("");
+        let job_state = job
+            .get("state")
+            .and_then(|v| v.as_str())
+            .unwrap_or(construction_defaults::MISSING_STATE);
         if matches!(job_state, "cancelled" | "failed" | "blocked") {
             return;
         }
@@ -429,11 +472,15 @@ impl ConstructionSystem {
             return;
         }
 
-        let progress = site.get("progress").and_then(|v| v.as_i64()).unwrap_or(0) + 1;
+        let progress = site
+            .get("progress")
+            .and_then(|v| v.as_i64())
+            .unwrap_or(construction_defaults::NO_PROGRESS)
+            + 1;
         let required_work = site
             .get("required_work")
             .and_then(|v| v.as_i64())
-            .unwrap_or(1)
+            .unwrap_or(construction_defaults::UNIT_WORK)
             .max(1);
         site["progress"] = json!(progress);
         if progress >= required_work {
@@ -455,7 +502,10 @@ impl ConstructionSystem {
             .get("reserved_stockpile")
             .cloned()
             .unwrap_or(JsonValue::Null);
-        let job_state = job.get("state").and_then(|v| v.as_str()).unwrap_or("");
+        let job_state = job
+            .get("state")
+            .and_then(|v| v.as_str())
+            .unwrap_or(construction_defaults::MISSING_STATE);
         let next_state = if reserved_stockpile.is_number() {
             if matches!(
                 job_state,
@@ -466,7 +516,7 @@ impl ConstructionSystem {
                 "reserved"
             }
         } else {
-            "pending"
+            construction_defaults::PENDING_STATE
         };
         let mut changed = false;
         if site.get("state").and_then(|v| v.as_str()) != Some(next_state) {
@@ -510,12 +560,21 @@ impl ConstructionSystem {
             return;
         };
         for req in requirements {
-            let kind = req.get("kind").and_then(|v| v.as_str()).unwrap_or("");
+            let kind = req
+                .get("kind")
+                .and_then(|v| v.as_str())
+                .unwrap_or(construction_defaults::DEFAULT_KIND);
             if kind.is_empty() {
                 continue;
             }
-            let amount = req.get("amount").map(amount_as_i64).unwrap_or(0);
-            let available = resources.get(kind).map(amount_as_i64).unwrap_or(0);
+            let amount = req
+                .get("amount")
+                .map(amount_as_i64)
+                .unwrap_or(construction_defaults::NO_AMOUNT);
+            let available = resources
+                .get(kind)
+                .map(amount_as_i64)
+                .unwrap_or(construction_defaults::NO_AMOUNT);
             resources.insert(kind.to_string(), json!((available - amount).max(0)));
         }
         let _ = world.set_component(stockpile_id, "Stockpile", stockpile);
@@ -566,12 +625,12 @@ impl ConstructionSystem {
         let building_type = site
             .get("building_type")
             .and_then(|v| v.as_str())
-            .unwrap_or("")
+            .unwrap_or(construction_defaults::DEFAULT_BUILDING_TYPE)
             .to_string();
         let required_work = site
             .get("required_work")
             .and_then(|v| v.as_i64())
-            .unwrap_or(1)
+            .unwrap_or(construction_defaults::UNIT_WORK)
             .max(1);
         let position = world
             .get_component(site_id, "Position")
@@ -595,7 +654,10 @@ impl ConstructionSystem {
         );
 
         if let Some(mut job) = world.get_component(job_id, "Job").cloned() {
-            let job_state = job.get("state").and_then(|v| v.as_str()).unwrap_or("");
+            let job_state = job
+                .get("state")
+                .and_then(|v| v.as_str())
+                .unwrap_or(construction_defaults::MISSING_STATE);
             if !matches!(
                 job_state,
                 "complete" | "failed" | "cancelled" | "blocked" | "interrupted"

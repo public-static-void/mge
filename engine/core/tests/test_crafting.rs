@@ -21,6 +21,7 @@ use world_io_helper::save_and_load_roundtrip;
 
 use engine_core::ecs::world::World;
 use engine_core::systems::crafting::CraftingSystem;
+use engine_core::systems::crafting::crafting_defaults::DEFAULT_INPUT_QUALITY;
 use rand::rngs::SmallRng;
 use rand::{Rng, SeedableRng};
 use serde_json::{Value as JsonValue, json};
@@ -249,7 +250,8 @@ fn deducts_materials_at_start_and_matches_quality_formula() {
 
     // Completed on the third tick while turn was 2; fresh world turn is now 3.
     assert_eq!(rc.borrow().turn, 3);
-    let (expected_quality, _) = expected_quality_and_xp(crafter, 2, 1.0, 2.0, 12.0);
+    let (expected_quality, _) =
+        expected_quality_and_xp(crafter, 2, DEFAULT_INPUT_QUALITY, 2.0, 12.0);
     let state = rc.borrow().get_craft_state(crafter).unwrap().clone();
     assert_eq!(state["state"], json!("complete"));
     let output = state["output_entity"].as_u64().unwrap() as u32;
@@ -292,7 +294,7 @@ fn gates_skill_level_and_awards_deterministic_xp() {
 
     let rc = ticking_world(world);
     complete_one_craft(&rc, crafter);
-    let (_, expected_xp) = expected_quality_and_xp(crafter, 2, 1.0, 5.0, 12.0);
+    let (_, expected_xp) = expected_quality_and_xp(crafter, 2, DEFAULT_INPUT_QUALITY, 5.0, 12.0);
     let mut world = rc.borrow_mut();
     let events = drain(&mut world, "craft_completed");
     assert_eq!(events.len(), 1);
@@ -716,7 +718,8 @@ fn save_load_roundtrip_preserves_recipes_orders_entities_xp() {
     let loaded_rc = Rc::new(RefCell::new(loaded));
     World::tick(Rc::clone(&loaded_rc));
     World::tick(Rc::clone(&loaded_rc));
-    let (expected_quality, expected_xp) = expected_quality_and_xp(crafter, 2, 1.0, 2.0, 12.0);
+    let (expected_quality, expected_xp) =
+        expected_quality_and_xp(crafter, 2, DEFAULT_INPUT_QUALITY, 2.0, 12.0);
     let mut loaded = loaded_rc.borrow_mut();
     let events = drain(&mut loaded, "craft_completed");
     assert_eq!(events.len(), 1);

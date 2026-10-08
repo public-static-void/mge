@@ -74,6 +74,13 @@ fn default_category() -> String {
     "general".to_string()
 }
 
+/// Minimum research cost enforced on load so a zero/negative cost can never
+/// cause a division-by-zero downstream. Extends the `default_*` serde pattern
+/// above with the named clamp both load and query paths share.
+pub const MIN_TECH_COST: f64 = 1.0;
+/// Fallback required skill level for skill-type prerequisites without one.
+pub const DEFAULT_REQUIRED_SKILL_LEVEL: f64 = 1.0;
+
 /// Loaded tech tree data: map of tech ID → TechNode.
 type TechTreeMap = Vec<TechNode>;
 
@@ -100,8 +107,8 @@ fn get_tech_tree_inner() -> &'static TechTreeMap {
                                     let mut node: TechNode =
                                         serde_json::from_value(t.clone()).ok()?;
                                     // Ensure cost is at least 1 to avoid division by zero
-                                    if node.cost < 1.0 {
-                                        node.cost = 1.0;
+                                    if node.cost < MIN_TECH_COST {
+                                        node.cost = MIN_TECH_COST;
                                     }
                                     Some(node)
                                 })
@@ -196,7 +203,7 @@ fn check_prerequisites(world: &World, entity: u32, node: &TechNode) -> Result<bo
                 }
             }
             "skill" => {
-                let required_level = prereq.level.unwrap_or(1.0);
+                let required_level = prereq.level.unwrap_or(DEFAULT_REQUIRED_SKILL_LEVEL);
                 let current_level = world
                     .get_component(entity, "SkillLevels")
                     .and_then(|sl| {

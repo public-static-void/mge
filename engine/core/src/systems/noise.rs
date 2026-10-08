@@ -3,6 +3,21 @@ use crate::ecs::world::World;
 use crate::map::cell_key::CellKey;
 use std::collections::{HashMap, VecDeque};
 
+/// Shared fallback defaults for noise emission, read by both the core
+/// [`NoiseSystem`] and the WASM bridge `tick_noise` mirror so the two sides
+/// can never drift apart. Follows the `DungeonConfig::DEFAULT_*` precedent:
+/// one definition per domain, no central `Defaults` object.
+pub mod noise_defaults {
+    /// Emitters without an `active` flag are processed.
+    pub const ACTIVE: bool = true;
+    /// Fallback `NoiseEmitter.intensity` when the field is absent.
+    pub const INTENSITY: f64 = 1.0;
+    /// Fallback `NoiseEmitter.radius` when the field is absent.
+    pub const RADIUS: u64 = 5;
+    /// Fallback `Stealth.noise_modifier` when the field is absent.
+    pub const NOISE_MODIFIER: f64 = 1.0;
+}
+
 /// System: Propagates noise from entities with a NoiseEmitter component.
 ///
 /// Uses BFS flood-fill from each emitter position with linear falloff:
@@ -36,7 +51,10 @@ impl System for NoiseSystem {
         if let Some(emitters) = world.components.get("NoiseEmitter") {
             for (&entity, data) in emitters.iter() {
                 // Skip inactive emitters (R010)
-                let active = data.get("active").and_then(|v| v.as_bool()).unwrap_or(true);
+                let active = data
+                    .get("active")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(noise_defaults::ACTIVE);
                 if !active {
                     continue;
                 }
@@ -44,8 +62,11 @@ impl System for NoiseSystem {
                 let intensity = data
                     .get("intensity")
                     .and_then(|v| v.as_f64())
-                    .unwrap_or(1.0);
-                let radius = data.get("radius").and_then(|v| v.as_u64()).unwrap_or(5) as i32;
+                    .unwrap_or(noise_defaults::INTENSITY);
+                let radius = data
+                    .get("radius")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(noise_defaults::RADIUS) as i32;
 
                 // Apply Stealth modifier: effective intensity = intensity * noise_modifier (R004)
                 let effective_intensity =
@@ -53,7 +74,7 @@ impl System for NoiseSystem {
                         let modifier = stealth
                             .get("noise_modifier")
                             .and_then(|v| v.as_f64())
-                            .unwrap_or(1.0);
+                            .unwrap_or(noise_defaults::NOISE_MODIFIER);
                         intensity * modifier
                     } else {
                         intensity

@@ -9,7 +9,12 @@ use crate::loot::LootTableRegistry;
 use crate::lore::{ChronicleEntry, ChronicleFilter, LoreState};
 use crate::map::CellKey;
 use crate::narrative::{NarrativeRecordKind, NarrativeSnapshot, NarrativeState, TriggerPredicate};
+use crate::systems::construction::system::construction_defaults;
+use crate::systems::crafting::crafting_defaults;
+use crate::systems::death_decay::health_defaults;
 use crate::systems::economic::recipe::Recipe;
+use crate::systems::economic::system::economic_defaults;
+use crate::systems::noise::noise_defaults;
 use crate::systems::temperature::{TemperatureState, compute_ambient_temperature};
 use crate::systems::weather::compute_visibility_modifier;
 use rand::rngs::SmallRng;
@@ -924,15 +929,21 @@ impl WasmWorld {
             (self.map.as_ref(), self.components.get("NoiseEmitter"))
         {
             for (&entity, data) in emitters.iter() {
-                let active = data.get("active").and_then(|v| v.as_bool()).unwrap_or(true);
+                let active = data
+                    .get("active")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(noise_defaults::ACTIVE);
                 if !active {
                     continue;
                 }
                 let intensity = data
                     .get("intensity")
                     .and_then(|v| v.as_f64())
-                    .unwrap_or(1.0);
-                let radius = data.get("radius").and_then(|v| v.as_u64()).unwrap_or(5) as i32;
+                    .unwrap_or(noise_defaults::INTENSITY);
+                let radius = data
+                    .get("radius")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(noise_defaults::RADIUS) as i32;
 
                 let effective = if let Some(stealth) =
                     self.components.get("Stealth").and_then(|m| m.get(&entity))
@@ -941,7 +952,7 @@ impl WasmWorld {
                         * stealth
                             .get("noise_modifier")
                             .and_then(|v| v.as_f64())
-                            .unwrap_or(1.0)
+                            .unwrap_or(noise_defaults::NOISE_MODIFIER)
                 } else {
                     intensity
                 };
@@ -1262,7 +1273,10 @@ impl WasmWorld {
         if let Some(healths) = self.components.get("Health") {
             for entity in &entity_ids {
                 if let Some(value) = healths.get(entity) {
-                    let current = value.get("current").and_then(|v| v.as_f64()).unwrap_or(1.0);
+                    let current = value
+                        .get("current")
+                        .and_then(|v| v.as_f64())
+                        .unwrap_or(health_defaults::DEFAULT_CURRENT);
                     if current <= 0.0 {
                         to_convert.push(*entity);
                     }
@@ -2527,7 +2541,7 @@ impl WasmWorld {
             .and_then(|m| m.get(&entity_id))
             .and_then(|v| v.get("state"))
             .and_then(|v| v.as_str())
-            .unwrap_or("pending")
+            .unwrap_or(economic_defaults::PENDING_STATE)
             .to_string()
     }
 
@@ -2788,10 +2802,10 @@ impl WasmWorld {
             .and_then(|m| m.get(&site_id))
         {
             let state = serde_json::json!({
-                "state": site.get("state").and_then(|v| v.as_str()).unwrap_or("pending"),
-                "progress": site.get("progress").and_then(|v| v.as_i64()).unwrap_or(0),
-                "required_work": site.get("required_work").and_then(|v| v.as_i64()).unwrap_or(1),
-                "building_type": site.get("building_type").and_then(|v| v.as_str()).unwrap_or(""),
+                "state": site.get("state").and_then(|v| v.as_str()).unwrap_or(construction_defaults::PENDING_STATE),
+                "progress": site.get("progress").and_then(|v| v.as_i64()).unwrap_or(construction_defaults::NO_PROGRESS),
+                "required_work": site.get("required_work").and_then(|v| v.as_i64()).unwrap_or(construction_defaults::UNIT_WORK),
+                "building_type": site.get("building_type").and_then(|v| v.as_str()).unwrap_or(construction_defaults::DEFAULT_BUILDING_TYPE),
             });
             return Ok(serde_json::to_string(&state).unwrap_or_default());
         }
@@ -2803,12 +2817,12 @@ impl WasmWorld {
             let integrity = building
                 .get("integrity")
                 .and_then(|v| v.as_i64())
-                .unwrap_or(0);
+                .unwrap_or(construction_defaults::DEFAULT_INTEGRITY);
             let state = serde_json::json!({
                 "state": "complete",
                 "progress": integrity,
                 "required_work": integrity,
-                "building_type": building.get("building_type").and_then(|v| v.as_str()).unwrap_or(""),
+                "building_type": building.get("building_type").and_then(|v| v.as_str()).unwrap_or(construction_defaults::DEFAULT_BUILDING_TYPE),
             });
             return Ok(serde_json::to_string(&state).unwrap_or_default());
         }
@@ -3425,7 +3439,7 @@ impl WasmWorld {
             .and_then(|m| m.get(&crafter))
             .and_then(|material| material.get("quality"))
             .map(Self::wasm_craft_num)
-            .unwrap_or(1.0);
+            .unwrap_or(crafting_defaults::DEFAULT_INPUT_QUALITY);
         let skill = self
             .components
             .get("SkillLevels")
