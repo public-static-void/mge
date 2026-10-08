@@ -33,3 +33,8 @@ local function test_update_job()
 	assert.equals(job.progress, 1.0, "Job progress should be updated to 1.0")
 	assert.equals(job.custom, "foo", "Job custom field should be updated to 'foo'")
 end
+
+return {
+	test_set_job_field = test_set_job_field,
+	test_update_job = test_update_job,
+}
