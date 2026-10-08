@@ -242,6 +242,15 @@ pub fn register_job_event_api(
         })?,
     )?;
 
+    // reset_for_tests: reset the job event log for per-test isolation
+    job_events.set(
+        "reset_for_tests",
+        lua.create_function(|_, ()| {
+            engine_core::systems::job::system::events::reset_for_tests();
+            Ok(())
+        })?,
+    )?;
+
     // Register the job_events table as a global
     globals.set("job_events", job_events)?;
     Ok(())

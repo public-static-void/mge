@@ -18,8 +18,7 @@ use engine_core::ecs::system::System;
 use engine_core::ecs::world::World;
 use engine_core::systems::job::job_board::{JobAssignmentResult, JobBoard};
 use engine_core::systems::job::system::events::{
-    emit_job_event, init_job_event_logger, load_job_event_log, replay_job_event_log,
-    save_job_event_log,
+    emit_job_event, load_job_event_log, replay_job_event_log, reset_for_tests, save_job_event_log,
 };
 use engine_core::systems::job::{JobLogicKind, JobSystem, JobTypeData, assign_jobs};
 use serde_json::json;
@@ -1855,7 +1854,7 @@ fn test_job_event_logging_and_replay() {
 
     // --- Original run: emit events and save log ---
     let registry = Arc::new(Mutex::new(ComponentRegistry::default()));
-    init_job_event_logger();
+    reset_for_tests();
     let mut world = World::new(registry.clone());
 
     // Create a dummy job
@@ -1901,7 +1900,7 @@ fn test_job_event_logging_and_replay() {
 
     // --- Replay run: load log and replay into a new world ---
     let registry = Arc::new(Mutex::new(ComponentRegistry::default()));
-    init_job_event_logger();
+    reset_for_tests();
     let mut replayed_world = World::new(registry);
 
     // Set up a new event bus and collector for replayed events

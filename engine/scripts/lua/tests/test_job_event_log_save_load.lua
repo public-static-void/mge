@@ -2,10 +2,14 @@ local assert = require("assert")
 local tmp_path = require("helpers.tmp_path")
 
 local function test_event_log_save_and_load()
-	init_job_event_logger()
+	-- Reset the process-global event log so this test is isolated from
+	-- whatever ran before it in the same runner process.
+	job_events.reset_for_tests()
 	set_mode("colony")
+	local agent = spawn_entity()
+	set_component(agent, "Agent", { entity_id = agent, skills = { TestJob = 1.0 } })
 	local e1 = spawn_entity()
-	assign_job(e1, "TestJob", { state = "pending", category = "test" })
+	assign_job(e1, "TestJob", { state = "pending", progress = 0.0, category = "test", assigned_to = agent })
 	advance_job_state(e1)
 	local events_before = job_events.get_log()
 	assert.is_table(events_before, "job_events.get_log should return a table")
