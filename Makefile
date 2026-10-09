@@ -131,7 +131,7 @@ setup-python:
 
 # Build/install Rust extension into venv using maturin (idempotent)
 build-python: setup-python
-	@command -v maturin >/dev/null 2>&1 || { echo >&2 "maturin is not installed. Aborting."; exit 1; }
+	@cd engine_py && . .venv/bin/activate && command -v maturin >/dev/null 2>&1 || { echo >&2 "maturin is not installed. Aborting."; exit 1; }
 	@echo "Building Python Rust extension with maturin..."
 	@cd engine_py && . .venv/bin/activate && maturin develop --release
 
@@ -142,7 +142,10 @@ build-wheel:
 	@cd engine_py && maturin build --release
 
 # Run Python tests (always runs setup and build first)
-test-python: build-python
+# Same logged guard as test-rust/test-lua: the Python suite needs the C .so
+# on LD_LIBRARY_PATH, so artifact reuse or rebuild is explicit in the log.
+test-python: build-c-plugins-if-needed build-python
+	@cd engine_py && . .venv/bin/activate && command -v pytest >/dev/null 2>&1 || { echo >&2 "pytest is not installed. Aborting."; exit 1; }
 	@echo "Running Python tests..."
 	@cd engine_py && . .venv/bin/activate && pytest
 

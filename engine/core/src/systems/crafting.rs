@@ -23,6 +23,14 @@ use rand::SeedableRng;
 use rand::rngs::SmallRng;
 use serde_json::{Value as JsonValue, json};
 
+/// Fallback defaults for crafting reads, following the
+/// `DungeonConfig::DEFAULT_*` precedent. Read by both [`craft_quality`] and
+/// the WASM bridge crafting mirror so the two sides can never drift apart.
+pub mod crafting_defaults {
+    /// Fallback `Material.quality` when the field is absent.
+    pub const DEFAULT_INPUT_QUALITY: f64 = 1.0;
+}
+
 /// Deterministic crafting system ticking `CraftOrder` components.
 pub struct CraftingSystem;
 
@@ -315,7 +323,7 @@ pub(crate) fn craft_quality(world: &World, crafter: u32, rng: &mut SmallRng) -> 
         .get_component(crafter, "Material")
         .and_then(|material| material.get("quality"))
         .map(json_num)
-        .unwrap_or(1.0);
+        .unwrap_or(crafting_defaults::DEFAULT_INPUT_QUALITY);
     let skill = world
         .get_component(crafter, "SkillLevels")
         .and_then(|levels| levels.get("skills"))

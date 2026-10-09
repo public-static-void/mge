@@ -1,6 +1,5 @@
 use engine_core::ecs::event_logger::EventLogger;
 use serde_json::json;
-use std::fs;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[test]
@@ -107,11 +106,10 @@ fn test_event_logger_save_and_load() {
     let logger = EventLogger::new();
     logger.log("job_failed", json!({"entity": 2, "state": "failed"}));
 
-    let path = "test_event_log.json";
-    logger.save_to_file(path).unwrap();
+    let tmp = tempfile::NamedTempFile::new().unwrap();
+    logger.save_to_file(tmp.path()).unwrap();
 
-    let loaded: EventLogger<serde_json::Value> = EventLogger::load_from_file(path).unwrap();
-    fs::remove_file(path).unwrap();
+    let loaded: EventLogger<serde_json::Value> = EventLogger::load_from_file(tmp.path()).unwrap();
 
     let events = loaded.all();
     assert_eq!(events.len(), 1);

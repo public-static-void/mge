@@ -64,6 +64,7 @@ test_vehicle_save.json
 test_crafting_save.json
 roguelike_save.json
 test_job_event_log.json
+test_event_log.json
 mge_demo_save_*.json
 knowledge/
 

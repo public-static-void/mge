@@ -22,6 +22,18 @@ pub fn job_event_logger() -> Arc<EventLogger<JsonValue>> {
         .clone()
 }
 
+/// Reset the global job event log for test isolation.
+///
+/// Ensures the logger is initialized, then clears it so each test starts
+/// from an empty log regardless of execution order. Production `init`/`get`
+/// paths are unchanged.
+pub fn reset_for_tests() {
+    init_job_event_logger();
+    if let Some(logger) = JOB_EVENT_LOGGER.get() {
+        logger.clear();
+    }
+}
+
 /// Emits a job-related event to the world's event system and logs it.
 /// The event payload includes the following fields (if present in the job):
 /// - entity: The job's ID, if present in the job as "id"

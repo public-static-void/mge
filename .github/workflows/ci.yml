@@ -176,22 +176,17 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: c-plugins
+          # Must land at plugins/*/lib*.so — the exact paths the
+          # build-c-plugins-if-needed guard checks before reusing.
           path: plugins
       - name: Build and deploy plugins
         run: cargo run -p xtask -- build-plugins
-      - name: Install Python test deps
-        run: |
-          cd engine_py
-          python3 -m venv .venv
-          source .venv/bin/activate
-          pip install maturin pytest
-          maturin develop --release
       - name: Run Python tests
         run: |
-          cd engine_py
-          source .venv/bin/activate
-          export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(pwd)/../plugins
-          pytest tests/ -v
+          export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(pwd)/plugins
+          # CI=true selects the guard's reuse path; the guard logs the
+          # "reusing c-plugins artifact (CI=true)" line as consumer-log proof.
+          CI=true make test-python
 
   release:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'

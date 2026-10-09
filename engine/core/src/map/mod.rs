@@ -18,6 +18,8 @@ pub mod province;
 pub mod square;
 /// Map topology module.
 pub mod topology;
+/// Topology construction/dispatch registry.
+pub mod topology_registry;
 
 pub use cell_key::CellKey;
 pub use fov::{BfsFovAlgorithm, FovAlgorithm, RecursiveShadowcasting, compute_fov};
@@ -27,6 +29,11 @@ pub use province::ProvinceMap;
 use serde_json::Value;
 pub use square::SquareGridMap;
 pub use topology::MapTopology;
+pub use topology_registry::{
+    FovKind, NeighborStrategy, TopologyEntry, cell_key_from_json, default_cell,
+    infer_neighbor_candidates, register_topology, registered_topology_names, resolve_topology,
+    topology_matches_cell,
+};
 
 /// The main Map type (boxed trait object for dynamic dispatch).
 #[derive(Clone)]

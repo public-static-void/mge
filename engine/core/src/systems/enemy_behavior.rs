@@ -12,6 +12,42 @@ use rand::SeedableRng;
 use rand::rngs::SmallRng;
 use serde_json::{Value as JsonValue, json};
 
+/// Named fallbacks for enemy behavior tuning params, following the
+/// `DungeonConfig::DEFAULT_*` precedent.
+///
+/// Each value below is read from the `EnemyAI` (or `Hearing`) component first;
+/// the const only applies when the component omits the key, so retuning an
+/// enemy type is a data edit, never a core edit. No central `Defaults`
+/// god-object: these live with the system that reads them.
+pub mod enemy_defaults {
+    /// Visual contact range when `EnemyAI.detection_range` is absent.
+    pub const DEFAULT_DETECTION_RANGE: u64 = 8;
+    /// Melee range when `EnemyAI.attack_range` is absent.
+    pub const DEFAULT_ATTACK_RANGE: u64 = 1;
+    /// Damage per attack tick (`damage_entity` takes `f32`).
+    pub const DEFAULT_ATTACK_DAMAGE: f32 = 1.0;
+    /// Health fraction at or below which the enemy flees.
+    pub const DEFAULT_FLEE_THRESHOLD: f64 = 0.25;
+    /// Invisible ticks before a chase gives up and returns home.
+    pub const DEFAULT_MAX_LOST_TICKS: u64 = 3;
+    /// Flee ticks before a healthy enemy recovers to idle.
+    pub const DEFAULT_FLEE_RECOVERY_TICKS: u64 = 3;
+    /// Alert level above which noise escalates straight to chase.
+    pub const DEFAULT_CHASE_ALERT_THRESHOLD: f64 = 0.7;
+    /// Alert level above which noise escalates to investigate.
+    pub const DEFAULT_INVESTIGATE_ALERT_THRESHOLD: f64 = 0.3;
+    /// Hearing sensitivity multiplier when the component omits it.
+    pub const DEFAULT_HEARING_SENSITIVITY: f64 = 1.0;
+    /// Noise floor below which hearing ignores the stimulus.
+    pub const DEFAULT_HEARING_THRESHOLD: f64 = 0.1;
+    /// Alert decay per quiet tick when the component omits the rate.
+    pub const DEFAULT_ALERT_DECAY_RATE: f64 = 0.1;
+    /// Alert level set on confirmed visual contact (scale maximum).
+    pub const DEFAULT_FULL_ALERT: f64 = 1.0;
+    /// Alert level of a fully calm enemy (scale minimum).
+    pub const DEFAULT_CALM_ALERT: f64 = 0.0;
+}
+
 /// Deterministic finite-state-machine system for enemy AI behaviors.
 ///
 /// Each tick iterates entities with an `EnemyAI` component, reads their state,
@@ -83,7 +119,7 @@ impl System for EnemyBehaviorSystem {
                 let _ = world.set_component(d.entity, "PatrolRoute", route);
             }
             if let Some(target) = d.attack_damage_target {
-                world.damage_entity(target, 1.0);
+                world.damage_entity(target, enemy_defaults::DEFAULT_ATTACK_DAMAGE);
             }
         }
     }
@@ -322,10 +358,10 @@ fn tick_idle(
 
     // R006/R016: Visual contact within detection_range → chase (alert_level = 1.0)
     if let Some(target) = select_target(world, eid, ai, visible) {
-        let detection_range = ai
-            .get("detection_range")
-            .and_then(|v| v.as_u64())
-            .unwrap_or(8) as i32;
+        let detection_range =
+            ai.get("detection_range")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(enemy_defaults::DEFAULT_DETECTION_RANGE) as i32;
 
         let target_pos = world
             .get_component(target, "Position")
@@ -336,7 +372,7 @@ fn tick_idle(
             let mut d = default_decision(eid, ai.clone());
             d.new_ai["state"] = json!("chase");
             d.new_ai["current_target"] = json!(target);
-            d.new_ai["alert_level"] = json!(1.0);
+            d.new_ai["alert_level"] = json!(enemy_defaults::DEFAULT_FULL_ALERT);
             if let Some((x, y, z)) = cell_to_xyz(&my_pos) {
                 d.new_ai["home_position"] = json!({"Square": {"x": x, "y": y, "z": z}});
             }
@@ -374,10 +410,10 @@ fn tick_patrol(
 
     // R007/R016: Visual contact → chase (alert_level = 1.0, priority over patrol movement)
     if let Some(target) = select_target(world, eid, ai, visible) {
-        let detection_range = ai
-            .get("detection_range")
-            .and_then(|v| v.as_u64())
-            .unwrap_or(8) as i32;
+        let detection_range =
+            ai.get("detection_range")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(enemy_defaults::DEFAULT_DETECTION_RANGE) as i32;
         let target_pos = world
             .get_component(target, "Position")
             .and_then(CellKey::from_position)?;
@@ -386,7 +422,7 @@ fn tick_patrol(
             let mut d = default_decision(eid, ai.clone());
             d.new_ai["state"] = json!("chase");
             d.new_ai["current_target"] = json!(target);
-            d.new_ai["alert_level"] = json!(1.0);
+            d.new_ai["alert_level"] = json!(enemy_defaults::DEFAULT_FULL_ALERT);
             if let Some((x, y, z)) = cell_to_xyz(&my_pos) {
                 d.new_ai["home_position"] = json!({"Square": {"x": x, "y": y, "z": z}});
             }
@@ -484,10 +520,10 @@ fn tick_investigate(
 
     // R015/R016: Visual contact → chase (alert_level = 1.0)
     if let Some(target) = select_target(world, eid, ai, visible) {
-        let detection_range = ai
-            .get("detection_range")
-            .and_then(|v| v.as_u64())
-            .unwrap_or(8) as i32;
+        let detection_range =
+            ai.get("detection_range")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(enemy_defaults::DEFAULT_DETECTION_RANGE) as i32;
         let target_pos = world
             .get_component(target, "Position")
             .and_then(CellKey::from_position)?;
@@ -496,7 +532,7 @@ fn tick_investigate(
             let mut d = default_decision(eid, ai.clone());
             d.new_ai["state"] = json!("chase");
             d.new_ai["current_target"] = json!(target);
-            d.new_ai["alert_level"] = json!(1.0);
+            d.new_ai["alert_level"] = json!(enemy_defaults::DEFAULT_FULL_ALERT);
             if let Some((x, y, z)) = cell_to_xyz(&my_pos) {
                 d.new_ai["home_position"] = json!({"Square": {"x": x, "y": y, "z": z}});
             }
@@ -586,7 +622,7 @@ fn tick_chase(
             .unwrap_or(0)
             + 1;
         d.new_ai["lost_target_ticks"] = json!(lost_ticks);
-        if lost_ticks >= 3 {
+        if lost_ticks >= enemy_defaults::DEFAULT_MAX_LOST_TICKS {
             return return_to_home(world, eid, &d.new_ai);
         }
         return Some(d);
@@ -610,7 +646,7 @@ fn tick_chase(
         .new_ai
         .get("attack_range")
         .and_then(|v| v.as_u64())
-        .unwrap_or(1) as i32;
+        .unwrap_or(enemy_defaults::DEFAULT_ATTACK_RANGE) as i32;
 
     if dist <= attack_range {
         d.new_ai["state"] = json!("attack");
@@ -664,7 +700,10 @@ fn tick_attack(
         .get_component(target_id, "Position")
         .and_then(CellKey::from_position)?;
     let dist = manhattan_distance(&my_pos, &target_pos);
-    let attack_range = ai.get("attack_range").and_then(|v| v.as_u64()).unwrap_or(1) as i32;
+    let attack_range = ai
+        .get("attack_range")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(enemy_defaults::DEFAULT_ATTACK_RANGE) as i32;
 
     if dist > attack_range {
         let mut d = default_decision(eid, ai.clone());
@@ -703,7 +742,8 @@ fn tick_flee(
     d.new_ai["flee_ticks"] = json!(flee_ticks);
 
     // R010: After 3 ticks, if health above threshold → idle
-    if flee_ticks >= 3 && !should_flee(&d.new_ai, health) {
+    if flee_ticks >= enemy_defaults::DEFAULT_FLEE_RECOVERY_TICKS && !should_flee(&d.new_ai, health)
+    {
         d.new_ai["state"] = json!("idle");
         return Some(d);
     }
@@ -736,7 +776,7 @@ fn should_flee(ai: &JsonValue, health: Option<&JsonValue>) -> bool {
     let threshold = ai
         .get("flee_threshold")
         .and_then(|v| v.as_f64())
-        .unwrap_or(0.25);
+        .unwrap_or(enemy_defaults::DEFAULT_FLEE_THRESHOLD);
     match health {
         Some(h) => {
             let current = h.get("current").and_then(|v| v.as_f64()).unwrap_or(1.0);
@@ -767,11 +807,11 @@ fn noise_detection(
     let sensitivity = hearing
         .get("sensitivity")
         .and_then(|v| v.as_f64())
-        .unwrap_or(1.0);
+        .unwrap_or(enemy_defaults::DEFAULT_HEARING_SENSITIVITY);
     let threshold = hearing
         .get("threshold")
         .and_then(|v| v.as_f64())
-        .unwrap_or(0.1);
+        .unwrap_or(enemy_defaults::DEFAULT_HEARING_THRESHOLD);
 
     let noise_level = world.get_noise_at(my_pos).unwrap_or(0.0);
     let mut d = default_decision(eid, ai.clone());
@@ -782,14 +822,15 @@ fn noise_detection(
         .unwrap_or(0.0);
 
     if noise_level >= threshold * sensitivity {
-        let new_alert = (current_alert + noise_level * sensitivity).min(1.0);
+        let new_alert =
+            (current_alert + noise_level * sensitivity).min(enemy_defaults::DEFAULT_FULL_ALERT);
         d.new_ai["alert_level"] = json!(new_alert);
-        if new_alert > 0.7 {
+        if new_alert > enemy_defaults::DEFAULT_CHASE_ALERT_THRESHOLD {
             d.new_ai["state"] = json!("chase");
         } else if new_alert
             > ai.get("noise_detection_threshold")
                 .and_then(|v| v.as_f64())
-                .unwrap_or(0.3)
+                .unwrap_or(enemy_defaults::DEFAULT_INVESTIGATE_ALERT_THRESHOLD)
         {
             d.new_ai["state"] = json!("investigate");
         }
@@ -801,8 +842,9 @@ fn noise_detection(
         let decay_rate = ai
             .get("alert_decay_rate")
             .and_then(|v| v.as_f64())
-            .unwrap_or(0.1);
-        d.new_ai["alert_level"] = json!((current_alert - decay_rate).max(0.0));
+            .unwrap_or(enemy_defaults::DEFAULT_ALERT_DECAY_RATE);
+        d.new_ai["alert_level"] =
+            json!((current_alert - decay_rate).max(enemy_defaults::DEFAULT_CALM_ALERT));
         return Some(d);
     }
 

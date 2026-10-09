@@ -5,6 +5,22 @@ use std::collections::HashMap;
 
 use super::recipe::{Recipe, ResourceAmount};
 
+/// Fallback defaults for economic reads, following the
+/// `DungeonConfig::DEFAULT_*` precedent. One domain-owned block, no central
+/// `Defaults` object.
+pub mod economic_defaults {
+    /// Fallback `ProductionJob` state when the field is absent.
+    pub const PENDING_STATE: &str = "pending";
+    /// Fallback job `priority` when the field is absent.
+    pub const DEFAULT_PRIORITY: i64 = 0;
+    /// Fallback stockpile balance when the resource entry is absent.
+    pub const NO_STOCK: i64 = 0;
+    /// Fallback job `progress` when the field is absent.
+    pub const NO_PROGRESS: i64 = 0;
+    /// Fallback `batch_size` when the field is absent or below one.
+    pub const UNIT_BATCH: i64 = 1;
+}
+
 /// Economic system
 #[derive(Default)]
 pub struct EconomicSystem {
@@ -29,7 +45,7 @@ impl EconomicSystem {
             let current = stockpile
                 .get(&input.kind)
                 .and_then(|v| v.as_i64())
-                .unwrap_or(0);
+                .unwrap_or(economic_defaults::NO_STOCK);
             if current < input.amount {
                 return false;
             }
@@ -45,7 +61,7 @@ impl EconomicSystem {
             let current = stockpile
                 .get(&input.kind)
                 .and_then(|v| v.as_i64())
-                .unwrap_or(0);
+                .unwrap_or(economic_defaults::NO_STOCK);
             stockpile.insert(input.kind.clone(), json!(current - input.amount));
         }
     }
@@ -58,7 +74,7 @@ impl EconomicSystem {
             let current = stockpile
                 .get(&output.kind)
                 .and_then(|v| v.as_i64())
-                .unwrap_or(0);
+                .unwrap_or(economic_defaults::NO_STOCK);
             stockpile.insert(output.kind.clone(), json!(current + output.amount));
         }
     }
@@ -77,7 +93,10 @@ impl System for EconomicSystem {
             .into_iter()
             .filter_map(|eid| {
                 let job = world.get_component(eid, "ProductionJob")?;
-                let priority = job.get("priority").and_then(|v| v.as_i64()).unwrap_or(0);
+                let priority = job
+                    .get("priority")
+                    .and_then(|v| v.as_i64())
+                    .unwrap_or(economic_defaults::DEFAULT_PRIORITY);
                 Some((eid, priority))
             })
             .collect();
@@ -93,7 +112,7 @@ impl System for EconomicSystem {
             let state = job
                 .get("state")
                 .and_then(|v| v.as_str())
-                .unwrap_or("pending");
+                .unwrap_or(economic_defaults::PENDING_STATE);
 
             // Skip already completed jobs
             if state == "complete" {
@@ -126,7 +145,11 @@ impl System for EconomicSystem {
             if Self::can_consume_inputs(stock_map, &recipe.inputs) {
                 Self::consume_inputs(stock_map, &recipe.inputs);
 
-                let progress = job.get("progress").and_then(|v| v.as_i64()).unwrap_or(0) + 1;
+                let progress = job
+                    .get("progress")
+                    .and_then(|v| v.as_i64())
+                    .unwrap_or(economic_defaults::NO_PROGRESS)
+                    + 1;
                 job["progress"] = json!(progress);
 
                 if progress >= recipe.duration {
@@ -134,8 +157,8 @@ impl System for EconomicSystem {
                     let batch_size = job
                         .get("batch_size")
                         .and_then(|v| v.as_i64())
-                        .filter(|&v| v >= 1)
-                        .unwrap_or(1);
+                        .filter(|&v| v >= economic_defaults::UNIT_BATCH)
+                        .unwrap_or(economic_defaults::UNIT_BATCH);
 
                     // Produce outputs multiplied by batch_size
                     let multiplied_outputs: Vec<super::recipe::ResourceAmount> = recipe

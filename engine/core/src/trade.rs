@@ -18,6 +18,11 @@ use crate::ecs::world::World;
 /// never hold negative dust.
 pub const TRANSFER_EPSILON: f64 = 1e-9;
 
+/// Fallback balance for a missing resource entry in a stockpile, following
+/// the `DungeonConfig::DEFAULT_*` precedent. A missing kind entry reads as
+/// zero on both the core and bridge paths.
+pub const DEFAULT_MISSING_BALANCE: f64 = 0.0;
+
 /// Failure modes for [`transfer_stockpile_resource`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum TransferError {
@@ -78,7 +83,7 @@ fn stockpile_balance(world: &World, entity: u32, kind: &str) -> Option<f64> {
                 .get("resources")
                 .and_then(|r| r.get(kind))
                 .and_then(|v| v.as_f64())
-                .unwrap_or(0.0)
+                .unwrap_or(DEFAULT_MISSING_BALANCE)
         })
 }
 
@@ -143,7 +148,7 @@ pub fn transfer_stockpile_resource(
             remainder
         },
     );
-    let dest_balance = stockpile_balance(world, to, kind).unwrap_or(0.0);
+    let dest_balance = stockpile_balance(world, to, kind).unwrap_or(DEFAULT_MISSING_BALANCE);
     set_stockpile_balance(world, to, kind, dest_balance + amount);
     Ok(())
 }

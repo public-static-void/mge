@@ -3,6 +3,12 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+/// Default progress threshold completing a job when the job carries no
+/// `required_progress` value. Read by both the live progress path
+/// (`system/process.rs`) and the builtin-handler path
+/// (`types/builtin_handlers.rs`) so the two can never drift.
+pub const DEFAULT_REQUIRED_PROGRESS: f64 = 3.0;
+
 /// Data describing a job type, as loaded from data files.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct JobTypeData {

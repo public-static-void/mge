@@ -154,20 +154,34 @@ pub fn register_body_api(lua: &Lua, globals: &Table, world: Rc<RefCell<World>>) 
                 let schema = get_schema("Body").expect("Body schema missing");
                 ensure_schema_arrays(&mut body, schema);
                 if let Some(parts) = body.get("parts").and_then(|v| v.as_array()) {
-                    for part in parts {
-                        if part.get("name").and_then(|n| n.as_str()) == Some(&part_name) {
-                            // Ensure part is schema-compliant before returning
-                            let mut part_clone = part.clone();
-                            ensure_schema_arrays(
-                                &mut part_clone,
-                                schema
-                                    .get("properties")
-                                    .and_then(|p| p.get("parts"))
-                                    .and_then(|s| s.get("items"))
-                                    .unwrap_or(schema),
-                            );
-                            return json_to_lua_table(lua, &part_clone);
+                    fn find_part_recursive<'a>(
+                        parts: &'a [JsonValue],
+                        name: &str,
+                    ) -> Option<&'a JsonValue> {
+                        for part in parts {
+                            if part.get("name").and_then(|n| n.as_str()) == Some(name) {
+                                return Some(part);
+                            }
+                            if let Some(children) = part.get("children").and_then(|v| v.as_array())
+                                && let Some(found) = find_part_recursive(children, name)
+                            {
+                                return Some(found);
+                            }
                         }
+                        None
+                    }
+                    if let Some(part) = find_part_recursive(parts, &part_name) {
+                        // Ensure part is schema-compliant before returning
+                        let mut part_clone = part.clone();
+                        ensure_schema_arrays(
+                            &mut part_clone,
+                            schema
+                                .get("properties")
+                                .and_then(|p| p.get("parts"))
+                                .and_then(|s| s.get("items"))
+                                .unwrap_or(schema),
+                        );
+                        return json_to_lua_table(lua, &part_clone);
                     }
                 }
             }

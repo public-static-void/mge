@@ -4,6 +4,8 @@
 
 /// Shared bridge-domain contract for the scripting API-module registries
 pub mod api_registry;
+/// Central resolver for file-backed asset lookup paths
+pub mod asset_paths;
 /// Config module
 pub mod config;
 /// Diplomacy and faction-pair relationship system

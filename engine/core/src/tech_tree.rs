@@ -3,10 +3,11 @@
 //! Provides loading of tech tree definitions from JSON, per-entity tech progress
 //! management, prerequisite checking, and research queue manipulation.
 
+use crate::asset_paths::{resolve_asset_paths, schema_dir_override};
 use crate::ecs::world::World;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value as JsonValue, json};
-use std::path::Path;
+use std::path::PathBuf;
 use std::sync::OnceLock;
 
 /// A prerequisite for unlocking a tech node.
@@ -74,50 +75,67 @@ fn default_category() -> String {
     "general".to_string()
 }
 
+/// Minimum research cost enforced on load so a zero/negative cost can never
+/// cause a division-by-zero downstream. Extends the `default_*` serde pattern
+/// above with the named clamp both load and query paths share.
+pub const MIN_TECH_COST: f64 = 1.0;
+/// Fallback required skill level for skill-type prerequisites without one.
+pub const DEFAULT_REQUIRED_SKILL_LEVEL: f64 = 1.0;
+
 /// Loaded tech tree data: map of tech ID → TechNode.
 type TechTreeMap = Vec<TechNode>;
 
+/// Load the tech tree from explicit candidate paths (first hit wins).
+/// Pure over its inputs so tests can point it at relocated fixtures; the
+/// cached [`get_tech_tree_inner`] wrapper keeps production behavior.
+pub fn load_tech_tree_from_paths(paths: &[PathBuf]) -> Vec<TechNode> {
+    for path in paths {
+        if path.exists() {
+            match std::fs::read_to_string(path) {
+                Ok(content) => {
+                    if let Ok(json) = serde_json::from_str::<JsonValue>(&content)
+                        && let Some(techs) = json.get("techs").and_then(|v| v.as_array())
+                    {
+                        let nodes: Vec<TechNode> = techs
+                            .iter()
+                            .filter_map(|t| {
+                                let mut node: TechNode = serde_json::from_value(t.clone()).ok()?;
+                                // Ensure cost is at least 1 to avoid division by zero
+                                if node.cost < MIN_TECH_COST {
+                                    node.cost = MIN_TECH_COST;
+                                }
+                                Some(node)
+                            })
+                            .collect();
+                        if !nodes.is_empty() {
+                            return nodes;
+                        }
+                    }
+                }
+                Err(_) => continue,
+            }
+            break;
+        }
+    }
+    // Return empty vec if file not found or parse error
+    Vec::new()
+}
+
 /// Loads the tech tree from tech_tree.json on first access.
+/// Immutable after init, so no reset hook is needed: tests cover relocated
+/// fixtures through [`load_tech_tree_from_paths`].
 fn get_tech_tree_inner() -> &'static TechTreeMap {
     static TECH_TREE: OnceLock<TechTreeMap> = OnceLock::new();
     TECH_TREE.get_or_init(|| {
-        let paths = [
-            "engine/assets/schemas/tech_tree.json", // from workspace root
-            "../engine/assets/schemas/tech_tree.json", // from engine/ subdir
-            "../../engine/assets/schemas/tech_tree.json", // from engine/core/ subdir (tests)
-        ];
-        for path_str in &paths {
-            let path = Path::new(path_str);
-            if path.exists() {
-                match std::fs::read_to_string(path) {
-                    Ok(content) => {
-                        if let Ok(json) = serde_json::from_str::<JsonValue>(&content)
-                            && let Some(techs) = json.get("techs").and_then(|v| v.as_array())
-                        {
-                            let nodes: Vec<TechNode> = techs
-                                .iter()
-                                .filter_map(|t| {
-                                    let mut node: TechNode =
-                                        serde_json::from_value(t.clone()).ok()?;
-                                    // Ensure cost is at least 1 to avoid division by zero
-                                    if node.cost < 1.0 {
-                                        node.cost = 1.0;
-                                    }
-                                    Some(node)
-                                })
-                                .collect();
-                            if !nodes.is_empty() {
-                                return nodes;
-                            }
-                        }
-                    }
-                    Err(_) => continue,
-                }
-                break;
-            }
-        }
-        // Return empty vec if file not found or parse error
-        Vec::new()
+        load_tech_tree_from_paths(&resolve_asset_paths(
+            "tech_tree.json",
+            schema_dir_override(),
+            &[
+                "engine/assets/schemas/tech_tree.json", // from workspace root
+                "../engine/assets/schemas/tech_tree.json", // from engine/ subdir
+                "../../engine/assets/schemas/tech_tree.json", // from engine/core/ subdir (tests)
+            ],
+        ))
     })
 }
 
@@ -196,7 +214,7 @@ fn check_prerequisites(world: &World, entity: u32, node: &TechNode) -> Result<bo
                 }
             }
             "skill" => {
-                let required_level = prereq.level.unwrap_or(1.0);
+                let required_level = prereq.level.unwrap_or(DEFAULT_REQUIRED_SKILL_LEVEL);
                 let current_level = world
                     .get_component(entity, "SkillLevels")
                     .and_then(|sl| {

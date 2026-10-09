@@ -9,7 +9,8 @@ use std::collections::HashSet;
 /// Each tick, this system iterates entities with Sight, reads their Position,
 /// and stores visible cell sets in `world.visible_cells`.
 ///
-/// The FOV algorithm is auto-selected based on the map's topology type:
+/// The FOV algorithm is selected from the topology registry's
+/// [`preferred_fov`](super::topology_registry::TopologyEntry::preferred_fov):
 /// - `"square"` → [`RecursiveShadowcasting`]
 /// - `"hex"` / `"province"` → [`BfsFovAlgorithm`]
 ///
@@ -33,11 +34,11 @@ impl System for FovUpdateSystem {
             None => return,
         };
 
-        // Auto-select the FOV algorithm based on map topology
-        let desired = match map.topology_type() {
-            "hex" | "province" => "bfs_flood_fill",
-            _ => "recursive_shadowcasting",
-        };
+        // The preferred algorithm comes from the topology registry, so a
+        // newly registered topology picks its FOV without a core edit.
+        let desired = crate::map::topology_registry::resolve_topology(map.topology_type())
+            .map(|entry| entry.preferred_fov.algorithm_name())
+            .unwrap_or("recursive_shadowcasting");
         if world.fov_algorithm.name() != desired {
             match desired {
                 "bfs_flood_fill" => world.fov_algorithm = Box::new(BfsFovAlgorithm),

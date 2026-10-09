@@ -8,8 +8,16 @@ use crate::ecs::world::{Season, WeatherCondition, WeatherState};
 use crate::loot::LootTableRegistry;
 use crate::lore::{ChronicleEntry, ChronicleFilter, LoreState};
 use crate::map::CellKey;
+use crate::map::topology_registry::{
+    cell_key_from_json, default_cell, infer_neighbor_candidates, topology_matches_cell,
+};
 use crate::narrative::{NarrativeRecordKind, NarrativeSnapshot, NarrativeState, TriggerPredicate};
+use crate::systems::construction::system::construction_defaults;
+use crate::systems::crafting::crafting_defaults;
+use crate::systems::death_decay::health_defaults;
 use crate::systems::economic::recipe::Recipe;
+use crate::systems::economic::system::economic_defaults;
+use crate::systems::noise::{noise_defaults, propagate_noise_kernel};
 use crate::systems::temperature::{TemperatureState, compute_ambient_temperature};
 use crate::systems::weather::compute_visibility_modifier;
 use rand::rngs::SmallRng;
@@ -917,22 +925,26 @@ impl WasmWorld {
     /// skipped), but traverses the world's explicit adjacency
     /// (`WasmMap.neighbors`) instead of a grid `MapTopology`.
     fn tick_noise(&mut self) {
-        use std::collections::VecDeque;
-
         let mut noise_map: HashMap<CellKey, f64> = HashMap::new();
         if let (Some(map), Some(emitters)) =
             (self.map.as_ref(), self.components.get("NoiseEmitter"))
         {
             for (&entity, data) in emitters.iter() {
-                let active = data.get("active").and_then(|v| v.as_bool()).unwrap_or(true);
+                let active = data
+                    .get("active")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(noise_defaults::ACTIVE);
                 if !active {
                     continue;
                 }
                 let intensity = data
                     .get("intensity")
                     .and_then(|v| v.as_f64())
-                    .unwrap_or(1.0);
-                let radius = data.get("radius").and_then(|v| v.as_u64()).unwrap_or(5) as i32;
+                    .unwrap_or(noise_defaults::INTENSITY);
+                let radius = data
+                    .get("radius")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(noise_defaults::RADIUS) as i32;
 
                 let effective = if let Some(stealth) =
                     self.components.get("Stealth").and_then(|m| m.get(&entity))
@@ -941,7 +953,7 @@ impl WasmWorld {
                         * stealth
                             .get("noise_modifier")
                             .and_then(|v| v.as_f64())
-                            .unwrap_or(1.0)
+                            .unwrap_or(noise_defaults::NOISE_MODIFIER)
                 } else {
                     intensity
                 };
@@ -962,49 +974,42 @@ impl WasmWorld {
                     continue;
                 }
 
-                let origin_key = serde_json::to_string(&origin).unwrap_or_default();
-                let mut visited: HashSet<String> = HashSet::new();
-                let mut queue: VecDeque<(String, i32)> = VecDeque::new();
-                noise_map.insert(origin.clone(), effective);
-                visited.insert(origin_key.clone());
-                queue.push_back((origin_key, 0));
+                // BFS flood-fill with linear falloff through the explicit
+                // adjacency map. The JSON-string transport stays on this side:
+                // the adapters translate keys at the boundary and the shared
+                // kernel owns the propagation shape.
+                let neighbors_of = |cell: &CellKey| -> Vec<CellKey> {
+                    let key = serde_json::to_string(cell).unwrap_or_default();
+                    match map.neighbors.get(&key) {
+                        Some(keys) => keys
+                            .iter()
+                            .filter_map(|neighbor_key| serde_json::from_str(neighbor_key).ok())
+                            .filter(|cell: &CellKey| map.cells.contains(cell))
+                            .collect(),
+                        None => Vec::new(),
+                    }
+                };
+                let is_opaque = |cell: &CellKey| -> bool {
+                    let key = serde_json::to_string(cell).unwrap_or_default();
+                    map.cell_metadata
+                        .get(&key)
+                        .and_then(|m| m.get("transparent"))
+                        .and_then(|v| v.as_bool())
+                        .is_some_and(|t| !t)
+                };
+                let propagated =
+                    propagate_noise_kernel(&origin, effective, radius, neighbors_of, is_opaque);
 
-                while let Some((current_key, depth)) = queue.pop_front() {
-                    if depth >= radius {
-                        continue;
-                    }
-                    let neighbors = match map.neighbors.get(&current_key) {
-                        Some(n) => n,
-                        None => continue,
-                    };
-                    for neighbor_key in neighbors {
-                        let cell: CellKey = match serde_json::from_str(neighbor_key) {
-                            Ok(c) => c,
-                            Err(_) => continue,
-                        };
-                        if !map.cells.contains(&cell) || !visited.insert(neighbor_key.clone()) {
-                            continue;
-                        }
-                        let distance = depth + 1;
-                        let noise = effective * (radius - distance) as f64 / radius as f64;
-                        noise_map
-                            .entry(cell)
-                            .and_modify(|v| {
-                                if noise > *v {
-                                    *v = noise;
-                                }
-                            })
-                            .or_insert(noise);
-                        let opaque = map
-                            .cell_metadata
-                            .get(neighbor_key)
-                            .and_then(|m| m.get("transparent"))
-                            .and_then(|v| v.as_bool())
-                            .is_some_and(|t| !t);
-                        if !opaque {
-                            queue.push_back((neighbor_key.clone(), distance));
-                        }
-                    }
+                // Max-aggregation: take the max at each cell.
+                for (cell, noise) in propagated {
+                    noise_map
+                        .entry(cell)
+                        .and_modify(|v| {
+                            if noise > *v {
+                                *v = noise;
+                            }
+                        })
+                        .or_insert(noise);
                 }
             }
         }
@@ -1262,7 +1267,10 @@ impl WasmWorld {
         if let Some(healths) = self.components.get("Health") {
             for entity in &entity_ids {
                 if let Some(value) = healths.get(entity) {
-                    let current = value.get("current").and_then(|v| v.as_f64()).unwrap_or(1.0);
+                    let current = value
+                        .get("current")
+                        .and_then(|v| v.as_f64())
+                        .unwrap_or(health_defaults::DEFAULT_CURRENT);
                     if current <= 0.0 {
                         to_convert.push(*entity);
                     }
@@ -2527,7 +2535,7 @@ impl WasmWorld {
             .and_then(|m| m.get(&entity_id))
             .and_then(|v| v.get("state"))
             .and_then(|v| v.as_str())
-            .unwrap_or("pending")
+            .unwrap_or(economic_defaults::PENDING_STATE)
             .to_string()
     }
 
@@ -2650,12 +2658,10 @@ impl WasmWorld {
     }
 
     /// True when the cell variant matches the WASM map topology type.
+    /// Single dispatch point: the core topology registry owns the
+    /// variant-to-name pairing, so no call site repeats the closed match.
     fn construction_topology_matches(cell: &CellKey, topology_type: &str) -> bool {
-        match cell {
-            CellKey::Square { .. } => topology_type == "square",
-            CellKey::Hex { .. } => topology_type == "hex",
-            CellKey::Province { .. } => topology_type == "province",
-        }
+        topology_matches_cell(topology_type, cell)
     }
 
     /// Places a validated blueprint; returns the site entity id.
@@ -2788,10 +2794,10 @@ impl WasmWorld {
             .and_then(|m| m.get(&site_id))
         {
             let state = serde_json::json!({
-                "state": site.get("state").and_then(|v| v.as_str()).unwrap_or("pending"),
-                "progress": site.get("progress").and_then(|v| v.as_i64()).unwrap_or(0),
-                "required_work": site.get("required_work").and_then(|v| v.as_i64()).unwrap_or(1),
-                "building_type": site.get("building_type").and_then(|v| v.as_str()).unwrap_or(""),
+                "state": site.get("state").and_then(|v| v.as_str()).unwrap_or(construction_defaults::PENDING_STATE),
+                "progress": site.get("progress").and_then(|v| v.as_i64()).unwrap_or(construction_defaults::NO_PROGRESS),
+                "required_work": site.get("required_work").and_then(|v| v.as_i64()).unwrap_or(construction_defaults::UNIT_WORK),
+                "building_type": site.get("building_type").and_then(|v| v.as_str()).unwrap_or(construction_defaults::DEFAULT_BUILDING_TYPE),
             });
             return Ok(serde_json::to_string(&state).unwrap_or_default());
         }
@@ -2803,12 +2809,12 @@ impl WasmWorld {
             let integrity = building
                 .get("integrity")
                 .and_then(|v| v.as_i64())
-                .unwrap_or(0);
+                .unwrap_or(construction_defaults::DEFAULT_INTEGRITY);
             let state = serde_json::json!({
                 "state": "complete",
                 "progress": integrity,
                 "required_work": integrity,
-                "building_type": building.get("building_type").and_then(|v| v.as_str()).unwrap_or(""),
+                "building_type": building.get("building_type").and_then(|v| v.as_str()).unwrap_or(construction_defaults::DEFAULT_BUILDING_TYPE),
             });
             return Ok(serde_json::to_string(&state).unwrap_or_default());
         }
@@ -3425,7 +3431,7 @@ impl WasmWorld {
             .and_then(|m| m.get(&crafter))
             .and_then(|material| material.get("quality"))
             .map(Self::wasm_craft_num)
-            .unwrap_or(1.0);
+            .unwrap_or(crafting_defaults::DEFAULT_INPUT_QUALITY);
         let skill = self
             .components
             .get("SkillLevels")
@@ -3678,7 +3684,8 @@ impl WasmWorld {
 
     /// Adds a cell at (x, y, z). Sets topology type to "square" if unset.
     ///
-    /// Topology dispatch (R003): `"hex"` → `CellKey::Hex { q: x, r: y, z }`;
+    /// Cell construction dispatches through the topology registry
+    /// ([`default_cell`]): `"hex"` → `CellKey::Hex { q: x, r: y, z }`;
     /// `"square"`/`"none"`/empty → `CellKey::Square` (topology defaults to
     /// `"square"` when unset, byte-identical to the pre-parity behavior);
     /// `"province"` → no cell appended (province is intentionally z-less —
@@ -3688,13 +3695,8 @@ impl WasmWorld {
         if map.topology_type.is_empty() || map.topology_type == "none" {
             map.topology_type = "square".to_string();
         }
-        if map.topology_type == "province" {
+        let Some(cell) = default_cell(&map.topology_type, x, y, z) else {
             return;
-        }
-        let cell = if map.topology_type == "hex" {
-            CellKey::Hex { q: x, r: y, z }
-        } else {
-            CellKey::Square { x, y, z }
         };
         if !map.cells.contains(&cell) {
             map.cells.push(cell);
@@ -5630,28 +5632,8 @@ fn wasm_map_from_map_json(map_json: &str) -> Result<WasmMap, String> {
         ..WasmMap::default()
     };
 
-    let cell_from_json = |cell: &JsonValue| -> Result<CellKey, String> {
-        match topology {
-            "square" => Ok(CellKey::Square {
-                x: cell.get("x").and_then(|v| v.as_i64()).unwrap_or(0) as i32,
-                y: cell.get("y").and_then(|v| v.as_i64()).unwrap_or(0) as i32,
-                z: cell.get("z").and_then(|v| v.as_i64()).unwrap_or(0) as i32,
-            }),
-            "hex" => Ok(CellKey::Hex {
-                q: cell.get("q").and_then(|v| v.as_i64()).unwrap_or(0) as i32,
-                r: cell.get("r").and_then(|v| v.as_i64()).unwrap_or(0) as i32,
-                z: cell.get("z").and_then(|v| v.as_i64()).unwrap_or(0) as i32,
-            }),
-            "province" => Ok(CellKey::Province {
-                id: cell
-                    .get("id")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| "Province cell missing 'id'".to_string())?
-                    .to_string(),
-            }),
-            other => Err(format!("Unknown topology '{other}'")),
-        }
-    };
+    let cell_from_json =
+        |cell: &JsonValue| -> Result<CellKey, String> { cell_key_from_json(topology, cell) };
 
     // First pass: add all cells so neighbor inference can reference the set.
     for cell in cells {
@@ -5677,40 +5659,11 @@ fn wasm_map_from_map_json(map_json: &str) -> Result<WasmMap, String> {
             }
             map.neighbors.insert(key_str.clone(), neighbor_keys);
         } else {
-            let candidates: Vec<CellKey> = match topology {
-                "square" => match key {
-                    CellKey::Square { x, y, z } => [
-                        CellKey::Square { x: x + 1, y, z },
-                        CellKey::Square { x: x - 1, y, z },
-                        CellKey::Square { x, y: y + 1, z },
-                        CellKey::Square { x, y: y - 1, z },
-                    ]
-                    .to_vec(),
-                    _ => Vec::new(),
-                },
-                "hex" => match key {
-                    CellKey::Hex { q, r, z } => [
-                        CellKey::Hex { q: q + 1, r, z },
-                        CellKey::Hex { q: q - 1, r, z },
-                        CellKey::Hex { q, r: r + 1, z },
-                        CellKey::Hex { q, r: r - 1, z },
-                        CellKey::Hex {
-                            q: q + 1,
-                            r: r - 1,
-                            z,
-                        },
-                        CellKey::Hex {
-                            q: q - 1,
-                            r: r + 1,
-                            z,
-                        },
-                    ]
-                    .to_vec(),
-                    _ => Vec::new(),
-                },
-                // Province adjacency must be explicit.
-                _ => Vec::new(),
-            };
+            // Neighbor inference dispatches through the registry: grid
+            // topologies contribute adjacency candidates, explicit-only
+            // topologies (provinces) contribute none. The JSON-transport
+            // adapter stays here; only the candidate kernel is shared.
+            let candidates: Vec<CellKey> = infer_neighbor_candidates(topology, &key);
             let mut neighbor_keys = Vec::new();
             for candidate in candidates {
                 if map.cells.contains(&candidate) {

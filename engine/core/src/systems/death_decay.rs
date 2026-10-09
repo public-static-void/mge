@@ -2,6 +2,15 @@ use crate::ecs::system::System;
 use crate::ecs::world::World;
 use serde_json::json;
 
+/// Fallback defaults for health reads, following the `DungeonConfig::DEFAULT_*`
+/// precedent. Read by both the core death/decay systems and the WASM bridge
+/// `process_deaths` mirror.
+pub mod health_defaults {
+    /// Fallback `Health.current` when the field is absent or non-numeric:
+    /// a present-but-unreadable heart is treated as alive, never auto-killed.
+    pub const DEFAULT_CURRENT: f64 = 1.0;
+}
+
 /// System: Processes death for entities with a Health component.
 pub struct ProcessDeaths;
 
@@ -17,7 +26,7 @@ impl System for ProcessDeaths {
             for (&entity, value) in healths.iter() {
                 if let Some(obj) = value.as_object()
                     && let Some(current) = obj.get("current")
-                    && current.as_f64().unwrap_or(1.0) <= 0.0
+                    && current.as_f64().unwrap_or(health_defaults::DEFAULT_CURRENT) <= 0.0
                 {
                     to_process.push(entity);
                 }

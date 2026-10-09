@@ -75,9 +75,28 @@ impl World {
 
     /// Borrow-safe, idiomatic ECS tick.
     pub fn simulation_tick(world_rc: Rc<RefCell<World>>) {
-        // Get system names in deterministic execution order (R011)
-        let sorted_names = world_rc.borrow().systems.sorted_system_names();
-        let system_names: Vec<String> = crate::systems::order_systems(&sorted_names);
+        // Deterministic execution order (R011/R012): the closed pack first,
+        // unlisted systems by topological tie-break over System::dependencies.
+        let system_names: Vec<String> = {
+            let world = world_rc.borrow();
+            let sorted_names = world.systems.sorted_system_names();
+            let dependencies: std::collections::HashMap<String, Vec<String>> = sorted_names
+                .iter()
+                .filter_map(|name| {
+                    world.systems.get_system(name).map(|system| {
+                        (
+                            name.clone(),
+                            system
+                                .dependencies()
+                                .iter()
+                                .map(|d| d.to_string())
+                                .collect(),
+                        )
+                    })
+                })
+                .collect();
+            crate::systems::order_systems_with_dependencies(&sorted_names, &dependencies)
+        };
 
         for name in &system_names {
             // Take the system out of the registry, drop the borrow immediately

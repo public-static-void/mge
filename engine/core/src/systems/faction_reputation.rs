@@ -1,5 +1,6 @@
 use crate::ecs::system::System;
 use crate::ecs::world::World;
+use crate::faction::DEFAULT_DECAY_RATE;
 
 /// System: Processes reputation decay for entities with a Reputation component.
 /// Each tick, reputation values decay toward zero by the decay_rate.
@@ -24,7 +25,7 @@ impl System for FactionReputationSystem {
                 let decay_rate = value
                     .get("decay_rate")
                     .and_then(|v| v.as_f64())
-                    .unwrap_or(0.0);
+                    .unwrap_or(DEFAULT_DECAY_RATE);
 
                 // Skip if decay_rate is 0.0 or effectively zero
                 if decay_rate.abs() < f64::EPSILON {
