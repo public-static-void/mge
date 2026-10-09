@@ -22,7 +22,6 @@ use engine_core::systems::job::system::events::{
 };
 use engine_core::systems::job::{JobLogicKind, JobSystem, JobTypeData, assign_jobs};
 use serde_json::json;
-use std::fs;
 use std::sync::{Arc, Mutex};
 
 const MAX_TICKS: usize = 16;
@@ -1848,9 +1847,8 @@ fn test_job_cancel_and_failure_events() {
 
 #[test]
 fn test_job_event_logging_and_replay() {
-    // Clean up any previous test log
-    let log_path = "test_job_event_log.json";
-    let _ = fs::remove_file(log_path);
+    let tmp = tempfile::NamedTempFile::new().unwrap();
+    let log_path = tmp.path().to_str().unwrap();
 
     // --- Original run: emit events and save log ---
     let registry = Arc::new(Mutex::new(ComponentRegistry::default()));
@@ -1943,9 +1941,6 @@ fn test_job_event_logging_and_replay() {
         found,
         "Replayed event with entity=42, job_type=dig not found"
     );
-
-    // Clean up
-    let _ = fs::remove_file(log_path);
 }
 
 // --- Section: Progression ---
