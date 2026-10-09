@@ -1,3 +1,11 @@
+//! Dynamic-system transport shim.
+//!
+//! Classification: pure transport — stays here, no logic moves into
+//! `python_api/` domains. `SystemBridge` only stores interpreter callbacks
+//! and forwards them to the world's dependency-ordered dynamic-system
+//! registry; the `system` domain surface (`register_system`, `run_system`,
+//! `run_native_system`) is delegated from `python_api::world::PyWorld`.
+
 use engine_core::ecs::world::World;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;

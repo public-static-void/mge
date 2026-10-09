@@ -1,3 +1,11 @@
+//! Job-callback transport shim.
+//!
+//! Classification: pure transport — stays here, no logic moves into
+//! `python_api/` domains. This file only stores interpreter callbacks and
+//! invokes them with serialized job data; the job-domain logic
+//! (`assign_job`, `register_job_type`, `advance_job_state`) already lives in
+//! `python_api::job_api`, which calls into this shim for the callback hop.
+
 use pyo3::prelude::*;
 use pythonize::{depythonize, pythonize};
 use std::collections::HashMap;

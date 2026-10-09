@@ -113,6 +113,15 @@ fn wasm_registry_names_are_unique() {
 }
 
 #[test]
+fn host_api_alias_matches_engine_registry() {
+    use engine_wasm::host_api::{WASM_API_MODULES, wasm_api_module_names};
+    assert_eq!(
+        wasm_api_module_names(WASM_API_MODULES),
+        api_module_names(API_MODULES)
+    );
+}
+
+#[test]
 fn removing_a_module_unregisters_its_domain() {
     let (linker, mut store) = register_into_fresh_linker(API_MODULES);
     assert!(import_present(

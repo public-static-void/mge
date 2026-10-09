@@ -17,7 +17,7 @@ mod plugin_init;
 pub mod python_api;
 mod system_bridge;
 mod worldgen_bridge;
-use crate::python_api::UiApi;
+use crate::python_api::{UiApi, list_api_modules};
 use crate::worldgen_bridge::{
     invoke_worldgen_plugin, list_worldgen_plugins, register_worldgen_plugin,
     register_worldgen_postprocessor, register_worldgen_validator,
@@ -36,6 +36,7 @@ fn engine_py(_py: Python, m: &Bound<'_, pyo3::types::PyModule>) -> PyResult<()> 
     m.add_function(wrap_pyfunction!(register_worldgen_validator, m)?)?;
     m.add_function(wrap_pyfunction!(register_worldgen_postprocessor, m)?)?;
     m.add_class::<UiApi>()?;
+    m.add_function(wrap_pyfunction!(list_api_modules, m)?)?;
     m.add_function(wrap_pyfunction!(job_logger::py_init_job_event_logger, m)?)?;
     Ok(())
 }

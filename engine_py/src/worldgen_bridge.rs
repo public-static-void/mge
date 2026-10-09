@@ -1,3 +1,11 @@
+//! Worldgen plugin transport shim.
+//!
+//! Classification: pure transport — stays here, no logic moves into
+//! `python_api/` domains. Adapts interpreter callbacks onto the global
+//! worldgen registry (`register` / `invoke` / validator / postprocessor)
+//! plus the idempotent builtin-algorithm ensure helper; map application
+//! itself lives in `python_api::map_api`.
+
 use crate::PyObject;
 use engine_core::worldgen::{
     GLOBAL_WORLDGEN_REGISTRY, ThreadSafeScriptingWorldgenPlugin, ThreadSafeWorldgenPlugin,

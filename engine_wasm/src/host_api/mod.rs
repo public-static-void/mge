@@ -157,3 +157,14 @@ pub mod trade;
 /// Vehicle module (embark_vehicle, disembark_vehicle, assign_vehicle_path,
 /// get_vehicle_occupants, is_mounted)
 pub mod vehicle;
+
+// Re-export the bridge module protocol at the `host_api` level under the
+// cross-bridge canonical names: `WASM_API_MODULES` is the one-entry-per-domain
+// inventory (name + register-fn shape) pinned by
+// `tests/wasm_api_module_registry.rs`. The unit structs and registration
+// logic stay in `engine.rs`; this alias keeps the registry addressable from
+// the domain tree without duplicating it.
+pub use crate::engine::{
+    API_MODULES as WASM_API_MODULES, ApiModule as WasmApiModule,
+    api_module_names as wasm_api_module_names,
+};
