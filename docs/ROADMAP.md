@@ -91,6 +91,20 @@
 - [x] Development guide
 - [x] README
 
+## Engine Modularity (DRY/SOLID building blocks)
+
+- [x] Balanced-brace Lua test-runner discovery (no silently skipped test files)
+- [x] Job event log test-reset hook plus global test hooks (order-independent suites)
+- [x] C-plugin artifact guard shared by all native test legs
+- [x] Per-domain named defaults with no central god-object
+- [x] CLI default-system registration helper
+- [x] Shared noise propagation kernel across the core/WASM transport boundary
+- [x] Topology construction/dispatch registry (one-registration topologies)
+- [x] Dependency-aware system execution-order tie-break
+- [x] Asset-path resolver honoring environment overrides
+- [x] Bridge registry parity (WASM/Python module inventories pinned vs shared domains)
+- [x] Task decoupling (required_progress-routed handlers, component-read enemy params)
+
 ## Planetary World Generation
 
 - [ ] Planet-scale biome and climate assignment (temperature/humidity/pressure-driven biomes on a planet grid)

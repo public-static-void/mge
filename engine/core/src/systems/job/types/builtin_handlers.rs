@@ -1,5 +1,7 @@
 use crate::ecs::world::World;
-use crate::systems::job::types::job_type::{JobLogicKind, JobTypeData, JobTypeRegistry};
+use crate::systems::job::types::job_type::{
+    DEFAULT_REQUIRED_PROGRESS, JobLogicKind, JobTypeData, JobTypeRegistry,
+};
 use crate::systems::job::types::loader::load_job_types_from_dir;
 use std::path::Path;
 
@@ -37,7 +39,14 @@ pub fn register_builtin_job_handlers(
                     let progress =
                         job.get("progress").and_then(|v| v.as_f64()).unwrap_or(0.0) + 1.0;
                     job["progress"] = serde_json::json!(progress);
-                    if progress >= 3.0 {
+                    // Completion is routed through the per-job required_progress
+                    // field (same field the live progress path reads), falling
+                    // back to the shared default when the job omits it.
+                    let required_progress = job
+                        .get("required_progress")
+                        .and_then(|v| v.as_f64())
+                        .unwrap_or(DEFAULT_REQUIRED_PROGRESS);
+                    if progress >= required_progress {
                         job["state"] = serde_json::json!("complete");
                     } else {
                         job["state"] = serde_json::json!("in_progress");

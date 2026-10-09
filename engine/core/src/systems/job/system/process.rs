@@ -2,6 +2,7 @@
 
 use crate::asset_paths::{resolve_asset_paths, schema_dir_override};
 use crate::ecs::world::World;
+use crate::systems::job::types::job_type::DEFAULT_REQUIRED_PROGRESS;
 use rand::Rng;
 use serde_json::{Map, Value as JsonValue};
 use std::collections::HashMap;
@@ -383,7 +384,7 @@ fn default_job_progress(
     let required_progress = job
         .get("required_progress")
         .and_then(|v| v.as_f64())
-        .unwrap_or(3.0);
+        .unwrap_or(DEFAULT_REQUIRED_PROGRESS);
     if progress >= required_progress {
         job["progress"] = serde_json::json!(progress.max(required_progress));
         job["state"] = serde_json::json!("complete");
