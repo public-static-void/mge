@@ -131,7 +131,7 @@ setup-python:
 
 # Build/install Rust extension into venv using maturin (idempotent)
 build-python: setup-python
-	@command -v maturin >/dev/null 2>&1 || { echo >&2 "maturin is not installed. Aborting."; exit 1; }
+	@cd engine_py && . .venv/bin/activate && command -v maturin >/dev/null 2>&1 || { echo >&2 "maturin is not installed. Aborting."; exit 1; }
 	@echo "Building Python Rust extension with maturin..."
 	@cd engine_py && . .venv/bin/activate && maturin develop --release
 
