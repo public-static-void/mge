@@ -145,6 +145,7 @@ build-wheel:
 # Same logged guard as test-rust/test-lua: the Python suite needs the C .so
 # on LD_LIBRARY_PATH, so artifact reuse or rebuild is explicit in the log.
 test-python: build-c-plugins-if-needed build-python
+	@cd engine_py && . .venv/bin/activate && command -v pytest >/dev/null 2>&1 || { echo >&2 "pytest is not installed. Aborting."; exit 1; }
 	@echo "Running Python tests..."
 	@cd engine_py && . .venv/bin/activate && pytest
 
