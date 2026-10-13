@@ -12,6 +12,8 @@ If a capability cannot be justified by a specific game need, it does not belong 
 
 The ROADMAP is the feature inventory. It grows and gets refined as new game genres are targeted. Not all items need to be done for any single game — the ROADMAP reflects the total set of capabilities accumulated across all genre cycles, not a mandatory checklist for any one project.
 
+Separation contract: genre docs hold design requirements only, the ROADMAP holds roadmap-worthy feature inventory only, and implementation traceability lives in code, schemas, and KDs.
+
 ## Current Example: Roguelike
 
 The roguelike genre has driven the current implementation. This cycle produced:
