@@ -96,7 +96,7 @@
 - [ ] Planet-scale biome and climate assignment (temperature/humidity/pressure-driven biomes on a planet grid)
 - [ ] Planet-to-region-to-hex hierarchical link generation (auto-link child maps through the link-maps surface)
 - [ ] Native planet-gen worldgen plugin backend (Rust/C plugin emitting planet maps through the worldgen hook)
-- [ ] Cross-bridge planet-gen scenario coverage (Lua/Python/WASM dungeon-gen-parity tests for planet output)
+- [ ] Planet-gen output on all scripting bridges (planet maps usable from Lua, Python, and WASM)
 
 ## Strategy-Layer Presentation
 
@@ -109,4 +109,4 @@
 
 - [ ] Host-side shared-object reload flow (unload/reload, state migration through the ABI hot-reload pointer, system re-registration)
 - [ ] CLI reload trigger surfacing (reload a native plugin without restarting the simulation)
-- [ ] Save-safe reload round-trip tests (state preserved across a reload cycle in core plus Lua suites, reusing the save/load harness)
+- [ ] State-preserving native plugin reload (simulation state preserved across a reload cycle)
