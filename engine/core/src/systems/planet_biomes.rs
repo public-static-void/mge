@@ -107,9 +107,10 @@ fn parse_dim(params: &serde_json::Value, key: &str, default: i32) -> Result<i32,
 }
 
 /// Planet-biome generator — stateless handle carrying the registry name.
-/// The [`crate::worldgen::MapgenAlgorithm`] impl (square output + registration)
-/// lands in the next milestone; this milestone owns the pure climate model,
-/// the taxonomy, and config parsing.
+/// Implements [`crate::worldgen::MapgenAlgorithm`] below: `generate` parses
+/// [`PlanetBiomeConfig`] from the invocation params and emits the square map
+/// via [`generate_map`]. Pure climate model, taxonomy, and config parsing live
+/// alongside it in this module.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct PlanetBiomeGenerator;
 
@@ -195,4 +196,56 @@ pub fn classify_biome(temperature_c: f64, humidity01: f64, pressure_hpa: f64) ->
         return "temperate_grassland";
     }
     "barren"
+}
+
+/// Build the schema-valid `square` map JSON for `config`: every cell carries
+/// integer `x`/`y`/`z = 0`, a `biome` label, and the full 4-neighbourhood.
+/// Movement-relevant terrain rides on the top-level `terrain` slot (schema
+/// surface) mirrored into `metadata.terrain` (runtime surface: the vehicle
+/// guard and the presentation layer read terrain from cell metadata, which
+/// `square_from_json` loads only from `metadata`). The mirror is a single
+/// additive key — `walkable`/`transparent` stay unset so later merges and
+/// postprocessors keep their defaults.
+pub fn generate_map(config: &PlanetBiomeConfig) -> serde_json::Value {
+    let mut cells = Vec::with_capacity(config.width as usize * config.height as usize);
+    for y in 0..config.height {
+        for x in 0..config.width {
+            let (temperature_c, humidity01, pressure_hpa) =
+                cell_climate(config.seed, x, y, config.width, config.height);
+            let biome = classify_biome(temperature_c, humidity01, pressure_hpa);
+            let mut cell = serde_json::json!({
+                "x": x,
+                "y": y,
+                "z": 0,
+                "biome": biome,
+            });
+            if biome == "mountain" {
+                cell["terrain"] = serde_json::json!("mountain");
+                cell["metadata"] = serde_json::json!({"terrain": "mountain"});
+            }
+            let mut neighbors = Vec::with_capacity(4);
+            for (dx, dy) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
+                let (nx, ny) = (x + dx, y + dy);
+                if nx >= 0 && nx < config.width && ny >= 0 && ny < config.height {
+                    neighbors.push(serde_json::json!({"x": nx, "y": ny, "z": 0}));
+                }
+            }
+            cell["neighbors"] = serde_json::Value::Array(neighbors);
+            cells.push(cell);
+        }
+    }
+    serde_json::json!({
+        "topology": "square",
+        "cells": cells,
+    })
+}
+
+impl crate::worldgen::MapgenAlgorithm for PlanetBiomeGenerator {
+    fn name(&self) -> &str {
+        Self::NAME
+    }
+
+    fn generate(&self, params: &serde_json::Value) -> Result<serde_json::Value, String> {
+        PlanetBiomeConfig::from_params(params).map(|config| generate_map(&config))
+    }
 }

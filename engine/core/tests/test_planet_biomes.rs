@@ -1,7 +1,20 @@
+use engine_core::ecs::system::System;
+use engine_core::ecs::world::World;
+use engine_core::map::cell_key::CellKey;
 use engine_core::systems::planet_biomes::{
     PlanetBiomeConfig, PlanetBiomeGenerator, cell_climate, classify_biome,
 };
+use engine_core::systems::vehicle::VehicleSystem;
+use engine_core::worldgen::{
+    FALLBACK_MAPGEN_ALGORITHM, MapgenAlgorithm, ThreadSafeWorldgenRegistry, WorldgenRegistry,
+    register_builtin_mapgen_algorithms, register_builtin_mapgen_algorithms_local,
+};
 use serde_json::json;
+use std::collections::{HashMap, HashSet};
+
+#[path = "helpers/world.rs"]
+mod world_helper;
+use world_helper::make_test_world;
 
 const ALLOWED_BIOMES: [&str; 11] = [
     "polar_ice",
@@ -306,4 +319,377 @@ fn oversized_grid_is_rejected_before_allocation() {
         err.contains("width") || err.contains("height"),
         "error names a dimension: {err}"
     );
+}
+
+// ---- Generator square output plus dual-registry integration ----
+
+fn biome_by_coord(map: &serde_json::Value) -> HashMap<(i32, i32), String> {
+    map["cells"]
+        .as_array()
+        .expect("cells is an array")
+        .iter()
+        .map(|cell| {
+            (
+                (
+                    cell["x"].as_i64().expect("integer x") as i32,
+                    cell["y"].as_i64().expect("integer y") as i32,
+                ),
+                cell["biome"].as_str().expect("string biome").to_string(),
+            )
+        })
+        .collect()
+}
+
+fn neighbors_by_coord(map: &serde_json::Value) -> HashMap<(i32, i32), Vec<(i32, i32)>> {
+    map["cells"]
+        .as_array()
+        .expect("cells is an array")
+        .iter()
+        .map(|cell| {
+            let key = (
+                cell["x"].as_i64().expect("integer x") as i32,
+                cell["y"].as_i64().expect("integer y") as i32,
+            );
+            let neighbors = cell
+                .get("neighbors")
+                .and_then(|n| n.as_array())
+                .cloned()
+                .unwrap_or_default()
+                .iter()
+                .map(|n| {
+                    (
+                        n["x"].as_i64().expect("integer neighbor x") as i32,
+                        n["y"].as_i64().expect("integer neighbor y") as i32,
+                    )
+                })
+                .collect();
+            (key, neighbors)
+        })
+        .collect()
+}
+
+fn find_plain_to_mountain_step(map: &serde_json::Value) -> ((i32, i32), (i32, i32)) {
+    let biomes = biome_by_coord(map);
+    let cells: HashSet<(i32, i32)> = biomes.keys().cloned().collect();
+    for (pos, biome) in &biomes {
+        if biome != "mountain" {
+            continue;
+        }
+        for offset in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
+            let plain = (pos.0 + offset.0, pos.1 + offset.1);
+            if cells.contains(&plain) && biomes[&plain] != "mountain" {
+                return (plain, *pos);
+            }
+        }
+    }
+    panic!("seed must yield a mountain cell adjacent to a plain cell");
+}
+
+fn vehicle_step(x: i32, y: i32) -> serde_json::Value {
+    json!({"Square": {"x": x, "y": y, "z": 0}})
+}
+
+fn vehicle_cell(world: &World, eid: u32) -> CellKey {
+    CellKey::from_position(world.get_component(eid, "Position").unwrap()).unwrap()
+}
+
+fn drain(world: &mut World, event_type: &str) -> Vec<serde_json::Value> {
+    world.update_event_buses::<serde_json::Value>();
+    world.drain_events::<serde_json::Value>(event_type)
+}
+
+fn spawn_vehicle(world: &mut World, x: i32, y: i32, blocked_terrains: Vec<&str>) -> u32 {
+    let eid = world.spawn_entity();
+    world
+        .set_component(
+            eid,
+            "Position",
+            json!({"pos": {"Square": {"x": x, "y": y, "z": 0}}}),
+        )
+        .unwrap();
+    world
+        .set_component(
+            eid,
+            "Vehicle",
+            json!({
+                "capacity": 2,
+                "speed": 1,
+                "blocked_terrains": blocked_terrains,
+            }),
+        )
+        .unwrap();
+    eid
+}
+
+fn spawn_rider(world: &mut World, x: i32, y: i32) -> u32 {
+    let eid = world.spawn_entity();
+    world
+        .set_component(
+            eid,
+            "Position",
+            json!({"pos": {"Square": {"x": x, "y": y, "z": 0}}}),
+        )
+        .unwrap();
+    world
+        .set_component(eid, "Agent", json!({"entity_id": eid}))
+        .unwrap();
+    eid
+}
+
+#[test]
+fn planet_biomes_generates_square_grid_on_the_global_registry() {
+    let mut registry = ThreadSafeWorldgenRegistry::new();
+    register_builtin_mapgen_algorithms(&mut registry);
+    let map = registry
+        .invoke(
+            "planet_biomes",
+            &json!({"seed": 7, "width": 8, "height": 8}),
+        )
+        .expect("planet_biomes invokes on the global registry");
+    assert_eq!(map["topology"], "square");
+    assert_eq!(map["cells"].as_array().expect("cells array").len(), 64);
+}
+
+#[test]
+fn planet_biomes_generates_square_grid_on_the_local_registry() {
+    let mut registry = WorldgenRegistry::new();
+    register_builtin_mapgen_algorithms_local(&mut registry);
+    let map = registry
+        .invoke(
+            "planet_biomes",
+            &json!({"seed": 7, "width": 8, "height": 8}),
+        )
+        .expect("planet_biomes invokes on the local registry");
+    assert_eq!(map["topology"], "square");
+    assert_eq!(map["cells"].as_array().expect("cells array").len(), 64);
+}
+
+#[test]
+fn direct_generation_matches_registry_output_for_same_seed() {
+    let params = json!({"seed": 7, "width": 8, "height": 8});
+    let direct = PlanetBiomeGenerator
+        .generate(&params)
+        .expect("direct generation succeeds");
+    let mut registry = ThreadSafeWorldgenRegistry::new();
+    register_builtin_mapgen_algorithms(&mut registry);
+    let via_registry = registry
+        .invoke("planet_biomes", &params)
+        .expect("registry generation succeeds");
+    assert_eq!(
+        serde_json::to_string(&direct).unwrap(),
+        serde_json::to_string(&via_registry).unwrap()
+    );
+}
+
+#[test]
+fn every_cell_carries_a_known_biome_with_terrain_only_on_mountains() {
+    let map = PlanetBiomeGenerator
+        .generate(&json!({"seed": 42, "width": 32, "height": 32}))
+        .expect("generates");
+    let cells = map["cells"].as_array().expect("cells array");
+    assert_eq!(cells.len(), 1024);
+    let mut mountains = 0;
+    for cell in cells {
+        let biome = cell["biome"].as_str().expect("string biome");
+        assert!(ALLOWED_BIOMES.contains(&biome), "unknown biome {biome}");
+        assert_eq!(cell["z"], 0);
+        if biome == "mountain" {
+            mountains += 1;
+            assert_eq!(cell["terrain"], "mountain");
+        } else {
+            assert!(
+                cell.get("terrain").is_none(),
+                "non-mountain cell must omit terrain: {cell}"
+            );
+        }
+    }
+    assert!(mountains >= 1, "seed 42 must surface mountain coverage");
+}
+
+#[test]
+fn neighbor_lists_match_four_neighbourhood_expectations() {
+    let map = PlanetBiomeGenerator
+        .generate(&json!({"seed": 7, "width": 8, "height": 8}))
+        .expect("generates");
+    let neighbors = neighbors_by_coord(&map);
+    assert_eq!(neighbors[&(0, 0)].len(), 2, "corner has 2 neighbors");
+    assert_eq!(neighbors[&(7, 0)].len(), 2, "corner has 2 neighbors");
+    assert_eq!(neighbors[&(0, 7)].len(), 2, "corner has 2 neighbors");
+    assert_eq!(neighbors[&(7, 7)].len(), 2, "corner has 2 neighbors");
+    assert_eq!(neighbors[&(4, 0)].len(), 3, "edge has 3 neighbors");
+    assert_eq!(neighbors[&(0, 4)].len(), 3, "edge has 3 neighbors");
+    assert_eq!(neighbors[&(4, 4)].len(), 4, "interior has 4 neighbors");
+    for (pos, neighs) in &neighbors {
+        for n in neighs {
+            assert_ne!(*n, *pos, "no cell lists itself");
+            assert!(
+                (0..8).contains(&n.0) && (0..8).contains(&n.1),
+                "neighbor {n:?} of {pos:?} stays in bounds"
+            );
+        }
+        let mut unique = neighs.clone();
+        unique.sort();
+        unique.dedup();
+        assert_eq!(unique.len(), neighs.len(), "no duplicate neighbors");
+    }
+}
+
+#[test]
+fn tiny_grids_label_every_cell_with_correct_neighbor_counts() {
+    let single = PlanetBiomeGenerator
+        .generate(&json!({"seed": 3, "width": 1, "height": 1}))
+        .expect("1x1 generates");
+    let cells = single["cells"].as_array().expect("cells array");
+    assert_eq!(cells.len(), 1);
+    assert!(cells[0]["biome"].is_string());
+    assert_eq!(
+        cells[0]
+            .get("neighbors")
+            .and_then(|n| n.as_array())
+            .map_or(0, |n| n.len()),
+        0,
+        "lone cell has no neighbors"
+    );
+
+    let row = PlanetBiomeGenerator
+        .generate(&json!({"seed": 3, "width": 4, "height": 1}))
+        .expect("4x1 generates");
+    let neighbors = neighbors_by_coord(&row);
+    assert_eq!(neighbors.len(), 4);
+    assert_eq!(neighbors[&(0, 0)].len(), 1);
+    assert_eq!(neighbors[&(1, 0)].len(), 2);
+    assert_eq!(neighbors[&(2, 0)].len(), 2);
+    assert_eq!(neighbors[&(3, 0)].len(), 1);
+
+    let column = PlanetBiomeGenerator
+        .generate(&json!({"seed": 3, "width": 1, "height": 4}))
+        .expect("1x4 generates");
+    let neighbors = neighbors_by_coord(&column);
+    assert_eq!(neighbors.len(), 4);
+    assert_eq!(neighbors[&(0, 0)].len(), 1);
+    assert_eq!(neighbors[&(0, 1)].len(), 2);
+    assert_eq!(neighbors[&(0, 2)].len(), 2);
+    assert_eq!(neighbors[&(0, 3)].len(), 1);
+}
+
+#[test]
+fn generated_metadata_never_blocks_movement_by_default() {
+    let map = PlanetBiomeGenerator
+        .generate(&json!({"seed": 42, "width": 32, "height": 32}))
+        .expect("generates");
+    for cell in map["cells"].as_array().expect("cells array") {
+        if let Some(metadata) = cell.get("metadata") {
+            assert!(
+                metadata.get("walkable").and_then(|v| v.as_bool()) != Some(false),
+                "generated metadata must not mark cells unwalkable: {cell}"
+            );
+            assert!(
+                metadata.get("transparent").and_then(|v| v.as_bool()) != Some(false),
+                "generated metadata must not mark cells opaque: {cell}"
+            );
+        }
+    }
+}
+
+#[test]
+fn caller_metadata_keys_survive_alongside_generated_terrain() {
+    let map = PlanetBiomeGenerator
+        .generate(&json!({"seed": 7, "width": 8, "height": 8}))
+        .expect("generates");
+    let (_, mountain) = find_plain_to_mountain_step(&map);
+    let mut world = make_test_world();
+    world.apply_generated_map(&map).expect("map applies");
+    let key = CellKey::Square {
+        x: mountain.0,
+        y: mountain.1,
+        z: 0,
+    };
+    world.merge_cell_metadata(&key, json!({"walkable": true, "transparent": true}));
+    let metadata = world
+        .get_cell_metadata(&key)
+        .expect("mountain cell has metadata");
+    assert_eq!(
+        metadata["terrain"], "mountain",
+        "generated terrain survives an additive merge"
+    );
+    assert_eq!(metadata["walkable"], true);
+    assert_eq!(metadata["transparent"], true);
+}
+
+#[test]
+fn mountain_terrain_blocks_only_mountain_averse_vehicles() {
+    let map = PlanetBiomeGenerator
+        .generate(&json!({"seed": 7, "width": 8, "height": 8}))
+        .expect("generates");
+    let (plain, mountain) = find_plain_to_mountain_step(&map);
+
+    let mut wary = make_test_world();
+    wary.apply_generated_map(&map).expect("map applies");
+    let vehicle = spawn_vehicle(&mut wary, plain.0, plain.1, vec!["mountain"]);
+    let rider = spawn_rider(&mut wary, plain.0, plain.1);
+    wary.embark(vehicle, rider).unwrap();
+    wary.set_component(
+        vehicle,
+        "Vehicle",
+        json!({
+            "capacity": 2,
+            "speed": 1,
+            "blocked_terrains": ["mountain"],
+            "occupants": [rider],
+            "move_path": [vehicle_step(mountain.0, mountain.1)],
+        }),
+    )
+    .unwrap();
+    VehicleSystem.run(&mut wary);
+    assert_eq!(
+        vehicle_cell(&wary, vehicle),
+        CellKey::Square {
+            x: plain.0,
+            y: plain.1,
+            z: 0
+        },
+        "mountain-averse vehicle holds before mountain terrain"
+    );
+    assert_eq!(drain(&mut wary, "vehicle_move_blocked").len(), 1);
+
+    let mut bold = make_test_world();
+    bold.apply_generated_map(&map).expect("map applies");
+    let vehicle = spawn_vehicle(&mut bold, plain.0, plain.1, vec![]);
+    let rider = spawn_rider(&mut bold, plain.0, plain.1);
+    bold.embark(vehicle, rider).unwrap();
+    bold.set_component(
+        vehicle,
+        "Vehicle",
+        json!({
+            "capacity": 2,
+            "speed": 1,
+            "blocked_terrains": [],
+            "occupants": [rider],
+            "move_path": [vehicle_step(mountain.0, mountain.1)],
+        }),
+    )
+    .unwrap();
+    VehicleSystem.run(&mut bold);
+    assert_eq!(
+        vehicle_cell(&bold, vehicle),
+        CellKey::Square {
+            x: mountain.0,
+            y: mountain.1,
+            z: 0
+        },
+        "vehicle with no blocked terrains enters mountain terrain"
+    );
+    assert_eq!(drain(&mut bold, "vehicle_move_blocked").len(), 0);
+}
+
+#[test]
+fn default_algorithm_fallback_remains_dungeon() {
+    assert_eq!(FALLBACK_MAPGEN_ALGORITHM, "dungeon");
+    let mut registry = ThreadSafeWorldgenRegistry::new();
+    register_builtin_mapgen_algorithms(&mut registry);
+    assert!(registry.names().contains(&"planet_biomes".to_string()));
+    let map = registry
+        .invoke("dungeon", &json!({"seed": 7, "width": 8, "height": 8}))
+        .expect("dungeon still invokes");
+    assert_eq!(map["topology"], "square");
 }

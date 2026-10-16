@@ -126,7 +126,8 @@ fn builtin_registration_is_idempotent() {
     let mut registry = ThreadSafeWorldgenRegistry::new();
     register_builtin_mapgen_algorithms(&mut registry);
     register_builtin_mapgen_algorithms(&mut registry);
-    assert_eq!(registry.names().len(), 2);
+    // dungeon plus caves plus planet_biomes; re-registration replaces.
+    assert_eq!(registry.names().len(), 3);
 }
 
 #[test]
