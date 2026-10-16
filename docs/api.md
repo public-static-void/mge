@@ -126,6 +126,8 @@
 | `list_worldgen_plugins()`              | List all registered worldgen plugins     |
 | `register_worldgen_plugin(name, fn)`   | Register a worldgen plugin               |
 
+> **Builtin algorithms:** `dungeon`, `caves`, and `planet_biomes` ship in-core — see the [Builtin algorithms catalog](worldgen.md#builtin-algorithms) for invocation names, parameters, and output shapes.
+
 ---
 
 ## Job System
