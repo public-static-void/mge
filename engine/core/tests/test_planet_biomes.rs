@@ -1,16 +1,19 @@
 use engine_core::ecs::system::System;
 use engine_core::ecs::world::World;
 use engine_core::map::cell_key::CellKey;
+use engine_core::map::deserialize::validate_map_schema;
 use engine_core::systems::planet_biomes::{
     PlanetBiomeConfig, PlanetBiomeGenerator, cell_climate, classify_biome,
 };
 use engine_core::systems::vehicle::VehicleSystem;
 use engine_core::worldgen::{
-    FALLBACK_MAPGEN_ALGORITHM, MapgenAlgorithm, ThreadSafeWorldgenRegistry, WorldgenRegistry,
+    FALLBACK_MAPGEN_ALGORITHM, MapgenAlgoEntry, MapgenAlgorithm, ThreadSafeWorldgenPlugin,
+    ThreadSafeWorldgenRegistry, WorldgenError, WorldgenPlugin, WorldgenRegistry,
     register_builtin_mapgen_algorithms, register_builtin_mapgen_algorithms_local,
 };
 use serde_json::json;
 use std::collections::{HashMap, HashSet};
+use std::time::Instant;
 
 #[path = "helpers/world.rs"]
 mod world_helper;
@@ -692,4 +695,263 @@ fn default_algorithm_fallback_remains_dungeon() {
         .invoke("dungeon", &json!({"seed": 7, "width": 8, "height": 8}))
         .expect("dungeon still invokes");
     assert_eq!(map["topology"], "square");
+}
+
+// ---- Determinism plus pipeline compliance plus perf plus hygiene edges ----
+
+fn biome_histogram(map: &serde_json::Value) -> HashMap<String, usize> {
+    let mut counts = HashMap::new();
+    for cell in map["cells"].as_array().expect("cells array") {
+        let biome = cell["biome"].as_str().expect("string biome");
+        *counts.entry(biome.to_string()).or_insert(0) += 1;
+    }
+    counts
+}
+
+#[test]
+fn same_seed_invoked_twice_yields_byte_identical_json() {
+    let params = json!({"seed": 12345, "width": 16, "height": 16});
+    let mut registry = ThreadSafeWorldgenRegistry::new();
+    register_builtin_mapgen_algorithms(&mut registry);
+    let first = registry
+        .invoke("planet_biomes", &params)
+        .expect("first invocation succeeds");
+    let second = registry
+        .invoke("planet_biomes", &params)
+        .expect("second invocation succeeds");
+    assert_eq!(
+        serde_json::to_string(&first).unwrap(),
+        serde_json::to_string(&second).unwrap(),
+        "same seed must serialize byte-identically across invocations"
+    );
+}
+
+#[test]
+fn distinct_seeds_yield_different_biome_histograms() {
+    let mut registry = ThreadSafeWorldgenRegistry::new();
+    register_builtin_mapgen_algorithms(&mut registry);
+    let first = registry
+        .invoke(
+            "planet_biomes",
+            &json!({"seed": 1, "width": 32, "height": 32}),
+        )
+        .expect("seed 1 generates");
+    let second = registry
+        .invoke(
+            "planet_biomes",
+            &json!({"seed": 2, "width": 32, "height": 32}),
+        )
+        .expect("seed 2 generates");
+    assert_ne!(
+        biome_histogram(&first),
+        biome_histogram(&second),
+        "distinct seeds must not collapse to one constant output"
+    );
+}
+
+#[test]
+fn registry_output_passes_schema_validation_on_both_registries() {
+    let params = json!({"seed": 7, "width": 8, "height": 8});
+    let mut shared = ThreadSafeWorldgenRegistry::new();
+    register_builtin_mapgen_algorithms(&mut shared);
+    let global_map = shared
+        .invoke("planet_biomes", &params)
+        .expect("global invoke succeeds");
+    validate_map_schema(&global_map).expect("global output validates");
+
+    let mut local = WorldgenRegistry::new();
+    register_builtin_mapgen_algorithms_local(&mut local);
+    let local_map = local
+        .invoke("planet_biomes", &params)
+        .expect("local invoke succeeds");
+    validate_map_schema(&local_map).expect("local output validates");
+}
+
+#[test]
+fn cell_missing_its_x_coordinate_fails_schema_validation() {
+    let mut registry = ThreadSafeWorldgenRegistry::new();
+    register_builtin_mapgen_algorithms(&mut registry);
+    let mut map = registry
+        .invoke(
+            "planet_biomes",
+            &json!({"seed": 7, "width": 8, "height": 8}),
+        )
+        .expect("generates");
+    map["cells"][0]
+        .as_object_mut()
+        .expect("cell is an object")
+        .remove("x");
+    validate_map_schema(&map).expect_err("corrupted cell must fail validation");
+}
+
+#[test]
+fn corrupting_postprocessor_surfaces_a_validation_error_through_invoke() {
+    let mut registry = ThreadSafeWorldgenRegistry::new();
+    register_builtin_mapgen_algorithms(&mut registry);
+    registry.register_postprocessor(|map| {
+        map["cells"][0]
+            .as_object_mut()
+            .expect("cell is an object")
+            .remove("x");
+    });
+    let result = registry.invoke(
+        "planet_biomes",
+        &json!({"seed": 7, "width": 8, "height": 8}),
+    );
+    assert!(
+        matches!(result, Err(WorldgenError::ValidationError(_))),
+        "postprocessor corruption must surface as ValidationError, got {result:?}"
+    );
+}
+
+#[test]
+fn benign_postprocessor_keeps_output_schema_valid() {
+    let mut registry = ThreadSafeWorldgenRegistry::new();
+    register_builtin_mapgen_algorithms(&mut registry);
+    registry.register_postprocessor(|map| {
+        map["generated_by"] = json!("planet_biomes_postprocessor_probe");
+    });
+    let map = registry
+        .invoke(
+            "planet_biomes",
+            &json!({"seed": 7, "width": 8, "height": 8}),
+        )
+        .expect("invoke with benign postprocessor succeeds");
+    validate_map_schema(&map).expect("postprocessed output still validates");
+    assert_eq!(map["generated_by"], "planet_biomes_postprocessor_probe");
+}
+
+#[test]
+fn unknown_algorithm_names_planet_biomes_as_available() {
+    let mut shared = ThreadSafeWorldgenRegistry::new();
+    register_builtin_mapgen_algorithms(&mut shared);
+    match shared.invoke("no_such_algorithm", &json!({"seed": 7})) {
+        Err(WorldgenError::NotFound { available, .. }) => {
+            assert!(available.contains(&"planet_biomes".to_string()));
+        }
+        other => panic!("expected NotFound, got {other:?}"),
+    }
+
+    let mut local = WorldgenRegistry::new();
+    register_builtin_mapgen_algorithms_local(&mut local);
+    match local.invoke("no_such_algorithm", &json!({"seed": 7})) {
+        Err(WorldgenError::NotFound { available, .. }) => {
+            assert!(available.contains(&"planet_biomes".to_string()));
+        }
+        other => panic!("expected NotFound, got {other:?}"),
+    }
+}
+
+#[test]
+fn duplicate_planet_biomes_registration_without_replace_is_rejected() {
+    let mut shared = ThreadSafeWorldgenRegistry::new();
+    register_builtin_mapgen_algorithms(&mut shared);
+    let err = shared
+        .register(ThreadSafeWorldgenPlugin::from(MapgenAlgoEntry::new(
+            PlanetBiomeGenerator,
+        )))
+        .expect_err("second registration without replace must fail");
+    assert_eq!(
+        err.to_string(),
+        "duplicate worldgen plugin name: planet_biomes"
+    );
+
+    let mut local = WorldgenRegistry::new();
+    register_builtin_mapgen_algorithms_local(&mut local);
+    let err = local
+        .register(WorldgenPlugin::from(MapgenAlgoEntry::new(
+            PlanetBiomeGenerator,
+        )))
+        .expect_err("second registration without replace must fail");
+    assert_eq!(
+        err.to_string(),
+        "duplicate worldgen plugin name: planet_biomes"
+    );
+}
+
+#[test]
+fn builtin_re_registration_stays_idempotent() {
+    let mut shared = ThreadSafeWorldgenRegistry::new();
+    register_builtin_mapgen_algorithms(&mut shared);
+    register_builtin_mapgen_algorithms(&mut shared);
+    assert_eq!(shared.names().len(), 3, "replace keeps exactly 3 builtins");
+    shared
+        .invoke(
+            "planet_biomes",
+            &json!({"seed": 7, "width": 8, "height": 8}),
+        )
+        .expect("planet_biomes still resolves after re-registration");
+}
+
+#[test]
+fn single_row_and_single_cell_grids_succeed_and_validate() {
+    let row = PlanetBiomeGenerator
+        .generate(&json!({"seed": 42, "width": 8, "height": 1}))
+        .expect("8x1 generates");
+    assert_eq!(row["cells"].as_array().expect("cells array").len(), 8);
+    validate_map_schema(&row).expect("8x1 output validates");
+    for cell in row["cells"].as_array().expect("cells array") {
+        let biome = cell["biome"].as_str().expect("string biome");
+        assert_ne!(biome, "polar_ice", "single-row grid stays equatorial");
+        assert_ne!(biome, "tundra", "single-row grid stays equatorial");
+    }
+
+    let single = PlanetBiomeGenerator
+        .generate(&json!({"seed": 42, "width": 1, "height": 1}))
+        .expect("1x1 generates");
+    validate_map_schema(&single).expect("1x1 output validates");
+}
+
+#[test]
+fn default_grid_generates_in_under_one_second() {
+    let started = Instant::now();
+    let map = PlanetBiomeGenerator
+        .generate(&json!({"seed": 42, "width": 32, "height": 32}))
+        .expect("generates");
+    let elapsed = started.elapsed();
+    eprintln!("planet_biomes 32x32 generated in {elapsed:?}");
+    assert_eq!(map["cells"].as_array().expect("cells array").len(), 1024);
+    assert!(
+        elapsed.as_secs() < 1,
+        "default 32x32 grid must complete in < 1 s, took {elapsed:?}"
+    );
+}
+
+#[test]
+fn large_grid_generates_in_under_five_seconds() {
+    let started = Instant::now();
+    let map = PlanetBiomeGenerator
+        .generate(&json!({"seed": 42, "width": 256, "height": 256}))
+        .expect("generates");
+    let elapsed = started.elapsed();
+    eprintln!("planet_biomes 256x256 generated in {elapsed:?}");
+    assert_eq!(
+        map["cells"].as_array().expect("cells array").len(),
+        256 * 256
+    );
+    assert!(
+        elapsed.as_secs() < 5,
+        "256x256 grid must complete in < 5 s, took {elapsed:?}"
+    );
+}
+
+#[test]
+fn time_seeded_generation_is_schema_valid() {
+    let config = PlanetBiomeConfig::from_params(&json!({})).expect("defaults apply");
+    let map = PlanetBiomeGenerator
+        .generate(&json!({"width": config.width, "height": config.height}))
+        .expect("time-seeded generation succeeds");
+    validate_map_schema(&map).expect("time-seeded output validates");
+}
+
+#[test]
+fn oversized_1024_grid_is_rejected_descriptively() {
+    let err = PlanetBiomeConfig::from_params(&json!({"seed": 1, "width": 1024, "height": 1024}))
+        .expect_err("1024x1024 exceeds the cell cap");
+    assert!(
+        err.contains("width") || err.contains("height"),
+        "error names a dimension: {err}"
+    );
+    let result = PlanetBiomeGenerator.generate(&json!({"seed": 1, "width": 1024, "height": 1024}));
+    assert!(result.is_err(), "generator refuses the oversized grid");
 }
