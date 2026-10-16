@@ -462,11 +462,15 @@ pub fn resolve_algorithm_name(config_default: Option<&str>, params: &JsonValue) 
 pub fn register_builtin_mapgen_algorithms(registry: &mut ThreadSafeWorldgenRegistry) {
     use crate::systems::cellular_caves::CellularCavesGenerator;
     use crate::systems::dungeon::DungeonGenerator;
+    use crate::systems::planet_biomes::PlanetBiomeGenerator;
     registry.register_or_replace(ThreadSafeWorldgenPlugin::from(MapgenAlgoEntry::new(
         DungeonGenerator,
     )));
     registry.register_or_replace(ThreadSafeWorldgenPlugin::from(MapgenAlgoEntry::new(
         CellularCavesGenerator,
+    )));
+    registry.register_or_replace(ThreadSafeWorldgenPlugin::from(MapgenAlgoEntry::new(
+        PlanetBiomeGenerator,
     )));
 }
 
@@ -475,9 +479,13 @@ pub fn register_builtin_mapgen_algorithms(registry: &mut ThreadSafeWorldgenRegis
 pub fn register_builtin_mapgen_algorithms_local(registry: &mut WorldgenRegistry) {
     use crate::systems::cellular_caves::CellularCavesGenerator;
     use crate::systems::dungeon::DungeonGenerator;
+    use crate::systems::planet_biomes::PlanetBiomeGenerator;
     registry.register_or_replace(WorldgenPlugin::from(MapgenAlgoEntry::new(DungeonGenerator)));
     registry.register_or_replace(WorldgenPlugin::from(MapgenAlgoEntry::new(
         CellularCavesGenerator,
+    )));
+    registry.register_or_replace(WorldgenPlugin::from(MapgenAlgoEntry::new(
+        PlanetBiomeGenerator,
     )));
 }
 

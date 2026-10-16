@@ -45,5 +45,6 @@ def test_unknown_algorithm_names_candidates():
         message = str(exc)
         assert "dungeon" in message
         assert "caves" in message
+        assert "planet_biomes" in message
     else:
         raise AssertionError("unknown algorithm name must raise")

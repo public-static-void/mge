@@ -50,6 +50,8 @@ pub mod movement_system;
 pub mod narrative;
 /// Noise propagation system
 pub mod noise;
+/// Planet-scale biome and climate assignment (generator-local climate model)
+pub mod planet_biomes;
 /// Research system
 pub mod research;
 /// Stat calculation system

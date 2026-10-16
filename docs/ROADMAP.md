@@ -93,7 +93,7 @@
 
 ## Planetary World Generation
 
-- [ ] Planet-scale biome and climate assignment (temperature/humidity/pressure-driven biomes on a planet grid)
+- [x] Planet-scale biome and climate assignment (temperature/humidity/pressure-driven biomes on a planet grid)
 - [ ] Planet-to-region-to-hex hierarchical link generation (auto-link child maps through the link-maps surface)
 - [ ] Native planet-gen worldgen plugin backend (Rust/C plugin emitting planet maps through the worldgen hook)
 - [ ] Planet-gen output on all scripting bridges (planet maps usable from Lua, Python, and WASM)
