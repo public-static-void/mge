@@ -1,8 +1,9 @@
 # MGE Scripting API Reference
 
 > **Note:**
-> All functions below are available in both **Lua** (as global functions or methods on the `world` userdata) and **Python** (as methods on the `PyWorld` class).
-> See [docs/examples.md](examples.md) for usage in both languages.
+> All functions below are available in an identical surface in **Lua** (as global functions or methods on the `world` userdata), **Python** (as methods on the `PyWorld` class), and **WASM** (as host functions called from the guest module).
+> WASM uses JSON-string transport: where Lua passes a table and Python passes a dict, the WASM guest passes or parses the same shape as a JSON string.
+> See [docs/examples.md](examples.md) for usage in all three bridges.
 
 ---
 
