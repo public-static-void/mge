@@ -1,4 +1,4 @@
-use super::{MapLink, World};
+use super::{HierarchyLevel, HierarchyReport, MAX_HIERARCHY_CELLS, MapLink, World, child_subseed};
 use crate::map::CellKey;
 use crate::map::Map;
 use serde_json::Value as JsonValue;
@@ -256,6 +256,118 @@ impl World {
         out
     }
 
+    /// Generate and link a bounded hierarchy of child maps rooted at `root`.
+    ///
+    /// For each level in `levels` (in order), one child map is generated per cell
+    /// of the current frontier (the root's cells at depth 0, then each generated
+    /// child's cells at the next depth). Each child is registered under
+    /// `"{parent}/L{level}/{cell_token}"` and its parent cell is linked to the
+    /// child's topology-appropriate origin cell (`square`/`hex` `{0,0,0}`).
+    ///
+    /// Determinism (R007/NFR001): child names use a collision-free per-topology
+    /// cell token; child seeds come from [`child_subseed`] over
+    /// `(seed, level, parent cell)`; the frontier is processed in canonical
+    /// `(parent name, cell key)` order, so `HashMap` iteration order never affects
+    /// the output. The algorithm is resolved through the global worldgen registry.
+    ///
+    /// Bounded allocation (NFR002): the projected budget
+    /// `root_cell_count * Π(width_i * height_i)` is computed up front and an `Err`
+    /// is returned before any registration or link mutation when it exceeds
+    /// [`MAX_HIERARCHY_CELLS`].
+    ///
+    /// `province`-topology children are out of generation scope (their cells carry
+    /// no grid coordinates); a province frontier cell errors. All error paths
+    /// return deterministic messages and never panic (NFR003).
+    pub fn generate_hierarchy(
+        &mut self,
+        root: &str,
+        seed: u64,
+        levels: &[HierarchyLevel],
+    ) -> Result<HierarchyReport, String> {
+        let root_cells: Vec<CellKey> = {
+            let root_map = self
+                .maps
+                .get(root)
+                .ok_or_else(|| format!("Map '{root}' is not registered"))?;
+            root_map.all_cells()
+        };
+
+        // Projected budget, validated before any mutation (NFR002).
+        let mut projected: usize = root_cells.len();
+        for (index, level) in levels.iter().enumerate() {
+            if level.width <= 0 || level.height <= 0 {
+                return Err(format!(
+                    "Hierarchy level {index} has non-positive dimensions {}x{}",
+                    level.width, level.height
+                ));
+            }
+            let per_child = (level.width as usize).saturating_mul(level.height as usize);
+            projected = projected
+                .checked_mul(per_child)
+                .ok_or_else(|| format!("Hierarchy cell budget overflows at level {index}"))?;
+            if projected > MAX_HIERARCHY_CELLS {
+                return Err(format!(
+                    "Hierarchy projected {projected} cells exceeds MAX_HIERARCHY_CELLS \
+                     ({MAX_HIERARCHY_CELLS}) at level {index}"
+                ));
+            }
+        }
+
+        let mut generated_maps: Vec<String> = Vec::new();
+        let mut total_cells: usize = 0;
+        // Frontier entries: `(parent map name, parent cell)`; the next level
+        // generates one child per entry.
+        let mut frontier: Vec<(String, CellKey)> = root_cells
+            .iter()
+            .map(|cell| (root.to_string(), cell.clone()))
+            .collect();
+
+        for (index, level) in levels.iter().enumerate() {
+            let child_level = (index + 1) as u32;
+            // Canonical order keeps generation deterministic despite HashMap order.
+            frontier.sort_by_cached_key(|(name, cell)| (name.clone(), canonical_cell_key(cell)));
+
+            let mut next_frontier: Vec<(String, CellKey)> = Vec::new();
+            for (parent_name, parent_cell) in &frontier {
+                let token = hierarchy_cell_token(parent_cell)?;
+                let child_name = format!("{parent_name}/L{child_level}/{token}");
+                if self.maps.contains_key(&child_name) {
+                    return Err(format!(
+                        "Generated child map '{child_name}' is already registered"
+                    ));
+                }
+                let child_seed = child_subseed(seed, child_level, parent_cell);
+                let params = serde_json::json!({
+                    "seed": child_seed,
+                    "width": level.width,
+                    "height": level.height,
+                });
+                let child_json = invoke_mapgen_algorithm(&level.algorithm, &params)?;
+                let child_map = Map::from_json(&child_json)?;
+                let origin = hierarchy_origin_cell(child_map.topology_type())?;
+                if !child_map.contains(&origin) {
+                    return Err(format!(
+                        "Generated child map '{child_name}' is missing its origin cell {origin:?}"
+                    ));
+                }
+                let child_cells = child_map.all_cells();
+                self.register_map(&child_name, child_map)?;
+                self.link_maps(parent_name, parent_cell.clone(), &child_name, origin)?;
+                total_cells += child_cells.len();
+                generated_maps.push(child_name.clone());
+                for cell in child_cells {
+                    next_frontier.push((child_name.clone(), cell));
+                }
+            }
+            frontier = next_frontier;
+        }
+
+        Ok(HierarchyReport {
+            generated_maps,
+            total_cells,
+        })
+    }
+
     /// Position the camera entity at the given cell (find or create the camera entity).
     ///
     /// The camera is an entity with `Camera` + `Position` components, mirroring
@@ -301,4 +413,44 @@ impl World {
 /// iteration order.
 fn canonical_cell_key(cell: &CellKey) -> String {
     serde_json::to_string(cell).unwrap_or_default()
+}
+
+/// Collision-free per-topology token encoding a parent cell into a child name.
+///
+/// Square cells render as `x{x}_y{y}_z{z}` and hex cells as `q{q}_r{r}_z{z}`;
+/// the coordinate prefixes keep the encodings unambiguous. Province cells are out
+/// of hierarchy generation scope.
+fn hierarchy_cell_token(cell: &CellKey) -> Result<String, String> {
+    match cell {
+        CellKey::Square { x, y, z } => Ok(format!("x{x}_y{y}_z{z}")),
+        CellKey::Hex { q, r, z } => Ok(format!("q{q}_r{r}_z{z}")),
+        CellKey::Province { id } => Err(format!(
+            "Province cell '{id}' is out of hierarchy generation scope (square/hex only)"
+        )),
+    }
+}
+
+/// Topology-appropriate origin cell of a generated child map: `{0,0,0}` for the
+/// uniform grid topologies the helper generates. Non-grid topologies error.
+fn hierarchy_origin_cell(topology: &str) -> Result<CellKey, String> {
+    match topology {
+        "square" => Ok(CellKey::Square { x: 0, y: 0, z: 0 }),
+        "hex" => Ok(CellKey::Hex { q: 0, r: 0, z: 0 }),
+        other => Err(format!(
+            "Topology '{other}' has no supported origin cell for hierarchy generation \
+             (square/hex only)"
+        )),
+    }
+}
+
+/// Resolve and run a registered map-generation algorithm through the global
+/// worldgen registry — the same pipeline the `invoke_worldgen_plugin` path uses.
+/// Maps every registry failure to a deterministic, algorithm-named message.
+fn invoke_mapgen_algorithm(algorithm: &str, params: &JsonValue) -> Result<JsonValue, String> {
+    let registry = crate::worldgen::GLOBAL_WORLDGEN_REGISTRY
+        .lock()
+        .map_err(|_| "Worldgen registry lock is poisoned".to_string())?;
+    registry
+        .invoke(algorithm, params)
+        .map_err(|err| format!("Worldgen algorithm '{algorithm}' is unavailable or failed: {err}"))
 }

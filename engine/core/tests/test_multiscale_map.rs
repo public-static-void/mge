@@ -617,3 +617,228 @@ fn test_map_hierarchy_is_runtime_only_and_absent_after_load() {
     assert!(loaded.map_links.is_empty(), "links are runtime-only");
     assert_eq!(loaded.map_cell("planet", &source), None);
 }
+
+// --- M4: hierarchical auto-link helper generate_hierarchy ---
+
+use engine_core::ecs::world::{HierarchyLevel, MAX_HIERARCHY_CELLS, child_subseed};
+use engine_core::worldgen::{GLOBAL_WORLDGEN_REGISTRY, reset_for_tests};
+use serde_json::json;
+
+/// Canonical JSON projection of a map: every cell plus its metadata, serialized
+/// in deterministic canonical-key order. Two maps with equal projections carry
+/// identical cells and metadata, so this is the byte-comparable surface for the
+/// "child map JSON" determinism claim (the map's algorithm-specific top-level
+/// fields are not retained by `Map`).
+fn canonical_map_json(map: &Map) -> String {
+    let mut cells = map.all_cells();
+    cells.sort_by_cached_key(|c| serde_json::to_string(c).unwrap());
+    let entries: Vec<serde_json::Value> = cells
+        .iter()
+        .map(|c| json!({ "cell": c, "metadata": map.get_cell_metadata(c) }))
+        .collect();
+    serde_json::to_string(&entries).unwrap()
+}
+
+// AC008 (R007): a one-level spec over a 2-cell parent registers one child map
+// per parent cell; each parent cell resolves to its child's origin cell, and
+// enter_map(child, origin) -> exit_map() round-trips back to the parent.
+#[test]
+fn test_generate_hierarchy_two_cell_parent_one_level() {
+    reset_for_tests();
+    let mut world = make_test_world();
+    world.register_map("planet", square_map()).unwrap();
+    world.set_active_map("planet").unwrap();
+
+    let levels = vec![HierarchyLevel {
+        algorithm: "planet_biomes".to_string(),
+        width: 2,
+        height: 2,
+    }];
+    let report = world.generate_hierarchy("planet", 12345, &levels).unwrap();
+
+    // One child per parent cell, both registered.
+    assert_eq!(
+        report.generated_maps.len(),
+        2,
+        "one child map per parent cell"
+    );
+    for name in &report.generated_maps {
+        assert!(
+            world.get_map_names().contains(name),
+            "generated child '{name}' must be registered"
+        );
+        assert_eq!(world.maps[name].topology_type(), "square");
+    }
+    // Two children of 2x2 cells each.
+    assert_eq!(report.total_cells, 8);
+
+    // Each parent cell links to a distinct child, resolving to the child origin.
+    let links = world.links_from("planet");
+    assert_eq!(links.len(), 2);
+    let origin = CellKey::Square { x: 0, y: 0, z: 0 };
+    for link in &links {
+        assert!(
+            report.generated_maps.contains(&link.target_map),
+            "link target '{}' must be a generated child",
+            link.target_map
+        );
+        assert_eq!(
+            link.target_cell, origin,
+            "link targets the child origin cell"
+        );
+        assert_eq!(
+            world.map_cell("planet", &link.source_cell),
+            Some(origin.clone())
+        );
+        assert!(world.maps[&link.target_map].contains(&origin));
+    }
+    assert_ne!(
+        links[0].target_map, links[1].target_map,
+        "the two parent cells must fan out to two distinct children"
+    );
+
+    // Traversal round-trip: enter a child at its origin, then leave to the parent.
+    let child = report.generated_maps[0].clone();
+    world.enter_map(&child, origin.clone()).unwrap();
+    assert_eq!(world.get_active_map_name(), child);
+    world.exit_map().unwrap();
+    assert_eq!(world.get_active_map_name(), "planet");
+}
+
+// AC009 (R007, NFR001): the same seed over two fresh worlds yields identical
+// map-name set, links_from output, and byte-identical child map JSON.
+#[test]
+fn test_generate_hierarchy_deterministic_across_fresh_worlds() {
+    reset_for_tests();
+    let levels = vec![HierarchyLevel {
+        algorithm: "planet_biomes".to_string(),
+        width: 2,
+        height: 2,
+    }];
+
+    let mut world_a = make_test_world();
+    world_a.register_map("planet", square_map()).unwrap();
+    let report_a = world_a.generate_hierarchy("planet", 777, &levels).unwrap();
+
+    let mut world_b = make_test_world();
+    world_b.register_map("planet", square_map()).unwrap();
+    let report_b = world_b.generate_hierarchy("planet", 777, &levels).unwrap();
+
+    // Deterministic generation order, names, and link table across processes.
+    assert_eq!(report_a.generated_maps, report_b.generated_maps);
+    assert_eq!(world_a.links_from("planet"), world_b.links_from("planet"));
+
+    let mut names_a = world_a.get_map_names();
+    let mut names_b = world_b.get_map_names();
+    names_a.sort();
+    names_b.sort();
+    assert_eq!(names_a, names_b);
+
+    // Byte-identical canonical child-map JSON.
+    for name in &report_a.generated_maps {
+        assert_eq!(
+            canonical_map_json(&world_a.maps[name]),
+            canonical_map_json(&world_b.maps[name]),
+            "child '{name}' JSON must be byte-identical across worlds"
+        );
+    }
+}
+
+// AC009 (R007): the child JSON is a pure function of the helper's derived
+// per-cell seed — re-invoking the registered algorithm with that seed reproduces
+// the registered child map exactly.
+#[test]
+fn test_generate_hierarchy_child_json_matches_registry_with_derived_seed() {
+    reset_for_tests();
+    let mut world = make_test_world();
+    world.register_map("planet", square_map()).unwrap();
+
+    let levels = vec![HierarchyLevel {
+        algorithm: "planet_biomes".to_string(),
+        width: 2,
+        height: 2,
+    }];
+    world.generate_hierarchy("planet", 555, &levels).unwrap();
+
+    for link in world.links_from("planet") {
+        let child_seed = child_subseed(555, 1, &link.source_cell);
+        let params = json!({ "seed": child_seed, "width": 2, "height": 2 });
+        let json_value = GLOBAL_WORLDGEN_REGISTRY
+            .lock()
+            .unwrap()
+            .invoke("planet_biomes", &params)
+            .unwrap();
+        let reconstructed = Map::from_json(&json_value).unwrap();
+        assert_eq!(
+            canonical_map_json(&reconstructed),
+            canonical_map_json(&world.maps[&link.target_map]),
+            "child '{}' must equal a direct algorithm invocation with its derived seed",
+            link.target_map
+        );
+    }
+}
+
+// AC010 (NFR002): a level whose projected budget exceeds MAX_HIERARCHY_CELLS
+// returns Err and mutates nothing (no partial registration or linking).
+#[test]
+fn test_generate_hierarchy_over_cap_errors_without_partial_state() {
+    reset_for_tests();
+    let mut world = make_test_world();
+    world.register_map("planet", square_map()).unwrap();
+
+    // 2 root cells * (800_000 * 1) = 1_600_000 > MAX_HIERARCHY_CELLS.
+    let levels = vec![HierarchyLevel {
+        algorithm: "planet_biomes".to_string(),
+        width: 800_000,
+        height: 1,
+    }];
+    let projected = 2usize * (levels[0].width as usize) * (levels[0].height as usize);
+    assert!(
+        projected > MAX_HIERARCHY_CELLS,
+        "fixture must project above the cell cap"
+    );
+
+    let err = world.generate_hierarchy("planet", 1, &levels).unwrap_err();
+    assert!(
+        err.contains("MAX_HIERARCHY_CELLS") || err.contains("exceeds"),
+        "error must name the cell budget: {err}"
+    );
+
+    // No partial state: parent alone, no links.
+    assert_eq!(world.get_map_names(), vec!["planet".to_string()]);
+    assert!(world.links_from("planet").is_empty());
+}
+
+// R007 (NFR003): a non-positive level dimension is rejected without mutation.
+#[test]
+fn test_generate_hierarchy_non_positive_dimension_errors() {
+    reset_for_tests();
+    let mut world = make_test_world();
+    world.register_map("planet", square_map()).unwrap();
+
+    let levels = vec![HierarchyLevel {
+        algorithm: "planet_biomes".to_string(),
+        width: 0,
+        height: 4,
+    }];
+    assert!(world.generate_hierarchy("planet", 1, &levels).is_err());
+    assert_eq!(world.get_map_names(), vec!["planet".to_string()]);
+    assert!(world.links_from("planet").is_empty());
+}
+
+// R007: the per-cell child seed is a deterministic pure function of
+// (seed, level, cell) — order-independent and collision-distinct across inputs.
+#[test]
+fn test_child_subseed_deterministic_and_input_sensitive() {
+    let a = CellKey::Square { x: 3, y: 4, z: 0 };
+    let b = CellKey::Square { x: 4, y: 3, z: 0 };
+
+    assert_eq!(child_subseed(42, 1, &a), child_subseed(42, 1, &a));
+    assert_ne!(child_subseed(42, 1, &a), child_subseed(42, 1, &b));
+    assert_ne!(child_subseed(42, 1, &a), child_subseed(42, 2, &a));
+    assert_ne!(child_subseed(42, 1, &a), child_subseed(43, 1, &a));
+    assert_ne!(
+        child_subseed(42, 1, &CellKey::Hex { q: 3, r: 4, z: 0 }),
+        child_subseed(42, 1, &a)
+    );
+}
