@@ -1,0 +1,15 @@
+[package]
+name = "planet_biomes_native_plugin"
+version = "0.1.0"
+edition = "2024"
+description = "Native planet-biome worldgen plugin for the Modular Game Engine"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+engine_core = { path = "../../engine/core" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0.140"
+libc = "0.2"
+ctor = "0.4"

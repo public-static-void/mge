@@ -90,6 +90,18 @@ The registry path — `list_worldgen_plugins`, `invoke_worldgen_plugin`, `regist
 
 ---
 
+## Native planet-gen plugin (`planet_biomes_native`)
+
+Planet generation also ships as a **native Rust cdylib plugin** at `plugins/planet_biomes_native_plugin/`. It delegates to the in-core generator (the `planet_biomes` algorithm above), so for the same parameters its output is byte-identical to the builtin — it exists to prove the worldgen hook carries a native, non-builtin planet emitter.
+
+- **Registry name**: `planet_biomes_native`, deliberately distinct from the builtin `planet_biomes`. The loader registers with duplicate rejection, so a shared name would fail on any builtin-populated registry.
+- **Build**: `make build-plugins` builds the crate and deploys `plugins/planet_biomes_native_plugin/libplanet_biomes_native_plugin.so` (a gitignored build output). `make test-rust` depends on that target, so the library is present on a fresh clone.
+- **Registration path**: loaded by path through the worldgen loader — `load_plugin_and_register_worldgen` for a local registry, `load_plugin_and_register_worldgen_threadsafe` for the global one. The plugin is not listed in `game.toml [plugins] native`, so it is reachable through the loader/core path (and its own integration test), not yet through the scripting bridges — planet-gen output on Lua/Python/WASM is a separate roadmap item.
+- **Parameters**: identical to `planet_biomes` — `width`, `height`, `seed` with 32x32 defaults; a missing/null `seed` falls back to `time_seed()` and an explicit seed always wins; `width * height` over the 1M-cell cap (`MAX_CELLS = 1_000_000`) fails fast; unknown keys are ignored.
+- **Output shape**: identical to `planet_biomes` — `square` topology; per-cell `x`/`y`/`z = 0`, a `biome` label from the 11-label taxonomy, and the full 4-neighbourhood. Mountain cells carry a mountain-only `terrain` slot mirrored into `metadata.terrain`; non-mountain cells omit `terrain`.
+
+---
+
 ## Data Interchange
 
 - Parameters and results are passed as JSON-like structures (`serde_json::Value` in Rust, tables in Lua, dicts in Python).

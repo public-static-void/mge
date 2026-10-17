@@ -108,7 +108,9 @@ build-all:
 # logged build-c-plugins-if-needed target below (explicit reuse/rebuild line
 # in the consumer log). Fresh-clone local runs (artifacts absent or stale)
 # rebuild C plugins from source via the same target.
-test-rust: build-c-plugins-if-needed
+# build-plugins is also a prerequisite: core tests load Rust plugin .so files
+# (abi_version.rs, test_planet_biomes_native_plugin.rs) that a fresh clone lacks.
+test-rust: build-c-plugins-if-needed build-plugins
 	cargo test -p engine_core
 	cargo test -p engine_macros
 	cargo test -p engine_py
