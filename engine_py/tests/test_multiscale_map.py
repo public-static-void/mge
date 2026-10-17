@@ -225,3 +225,46 @@ def test_register_duplicate_name_errors(make_world):
 
     with pytest.raises(ValueError, match="already registered"):
         world.register_map("field", square_map_json())
+
+
+# AC002 (R001/R009): fan-out — two source cells on one parent map link to two
+# distinct child maps, and both resolve independently on the Python bridge.
+def test_link_maps_fans_out_two_cells_to_two_children(make_world):
+    world = make_world()
+    world.register_map("planet", square_map_json())
+    world.register_map("region_a", square_map_json())
+    world.register_map("region_b", square_map_json())
+
+    cell_a = {"Square": {"x": 0, "y": 0, "z": 0}}
+    cell_b = {"Square": {"x": 1, "y": 0, "z": 0}}
+    target_a = {"Square": {"x": 5, "y": 5, "z": 0}}
+    target_b = {"Square": {"x": 7, "y": 7, "z": 0}}
+
+    world.link_maps("planet", cell_a, "region_a", target_a)
+    world.link_maps("planet", cell_b, "region_b", target_b)
+
+    assert world.map_cell("planet", cell_a) == target_a, "First cell resolves to its child"
+    assert world.map_cell("planet", cell_b) == target_b, "Second cell resolves to its child"
+    assert world.unmap_cell("region_a", target_a) == cell_a, "First child reverse-resolves"
+    assert world.unmap_cell("region_b", target_b) == cell_b, "Second child reverse-resolves"
+
+
+# AC002 (R002/R009): a conflicting link from an already-linked source cell raises
+# and leaves the original link unchanged.
+def test_link_maps_conflicting_target_errors_and_retains_original(make_world):
+    world = make_world()
+    world.register_map("planet", square_map_json())
+    world.register_map("region_a", square_map_json())
+    world.register_map("region_b", square_map_json())
+
+    source = {"Square": {"x": 0, "y": 0, "z": 0}}
+    original_target = {"Square": {"x": 1, "y": 1, "z": 0}}
+    other_target = {"Square": {"x": 2, "y": 2, "z": 0}}
+
+    world.link_maps("planet", source, "region_a", original_target)
+
+    with pytest.raises(ValueError, match="already linked"):
+        world.link_maps("planet", source, "region_b", other_target)
+
+    assert world.map_cell("planet", source) == original_target, "Original link retained"
+    assert world.unmap_cell("region_b", other_target) is None, "Conflicting link not inserted"

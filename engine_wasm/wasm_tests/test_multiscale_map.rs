@@ -293,6 +293,95 @@ pub extern "C" fn test_multiscale_map() -> i32 {
             return 0;
         }
 
+        // AC002 (R001/R009): fan-out — two source cells on one parent map link to
+        // two distinct child maps, and both resolve independently through the
+        // WASM mirror. Fails on the pre-fix single-link mirror, where the second
+        // link overwrites the first.
+        let planet = "{\"topology\":\"square\",\"cells\":[{\"x\":0,\"y\":0,\"z\":0},{\"x\":1,\"y\":0,\"z\":0}]}";
+        if register_map(b"planet".as_ptr(), 6, planet.as_ptr(), planet.len() as i32) != 0 {
+            return 0;
+        }
+        let region_a = "{\"topology\":\"square\",\"cells\":[{\"x\":5,\"y\":5,\"z\":0}]}";
+        if register_map(b"region_a".as_ptr(), 8, region_a.as_ptr(), region_a.len() as i32) != 0 {
+            return 0;
+        }
+        let region_b = "{\"topology\":\"square\",\"cells\":[{\"x\":7,\"y\":7,\"z\":0}]}";
+        if register_map(b"region_b".as_ptr(), 8, region_b.as_ptr(), region_b.len() as i32) != 0 {
+            return 0;
+        }
+        let planet_000 = "{\"Square\":{\"x\":0,\"y\":0,\"z\":0}}";
+        let planet_100 = "{\"Square\":{\"x\":1,\"y\":0,\"z\":0}}";
+        let region_a_550 = "{\"Square\":{\"x\":5,\"y\":5,\"z\":0}}";
+        let region_b_770 = "{\"Square\":{\"x\":7,\"y\":7,\"z\":0}}";
+        if link_maps(
+            b"planet".as_ptr(), 6,
+            planet_000.as_ptr(), planet_000.len() as i32,
+            b"region_a".as_ptr(), 8,
+            region_a_550.as_ptr(), region_a_550.len() as i32,
+        ) != 0 {
+            return 0;
+        }
+        if link_maps(
+            b"planet".as_ptr(), 6,
+            planet_100.as_ptr(), planet_100.len() as i32,
+            b"region_b".as_ptr(), 8,
+            region_b_770.as_ptr(), region_b_770.len() as i32,
+        ) != 0 {
+            return 0;
+        }
+        let wc = map_cell(
+            b"planet".as_ptr(), 6,
+            planet_000.as_ptr(), planet_000.len() as i32,
+            cell_buf.as_mut_ptr(), cell_buf.len() as i32,
+        );
+        if wc <= 0 || !eq(&cell_buf[..wc as usize], region_a_550) {
+            return 0;
+        }
+        let wc = map_cell(
+            b"planet".as_ptr(), 6,
+            planet_100.as_ptr(), planet_100.len() as i32,
+            cell_buf.as_mut_ptr(), cell_buf.len() as i32,
+        );
+        if wc <= 0 || !eq(&cell_buf[..wc as usize], region_b_770) {
+            return 0;
+        }
+        let wc = unmap_cell(
+            b"region_a".as_ptr(), 8,
+            region_a_550.as_ptr(), region_a_550.len() as i32,
+            cell_buf.as_mut_ptr(), cell_buf.len() as i32,
+        );
+        if wc <= 0 || !eq(&cell_buf[..wc as usize], planet_000) {
+            return 0;
+        }
+        let wc = unmap_cell(
+            b"region_b".as_ptr(), 8,
+            region_b_770.as_ptr(), region_b_770.len() as i32,
+            cell_buf.as_mut_ptr(), cell_buf.len() as i32,
+        );
+        if wc <= 0 || !eq(&cell_buf[..wc as usize], planet_100) {
+            return 0;
+        }
+
+        // AC002 (R002/R009): a conflicting link from an already-linked source cell
+        // returns -1 and leaves the original link unchanged.
+        let region_b_990 = "{\"Square\":{\"x\":9,\"y\":9,\"z\":0}}";
+        if link_maps(
+            b"planet".as_ptr(), 6,
+            planet_000.as_ptr(), planet_000.len() as i32,
+            b"region_b".as_ptr(), 8,
+            region_b_990.as_ptr(), region_b_990.len() as i32,
+        ) != -1 {
+            return 0;
+        }
+        let wc = map_cell(
+            b"planet".as_ptr(), 6,
+            planet_000.as_ptr(), planet_000.len() as i32,
+            cell_buf.as_mut_ptr(), cell_buf.len() as i32,
+        );
+        if wc <= 0 || !eq(&cell_buf[..wc as usize], region_a_550) {
+            return 0;
+        }
+
         1
     }
 }
