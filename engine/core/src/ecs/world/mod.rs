@@ -216,12 +216,6 @@ pub struct World {
     /// Name of the map currently held in `World.map`.
     #[serde(skip)]
     pub active_map: String,
-    /// Region id -> local map name (transition anchor, runtime-only).
-    #[serde(skip)]
-    pub region_map_links: HashMap<String, String>,
-    /// Region id -> entry cell on the linked local map (runtime-only).
-    #[serde(skip)]
-    pub region_entry_cells: HashMap<String, CellKey>,
     /// Source map name -> (source cell -> link to target map). Keying per source
     /// cell lets a parent map fan out many outbound links, one per cell at every
     /// hierarchy level (runtime-only).
@@ -379,8 +373,6 @@ impl World {
             map: None,
             maps: HashMap::new(),
             active_map: String::new(),
-            region_map_links: HashMap::new(),
-            region_entry_cells: HashMap::new(),
             map_links: HashMap::new(),
             map_stack: Vec::new(),
             visible_cells: HashMap::new(),
