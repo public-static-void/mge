@@ -410,8 +410,9 @@ impl World {
 ///
 /// Used as the deterministic ordering key for link enumeration and reverse
 /// lookup: `serde_json`'s encoding is byte-stable across runs, unlike `HashMap`
-/// iteration order.
-fn canonical_cell_key(cell: &CellKey) -> String {
+/// iteration order. Shared with the `WasmWorld` mirror so its reverse lookup
+/// orders identically.
+pub(super) fn canonical_cell_key(cell: &CellKey) -> String {
     serde_json::to_string(cell).unwrap_or_default()
 }
 

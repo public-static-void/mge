@@ -1,3 +1,4 @@
+use super::map::canonical_cell_key;
 use crate::diplomacy::DiplomacyState;
 use crate::ecs::equipment_set::{EquipmentSet, EquipmentSetRegistry};
 use crate::ecs::item::ItemRegistry;
@@ -164,9 +165,11 @@ pub struct WasmWorld {
     /// Name of the map currently held in `WasmWorld.map`.
     #[serde(skip)]
     pub active_map: String,
-    /// Source map name -> link to target map (scale-generic transitions, runtime-only).
+    /// Source map name -> (source cell -> link to target map). Keying per source
+    /// cell lets a parent map fan out many outbound links, one per cell at every
+    /// hierarchy level (runtime-only).
     #[serde(skip)]
-    pub map_links: HashMap<String, WasmMapLink>,
+    pub map_links: HashMap<String, HashMap<CellKey, WasmMapLink>>,
     /// Active-map history for `exit_map()` (runtime-only).
     #[serde(skip)]
     pub map_stack: Vec<String>,
@@ -4478,8 +4481,15 @@ impl WasmWorld {
 
     /// Link a source map cell to a target map cell. Errors on unknown map name.
     ///
-    /// The link is stored per source map (a map's exit target). Both cells are
-    /// topology-generic [`CellKey`]s, so any two topologies may be linked.
+    /// Links are keyed per `(source_map, source_cell)`, so a parent map
+    /// accumulates many outbound links, one per distinct source cell, at every
+    /// hierarchy level. Both cells are topology-generic [`CellKey`]s, so any two
+    /// topologies may be linked.
+    ///
+    /// Re-linking an already-linked source cell with the **identical** target is
+    /// an idempotent `Ok`. Linking it to any **different** target returns `Err`
+    /// and leaves the prior link unchanged (no silent overwrite). Mirrors the
+    /// core `World::link_maps` semantics exactly.
     pub fn link_maps(
         &mut self,
         source_map: &str,
@@ -4493,15 +4503,23 @@ impl WasmWorld {
         if !self.maps.contains_key(target_map) {
             return Err(format!("Map '{target_map}' is not registered"));
         }
-        self.map_links.insert(
-            source_map.to_string(),
-            WasmMapLink {
-                target_map: target_map.to_string(),
-                source_cell,
-                target_cell,
-            },
-        );
-        Ok(())
+        let candidate = WasmMapLink {
+            target_map: target_map.to_string(),
+            source_cell: source_cell.clone(),
+            target_cell,
+        };
+        let source_links = self.map_links.entry(source_map.to_string()).or_default();
+        match source_links.get(&source_cell) {
+            Some(existing) if existing == &candidate => Ok(()),
+            Some(existing) => Err(format!(
+                "Map '{source_map}' cell {source_cell:?} is already linked to map '{}' cell {:?}",
+                existing.target_map, existing.target_cell
+            )),
+            None => {
+                source_links.insert(source_cell, candidate);
+                Ok(())
+            }
+        }
     }
 
     /// Transition: set the active map to `name` and position the camera at `entry_cell`.
@@ -4548,24 +4566,34 @@ impl WasmWorld {
 
     /// Map a cell on `source_map` to the linked cell on the target map.
     ///
-    /// Returns `None` if no link exists from that source cell.
+    /// Returns `None` if no link exists from exactly that `(source_map, source_cell)`.
     pub fn map_cell(&self, source_map: &str, source_cell: &CellKey) -> Option<CellKey> {
-        let link = self.map_links.get(source_map)?;
-        if &link.source_cell == source_cell {
-            Some(link.target_cell.clone())
-        } else {
-            None
-        }
+        self.map_links
+            .get(source_map)?
+            .get(source_cell)
+            .map(|link| link.target_cell.clone())
     }
 
-    /// Reverse mapping: map a cell on `target_map` back to the linked source cell.
+    /// Reverse mapping: map a cell on `target_map` back to a linked source cell.
+    ///
+    /// When several links share the same `(target_map, target_cell)` anchor, the
+    /// result is the link whose `(source_map, source_cell)` is minimum under the
+    /// documented total order (source_map in UTF-8 byte order, then canonical
+    /// source-cell-key byte order). The result is stable across repeated calls
+    /// and `HashMap` iteration order never affects it, mirroring the core
+    /// `World::unmap_cell` result exactly.
     ///
     /// Returns `None` if no link exists to that target cell.
     pub fn unmap_cell(&self, target_map: &str, target_cell: &CellKey) -> Option<CellKey> {
         self.map_links
-            .values()
-            .find(|link| link.target_map == target_map && &link.target_cell == target_cell)
-            .map(|link| link.source_cell.clone())
+            .iter()
+            .flat_map(|(source_map, links)| links.values().map(move |link| (source_map, link)))
+            .filter(|(_, link)| link.target_map == target_map && &link.target_cell == target_cell)
+            .min_by(|(map_a, link_a), (map_b, link_b)| {
+                (map_a.as_str(), canonical_cell_key(&link_a.source_cell))
+                    .cmp(&(map_b.as_str(), canonical_cell_key(&link_b.source_cell)))
+            })
+            .map(|(_, link)| link.source_cell.clone())
     }
 
     // ---- FOV API ----
