@@ -409,6 +409,151 @@ fn test_link_maps_identical_relink_is_idempotent_ok() {
     assert_eq!(world.unmap_cell("region_a", &target), Some(source));
 }
 
+// --- M2: deterministic links_from enumeration and unmap_cell reverse lookup ---
+
+use engine_core::ecs::world::MapLink;
+
+// AC005 (R004): when several links share the same (target_map, target_cell),
+// unmap_cell returns the link whose (source_map, source_cell) is minimum under
+// the documented total order (source_map UTF-8 byte order, then canonical
+// cell-key string byte order), and repeated calls stay stable regardless of
+// HashMap iteration order.
+#[test]
+fn test_unmap_cell_tie_break_returns_documented_minimum() {
+    let mut world = make_test_world();
+    world.register_map("planet", square_map()).unwrap();
+    world.register_map("region", square_map()).unwrap();
+
+    let cell_min = CellKey::Square { x: 0, y: 0, z: 0 };
+    let cell_other = CellKey::Square { x: 5, y: 5, z: 0 };
+    let shared_target = CellKey::Square { x: 2, y: 2, z: 0 };
+
+    // Insert the larger key first so a truncating scan cannot rely on insertion
+    // order for the documented minimum.
+    world
+        .link_maps(
+            "planet",
+            cell_other.clone(),
+            "region",
+            shared_target.clone(),
+        )
+        .unwrap();
+    world
+        .link_maps("planet", cell_min.clone(), "region", shared_target.clone())
+        .unwrap();
+
+    // Canonical key strings: {"Square":{"x":0,...}} < {"Square":{"x":5,...}}.
+    assert_eq!(
+        world.unmap_cell("region", &shared_target),
+        Some(cell_min.clone())
+    );
+    for _ in 0..32 {
+        assert_eq!(
+            world.unmap_cell("region", &shared_target),
+            Some(cell_min.clone())
+        );
+    }
+}
+
+// AC005 (R004): source_map is the primary key of the documented total order
+// (UTF-8 byte order), so a link from the lexicographically smaller source map
+// wins the tie-break regardless of insertion order.
+#[test]
+fn test_unmap_cell_tie_break_orders_by_source_map_first() {
+    let mut world = make_test_world();
+    world.register_map("alpha", square_map()).unwrap();
+    world.register_map("beta", square_map()).unwrap();
+    world.register_map("region", square_map()).unwrap();
+
+    let shared_target = CellKey::Square { x: 3, y: 3, z: 0 };
+    let cell_beta = CellKey::Square { x: 9, y: 9, z: 0 };
+    let cell_alpha = CellKey::Square { x: 9, y: 9, z: 0 };
+
+    // "beta" inserted first; "alpha" must still win because "alpha" < "beta".
+    world
+        .link_maps("beta", cell_beta, "region", shared_target.clone())
+        .unwrap();
+    world
+        .link_maps("alpha", cell_alpha.clone(), "region", shared_target.clone())
+        .unwrap();
+
+    assert_eq!(world.unmap_cell("region", &shared_target), Some(cell_alpha));
+    for _ in 0..32 {
+        assert_eq!(
+            world.unmap_cell("region", &shared_target),
+            Some(CellKey::Square { x: 9, y: 9, z: 0 })
+        );
+    }
+}
+
+// AC006 (R005): links_from returns every outbound link of a source map in
+// deterministic canonical source-cell-key byte order; unknown and link-less
+// source maps return an empty Vec.
+#[test]
+fn test_links_from_canonical_order_and_empty_for_unknown() {
+    let mut world = make_test_world();
+    world.register_map("planet", square_map()).unwrap();
+    world.register_map("region_1", square_map()).unwrap();
+    world.register_map("region_2", square_map()).unwrap();
+    world.register_map("region_3", square_map()).unwrap();
+
+    let cell_x1 = CellKey::Square { x: 1, y: 0, z: 0 };
+    let cell_x0y0 = CellKey::Square { x: 0, y: 0, z: 0 };
+    let cell_x0y1 = CellKey::Square { x: 0, y: 1, z: 0 };
+
+    // Insert in scrambled order: canonical order is by serialized key bytes,
+    // not insertion order.
+    world
+        .link_maps(
+            "planet",
+            cell_x1.clone(),
+            "region_1",
+            CellKey::Square { x: 1, y: 1, z: 0 },
+        )
+        .unwrap();
+    world
+        .link_maps(
+            "planet",
+            cell_x0y0.clone(),
+            "region_2",
+            CellKey::Square { x: 0, y: 0, z: 0 },
+        )
+        .unwrap();
+    world
+        .link_maps(
+            "planet",
+            cell_x0y1.clone(),
+            "region_3",
+            CellKey::Square { x: 0, y: 3, z: 0 },
+        )
+        .unwrap();
+
+    // Canonical strings: {"Square":{"x":0,"y":0,..}} < {"Square":{"x":0,"y":1,..}}
+    // < {"Square":{"x":1,"y":0,..}}.
+    let expected = vec![
+        MapLink {
+            target_map: "region_2".to_string(),
+            source_cell: cell_x0y0.clone(),
+            target_cell: CellKey::Square { x: 0, y: 0, z: 0 },
+        },
+        MapLink {
+            target_map: "region_3".to_string(),
+            source_cell: cell_x0y1.clone(),
+            target_cell: CellKey::Square { x: 0, y: 3, z: 0 },
+        },
+        MapLink {
+            target_map: "region_1".to_string(),
+            source_cell: cell_x1.clone(),
+            target_cell: CellKey::Square { x: 1, y: 1, z: 0 },
+        },
+    ];
+    assert_eq!(world.links_from("planet"), expected);
+
+    // Unknown source map and a registered-but-link-less map both yield empty.
+    assert!(world.links_from("unknown").is_empty());
+    assert!(world.links_from("region_1").is_empty());
+}
+
 // --- M1: R008 runtime-only hierarchy (no save/load persistence) ---
 
 #[path = "helpers/world_io.rs"]

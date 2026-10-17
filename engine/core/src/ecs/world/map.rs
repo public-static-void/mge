@@ -220,15 +220,40 @@ impl World {
             .map(|link| link.target_cell.clone())
     }
 
-    /// Reverse mapping: map a cell on `target_map` back to the linked source cell.
+    /// Reverse mapping: map a target cell back to a source cell, deterministically.
+    ///
+    /// When several links share the same `(target_map, target_cell)` anchor, the
+    /// result is the link whose `(source_map, source_cell)` is minimum under the
+    /// documented total order: `source_map` in UTF-8 byte order, then the
+    /// canonical source-cell-key string (`serde_json::to_string(&CellKey)`) in
+    /// byte order. The result is stable across repeated calls and process runs —
+    /// `HashMap` iteration order never affects it.
     ///
     /// Returns `None` if no link exists to that target cell.
     pub fn unmap_cell(&self, target_map: &str, target_cell: &CellKey) -> Option<CellKey> {
         self.map_links
-            .values()
-            .flat_map(|links| links.values())
-            .find(|link| link.target_map == target_map && &link.target_cell == target_cell)
-            .map(|link| link.source_cell.clone())
+            .iter()
+            .flat_map(|(source_map, links)| links.values().map(move |link| (source_map, link)))
+            .filter(|(_, link)| link.target_map == target_map && &link.target_cell == target_cell)
+            .min_by(|(map_a, link_a), (map_b, link_b)| {
+                (map_a.as_str(), canonical_cell_key(&link_a.source_cell))
+                    .cmp(&(map_b.as_str(), canonical_cell_key(&link_b.source_cell)))
+            })
+            .map(|(_, link)| link.source_cell.clone())
+    }
+
+    /// Enumerate every outbound link from `source_map`.
+    ///
+    /// Links are returned in deterministic canonical source-cell-key byte order
+    /// (the serialized `CellKey` shape), independent of `HashMap` iteration order.
+    /// Returns an empty `Vec` for an unknown or link-less source map.
+    pub fn links_from(&self, source_map: &str) -> Vec<MapLink> {
+        let Some(links) = self.map_links.get(source_map) else {
+            return Vec::new();
+        };
+        let mut out: Vec<MapLink> = links.values().cloned().collect();
+        out.sort_by_cached_key(|link| canonical_cell_key(&link.source_cell));
+        out
     }
 
     /// Position the camera entity at the given cell (find or create the camera entity).
@@ -266,4 +291,14 @@ impl World {
         );
         let _ = self.set_component(camera_id, "Position", pos_json);
     }
+}
+
+/// Canonical, order-stable string form of a cell key — the serialized enum shape
+/// (`{"Square":{"x":..,"y":..,"z":..}}`, `{"Hex":..}`, `{"Province":..}`).
+///
+/// Used as the deterministic ordering key for link enumeration and reverse
+/// lookup: `serde_json`'s encoding is byte-stable across runs, unlike `HashMap`
+/// iteration order.
+fn canonical_cell_key(cell: &CellKey) -> String {
+    serde_json::to_string(cell).unwrap_or_default()
 }
