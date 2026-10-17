@@ -215,6 +215,51 @@ local function test_register_duplicate_name_errors()
 	)
 end
 
+-- AC002 (R001/R009): fan-out — two source cells on one parent map link to two
+-- distinct child maps, and both resolve independently.
+local function test_link_maps_fans_out_two_cells_to_two_children()
+	register_map("planet", square_map_json())
+	register_map("region_a", square_map_json())
+	register_map("region_b", square_map_json())
+
+	local cell_a = { Square = { x = 0, y = 0, z = 0 } }
+	local cell_b = { Square = { x = 1, y = 0, z = 0 } }
+	local target_a = { Square = { x = 5, y = 5, z = 0 } }
+	local target_b = { Square = { x = 7, y = 7, z = 0 } }
+
+	link_maps("planet", cell_a, "region_a", target_a)
+	link_maps("planet", cell_b, "region_b", target_b)
+
+	assert.table_equals(map_cell("planet", cell_a), target_a, "First cell resolves to its child")
+	assert.table_equals(map_cell("planet", cell_b), target_b, "Second cell resolves to its child")
+	assert.table_equals(unmap_cell("region_a", target_a), cell_a, "First child reverse-resolves")
+	assert.table_equals(unmap_cell("region_b", target_b), cell_b, "Second child reverse-resolves")
+end
+
+-- AC002 (R002/R009): a conflicting link from an already-linked source cell errors
+-- and leaves the original link unchanged.
+local function test_link_maps_conflicting_target_errors_and_retains_original()
+	register_map("planet", square_map_json())
+	register_map("region_a", square_map_json())
+	register_map("region_b", square_map_json())
+
+	local source = { Square = { x = 0, y = 0, z = 0 } }
+	local original_target = { Square = { x = 1, y = 1, z = 0 } }
+	local other_target = { Square = { x = 2, y = 2, z = 0 } }
+
+	link_maps("planet", source, "region_a", original_target)
+
+	local ok, err = pcall(link_maps, "planet", source, "region_b", other_target)
+	assert.is_false(ok, "A conflicting target for the same source cell must error")
+	assert.is_true(
+		string.find(tostring(err) or "", "already linked") ~= nil,
+		"Error should mention already linked"
+	)
+
+	assert.table_equals(map_cell("planet", source), original_target, "Original link retained")
+	assert.is_nil(unmap_cell("region_b", other_target), "Conflicting link not inserted")
+end
+
 return {
 	test_register_two_maps_appear_in_registry = test_register_two_maps_appear_in_registry,
 	test_set_active_map_reflects_topology = test_set_active_map_reflects_topology,
@@ -229,4 +274,6 @@ return {
 	test_map_cell_unmap_cell_unlinked_returns_nil = test_map_cell_unmap_cell_unlinked_returns_nil,
 	test_cross_topology_round_trip_province_to_square = test_cross_topology_round_trip_province_to_square,
 	test_register_duplicate_name_errors = test_register_duplicate_name_errors,
+	test_link_maps_fans_out_two_cells_to_two_children = test_link_maps_fans_out_two_cells_to_two_children,
+	test_link_maps_conflicting_target_errors_and_retains_original = test_link_maps_conflicting_target_errors_and_retains_original,
 }

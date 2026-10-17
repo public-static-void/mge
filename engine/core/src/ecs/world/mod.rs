@@ -216,15 +216,11 @@ pub struct World {
     /// Name of the map currently held in `World.map`.
     #[serde(skip)]
     pub active_map: String,
-    /// Region id -> local map name (transition anchor, runtime-only).
+    /// Source map name -> (source cell -> link to target map). Keying per source
+    /// cell lets a parent map fan out many outbound links, one per cell at every
+    /// hierarchy level (runtime-only).
     #[serde(skip)]
-    pub region_map_links: HashMap<String, String>,
-    /// Region id -> entry cell on the linked local map (runtime-only).
-    #[serde(skip)]
-    pub region_entry_cells: HashMap<String, CellKey>,
-    /// Source map name -> link to target map (scale-generic transitions, runtime-only).
-    #[serde(skip)]
-    pub map_links: HashMap<String, MapLink>,
+    pub map_links: HashMap<String, HashMap<CellKey, MapLink>>,
     /// Active-map history for `exit_map()` (runtime-only).
     #[serde(skip)]
     pub map_stack: Vec<String>,
@@ -332,6 +328,85 @@ pub struct MapLink {
     pub target_cell: CellKey,
 }
 
+/// One fan-out level of a [`World::generate_hierarchy`] run.
+///
+/// Each level generates one child map per cell of the current frontier using the
+/// registered [`crate::worldgen::MapgenAlgorithm`] named by `algorithm`, emitting
+/// a uniform grid of `width` x `height` cells. Both dimensions must be positive.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HierarchyLevel {
+    /// Registered map-generation algorithm name.
+    pub algorithm: String,
+    /// Child grid width in cells (`> 0`).
+    pub width: i32,
+    /// Child grid height in cells (`> 0`).
+    pub height: i32,
+}
+
+/// Outcome of a [`World::generate_hierarchy`] run.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HierarchyReport {
+    /// Generated child map names in deterministic generation order.
+    pub generated_maps: Vec<String>,
+    /// Total cells across all generated child maps.
+    pub total_cells: usize,
+}
+
+/// Upper bound on the projected hierarchy cell budget; a request whose
+/// `root_cell_count * Π(width_i * height_i)` exceeds this fails before any map is
+/// registered or linked. Mirrors [`crate::systems::planet_biomes::MAX_CELLS`].
+pub const MAX_HIERARCHY_CELLS: usize = 1_000_000;
+
+/// Deterministic per-cell child seed derived from `(seed, level, cell)`.
+///
+/// Uses the splitmix64 finalizer precedent
+/// ([`crate::systems::planet_biomes`] `cell_subseed`): fixed integer arithmetic
+/// keeps the mapping stable across processes and toolchains, and the result
+/// depends only on the inputs — never on grid iteration order.
+///
+/// Province cells have no generation scope (see [`World::generate_hierarchy`]),
+/// but the fold stays defined for them via a byte hash of the province id.
+pub fn child_subseed(seed: u64, level: u32, cell: &CellKey) -> u64 {
+    const GOLDEN: u64 = 0x9E37_79B9_7F4A_7C15;
+    const TAG_MUL: u64 = 0xA24B_AED4_963E_E407;
+    // A per-variant tag keeps same-coordinate cells of different topologies
+    // distinct (the splitmix64 finalizer is a bijection, so distinct folds stay
+    // distinct).
+    let tag: u64 = match cell {
+        CellKey::Square { .. } => 0x01,
+        CellKey::Hex { .. } => 0x02,
+        CellKey::Province { .. } => 0x03,
+    };
+    let mut z = seed
+        .wrapping_add((level as u64).wrapping_mul(GOLDEN))
+        .wrapping_add(tag.wrapping_mul(TAG_MUL));
+    match cell {
+        CellKey::Square { x, y, z: zz } => {
+            z = z
+                .wrapping_add((*x as u64).wrapping_mul(0xBF58_476D_1CE4_E5B9))
+                .wrapping_add((*y as u64).wrapping_mul(0x94D0_49BB_1331_11EB))
+                .wrapping_add((*zz as u64).wrapping_mul(0x2545_F491_4F6C_DD1D));
+        }
+        CellKey::Hex { q, r, z: zz } => {
+            z = z
+                .wrapping_add((*q as u64).wrapping_mul(0xBF58_476D_1CE4_E5B9))
+                .wrapping_add((*r as u64).wrapping_mul(0x94D0_49BB_1331_11EB))
+                .wrapping_add((*zz as u64).wrapping_mul(0x2545_F491_4F6C_DD1D));
+        }
+        CellKey::Province { id } => {
+            let mut hash = 0xcbf2_9ce4_8422_2325u64;
+            for b in id.as_bytes() {
+                hash = (hash ^ u64::from(*b)).wrapping_mul(0x0000_0100_0000_01B3);
+            }
+            z = z.wrapping_add(hash);
+        }
+    }
+    z = z.wrapping_add(GOLDEN);
+    z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+    z ^ (z >> 31)
+}
+
 /// Default FOV algorithm factory (used by serde `#[serde(skip, default)]`).
 fn default_fov_algorithm() -> Box<dyn FovAlgorithm> {
     Box::new(RecursiveShadowcasting)
@@ -377,8 +452,6 @@ impl World {
             map: None,
             maps: HashMap::new(),
             active_map: String::new(),
-            region_map_links: HashMap::new(),
-            region_entry_cells: HashMap::new(),
             map_links: HashMap::new(),
             map_stack: Vec::new(),
             visible_cells: HashMap::new(),
