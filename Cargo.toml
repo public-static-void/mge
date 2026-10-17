@@ -7,6 +7,7 @@ members = [
   "engine_wasm",
   "engine/tools/schema_validator",
   "plugins/rust_test_plugin",
+  "plugins/planet_biomes_native_plugin",
   "xtask",
 ]
 resolver = "3"

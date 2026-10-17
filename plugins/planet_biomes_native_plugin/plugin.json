@@ -1,0 +1,8 @@
+{
+  "name": "Planet Biomes Native Plugin",
+  "version": "0.1.0",
+  "description": "Native planet-biome worldgen plugin emitting planet maps through the worldgen hook.",
+  "authors": ["MGE"],
+  "dependencies": [],
+  "dynamic_library": "libplanet_biomes_native_plugin.so"
+}
