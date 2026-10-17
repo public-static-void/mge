@@ -222,9 +222,11 @@ pub struct World {
     /// Region id -> entry cell on the linked local map (runtime-only).
     #[serde(skip)]
     pub region_entry_cells: HashMap<String, CellKey>,
-    /// Source map name -> link to target map (scale-generic transitions, runtime-only).
+    /// Source map name -> (source cell -> link to target map). Keying per source
+    /// cell lets a parent map fan out many outbound links, one per cell at every
+    /// hierarchy level (runtime-only).
     #[serde(skip)]
-    pub map_links: HashMap<String, MapLink>,
+    pub map_links: HashMap<String, HashMap<CellKey, MapLink>>,
     /// Active-map history for `exit_map()` (runtime-only).
     #[serde(skip)]
     pub map_stack: Vec<String>,

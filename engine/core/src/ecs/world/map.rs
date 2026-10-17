@@ -135,8 +135,14 @@ impl World {
 
     /// Link a source map cell to a target map cell. Errors on unknown map name.
     ///
-    /// The link is stored per source map (a map's exit target). Both cells are
-    /// topology-generic [`CellKey`]s, so any two topologies may be linked.
+    /// Links are keyed per `(source_map, source_cell)`, so a parent map
+    /// accumulates many outbound links, one per distinct source cell, at every
+    /// hierarchy level. Both cells are topology-generic [`CellKey`]s, so any two
+    /// topologies may be linked.
+    ///
+    /// Re-linking an already-linked source cell with the **identical** target is
+    /// an idempotent `Ok`. Linking it to any **different** target returns `Err`
+    /// and leaves the prior link unchanged (no silent overwrite).
     pub fn link_maps(
         &mut self,
         source_map: &str,
@@ -150,15 +156,23 @@ impl World {
         if !self.maps.contains_key(target_map) {
             return Err(format!("Map '{target_map}' is not registered"));
         }
-        self.map_links.insert(
-            source_map.to_string(),
-            MapLink {
-                target_map: target_map.to_string(),
-                source_cell,
-                target_cell,
-            },
-        );
-        Ok(())
+        let candidate = MapLink {
+            target_map: target_map.to_string(),
+            source_cell: source_cell.clone(),
+            target_cell,
+        };
+        let source_links = self.map_links.entry(source_map.to_string()).or_default();
+        match source_links.get(&source_cell) {
+            Some(existing) if existing == &candidate => Ok(()),
+            Some(existing) => Err(format!(
+                "Map '{source_map}' cell {source_cell:?} is already linked to map '{}' cell {:?}",
+                existing.target_map, existing.target_cell
+            )),
+            None => {
+                source_links.insert(source_cell, candidate);
+                Ok(())
+            }
+        }
     }
 
     /// Transition: set the active map to `name` and position the camera at `entry_cell`.
@@ -198,14 +212,12 @@ impl World {
 
     /// Map a cell on `source_map` to the linked cell on the target map.
     ///
-    /// Returns `None` if no link exists from that source cell.
+    /// Returns `None` if no link exists from exactly that `(source_map, source_cell)`.
     pub fn map_cell(&self, source_map: &str, source_cell: &CellKey) -> Option<CellKey> {
-        let link = self.map_links.get(source_map)?;
-        if &link.source_cell == source_cell {
-            Some(link.target_cell.clone())
-        } else {
-            None
-        }
+        self.map_links
+            .get(source_map)?
+            .get(source_cell)
+            .map(|link| link.target_cell.clone())
     }
 
     /// Reverse mapping: map a cell on `target_map` back to the linked source cell.
@@ -214,6 +226,7 @@ impl World {
     pub fn unmap_cell(&self, target_map: &str, target_cell: &CellKey) -> Option<CellKey> {
         self.map_links
             .values()
+            .flat_map(|links| links.values())
             .find(|link| link.target_map == target_map && &link.target_cell == target_cell)
             .map(|link| link.source_cell.clone())
     }

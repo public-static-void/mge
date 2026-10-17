@@ -313,3 +313,162 @@ fn test_link_maps_unknown_map_errors() {
     );
     assert!(err.is_err());
 }
+
+// --- M1: per-(source_map, source_cell) link keying, conflict semantics ---
+// AC001 (R001): fan-out — two source cells on one parent map link to two
+// distinct child maps, and both resolve independently. Fails on the pre-fix
+// single-link-per-source-map model, where the second link discards the first.
+#[test]
+fn test_link_maps_fans_out_two_cells_to_two_children() {
+    let mut world = make_test_world();
+    world.register_map("planet", square_map()).unwrap();
+    world.register_map("region_a", square_map()).unwrap();
+    world.register_map("region_b", square_map()).unwrap();
+
+    let cell_a = CellKey::Square { x: 0, y: 0, z: 0 };
+    let cell_b = CellKey::Square { x: 1, y: 0, z: 0 };
+    let target_a = CellKey::Square { x: 5, y: 5, z: 0 };
+    let target_b = CellKey::Square { x: 7, y: 7, z: 0 };
+
+    world
+        .link_maps("planet", cell_a.clone(), "region_a", target_a.clone())
+        .unwrap();
+    world
+        .link_maps("planet", cell_b.clone(), "region_b", target_b.clone())
+        .unwrap();
+
+    // Both links coexist: each source cell resolves to its own target.
+    assert_eq!(world.map_cell("planet", &cell_a), Some(target_a.clone()));
+    assert_eq!(world.map_cell("planet", &cell_b), Some(target_b.clone()));
+
+    // Reverse lookup stays per-target-map too.
+    assert_eq!(world.unmap_cell("region_a", &target_a), Some(cell_a));
+    assert_eq!(world.unmap_cell("region_b", &target_b), Some(cell_b));
+}
+
+// AC003 (R002): a link from an already-linked source cell to a *different*
+// target returns Err, and the original link is retained unchanged.
+#[test]
+fn test_link_maps_conflicting_target_errors_and_retains_original() {
+    let mut world = make_test_world();
+    world.register_map("planet", square_map()).unwrap();
+    world.register_map("region_a", square_map()).unwrap();
+    world.register_map("region_b", square_map()).unwrap();
+
+    let source = CellKey::Square { x: 0, y: 0, z: 0 };
+    let original_target = CellKey::Square { x: 1, y: 1, z: 0 };
+    let other_target = CellKey::Square { x: 2, y: 2, z: 0 };
+
+    world
+        .link_maps(
+            "planet",
+            source.clone(),
+            "region_a",
+            original_target.clone(),
+        )
+        .unwrap();
+
+    let err = world.link_maps("planet", source.clone(), "region_b", other_target.clone());
+    assert!(
+        err.is_err(),
+        "a conflicting target for the same source cell must return Err"
+    );
+
+    // Original link retained; conflicting target was not inserted.
+    assert_eq!(
+        world.map_cell("planet", &source),
+        Some(original_target.clone())
+    );
+    assert_eq!(
+        world.unmap_cell("region_a", &original_target),
+        Some(source.clone())
+    );
+    assert_eq!(world.unmap_cell("region_b", &other_target), None);
+}
+
+// AC004 (R002): re-issuing the *identical* link is an idempotent Ok and leaves
+// the link table unchanged.
+#[test]
+fn test_link_maps_identical_relink_is_idempotent_ok() {
+    let mut world = make_test_world();
+    world.register_map("planet", square_map()).unwrap();
+    world.register_map("region_a", square_map()).unwrap();
+
+    let source = CellKey::Square { x: 0, y: 0, z: 0 };
+    let target = CellKey::Square { x: 1, y: 1, z: 0 };
+
+    world
+        .link_maps("planet", source.clone(), "region_a", target.clone())
+        .unwrap();
+    // Identical re-link: Ok, no change.
+    world
+        .link_maps("planet", source.clone(), "region_a", target.clone())
+        .unwrap();
+
+    assert_eq!(world.map_cell("planet", &source), Some(target.clone()));
+    assert_eq!(world.unmap_cell("region_a", &target), Some(source));
+}
+
+// --- M1: R008 runtime-only hierarchy (no save/load persistence) ---
+
+#[path = "helpers/world_io.rs"]
+mod world_io_helper;
+use world_io_helper::save_and_load_roundtrip;
+
+// AC011 (R008): core `MapLink` has no Serialize/Deserialize derive.
+//
+// Compile-level guard (the `static_assertions::assert_not_impl_any!` technique):
+// a blanket `AmbiguousIfImpl<()>` applies to every type, and a second impl with a
+// distinct marker trait-arg applies only when the bound holds. If `MapLink`
+// implemented `Serialize` or `Deserialize`, two candidate impls would apply and
+// inferring `_` in the probe below would be ambiguous (E0283), failing
+// compilation. It compiles only while MapLink implements neither.
+#[test]
+fn test_map_link_has_no_serde_derives() {
+    use engine_core::ecs::world::MapLink;
+
+    trait AmbiguousIfImpl<A> {
+        fn some_item() {}
+    }
+    impl<T: ?Sized> AmbiguousIfImpl<()> for T {}
+    struct IfSerialize;
+    struct IfDeserialize;
+    impl<T: ?Sized + serde::Serialize> AmbiguousIfImpl<IfSerialize> for T {}
+    impl<T: for<'de> serde::Deserialize<'de>> AmbiguousIfImpl<IfDeserialize> for T {}
+
+    let _ = <MapLink as AmbiguousIfImpl<_>>::some_item;
+}
+
+// AC011 (R008): the multi-map fields stay #[serde(skip)]; a save->load
+// round-trip completes without error and the hierarchy is absent after load.
+#[test]
+fn test_map_hierarchy_is_runtime_only_and_absent_after_load() {
+    let mut world = make_test_world();
+    world.register_map("planet", square_map()).unwrap();
+    world.register_map("region_a", square_map()).unwrap();
+    world.set_active_map("planet").unwrap();
+
+    let source = CellKey::Square { x: 0, y: 0, z: 0 };
+    let target = CellKey::Square { x: 1, y: 1, z: 0 };
+    world
+        .link_maps("planet", source.clone(), "region_a", target.clone())
+        .unwrap();
+
+    // Serialized form carries no hierarchy state.
+    let json = serde_json::to_string(&world).unwrap();
+    assert!(
+        !json.contains("\"map_links\""),
+        "map_links must be #[serde(skip)]"
+    );
+    assert!(!json.contains("\"maps\""), "maps must be #[serde(skip)]");
+
+    // Save -> load completes without error and the hierarchy is gone.
+    let loaded = save_and_load_roundtrip(&world, world.registry.clone());
+    assert!(
+        loaded.get_map_names().is_empty(),
+        "map registry is runtime-only"
+    );
+    assert_eq!(loaded.get_active_map_name(), "");
+    assert!(loaded.map_links.is_empty(), "links are runtime-only");
+    assert_eq!(loaded.map_cell("planet", &source), None);
+}
